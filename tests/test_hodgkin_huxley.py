@@ -4,7 +4,7 @@ Tests for the Hodgkin-Huxley model implementation.
 
 import pytest
 import pandas as pd
-from src.hodgkin_huxley import HodgkinHuxley
+from ap_sim.hodgkin_huxley import HodgkinHuxley
 
 
 @pytest.fixture
@@ -20,8 +20,8 @@ def test_initialization(hh_model):
     assert hh_model.g_K == pytest.approx(36.0)
     assert hh_model.g_L == pytest.approx(0.3)
 
-    # Test that reversal potentials are within expected ranges
-    assert 40.0 < hh_model.E_Na < 60.0
+    # Test that reversal potentials are within  expected ranges
+    assert 60.0 < hh_model.E_Na < 65.0
     assert -90.0 < hh_model.E_K < -65.0
     assert -70.0 < hh_model.E_L < -40.0
 

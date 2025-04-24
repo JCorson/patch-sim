@@ -20,3 +20,9 @@ ignore = []
 
 [project.optional-dependencies]
 dev = ["ruff", "pytest", "mypy"]
+
+[tool.uv.sources]
+ap_sim = {path = "./ap_sim", editable = true}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

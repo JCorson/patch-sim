@@ -5,7 +5,7 @@ The model includes equations for ion channel dynamics and membrane voltage.
 
 import numpy as np
 import pandas as pd
-from nernst_neuron import nernst_potential
+from .nernst_neuron import nernst_potential
 
 
 class HodgkinHuxley:
@@ -20,16 +20,24 @@ class HodgkinHuxley:
         E_Na (float): Sodium reversal potential in mV.
         E_K (float): Potassium reversal potential in mV.
         E_L (float): Leak reversal potential in mV.
+        v_rest (float): Resting potential in mV.
     """
 
-    def __init__(self):
+    def __init__(self, g_na=120.0, g_k=36.0, g_l=0.3, v_rest=-65.0):
         """
-        Initialize the Hodgkin-Huxley model with default parameters.
+        Initialize the Hodgkin-Huxley model with default or user-defined parameters.
+
+        Args:
+            g_na (float): Maximum sodium conductance in mS/cm^2.
+            g_k (float): Maximum potassium conductance in mS/cm^2.
+            g_l (float): Leak conductance in mS/cm^2.
+            v_rest (float): Resting potential in mV.
         """
         self.C_m = 1.0  # Membrane capacitance, in uF/cm^2
-        self.g_Na = 120.0  # Maximum conductances, in mS/cm^2
-        self.g_K = 36.0
-        self.g_L = 0.3
+        self.g_Na = g_na  # Maximum conductances, in mS/cm^2
+        self.g_K = g_k
+        self.g_L = g_l
+        self.v_rest = v_rest  # Resting potential
 
         # Ion concentrations (in mM)
         Na_out = 145.0  # Extracellular sodium
@@ -45,6 +53,19 @@ class HodgkinHuxley:
         self.E_K = nernst_potential(1, T, K_out, K_in)  # Potassium reversal potential
         self.E_L = nernst_potential(-1, T, Cl_out, Cl_in)  # Leak reversal potential
 
+    @staticmethod
+    def safe_exp(x: float) -> float:
+        """
+        Safely compute the exponential to avoid overflow.
+
+        Parameters:
+            x (float): The input value.
+
+        Returns:
+            float: The computed exponential value, capped to prevent overflow.
+        """
+        return np.exp(np.clip(x, -100, 100))
+
     def alpha_n(self, V: float) -> float:
         """
         Calculate the rate constant alpha_n for potassium channel activation.
@@ -55,7 +76,7 @@ class HodgkinHuxley:
         Returns:
             float: The rate constant alpha_n.
         """
-        return 0.01 * (V + 55) / (1 - np.exp(-(V + 55) / 10))
+        return 0.01 * (V + 55) / (1 - self.safe_exp(-(V + 55) / 10))
 
     def beta_n(self, V: float) -> float:
         """
@@ -67,7 +88,7 @@ class HodgkinHuxley:
         Returns:
             float: The rate constant beta_n.
         """
-        return 0.125 * np.exp(-(V + 65) / 80)
+        return 0.125 * self.safe_exp(-(V + 65) / 80)
 
     def alpha_m(self, V: float) -> float:
         """
@@ -79,7 +100,7 @@ class HodgkinHuxley:
         Returns:
             float: The rate constant alpha_m.
         """
-        return 0.1 * (V + 40) / (1 - np.exp(-(V + 40) / 10))
+        return 0.1 * (V + 40) / (1 - self.safe_exp(-(V + 40) / 10))
 
     def beta_m(self, V: float) -> float:
         """
@@ -91,7 +112,7 @@ class HodgkinHuxley:
         Returns:
             float: The rate constant beta_m.
         """
-        return 4.0 * np.exp(-(V + 65) / 18)
+        return 4.0 * self.safe_exp(-(V + 65) / 18)
 
     def alpha_h(self, V: float) -> float:
         """
@@ -103,7 +124,7 @@ class HodgkinHuxley:
         Returns:
             float: The rate constant alpha_h.
         """
-        return 0.07 * np.exp(-(V + 65) / 20)
+        return 0.07 * self.safe_exp(-(V + 65) / 20)
 
     def beta_h(self, V: float) -> float:
         """
@@ -115,7 +136,7 @@ class HodgkinHuxley:
         Returns:
             float: The rate constant beta_h.
         """
-        return 1 / (1 + np.exp(-(V + 35) / 10))
+        return 1 / (1 + self.safe_exp(-(V + 35) / 10))
 
     def compute(
         self, simulation_time: float = 50, time_step: float = 0.01
@@ -139,18 +160,18 @@ class HodgkinHuxley:
         results.index.name = "time"
 
         # Initialize the first row of the DataFrame
-        results.loc[0, "voltage"] = -65.0
-        results.loc[0, "potassium_activation"] = self.alpha_n(-65.0) / (
-            self.alpha_n(-65.0) + self.beta_n(-65.0)
+        results.loc[0, "voltage"] = self.v_rest
+        results.loc[0, "potassium_activation"] = self.alpha_n(self.v_rest) / (
+            self.alpha_n(self.v_rest) + self.beta_n(self.v_rest)
         )
-        results.loc[0, "sodium_activation"] = self.alpha_m(-65.0) / (
-            self.alpha_m(-65.0) + self.beta_m(-65.0)
+        results.loc[0, "sodium_activation"] = self.alpha_m(self.v_rest) / (
+            self.alpha_m(self.v_rest) + self.beta_m(self.v_rest)
         )
-        results.loc[0, "sodium_inactivation"] = self.alpha_h(-65.0) / (
-            self.alpha_h(-65.0) + self.beta_h(-65.0)
+        results.loc[0, "sodium_inactivation"] = self.alpha_h(self.v_rest) / (
+            self.alpha_h(self.v_rest) + self.beta_h(self.v_rest)
         )
 
-        current_external = 10.0  # External current, in uA/cm^2
+        current_external = 20.0  # Increased external current, in uA/cm^2
 
         # Ensure consistent precision for time index calculations
         results.index = results.index.round(10)
@@ -185,10 +206,17 @@ class HodgkinHuxley:
                 - self.beta_h(voltage) * sodium_inactivation
             )
 
+            # Ensure gating variables and voltage remain within physiological bounds
+            voltage = np.clip(voltage, -100, 100)
+            potassium_activation = np.clip(potassium_activation, 0, 1)
+            sodium_activation = np.clip(sodium_activation, 0, 1)
+            sodium_inactivation = np.clip(sodium_inactivation, 0, 1)
+
+            # Update results with bounded values
             results.loc[t, "voltage"] = voltage + dV * time_step
-            results.loc[t, "potassium_activation"] = potassium_activation + dn * time_step
-            results.loc[t, "sodium_activation"] = sodium_activation + dm * time_step
-            results.loc[t, "sodium_inactivation"] = sodium_inactivation + dh * time_step
+            results.loc[t, "potassium_activation"] = np.clip(potassium_activation + dn * time_step, 0, 1)
+            results.loc[t, "sodium_activation"] = np.clip(sodium_activation + dm * time_step, 0, 1)
+            results.loc[t, "sodium_inactivation"] = np.clip(sodium_inactivation + dh * time_step, 0, 1)
 
         return results
 
