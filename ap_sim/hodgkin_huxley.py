@@ -23,20 +23,20 @@ class HodgkinHuxley:
         v_rest (float): Resting potential in mV.
     """
 
-    def __init__(self, g_na=120.0, g_k=36.0, g_l=0.3, v_rest=-65.0):
+    def __init__(self, g_Na=120.0, g_K=36.0, g_L=0.3, v_rest=-65.0):
         """
         Initialize the Hodgkin-Huxley model with default or user-defined parameters.
 
         Args:
-            g_na (float): Maximum sodium conductance in mS/cm^2.
-            g_k (float): Maximum potassium conductance in mS/cm^2.
-            g_l (float): Leak conductance in mS/cm^2.
+            g_Na (float): Maximum sodium conductance in mS/cm^2.
+            g_K (float): Maximum potassium conductance in mS/cm^2.
+            g_L (float): Leak conductance in mS/cm^2.
             v_rest (float): Resting potential in mV.
         """
         self.C_m = 1.0  # Membrane capacitance, in uF/cm^2
-        self.g_Na = g_na  # Maximum conductances, in mS/cm^2
-        self.g_K = g_k
-        self.g_L = g_l
+        self.g_Na = g_Na  # Maximum conductances, in mS/cm^2
+        self.g_K = g_K
+        self.g_L = g_L
         self.v_rest = v_rest  # Resting potential
 
         # Ion concentrations (in mM)
