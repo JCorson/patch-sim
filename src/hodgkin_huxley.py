@@ -40,9 +40,10 @@ class HodgkinHuxley:
         Cl_in = 10.0  # Intracellular chloride
 
         # Calculate reversal potentials using the Nernst equation
-        self.E_Na = nernst_potential(Na_out, Na_in, z=1)  # Sodium reversal potential
-        self.E_K = nernst_potential(K_out, K_in, z=1)  # Potassium reversal potential
-        self.E_L = nernst_potential(Cl_out, Cl_in, z=-1)  # Leak reversal potential
+        T = 310.15  # Temperature in Kelvin (37°C)
+        self.E_Na = nernst_potential(1, T, Na_out, Na_in)  # Sodium reversal potential
+        self.E_K = nernst_potential(1, T, K_out, K_in)  # Potassium reversal potential
+        self.E_L = nernst_potential(-1, T, Cl_out, Cl_in)  # Leak reversal potential
 
     def alpha_n(self, V: float) -> float:
         """
@@ -130,65 +131,85 @@ class HodgkinHuxley:
             pd.DataFrame: DataFrame containing time points and corresponding voltage values,
                          as well as gating variables potassium_activation, sodium_activation, and sodium_inactivation.
         """
-        time = np.arange(0, simulation_time + time_step, time_step)
-        voltage = np.zeros(len(time))
-        potassium_activation = np.zeros(len(time))  # n
-        sodium_activation = np.zeros(len(time))  # m
-        sodium_inactivation = np.zeros(len(time))  # h
+        # Create the DataFrame at the start of the method
+        results = pd.DataFrame(
+            index=np.arange(0, simulation_time + time_step, time_step),
+            columns=["voltage", "potassium_activation", "sodium_activation", "sodium_inactivation"],
+        )
+        results.index.name = "time"
 
-        voltage[0] = -65.0
-        potassium_activation[0] = self.alpha_n(voltage[0]) / (
-            self.alpha_n(voltage[0]) + self.beta_n(voltage[0])
+        # Initialize the first row of the DataFrame
+        results.loc[0, "voltage"] = -65.0
+        results.loc[0, "potassium_activation"] = self.alpha_n(-65.0) / (
+            self.alpha_n(-65.0) + self.beta_n(-65.0)
         )
-        sodium_activation[0] = self.alpha_m(voltage[0]) / (
-            self.alpha_m(voltage[0]) + self.beta_m(voltage[0])
+        results.loc[0, "sodium_activation"] = self.alpha_m(-65.0) / (
+            self.alpha_m(-65.0) + self.beta_m(-65.0)
         )
-        sodium_inactivation[0] = self.alpha_h(voltage[0]) / (
-            self.alpha_h(voltage[0]) + self.beta_h(voltage[0])
+        results.loc[0, "sodium_inactivation"] = self.alpha_h(-65.0) / (
+            self.alpha_h(-65.0) + self.beta_h(-65.0)
         )
 
         current_external = 10.0  # External current, in uA/cm^2
 
-        for i in range(1, len(time)):
-            conductance_Na = (
-                self.g_Na * (sodium_activation[i - 1] ** 3) * sodium_inactivation[i - 1]
-            )
-            conductance_K = self.g_K * (potassium_activation[i - 1] ** 4)
+        # Ensure consistent precision for time index calculations
+        results.index = results.index.round(10)
+
+        # Iterate over the time index
+        for t in results.index[1:]:
+            previous_time = results.index[results.index.get_loc(t) - 1]
+            voltage = results.loc[previous_time, "voltage"]
+            potassium_activation = results.loc[previous_time, "potassium_activation"]
+            sodium_activation = results.loc[previous_time, "sodium_activation"]
+            sodium_inactivation = results.loc[previous_time, "sodium_inactivation"]
+
+            conductance_Na = self.g_Na * (sodium_activation ** 3) * sodium_inactivation
+            conductance_K = self.g_K * (potassium_activation ** 4)
             conductance_leak = self.g_L
 
-            current_Na = conductance_Na * (voltage[i - 1] - self.E_Na)
-            current_K = conductance_K * (voltage[i - 1] - self.E_K)
-            current_leak = conductance_leak * (voltage[i - 1] - self.E_L)
+            current_Na = conductance_Na * (voltage - self.E_Na)
+            current_K = conductance_K * (voltage - self.E_K)
+            current_leak = conductance_leak * (voltage - self.E_L)
 
             dV = (current_external - current_Na - current_K - current_leak) / self.C_m
             dn = (
-                self.alpha_n(voltage[i - 1]) * (1 - potassium_activation[i - 1])
-                - self.beta_n(voltage[i - 1]) * potassium_activation[i - 1]
+                self.alpha_n(voltage) * (1 - potassium_activation)
+                - self.beta_n(voltage) * potassium_activation
             )
             dm = (
-                self.alpha_m(voltage[i - 1]) * (1 - sodium_activation[i - 1])
-                - self.beta_m(voltage[i - 1]) * sodium_activation[i - 1]
+                self.alpha_m(voltage) * (1 - sodium_activation)
+                - self.beta_m(voltage) * sodium_activation
             )
             dh = (
-                self.alpha_h(voltage[i - 1]) * (1 - sodium_inactivation[i - 1])
-                - self.beta_h(voltage[i - 1]) * sodium_inactivation[i - 1]
+                self.alpha_h(voltage) * (1 - sodium_inactivation)
+                - self.beta_h(voltage) * sodium_inactivation
             )
 
-            voltage[i] = voltage[i - 1] + dV * time_step
-            potassium_activation[i] = potassium_activation[i - 1] + dn * time_step
-            sodium_activation[i] = sodium_activation[i - 1] + dm * time_step
-            sodium_inactivation[i] = sodium_inactivation[i - 1] + dh * time_step
-
-        # Create and return pandas DataFrame
-        results = pd.DataFrame(
-            {
-                "voltage": voltage,
-                "potassium_activation": potassium_activation,
-                "sodium_activation": sodium_activation,
-                "sodium_inactivation": sodium_inactivation,
-            },
-            index=time,
-        )
-        results.index.name = "time"
+            results.loc[t, "voltage"] = voltage + dV * time_step
+            results.loc[t, "potassium_activation"] = potassium_activation + dn * time_step
+            results.loc[t, "sodium_activation"] = sodium_activation + dm * time_step
+            results.loc[t, "sodium_inactivation"] = sodium_inactivation + dh * time_step
 
         return results
+
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    # Create an instance of the HodgkinHuxley model
+    hh_model = HodgkinHuxley()
+
+    # Run the simulation
+    simulation_time = 50  # in ms
+    time_step = 0.01  # in ms
+    results = hh_model.compute(simulation_time=simulation_time, time_step=time_step)
+
+    # Plot the results
+    plt.figure(figsize=(10, 6))
+    plt.plot(results.index, results["voltage"], label="Membrane Voltage (mV)")
+    plt.title("Hodgkin-Huxley Model Simulation")
+    plt.xlabel("Time (ms)")
+    plt.ylabel("Voltage (mV)")
+    plt.legend()
+    plt.grid()
+    plt.show()
