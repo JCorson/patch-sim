@@ -42,14 +42,17 @@ def simulate_action_potential() -> str:
     return image_base64
 
 
-def simulate_hodgkin_huxley() -> str:
+def simulate_hodgkin_huxley_with_params(params: dict) -> str:
     """
-    Simulate the Hodgkin-Huxley model and return its plot as a base64 string.
+    Simulate the Hodgkin-Huxley model with user-defined parameters and return its plot as a base64 string.
+
+    Args:
+        params (dict): Dictionary containing Hodgkin-Huxley parameters.
 
     Returns:
         str: Base64-encoded PNG image of the Hodgkin-Huxley simulation plot.
     """
-    hh_model = HodgkinHuxley()
+    hh_model = HodgkinHuxley(**params)
     time, voltage = hh_model.compute()
 
     # Plot the Hodgkin-Huxley simulation
@@ -73,23 +76,40 @@ def simulate_hodgkin_huxley() -> str:
 
 def index() -> rx.Component:
     """
-    Define the main page of the application, displaying simulation results.
+    Define the main page of the application, allowing users to set parameters and view simulation results.
 
     Returns:
         rx.Component: Reflex component containing the main page layout.
     """
-    # Generate the action potential plot
-    ap_image_base64 = simulate_action_potential()
-    ap_image_src = f"data:image/png;base64,{ap_image_base64}"
+    # Define state to hold user inputs and simulation results
+    class AppState(rx.State):
+        g_na: float = 120.0  # Sodium conductance (mS/cm^2)
+        g_k: float = 36.0    # Potassium conductance (mS/cm^2)
+        g_l: float = 0.3     # Leak conductance (mS/cm^2)
+        v_rest: float = -65.0  # Resting potential (mV)
+        hh_image_base64: str = ""
 
-    # Generate the Hodgkin-Huxley plot
-    hh_image_base64 = simulate_hodgkin_huxley()
-    hh_image_src = f"data:image/png;base64,{hh_image_base64}"
+        def run_simulation(self):
+            params = {
+                "g_na": self.g_na,
+                "g_k": self.g_k,
+                "g_l": self.g_l,
+                "v_rest": self.v_rest,
+            }
+            self.hh_image_base64 = simulate_hodgkin_huxley_with_params(params)
 
     return rx.box(
         rx.text("Welcome to the Action Potential Simulator!"),
-        rx.image(src=ap_image_src, alt="Action Potential Plot"),
-        rx.image(src=hh_image_src, alt="Hodgkin-Huxley Plot"),
+        rx.text("Set Hodgkin-Huxley Model Parameters:"),
+        rx.slider(label="Sodium Conductance (g_na)", min=0, max=200, step=1, value=AppState.g_na, on_change=AppState.set_g_na),
+        rx.slider(label="Potassium Conductance (g_k)", min=0, max=100, step=1, value=AppState.g_k, on_change=AppState.set_g_k),
+        rx.slider(label="Leak Conductance (g_l)", min=0, max=10, step=0.1, value=AppState.g_l, on_change=AppState.set_g_l),
+        rx.input(label="Resting Potential (v_rest)", value=AppState.v_rest, on_change=AppState.set_v_rest),
+        rx.button("Run Simulation", on_click=AppState.run_simulation),
+        rx.cond(
+            AppState.hh_image_base64 != "",
+            rx.image(src=f"data:image/png;base64,{{AppState.hh_image_base64}}", alt="Hodgkin-Huxley Plot"),
+        ),
     )
 
 
