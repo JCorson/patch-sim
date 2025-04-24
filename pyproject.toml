@@ -1,0 +1,20 @@
+[project]
+name = "ap-sim"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "reflex>=0.7.6",
+    "numpy",
+    "matplotlib",
+    "pandas",
+]
+
+[tool.ruff]
+select = ["E", "F", "W"]
+ignore = []
+line-length = 88
+
+[project.optional-dependencies]
+dev = ["ruff", "pytest", "mypy"]
