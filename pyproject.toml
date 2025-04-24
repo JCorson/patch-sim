@@ -12,9 +12,11 @@ dependencies = [
 ]
 
 [tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
 select = ["E", "F", "W"]
 ignore = []
-line-length = 88
 
 [project.optional-dependencies]
 dev = ["ruff", "pytest", "mypy"]
