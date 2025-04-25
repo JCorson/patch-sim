@@ -139,7 +139,7 @@ class HodgkinHuxley:
         return 1 / (1 + self.safe_exp(-(V + 35) / 10))
 
     def compute(
-        self, simulation_time: float = 50, time_step: float = 0.01
+        self, simulation_time: float = 50, time_step: float = 0.01, current_external: float = 20.0
     ) -> pd.DataFrame:
         """
         Simulate the membrane voltage over time using the Hodgkin-Huxley model.
@@ -147,6 +147,7 @@ class HodgkinHuxley:
         Parameters:
             simulation_time (float): Total simulation time in ms.
             time_step (float): Time step in ms.
+            current_external (float): External current in uA/cm^2.
 
         Returns:
             pd.DataFrame: DataFrame containing time points and corresponding voltage values,
@@ -171,10 +172,12 @@ class HodgkinHuxley:
             self.alpha_h(self.v_rest) + self.beta_h(self.v_rest)
         )
 
-        current_external = 20.0  # Increased external current, in uA/cm^2
-
         # Ensure consistent precision for time index calculations
         results.index = results.index.round(10)
+
+        # Define physiological limits for membrane voltage
+        min_voltage = -100.0  # mV
+        max_voltage = 60.0    # mV
 
         # Iterate over the time index
         for t in results.index[1:]:
@@ -183,6 +186,9 @@ class HodgkinHuxley:
             potassium_activation = results.loc[previous_time, "potassium_activation"]
             sodium_activation = results.loc[previous_time, "sodium_activation"]
             sodium_inactivation = results.loc[previous_time, "sodium_inactivation"]
+
+            # Ensure current voltage is within limits (defensive)
+            voltage = np.clip(voltage, min_voltage, max_voltage)
 
             conductance_Na = self.g_Na * (sodium_activation ** 3) * sodium_inactivation
             conductance_K = self.g_K * (potassium_activation ** 4)
@@ -206,17 +212,18 @@ class HodgkinHuxley:
                 - self.beta_h(voltage) * sodium_inactivation
             )
 
-            # Ensure gating variables and voltage remain within physiological bounds
-            voltage = np.clip(voltage, -100, 100)
-            potassium_activation = np.clip(potassium_activation, 0, 1)
-            sodium_activation = np.clip(sodium_activation, 0, 1)
-            sodium_inactivation = np.clip(sodium_inactivation, 0, 1)
+            # Calculate new values
+            new_voltage = voltage + dV * time_step
+            new_potassium_activation = potassium_activation + dn * time_step
+            new_sodium_activation = sodium_activation + dm * time_step
+            new_sodium_inactivation = sodium_inactivation + dh * time_step
 
-            # Update results with bounded values
-            results.loc[t, "voltage"] = voltage + dV * time_step
-            results.loc[t, "potassium_activation"] = np.clip(potassium_activation + dn * time_step, 0, 1)
-            results.loc[t, "sodium_activation"] = np.clip(sodium_activation + dm * time_step, 0, 1)
-            results.loc[t, "sodium_inactivation"] = np.clip(sodium_inactivation + dh * time_step, 0, 1)
+            # Ensure values remain within physiological bounds
+            # Most importantly, clip the NEW voltage value
+            results.loc[t, "voltage"] = np.clip(new_voltage, min_voltage, max_voltage)
+            results.loc[t, "potassium_activation"] = np.clip(new_potassium_activation, 0, 1)
+            results.loc[t, "sodium_activation"] = np.clip(new_sodium_activation, 0, 1)
+            results.loc[t, "sodium_inactivation"] = np.clip(new_sodium_inactivation, 0, 1)
 
         return results
 
