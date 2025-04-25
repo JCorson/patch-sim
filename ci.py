@@ -76,17 +76,14 @@ def format() -> None:
 @cli.command("lint")
 def lint() -> None:
     """Run linting tools against Python source."""
-    failed_checks = []
+    click.echo("\nRunning ruff check...")
+    uv("tool", "run", "ruff", "check", ROOT)
 
-    if uv("tool", "run", "ruff", "check", ROOT, check=False).returncode:
-        failed_checks.append("ruff check")
-    if uv("tool", "run", "ruff", "format", "--check", ROOT, check=False).returncode:
-        failed_checks.append("ruff format")
+    click.echo("\nRunning ruff format check...")
+    uv("tool", "run", "ruff", "format", "--check", ROOT)
 
-    if failed_checks:
-        report_failure(f"linting failures: {', '.join(sorted(failed_checks))}")
-    else:
-        report_success("All lint checks passed")
+    click.echo("")
+    click.secho("All lint checks passed", fg="green")
 
 
 @cli.command("serve")
@@ -98,34 +95,22 @@ def run_server() -> None:
 @cli.command("test")
 def test() -> None:
     """Run Python unit tests for all packages."""
-    failed_checks = []
-
     for pkg in PYTHON_PACKAGES:
         click.echo(f"Running {pkg} tests...")
-        if pythonm("unittest", "discover", "--verbose", pkg, check=False).returncode:
-            failed_checks.append(pkg)
+        pythonm("unittest", "discover", "--verbose", pkg)
 
-    if failed_checks:
-        report_failure(
-            f"test failures for packages: {', '.join(sorted(failed_checks))}"
-        )
-    else:
-        report_success("All tests passed")
+    click.echo("")
+    click.secho("All tests passed", fg="green")
 
 
 @cli.command("typecheck")
 def typecheck() -> None:
     """Run type checking tools against source code."""
-    failed_checks = []
-
     click.echo("Checking Python with mypy...")
-    if pythonm("mypy", ROOT, check=False).returncode:
-        failed_checks.append("mypy")
+    pythonm("mypy", ROOT)
 
-    if failed_checks:
-        report_failure(f"type check failures: {', '.join(sorted(failed_checks))}")
-    else:
-        report_success("All type checks passed")
+    click.echo("")
+    click.secho("All type checks passed", fg="green")
 
 
 # ----------------------------------------------------------------------------
@@ -142,21 +127,6 @@ def pythonm(
     return uv("run", "--frozen", "-m", *args, check=check, env=env)
 
 
-def report_failure(msg: str):
-    """Report a ci command failure.
-
-    Exits the CLI with an error message and a nonzero exit code.
-    """
-    click.echo("")
-    raise click.ClickException(click.style(msg, fg="red"))
-
-
-def report_success(msg: str):
-    """Report a ci command success."""
-    click.echo("")
-    click.secho(msg, fg="green")
-
-
 def run_process(
     proc: subprocess.Popen, check: bool = False
 ) -> subprocess.CompletedProcess:
@@ -171,7 +141,12 @@ def run_process(
     retcode = proc.poll() or 0
     if check and retcode:
         cmd_str: str = str(cast(list, proc.args))
-        report_failure(f"Command {cmd_str} failed with return code {retcode}.")
+        click.echo("")
+        raise click.ClickException(
+            click.style(
+                f"Command {cmd_str} failed with return code {retcode}.", fg="red"
+            )
+        )
 
     return subprocess.CompletedProcess(proc.args, retcode, stdout, stderr)
 
