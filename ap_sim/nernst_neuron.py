@@ -2,7 +2,8 @@
 This module provides functionality to compute the Nernst potential for ions.
 
 It includes:
-- A function to calculate the Nernst potential for a single ion based on its valence, temperature, and concentration gradients.
+- A function to calculate the Nernst potential for a single ion based on its valence,
+  temperature, and concentration gradients.
 """
 
 import numpy as np

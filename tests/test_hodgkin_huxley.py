@@ -101,11 +101,12 @@ def test_compute_with_zero_current(hh_model):
 
     # With zero external current, voltage should drift toward equilibrium
     # Acceptable deviation based on observed behavior
-    initial_voltage = result["voltage"].iloc[0]
-    max_allowable_deviation = 15.0  # mV, maximum acceptable deviation (adjusted based on observations)
+    max_allowable_deviation = 15.0  # mV, maximum acceptable deviation
 
     voltage_range = result["voltage"].max() - result["voltage"].min()
-    assert voltage_range < max_allowable_deviation, f"Voltage range {voltage_range} exceeds maximum allowed deviation"
+    assert voltage_range < max_allowable_deviation, (
+        f"Voltage range {voltage_range} exceeds maximum allowed deviation"
+    )
 
 
 def test_compute_with_non_zero_currents(hh_model):
@@ -115,7 +116,11 @@ def test_compute_with_non_zero_currents(hh_model):
     time_step = 0.1  # ms
 
     for current in currents:
-        result = hh_model.compute(simulation_time=simulation_time, time_step=time_step, current_external=current)
+        result = hh_model.compute(
+            simulation_time=simulation_time,
+            time_step=time_step,
+            current_external=current,
+        )
 
         # Check result type and structure
         assert isinstance(result, pd.DataFrame)
@@ -133,23 +138,25 @@ def test_compute_with_non_zero_currents(hh_model):
         max_change = abs(result["voltage"].max() - initial_voltage)
 
         # Adjusted threshold based on observed behavior
-        assert max_change > 3.0, f"Voltage did not change significantly for current {current}"
+        assert max_change > 3.0, (
+            f"Voltage did not change significantly for current {current}"
+        )
 
 
 def test_physiological_limits_and_action_potentials(hh_model):
     """
-    Test that the voltage does not exceed physiological limits and that increasing current
-    generates more action potentials.
+    Test that the voltage does not exceed physiological limits and that increasing
+    current generates more action potentials.
     """
     # Physiological limits for membrane voltage
     min_physiological_voltage = -100  # mV
-    max_physiological_voltage = 60    # mV
+    max_physiological_voltage = 60  # mV
 
     # Parameters for testing action potentials
     simulation_time = 100  # ms, longer simulation to observe multiple APs
-    time_step = 0.1       # ms
+    time_step = 0.1  # ms
     currents = [20.0, 40.0, 60.0]  # increasing external currents in μA/cm²
-    ap_threshold = 0      # mV, voltage threshold for counting action potentials
+    ap_threshold = 0  # mV, voltage threshold for counting action potentials
 
     ap_counts = []
 
@@ -157,25 +164,32 @@ def test_physiological_limits_and_action_potentials(hh_model):
         result = hh_model.compute(
             simulation_time=simulation_time,
             time_step=time_step,
-            current_external=current
+            current_external=current,
         )
 
         # Test that voltage stays within physiological limits
-        assert result["voltage"].min() >= min_physiological_voltage, \
+        assert result["voltage"].min() >= min_physiological_voltage, (
             f"Voltage below physiological minimum with current {current}"
-        assert result["voltage"].max() <= max_physiological_voltage, \
+        )
+        assert result["voltage"].max() <= max_physiological_voltage, (
             f"Voltage exceeds physiological maximum with current {current}"
+        )
 
         # Count action potentials (threshold crossings from below)
         voltage = result["voltage"].values
         # A threshold crossing is when voltage goes from below to above the threshold
-        threshold_crossings = sum(1 for i in range(1, len(voltage))
-                                 if voltage[i-1] < ap_threshold and voltage[i] >= ap_threshold)
+        threshold_crossings = sum(
+            1
+            for i in range(1, len(voltage))
+            if voltage[i - 1] < ap_threshold and voltage[i] >= ap_threshold
+        )
         ap_counts.append(threshold_crossings)
 
-        print(f"Current {current} μA/cm² generated {threshold_crossings} action potentials")
+        print(f"Current {current} μA/cm² generated {threshold_crossings} APs")
 
-    # Verify that higher currents generate more (or at least not fewer) action potentials
+    # Verify currents generate more (or equal) action potentials as they increase
     for i in range(1, len(currents)):
-        assert ap_counts[i] >= ap_counts[i-1], \
-            f"Higher current {currents[i]} generated fewer APs ({ap_counts[i]}) than current {currents[i-1]} ({ap_counts[i-1]})"
+        assert ap_counts[i] >= ap_counts[i - 1], (
+            f"Higher current {currents[i]} generated fewer APs ({ap_counts[i]}) "
+            f"than current {currents[i - 1]} ({ap_counts[i - 1]})"
+        )

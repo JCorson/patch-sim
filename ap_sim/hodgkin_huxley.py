@@ -139,7 +139,10 @@ class HodgkinHuxley:
         return 1 / (1 + self.safe_exp(-(V + 35) / 10))
 
     def compute(
-        self, simulation_time: float = 50, time_step: float = 0.01, current_external: float = 20.0
+        self,
+        simulation_time: float = 50,
+        time_step: float = 0.01,
+        current_external: float = 20.0,
     ) -> pd.DataFrame:
         """
         Simulate the membrane voltage over time using the Hodgkin-Huxley model.
@@ -150,13 +153,19 @@ class HodgkinHuxley:
             current_external (float): External current in uA/cm^2.
 
         Returns:
-            pd.DataFrame: DataFrame containing time points and corresponding voltage values,
-                         as well as gating variables potassium_activation, sodium_activation, and sodium_inactivation.
+            pd.DataFrame: DataFrame with time points and corresponding voltage values,
+                as well as gating variables potassium_activation, sodium_activation,
+                and sodium_inactivation.
         """
         # Create the DataFrame at the start of the method
         results = pd.DataFrame(
             index=np.arange(0, simulation_time + time_step, time_step),
-            columns=["voltage", "potassium_activation", "sodium_activation", "sodium_inactivation"],
+            columns=[
+                "voltage",
+                "potassium_activation",
+                "sodium_activation",
+                "sodium_inactivation",
+            ],
         )
         results.index.name = "time"
 
@@ -177,7 +186,7 @@ class HodgkinHuxley:
 
         # Define physiological limits for membrane voltage
         min_voltage = -100.0  # mV
-        max_voltage = 60.0    # mV
+        max_voltage = 60.0  # mV
 
         # Iterate over the time index
         for t in results.index[1:]:
@@ -190,8 +199,8 @@ class HodgkinHuxley:
             # Ensure current voltage is within limits (defensive)
             voltage = np.clip(voltage, min_voltage, max_voltage)
 
-            conductance_Na = self.g_Na * (sodium_activation ** 3) * sodium_inactivation
-            conductance_K = self.g_K * (potassium_activation ** 4)
+            conductance_Na = self.g_Na * (sodium_activation**3) * sodium_inactivation
+            conductance_K = self.g_K * (potassium_activation**4)
             conductance_leak = self.g_L
 
             current_Na = conductance_Na * (voltage - self.E_Na)
@@ -221,9 +230,13 @@ class HodgkinHuxley:
             # Ensure values remain within physiological bounds
             # Most importantly, clip the NEW voltage value
             results.loc[t, "voltage"] = np.clip(new_voltage, min_voltage, max_voltage)
-            results.loc[t, "potassium_activation"] = np.clip(new_potassium_activation, 0, 1)
+            results.loc[t, "potassium_activation"] = np.clip(
+                new_potassium_activation, 0, 1
+            )
             results.loc[t, "sodium_activation"] = np.clip(new_sodium_activation, 0, 1)
-            results.loc[t, "sodium_inactivation"] = np.clip(new_sodium_inactivation, 0, 1)
+            results.loc[t, "sodium_inactivation"] = np.clip(
+                new_sodium_inactivation, 0, 1
+            )
 
         return results
 
