@@ -95,7 +95,7 @@ def test() -> None:
     """Run Python unit tests for all packages."""
     for pkg in PYTHON_PACKAGES:
         click.echo(f"Running {pkg} tests...")
-        pythonm("unittest", "discover", "--verbose", pkg)
+        pythonm("pytest", "--verbose")
 
     click.echo("")
     click.secho("All tests passed", fg="green")
