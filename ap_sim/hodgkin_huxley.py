@@ -26,6 +26,7 @@ class HodgkinHuxley:
         E_K (float): Potassium reversal potential in mV.
         E_L (float): Leak reversal potential in mV.
         v_rest (float): Resting potential in mV.
+        time_step (float): Time step for simulation in ms.
     """
 
     def __init__(
@@ -34,6 +35,7 @@ class HodgkinHuxley:
         g_K: float = 36.0,
         g_L: float = 0.3,
         v_rest: float = -65.0,
+        time_step: float = 0.01,
     ) -> None:
         """
         Initialize the Hodgkin-Huxley model with default or user-defined parameters.
@@ -43,12 +45,14 @@ class HodgkinHuxley:
             g_K (float): Maximum potassium conductance in mS/cm^2.
             g_L (float): Leak conductance in mS/cm^2.
             v_rest (float): Resting potential in mV.
+            time_step (float): Time step for simulation in ms.
         """
         self.C_m: float = 1.0  # Membrane capacitance, in uF/cm^2
         self.g_Na: float = g_Na  # Maximum conductances, in mS/cm^2
         self.g_K: float = g_K
         self.g_L: float = g_L
         self.v_rest: float = v_rest  # Resting potential
+        self.time_step: float = time_step  # Time step for simulation
 
         # Ion concentrations (in mM)
         Na_out: float = 145.0  # Extracellular sodium
@@ -155,7 +159,6 @@ class HodgkinHuxley:
     def compute(
         self,
         simulation_time: float = 50,
-        time_step: float = 0.01,
         current_external: float = 20.0,
     ) -> pd.DataFrame:
         """
@@ -163,7 +166,6 @@ class HodgkinHuxley:
 
         Parameters:
             simulation_time (float): Total simulation time in ms.
-            time_step (float): Time step in ms.
             current_external (float): External current in uA/cm^2.
 
         Returns:
@@ -173,13 +175,14 @@ class HodgkinHuxley:
         """
         # Create the DataFrame at the start of the method
         results = pd.DataFrame(
-            index=np.arange(0, simulation_time + time_step, time_step),
+            index=np.arange(0, simulation_time + self.time_step, self.time_step),
             columns=[
                 "voltage",
                 "potassium_activation",
                 "sodium_activation",
                 "sodium_inactivation",
             ],
+            dtype=np.float64,  # Set float dtype for all columns
         )
         results.index.name = "time"
 
@@ -204,15 +207,12 @@ class HodgkinHuxley:
 
         # Iterate over the time index
         for t in results.index[1:]:
-            previous_idx = results.index.get_loc(t) - 1
+            previous_idx = results.index.get_indexer([t])[0] - 1
             previous_time = results.index[previous_idx]
             voltage = results.loc[previous_time, "voltage"]
             potassium_activation = results.loc[previous_time, "potassium_activation"]
             sodium_activation = results.loc[previous_time, "sodium_activation"]
             sodium_inactivation = results.loc[previous_time, "sodium_inactivation"]
-
-            # Ensure current voltage is within limits (defensive)
-            voltage = np.clip(voltage, min_voltage, max_voltage)
 
             conductance_Na = self.g_Na * (sodium_activation**3) * sodium_inactivation
             conductance_K = self.g_K * (potassium_activation**4)
@@ -237,10 +237,10 @@ class HodgkinHuxley:
             )
 
             # Calculate new values
-            new_voltage = voltage + dV * time_step
-            new_potassium_activation = potassium_activation + dn * time_step
-            new_sodium_activation = sodium_activation + dm * time_step
-            new_sodium_inactivation = sodium_inactivation + dh * time_step
+            new_voltage = voltage + dV * self.time_step
+            new_potassium_activation = potassium_activation + dn * self.time_step
+            new_sodium_activation = sodium_activation + dm * self.time_step
+            new_sodium_inactivation = sodium_inactivation + dh * self.time_step
 
             # Ensure values remain within physiological bounds
             results.at[t, "voltage"] = float(
@@ -267,8 +267,7 @@ if __name__ == "__main__":
 
     # Run the simulation
     simulation_time = 50  # in ms
-    time_step = 0.01  # in ms
-    results = hh_model.compute(simulation_time=simulation_time, time_step=time_step)
+    results = hh_model.compute(simulation_time=simulation_time)
 
     # Plot the results
     plt.figure(figsize=(10, 6))

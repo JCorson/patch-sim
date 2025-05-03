@@ -13,22 +13,29 @@ def hh_model():
     return HodgkinHuxley()
 
 
+@pytest.fixture
+def hh_model_custom_timestep():
+    """Fixture to create a HodgkinHuxley model instance with custom timestep."""
+    return HodgkinHuxley(time_step=0.1)
+
+
 def test_initialization(hh_model):
     """Test that the model is initialized with correct parameters."""
     assert hh_model.C_m == pytest.approx(1.0)
     assert hh_model.g_Na == pytest.approx(120.0)
     assert hh_model.g_K == pytest.approx(36.0)
     assert hh_model.g_L == pytest.approx(0.3)
+    assert hh_model.time_step == pytest.approx(0.01)
 
-    # Test that reversal potentials are within  expected ranges
+    # Test that reversal potentials are within expected ranges
     assert 60.0 < hh_model.E_Na < 65.0
     assert -90.0 < hh_model.E_K < -65.0
     assert -70.0 < hh_model.E_L < -40.0
 
 
-def test_compute_returns_dataframe(hh_model):
+def test_compute_returns_dataframe(hh_model_custom_timestep):
     """Test that compute method returns a pandas DataFrame with correct structure."""
-    result = hh_model.compute(simulation_time=10, time_step=0.1)
+    result = hh_model_custom_timestep.compute(simulation_time=10)
 
     # Check result type
     assert isinstance(result, pd.DataFrame)
@@ -66,7 +73,9 @@ def test_rate_constants(hh_model):
 
 def test_simulation_dynamics(hh_model):
     """Test that the simulation shows expected dynamics."""
-    result = hh_model.compute(simulation_time=50, time_step=0.05)
+    # Create model with specific time step
+    custom_model = HodgkinHuxley(time_step=0.05)
+    result = custom_model.compute(simulation_time=50)
 
     # Voltage should change from initial value
     initial_voltage = result["voltage"].iloc[0]
@@ -81,12 +90,12 @@ def test_simulation_dynamics(hh_model):
     assert result["sodium_activation"].max() > result["sodium_activation"].iloc[0]
 
 
-def test_compute_with_zero_current(hh_model):
+def test_compute_with_zero_current(hh_model_custom_timestep):
     """
     Test the compute method with zero external current.
     Small fluctuations in voltage may occur due to intrinsic dynamics.
     """
-    result = hh_model.compute(simulation_time=10, time_step=0.1, current_external=0.0)
+    result = hh_model_custom_timestep.compute(simulation_time=10, current_external=0.0)
 
     # Check result type and structure
     assert isinstance(result, pd.DataFrame)
@@ -113,12 +122,13 @@ def test_compute_with_non_zero_currents(hh_model):
     """Test the compute method with various non-zero external currents."""
     currents = [10.0, 20.0, 50.0]  # Different external currents to test
     simulation_time = 10  # ms
-    time_step = 0.1  # ms
+
+    # Create a model with specific time_step
+    custom_model = HodgkinHuxley(time_step=0.1)
 
     for current in currents:
-        result = hh_model.compute(
+        result = custom_model.compute(
             simulation_time=simulation_time,
-            time_step=time_step,
             current_external=current,
         )
 
@@ -154,16 +164,17 @@ def test_physiological_limits_and_action_potentials(hh_model):
 
     # Parameters for testing action potentials
     simulation_time = 100  # ms, longer simulation to observe multiple APs
-    time_step = 0.1  # ms
     currents = [20.0, 40.0, 60.0]  # increasing external currents in μA/cm²
     ap_threshold = 0  # mV, voltage threshold for counting action potentials
+
+    # Create a model with specific time_step
+    custom_model = HodgkinHuxley(time_step=0.1)
 
     ap_counts = []
 
     for current in currents:
-        result = hh_model.compute(
+        result = custom_model.compute(
             simulation_time=simulation_time,
-            time_step=time_step,
             current_external=current,
         )
 
