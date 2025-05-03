@@ -4,8 +4,13 @@ The model includes equations for ion channel dynamics and membrane voltage.
 """
 
 import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
+from typing import Union
 from .nernst_neuron import nernst_potential
+
+# Type aliases for better readability
+FloatOrArray = Union[float, NDArray[np.float64], pd.Series]
 
 
 class HodgkinHuxley:
@@ -23,7 +28,7 @@ class HodgkinHuxley:
         v_rest (float): Resting potential in mV.
     """
 
-    def __init__(self, g_Na=120.0, g_K=36.0, g_L=0.3, v_rest=-65.0):
+    def __init__(self, g_Na: float = 120.0, g_K: float = 36.0, g_L: float = 0.3, v_rest: float = -65.0) -> None:
         """
         Initialize the Hodgkin-Huxley model with default or user-defined parameters.
 
@@ -33,108 +38,108 @@ class HodgkinHuxley:
             g_L (float): Leak conductance in mS/cm^2.
             v_rest (float): Resting potential in mV.
         """
-        self.C_m = 1.0  # Membrane capacitance, in uF/cm^2
-        self.g_Na = g_Na  # Maximum conductances, in mS/cm^2
-        self.g_K = g_K
-        self.g_L = g_L
-        self.v_rest = v_rest  # Resting potential
+        self.C_m: float = 1.0  # Membrane capacitance, in uF/cm^2
+        self.g_Na: float = g_Na  # Maximum conductances, in mS/cm^2
+        self.g_K: float = g_K
+        self.g_L: float = g_L
+        self.v_rest: float = v_rest  # Resting potential
 
         # Ion concentrations (in mM)
-        Na_out = 145.0  # Extracellular sodium
-        Na_in = 15.0  # Intracellular sodium
-        K_out = 5.0  # Extracellular potassium
-        K_in = 140.0  # Intracellular potassium
-        Cl_out = 120.0  # Extracellular chloride
-        Cl_in = 10.0  # Intracellular chloride
+        Na_out: float = 145.0  # Extracellular sodium
+        Na_in: float = 15.0  # Intracellular sodium
+        K_out: float = 5.0  # Extracellular potassium
+        K_in: float = 140.0  # Intracellular potassium
+        Cl_out: float = 120.0  # Extracellular chloride
+        Cl_in: float = 10.0  # Intracellular chloride
 
         # Calculate reversal potentials using the Nernst equation
-        T = 310.15  # Temperature in Kelvin (37°C)
-        self.E_Na = nernst_potential(1, T, Na_out, Na_in)  # Sodium reversal potential
-        self.E_K = nernst_potential(1, T, K_out, K_in)  # Potassium reversal potential
-        self.E_L = nernst_potential(-1, T, Cl_out, Cl_in)  # Leak reversal potential
+        T: float = 310.15  # Temperature in Kelvin (37°C)
+        self.E_Na: float = nernst_potential(1, T, Na_out, Na_in)  # Sodium reversal potential
+        self.E_K: float = nernst_potential(1, T, K_out, K_in)  # Potassium reversal potential
+        self.E_L: float = nernst_potential(-1, T, Cl_out, Cl_in)  # Leak reversal potential
 
     @staticmethod
-    def safe_exp(x: float) -> float:
+    def safe_exp(x: FloatOrArray) -> FloatOrArray:
         """
         Safely compute the exponential to avoid overflow.
 
         Parameters:
-            x (float): The input value.
+            x (FloatOrArray): The input value or array.
 
         Returns:
-            float: The computed exponential value, capped to prevent overflow.
+            FloatOrArray: The computed exponential value, capped to prevent overflow.
         """
         return np.exp(np.clip(x, -100, 100))
 
-    def alpha_n(self, V: float) -> float:
+    def alpha_n(self, V: FloatOrArray) -> FloatOrArray:
         """
         Calculate the rate constant alpha_n for potassium channel activation.
 
         Parameters:
-            V (float): Membrane voltage in mV.
+            V (FloatOrArray): Membrane voltage in mV.
 
         Returns:
-            float: The rate constant alpha_n.
+            FloatOrArray: The rate constant alpha_n.
         """
         return 0.01 * (V + 55) / (1 - self.safe_exp(-(V + 55) / 10))
 
-    def beta_n(self, V: float) -> float:
+    def beta_n(self, V: FloatOrArray) -> FloatOrArray:
         """
         Calculate the rate constant beta_n for potassium channel deactivation.
 
         Parameters:
-            V (float): Membrane voltage in mV.
+            V (FloatOrArray): Membrane voltage in mV.
 
         Returns:
-            float: The rate constant beta_n.
+            FloatOrArray: The rate constant beta_n.
         """
         return 0.125 * self.safe_exp(-(V + 65) / 80)
 
-    def alpha_m(self, V: float) -> float:
+    def alpha_m(self, V: FloatOrArray) -> FloatOrArray:
         """
         Calculate the rate constant alpha_m for sodium channel activation.
 
         Parameters:
-            V (float): Membrane voltage in mV.
+            V (FloatOrArray): Membrane voltage in mV.
 
         Returns:
-            float: The rate constant alpha_m.
+            FloatOrArray: The rate constant alpha_m.
         """
         return 0.1 * (V + 40) / (1 - self.safe_exp(-(V + 40) / 10))
 
-    def beta_m(self, V: float) -> float:
+    def beta_m(self, V: FloatOrArray) -> FloatOrArray:
         """
         Calculate the rate constant beta_m for sodium channel deactivation.
 
         Parameters:
-            V (float): Membrane voltage in mV.
+            V (FloatOrArray): Membrane voltage in mV.
 
         Returns:
-            float: The rate constant beta_m.
+            FloatOrArray: The rate constant beta_m.
         """
         return 4.0 * self.safe_exp(-(V + 65) / 18)
 
-    def alpha_h(self, V: float) -> float:
+    def alpha_h(self, V: FloatOrArray) -> FloatOrArray:
         """
         Calculate the rate constant alpha_h for sodium channel inactivation.
 
         Parameters:
-            V (float): Membrane voltage in mV.
+            V (FloatOrArray): Membrane voltage in mV.
 
         Returns:
-            float: The rate constant alpha_h.
+            FloatOrArray: The rate constant alpha_h.
         """
         return 0.07 * self.safe_exp(-(V + 65) / 20)
 
-    def beta_h(self, V: float) -> float:
+    def beta_h(self, V: FloatOrArray) -> FloatOrArray:
         """
         Calculate the rate constant beta_h for sodium channel reactivation.
 
         Parameters:
-            V (float): Membrane voltage in mV.
+            V (FloatOrArray): Membrane voltage in mV.
 
         Returns:
-            float: The rate constant beta_h.
+            FloatOrArray: The rate constant beta_h.
         """
         return 1 / (1 + self.safe_exp(-(V + 35) / 10))
 
@@ -182,7 +187,7 @@ class HodgkinHuxley:
         )
 
         # Ensure consistent precision for time index calculations
-        results.index = results.index.round(10)
+        results.index = pd.Index(np.round(results.index.astype(float), 10))
 
         # Define physiological limits for membrane voltage
         min_voltage = -100.0  # mV
@@ -190,7 +195,8 @@ class HodgkinHuxley:
 
         # Iterate over the time index
         for t in results.index[1:]:
-            previous_time = results.index[results.index.get_loc(t) - 1]
+            previous_idx = results.index.get_loc(t) - 1
+            previous_time = results.index[previous_idx]
             voltage = results.loc[previous_time, "voltage"]
             potassium_activation = results.loc[previous_time, "potassium_activation"]
             sodium_activation = results.loc[previous_time, "sodium_activation"]
@@ -228,15 +234,14 @@ class HodgkinHuxley:
             new_sodium_inactivation = sodium_inactivation + dh * time_step
 
             # Ensure values remain within physiological bounds
-            # Most importantly, clip the NEW voltage value
-            results.loc[t, "voltage"] = np.clip(new_voltage, min_voltage, max_voltage)
-            results.loc[t, "potassium_activation"] = np.clip(
+            results.at[t, "voltage"] = float(np.clip(new_voltage, min_voltage, max_voltage))
+            results.at[t, "potassium_activation"] = float(np.clip(
                 new_potassium_activation, 0, 1
-            )
-            results.loc[t, "sodium_activation"] = np.clip(new_sodium_activation, 0, 1)
-            results.loc[t, "sodium_inactivation"] = np.clip(
+            ))
+            results.at[t, "sodium_activation"] = float(np.clip(new_sodium_activation, 0, 1))
+            results.at[t, "sodium_inactivation"] = float(np.clip(
                 new_sodium_inactivation, 0, 1
-            )
+            ))
 
         return results
 
