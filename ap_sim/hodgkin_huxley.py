@@ -28,7 +28,13 @@ class HodgkinHuxley:
         v_rest (float): Resting potential in mV.
     """
 
-    def __init__(self, g_Na: float = 120.0, g_K: float = 36.0, g_L: float = 0.3, v_rest: float = -65.0) -> None:
+    def __init__(
+        self,
+        g_Na: float = 120.0,
+        g_K: float = 36.0,
+        g_L: float = 0.3,
+        v_rest: float = -65.0,
+    ) -> None:
         """
         Initialize the Hodgkin-Huxley model with default or user-defined parameters.
 
@@ -54,9 +60,12 @@ class HodgkinHuxley:
 
         # Calculate reversal potentials using the Nernst equation
         T: float = 310.15  # Temperature in Kelvin (37°C)
-        self.E_Na: float = nernst_potential(1, T, Na_out, Na_in)  # Sodium reversal potential
-        self.E_K: float = nernst_potential(1, T, K_out, K_in)  # Potassium reversal potential
-        self.E_L: float = nernst_potential(-1, T, Cl_out, Cl_in)  # Leak reversal potential
+        # Sodium reversal potential
+        self.E_Na: float = nernst_potential(1, T, Na_out, Na_in)
+        # Potassium reversal potential
+        self.E_K: float = nernst_potential(1, T, K_out, K_in)
+        # Leak reversal potential
+        self.E_L: float = nernst_potential(-1, T, Cl_out, Cl_in)
 
     @staticmethod
     def safe_exp(x: FloatOrArray) -> FloatOrArray:
@@ -234,14 +243,18 @@ class HodgkinHuxley:
             new_sodium_inactivation = sodium_inactivation + dh * time_step
 
             # Ensure values remain within physiological bounds
-            results.at[t, "voltage"] = float(np.clip(new_voltage, min_voltage, max_voltage))
-            results.at[t, "potassium_activation"] = float(np.clip(
-                new_potassium_activation, 0, 1
-            ))
-            results.at[t, "sodium_activation"] = float(np.clip(new_sodium_activation, 0, 1))
-            results.at[t, "sodium_inactivation"] = float(np.clip(
-                new_sodium_inactivation, 0, 1
-            ))
+            results.at[t, "voltage"] = float(
+                np.clip(new_voltage, min_voltage, max_voltage)
+            )
+            results.at[t, "potassium_activation"] = float(
+                np.clip(new_potassium_activation, 0, 1)
+            )
+            results.at[t, "sodium_activation"] = float(
+                np.clip(new_sodium_activation, 0, 1)
+            )
+            results.at[t, "sodium_inactivation"] = float(
+                np.clip(new_sodium_inactivation, 0, 1)
+            )
 
         return results
 
