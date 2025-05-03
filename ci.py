@@ -37,8 +37,6 @@ PYTHON_PACKAGES = ["ap_sim"]
 
 #: Path to repository root
 ROOT = Path(__file__).parent.resolve()
-#: Path to backend server code
-BACKEND_SRC_DIR = ROOT / "src"
 
 
 # --- Click interface
