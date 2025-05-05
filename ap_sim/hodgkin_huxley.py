@@ -158,24 +158,40 @@ class HodgkinHuxley:
 
     def compute(
         self,
-        simulation_time: float = 50,
-        current_external: float = 20.0,
+        current_external: Union[np.ndarray, list],
     ) -> pd.DataFrame:
         """
         Simulate the membrane voltage over time using the Hodgkin-Huxley model.
 
         Parameters:
-            simulation_time (float): Total simulation time in ms.
-            current_external (float): External current in uA/cm^2.
+            current_external (Union[np.ndarray, list]): External current in uA/cm^2.
+                Must be an array/list for a time-varying current waveform.
+                The length of the array determines the simulation duration.
 
         Returns:
             pd.DataFrame: DataFrame with time points and corresponding voltage values,
                 as well as gating variables potassium_activation, sodium_activation,
                 and sodium_inactivation.
         """
+        # Convert current_external to numpy array if it's a list
+        current_array = np.asarray(current_external)
+        num_time_steps = len(current_array)
+
+        # Calculate the actual simulation time
+        actual_simulation_time = (num_time_steps - 1) * self.time_step
+
+        # Create time array for the entire simulation
+        time_array = np.round(
+            np.arange(0, actual_simulation_time + self.time_step, self.time_step), 10
+        )
+
+        # Ensure the time array matches the current array length
+        if len(time_array) != len(current_array):
+            time_array = np.linspace(0, actual_simulation_time, num_time_steps)
+
         # Create the DataFrame at the start of the method
         results = pd.DataFrame(
-            index=np.arange(0, simulation_time + self.time_step, self.time_step),
+            index=time_array,
             columns=[
                 "voltage",
                 "potassium_activation",
@@ -198,16 +214,13 @@ class HodgkinHuxley:
             self.alpha_h(self.v_rest) + self.beta_h(self.v_rest)
         )
 
-        # Ensure consistent precision for time index calculations
-        results.index = pd.Index(np.round(results.index.astype(float), 10))
-
         # Define physiological limits for membrane voltage
         min_voltage = -100.0  # mV
         max_voltage = 60.0  # mV
 
         # Iterate over the time index
-        for t in results.index[1:]:
-            previous_idx = results.index.get_indexer([t])[0] - 1
+        for i, t in enumerate(results.index[1:], start=1):
+            previous_idx = i - 1
             previous_time = results.index[previous_idx]
             voltage = results.loc[previous_time, "voltage"]
             potassium_activation = results.loc[previous_time, "potassium_activation"]
@@ -222,7 +235,10 @@ class HodgkinHuxley:
             current_K = conductance_K * (voltage - self.E_K)
             current_leak = conductance_leak * (voltage - self.E_L)
 
-            dV = (current_external - current_Na - current_K - current_leak) / self.C_m
+            # Use the current from the current_array at this time step
+            current_at_time = current_array[i]
+
+            dV = (current_at_time - current_Na - current_K - current_leak) / self.C_m
             dn = (
                 self.alpha_n(voltage) * (1 - potassium_activation)
                 - self.beta_n(voltage) * potassium_activation
@@ -257,24 +273,3 @@ class HodgkinHuxley:
             )
 
         return results
-
-
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-
-    # Create an instance of the HodgkinHuxley model
-    hh_model = HodgkinHuxley()
-
-    # Run the simulation
-    simulation_time = 50  # in ms
-    results = hh_model.compute(simulation_time=simulation_time)
-
-    # Plot the results
-    plt.figure(figsize=(10, 6))
-    plt.plot(results.index, results["voltage"], label="Membrane Voltage (mV)")
-    plt.title("Hodgkin-Huxley Model Simulation")
-    plt.xlabel("Time (ms)")
-    plt.ylabel("Voltage (mV)")
-    plt.legend()
-    plt.grid()
-    plt.show()

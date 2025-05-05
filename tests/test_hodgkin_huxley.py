@@ -4,6 +4,7 @@ Tests for the Hodgkin-Huxley model implementation.
 
 import pytest
 import pandas as pd
+import numpy as np
 from ap_sim.hodgkin_huxley import HodgkinHuxley
 
 
@@ -35,7 +36,13 @@ def test_initialization(hh_model):
 
 def test_compute_returns_dataframe(hh_model_custom_timestep):
     """Test that compute method returns a pandas DataFrame with correct structure."""
-    result = hh_model_custom_timestep.compute(simulation_time=10)
+    # Create a current array for a 10ms simulation
+    duration = 10  # ms
+    time_step = hh_model_custom_timestep.time_step
+    num_steps = int(duration / time_step) + 1
+    current = np.full(num_steps, 20.0)  # constant current
+
+    result = hh_model_custom_timestep.compute(current_external=current)
 
     # Check result type
     assert isinstance(result, pd.DataFrame)
@@ -54,8 +61,7 @@ def test_compute_returns_dataframe(hh_model_custom_timestep):
         assert col in result.columns
 
     # Check DataFrame length matches expected number of time steps
-    expected_length = int(10 / 0.1) + 1  # (simulation_time/time_step) + 1
-    assert len(result) == expected_length
+    assert len(result) == num_steps
 
 
 def test_rate_constants(hh_model):
@@ -75,7 +81,14 @@ def test_simulation_dynamics(hh_model):
     """Test that the simulation shows expected dynamics."""
     # Create model with specific time step
     custom_model = HodgkinHuxley(time_step=0.05)
-    result = custom_model.compute(simulation_time=50)
+
+    # Create current array for a 50ms simulation
+    duration = 50  # ms
+    time_step = custom_model.time_step
+    num_steps = int(duration / time_step) + 1
+    current = np.full(num_steps, 20.0)  # constant current
+
+    result = custom_model.compute(current_external=current)
 
     # Voltage should change from initial value
     initial_voltage = result["voltage"].iloc[0]
@@ -95,7 +108,13 @@ def test_compute_with_zero_current(hh_model_custom_timestep):
     Test the compute method with zero external current.
     Small fluctuations in voltage may occur due to intrinsic dynamics.
     """
-    result = hh_model_custom_timestep.compute(simulation_time=10, current_external=0.0)
+    # Create zero current array for a 10ms simulation
+    duration = 10  # ms
+    time_step = hh_model_custom_timestep.time_step
+    num_steps = int(duration / time_step) + 1
+    zero_current = np.zeros(num_steps)  # zero current array
+
+    result = hh_model_custom_timestep.compute(current_external=zero_current)
 
     # Check result type and structure
     assert isinstance(result, pd.DataFrame)
@@ -121,16 +140,18 @@ def test_compute_with_zero_current(hh_model_custom_timestep):
 def test_compute_with_non_zero_currents(hh_model):
     """Test the compute method with various non-zero external currents."""
     currents = [10.0, 20.0, 50.0]  # Different external currents to test
-    simulation_time = 10  # ms
+    duration = 10  # ms
 
     # Create a model with specific time_step
     custom_model = HodgkinHuxley(time_step=0.1)
+    time_step = custom_model.time_step
+    num_steps = int(duration / time_step) + 1
 
-    for current in currents:
-        result = custom_model.compute(
-            simulation_time=simulation_time,
-            current_external=current,
-        )
+    for current_value in currents:
+        # Create constant current array for each value
+        current_array = np.full(num_steps, current_value)
+
+        result = custom_model.compute(current_external=current_array)
 
         # Check result type and structure
         assert isinstance(result, pd.DataFrame)
@@ -149,7 +170,7 @@ def test_compute_with_non_zero_currents(hh_model):
 
         # Adjusted threshold based on observed behavior
         assert max_change > 3.0, (
-            f"Voltage did not change significantly for current {current}"
+            f"Voltage did not change significantly for current {current_value}"
         )
 
 
@@ -163,27 +184,29 @@ def test_physiological_limits_and_action_potentials(hh_model):
     max_physiological_voltage = 60  # mV
 
     # Parameters for testing action potentials
-    simulation_time = 100  # ms, longer simulation to observe multiple APs
+    duration = 100  # ms, longer simulation to observe multiple APs
     currents = [20.0, 40.0, 60.0]  # increasing external currents in μA/cm²
     ap_threshold = 0  # mV, voltage threshold for counting action potentials
 
     # Create a model with specific time_step
     custom_model = HodgkinHuxley(time_step=0.1)
+    time_step = custom_model.time_step
+    num_steps = int(duration / time_step) + 1
 
     ap_counts = []
 
-    for current in currents:
-        result = custom_model.compute(
-            simulation_time=simulation_time,
-            current_external=current,
-        )
+    for current_value in currents:
+        # Create constant current array for each value
+        current_array = np.full(num_steps, current_value)
+
+        result = custom_model.compute(current_external=current_array)
 
         # Test that voltage stays within physiological limits
         assert result["voltage"].min() >= min_physiological_voltage, (
-            f"Voltage below physiological minimum with current {current}"
+            f"Voltage below physiological minimum with current {current_value}"
         )
         assert result["voltage"].max() <= max_physiological_voltage, (
-            f"Voltage exceeds physiological maximum with current {current}"
+            f"Voltage exceeds physiological maximum with current {current_value}"
         )
 
         # Count action potentials (threshold crossings from below)
@@ -196,7 +219,7 @@ def test_physiological_limits_and_action_potentials(hh_model):
         )
         ap_counts.append(threshold_crossings)
 
-        print(f"Current {current} μA/cm² generated {threshold_crossings} APs")
+        print(f"Current {current_value} μA/cm² generated {threshold_crossings} APs")
 
     # Verify currents generate more (or equal) action potentials as they increase
     for i in range(1, len(currents)):
@@ -204,3 +227,63 @@ def test_physiological_limits_and_action_potentials(hh_model):
             f"Higher current {currents[i]} generated fewer APs ({ap_counts[i]}) "
             f"than current {currents[i - 1]} ({ap_counts[i - 1]})"
         )
+
+
+def test_compute_with_different_currents(hh_model):
+    """Test the compute method with a time-varying current waveform."""
+    duration = 50  # ms
+    time_step = 0.01  # ms
+
+    # Create a custom model with our desired time step
+    custom_model = HodgkinHuxley(time_step=time_step)
+
+    # Calculate the number of time steps
+    num_time_steps = int(duration / time_step) + 1
+
+    # Create a simple current waveform
+    # First half is 10 uA/cm², second half is 50 uA/cm²
+    current_waveform = np.concatenate(
+        [
+            np.full(num_time_steps // 2, 10.0),
+            np.full(num_time_steps - num_time_steps // 2, 50.0),
+        ]
+    )
+
+    # Run the simulation with the time-varying current
+    result = custom_model.compute(current_external=current_waveform)
+
+    # Check basic properties of the result
+    assert isinstance(result, pd.DataFrame)
+    assert len(result) == num_time_steps
+
+    # Find the point where current changes
+    midpoint_time = duration / 2
+
+    # Get voltages before and after current change
+    # (give some time for the effect to manifest)
+    early_voltages = result.loc[result.index < midpoint_time - 5, "voltage"]
+    late_voltages = result.loc[result.index > midpoint_time + 5, "voltage"]
+
+    # The maximum voltage should be higher in the second half when the current is higher
+    assert late_voltages.max() > early_voltages.max()
+
+
+def test_simulation_time_from_current_waveform(hh_model):
+    """Test that simulation time is correctly derived from the current waveform length."""
+    time_step = 0.01
+    custom_model = HodgkinHuxley(time_step=time_step)
+
+    # Create a current waveform of specific length
+    duration = 75.0  # ms
+    num_steps = int(duration / time_step) + 1
+    current_waveform = np.ones(num_steps) * 20.0  # constant current
+
+    # Run simulation with only the current waveform, no simulation_time
+    result = custom_model.compute(current_external=current_waveform)
+
+    # Check that the simulation time matches what we expect from the current array length
+    expected_simulation_time = (len(current_waveform) - 1) * time_step
+    actual_simulation_time = result.index[-1]
+
+    assert actual_simulation_time == pytest.approx(expected_simulation_time)
+    assert len(result) == num_steps
