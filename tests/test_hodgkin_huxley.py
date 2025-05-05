@@ -269,7 +269,9 @@ def test_compute_with_different_currents(hh_model):
 
 
 def test_simulation_time_from_current_waveform(hh_model):
-    """Test that simulation time is correctly derived from the current waveform length."""
+    """Test that simulation time is correctly derived from the current waveform
+    length.
+    """
     time_step = 0.01
     custom_model = HodgkinHuxley(time_step=time_step)
 
@@ -281,7 +283,8 @@ def test_simulation_time_from_current_waveform(hh_model):
     # Run simulation with only the current waveform, no simulation_time
     result = custom_model.compute(current_external=current_waveform)
 
-    # Check that the simulation time matches what we expect from the current array length
+    # Check that the simulation time matches what we expect from the current array
+    # length
     expected_simulation_time = (len(current_waveform) - 1) * time_step
     actual_simulation_time = result.index[-1]
 
