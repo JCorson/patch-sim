@@ -156,12 +156,17 @@ class HodgkinHuxley:
         """
         return 1 / (1 + self.safe_exp(-(V + 35) / 10))
 
-    def compute(
+    def simulate_current_clamp(
         self,
         current_external: Union[np.ndarray, list],
     ) -> pd.DataFrame:
         """
-        Simulate the membrane voltage over time using the Hodgkin-Huxley model.
+        Simulate a current clamp experiment using the Hodgkin-Huxley model.
+
+        In a current clamp experiment, current is injected into the cell membrane and
+        the resulting voltage changes are recorded. This method simulates this process
+        by computing the membrane voltage over time in response to the specified
+        external current.
 
         Parameters:
             current_external (Union[np.ndarray, list]): External current in uA/cm^2.

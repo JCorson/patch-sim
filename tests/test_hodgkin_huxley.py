@@ -1,7 +1,3 @@
-"""
-Tests for the Hodgkin-Huxley model implementation.
-"""
-
 import pytest
 import pandas as pd
 import numpy as np
@@ -34,15 +30,19 @@ def test_initialization(hh_model):
     assert -70.0 < hh_model.E_L < -40.0
 
 
-def test_compute_returns_dataframe(hh_model_custom_timestep):
-    """Test that compute method returns a pandas DataFrame with correct structure."""
+def test_simulate_current_clamp_returns_dataframe(hh_model_custom_timestep):
+    """Test that simulate_current_clamp method returns a pandas DataFrame with correct
+    structure.
+
+    Validates the data types and structure of the returned DataFrame.
+    """
     # Create a current array for a 10ms simulation
     duration = 10  # ms
     time_step = hh_model_custom_timestep.time_step
     num_steps = int(duration / time_step) + 1
     current = np.full(num_steps, 20.0)  # constant current
 
-    result = hh_model_custom_timestep.compute(current_external=current)
+    result = hh_model_custom_timestep.simulate_current_clamp(current_external=current)
 
     # Check result type
     assert isinstance(result, pd.DataFrame)
@@ -88,7 +88,7 @@ def test_simulation_dynamics(hh_model):
     num_steps = int(duration / time_step) + 1
     current = np.full(num_steps, 20.0)  # constant current
 
-    result = custom_model.compute(current_external=current)
+    result = custom_model.simulate_current_clamp(current_external=current)
 
     # Voltage should change from initial value
     initial_voltage = result["voltage"].iloc[0]
@@ -103,9 +103,9 @@ def test_simulation_dynamics(hh_model):
     assert result["sodium_activation"].max() > result["sodium_activation"].iloc[0]
 
 
-def test_compute_with_zero_current(hh_model_custom_timestep):
+def test_simulate_current_clamp_with_zero_current(hh_model_custom_timestep):
     """
-    Test the compute method with zero external current.
+    Test the simulate_current_clamp method with zero external current.
     Small fluctuations in voltage may occur due to intrinsic dynamics.
     """
     # Create zero current array for a 10ms simulation
@@ -114,7 +114,9 @@ def test_compute_with_zero_current(hh_model_custom_timestep):
     num_steps = int(duration / time_step) + 1
     zero_current = np.zeros(num_steps)  # zero current array
 
-    result = hh_model_custom_timestep.compute(current_external=zero_current)
+    result = hh_model_custom_timestep.simulate_current_clamp(
+        current_external=zero_current
+    )
 
     # Check result type and structure
     assert isinstance(result, pd.DataFrame)
@@ -137,8 +139,9 @@ def test_compute_with_zero_current(hh_model_custom_timestep):
     )
 
 
-def test_compute_with_non_zero_currents(hh_model):
-    """Test the compute method with various non-zero external currents."""
+def test_simulate_current_clamp_with_non_zero_currents(hh_model):
+    """Test the simulate_current_clamp method with various non-zero external
+    currents."""
     currents = [10.0, 20.0, 50.0]  # Different external currents to test
     duration = 10  # ms
 
@@ -151,7 +154,7 @@ def test_compute_with_non_zero_currents(hh_model):
         # Create constant current array for each value
         current_array = np.full(num_steps, current_value)
 
-        result = custom_model.compute(current_external=current_array)
+        result = custom_model.simulate_current_clamp(current_external=current_array)
 
         # Check result type and structure
         assert isinstance(result, pd.DataFrame)
@@ -199,7 +202,7 @@ def test_physiological_limits_and_action_potentials(hh_model):
         # Create constant current array for each value
         current_array = np.full(num_steps, current_value)
 
-        result = custom_model.compute(current_external=current_array)
+        result = custom_model.simulate_current_clamp(current_external=current_array)
 
         # Test that voltage stays within physiological limits
         assert result["voltage"].min() >= min_physiological_voltage, (
@@ -229,8 +232,8 @@ def test_physiological_limits_and_action_potentials(hh_model):
         )
 
 
-def test_compute_with_different_currents(hh_model):
-    """Test the compute method with a time-varying current waveform."""
+def test_simulate_current_clamp_with_different_currents(hh_model):
+    """Test the simulate_current_clamp method with a time-varying current waveform."""
     duration = 50  # ms
     time_step = 0.01  # ms
 
@@ -250,7 +253,7 @@ def test_compute_with_different_currents(hh_model):
     )
 
     # Run the simulation with the time-varying current
-    result = custom_model.compute(current_external=current_waveform)
+    result = custom_model.simulate_current_clamp(current_external=current_waveform)
 
     # Check basic properties of the result
     assert isinstance(result, pd.DataFrame)
@@ -281,7 +284,7 @@ def test_simulation_time_from_current_waveform(hh_model):
     current_waveform = np.ones(num_steps) * 20.0  # constant current
 
     # Run simulation with only the current waveform, no simulation_time
-    result = custom_model.compute(current_external=current_waveform)
+    result = custom_model.simulate_current_clamp(current_external=current_waveform)
 
     # Check that the simulation time matches what we expect from the current array
     # length
