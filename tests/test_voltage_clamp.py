@@ -5,7 +5,8 @@ Tests for the voltage clamp simulation in the Hodgkin-Huxley model.
 import pytest
 import pandas as pd
 import numpy as np
-from ap_sim.hodgkin_huxley import HodgkinHuxley, simulate_voltage_clamp
+from ap_sim.hodgkin_huxley import HodgkinHuxley
+from ap_sim.clamp_simulations import simulate_voltage_clamp
 
 
 @pytest.fixture
