@@ -5,7 +5,7 @@ Tests for the voltage clamp simulation in the Hodgkin-Huxley model.
 import pytest
 import pandas as pd
 import numpy as np
-from ap_sim.hodgkin_huxley import HodgkinHuxley
+from ap_sim.hodgkin_huxley import HodgkinHuxley, simulate_voltage_clamp
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ def test_simulate_voltage_clamp_returns_dataframe(hh_model):
     num_steps = int(duration / time_step) + 1
     voltage = np.full(num_steps, -65.0)  # constant voltage at resting potential
 
-    result = hh_model.simulate_voltage_clamp(voltage_protocol=voltage)
+    result = simulate_voltage_clamp(hh_model, voltage_protocol=voltage)
 
     # Check result type
     assert isinstance(result, pd.DataFrame)
@@ -57,7 +57,7 @@ def test_voltage_clamp_constant_voltage(hh_model):
 
     # Test at resting potential
     resting_voltage = np.full(num_steps, hh_model.v_rest)
-    result_rest = hh_model.simulate_voltage_clamp(voltage_protocol=resting_voltage)
+    result_rest = simulate_voltage_clamp(hh_model, voltage_protocol=resting_voltage)
 
     # At resting potential, the current might not be exactly zero
     # Check that current settles to a relatively small value
@@ -65,7 +65,9 @@ def test_voltage_clamp_constant_voltage(hh_model):
 
     # Test at depolarized potential
     depolarized_voltage = np.full(num_steps, 0.0)  # 0 mV is strongly depolarized
-    result_depol = hh_model.simulate_voltage_clamp(voltage_protocol=depolarized_voltage)
+    result_depol = simulate_voltage_clamp(
+        hh_model, voltage_protocol=depolarized_voltage
+    )
 
     # Depolarization should activate Na+ and K+ channels
     # Na+ current should be significant at depolarized voltages
@@ -103,7 +105,7 @@ def test_voltage_step_protocol(hh_model):
         ]
     )
 
-    result = custom_model.simulate_voltage_clamp(voltage_protocol=voltage_protocol)
+    result = simulate_voltage_clamp(custom_model, voltage_protocol=voltage_protocol)
 
     # Verify voltage protocol was applied correctly
     assert result["voltage"].iloc[0] == -80.0
@@ -152,7 +154,7 @@ def test_voltage_clamp_i_v_relationship(hh_model):
     # Run voltage clamp at each test voltage
     for v in voltages:
         voltage_protocol = np.full(num_steps, v)
-        result = custom_model.simulate_voltage_clamp(voltage_protocol=voltage_protocol)
+        result = simulate_voltage_clamp(custom_model, voltage_protocol=voltage_protocol)
 
         # Get steady-state total current (last time point)
         steady_state_currents.append(result["total_current"].iloc[-1])
@@ -205,7 +207,7 @@ def test_voltage_ramp_protocol(hh_model):
     num_steps = int(duration / time_step) + 1
     voltage_protocol = np.linspace(-80, 40, num_steps)
 
-    result = custom_model.simulate_voltage_clamp(voltage_protocol=voltage_protocol)
+    result = simulate_voltage_clamp(custom_model, voltage_protocol=voltage_protocol)
 
     # Verify voltage protocol was applied correctly
     assert np.isclose(result["voltage"].iloc[0], -80.0)
