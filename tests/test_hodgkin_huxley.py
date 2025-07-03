@@ -18,7 +18,6 @@ def test_initialization(hh_model):
     assert hh_model.g_Na == pytest.approx(120.0)
     assert hh_model.g_K == pytest.approx(36.0)
     assert hh_model.g_L == pytest.approx(0.3)
-    assert hh_model.time_step == pytest.approx(0.01)
 
     # Test that reversal potentials are within expected ranges
     assert 60.0 < hh_model.E_Na < 65.0
@@ -89,13 +88,12 @@ def test_time_constants(hh_model):
 
 def test_custom_initialization():
     """Test that the model can be initialized with custom parameters."""
-    custom_time_step = 0.05
-    custom_model = HodgkinHuxley(time_step=custom_time_step)
+    custom_g_Na = 100.0
+    custom_model = HodgkinHuxley(g_Na=custom_g_Na)
 
-    assert custom_model.time_step == pytest.approx(custom_time_step)
+    assert custom_model.g_Na == pytest.approx(custom_g_Na)
 
     # Other parameters should still have default values
     assert custom_model.C_m == pytest.approx(1.0)
-    assert custom_model.g_Na == pytest.approx(120.0)
     assert custom_model.g_K == pytest.approx(36.0)
     assert custom_model.g_L == pytest.approx(0.3)

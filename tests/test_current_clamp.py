@@ -17,8 +17,8 @@ def hh_model():
 
 @pytest.fixture
 def hh_model_custom_timestep():
-    """Fixture to create a HodgkinHuxley model instance with custom timestep."""
-    return HodgkinHuxley(time_step=0.1)
+    """Fixture to create a HodgkinHuxley model instance."""
+    return HodgkinHuxley()
 
 
 def test_simulate_current_clamp_returns_dataframe(hh_model_custom_timestep):
@@ -29,11 +29,15 @@ def test_simulate_current_clamp_returns_dataframe(hh_model_custom_timestep):
     """
     # Create a current array for a 10ms simulation
     duration = 10  # ms
-    time_step = hh_model_custom_timestep.time_step
+    time_step = 0.1  # ms
     num_steps = int(duration / time_step) + 1
     current = np.full(num_steps, 20.0)  # constant current
 
-    result = simulate_current_clamp(hh_model_custom_timestep, current_external=current)
+    result = simulate_current_clamp(
+        hh_model_custom_timestep,
+        current_external=current,
+        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
+    )
 
     # Check result type
     assert isinstance(result, pd.DataFrame)
@@ -64,16 +68,20 @@ def test_simulate_current_clamp_returns_dataframe(hh_model_custom_timestep):
 
 def test_simulation_dynamics(hh_model):
     """Test that the simulation shows expected dynamics."""
-    # Create model with specific time step
-    custom_model = HodgkinHuxley(time_step=0.05)
+    # Create model for testing
+    custom_model = HodgkinHuxley()
 
     # Create current array for a 50ms simulation
     duration = 50  # ms
-    time_step = custom_model.time_step
+    time_step = 0.05  # ms
     num_steps = int(duration / time_step) + 1
     current = np.full(num_steps, 20.0)  # constant current
 
-    result = simulate_current_clamp(custom_model, current_external=current)
+    result = simulate_current_clamp(
+        custom_model,
+        current_external=current,
+        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
+    )
 
     # Voltage should change from initial value
     initial_voltage = result["voltage"].iloc[0]
@@ -95,12 +103,14 @@ def test_simulate_current_clamp_with_zero_current(hh_model_custom_timestep):
     """
     # Create zero current array for a 10ms simulation
     duration = 10  # ms
-    time_step = hh_model_custom_timestep.time_step
+    time_step = 0.1  # ms
     num_steps = int(duration / time_step) + 1
     zero_current = np.zeros(num_steps)  # zero current array
 
     result = simulate_current_clamp(
-        hh_model_custom_timestep, current_external=zero_current
+        hh_model_custom_timestep,
+        current_external=zero_current,
+        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
     )
 
     # Check result type and structure
@@ -129,16 +139,20 @@ def test_simulate_current_clamp_with_non_zero_currents(hh_model):
     currents = [10.0, 20.0, 50.0]  # Different external currents to test
     duration = 10  # ms
 
-    # Create a model with specific time_step
-    custom_model = HodgkinHuxley(time_step=0.1)
-    time_step = custom_model.time_step
+    # Create a model for testing
+    custom_model = HodgkinHuxley()
+    time_step = 0.1  # ms
     num_steps = int(duration / time_step) + 1
 
     for current_value in currents:
         # Create constant current array for each value
         current_array = np.full(num_steps, current_value)
 
-        result = simulate_current_clamp(custom_model, current_external=current_array)
+        result = simulate_current_clamp(
+            custom_model,
+            current_external=current_array,
+            sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
+        )
 
         # Check result type and structure
         assert isinstance(result, pd.DataFrame)
@@ -185,9 +199,9 @@ def test_physiological_limits_and_action_potentials(hh_model):
     currents = [20.0, 40.0, 60.0]  # increasing external currents in μA/cm²
     ap_threshold = 0  # mV, voltage threshold for counting action potentials
 
-    # Create a model with specific time_step
-    custom_model = HodgkinHuxley(time_step=0.1)
-    time_step = custom_model.time_step
+    # Create a model for testing
+    custom_model = HodgkinHuxley()
+    time_step = 0.1  # ms
     num_steps = int(duration / time_step) + 1
 
     ap_counts = []
@@ -196,7 +210,11 @@ def test_physiological_limits_and_action_potentials(hh_model):
         # Create constant current array for each value
         current_array = np.full(num_steps, current_value)
 
-        result = simulate_current_clamp(custom_model, current_external=current_array)
+        result = simulate_current_clamp(
+            custom_model,
+            current_external=current_array,
+            sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
+        )
 
         # Test that voltage stays within physiological limits
         assert result["voltage"].min() >= min_physiological_voltage, (
@@ -232,8 +250,8 @@ def test_simulate_current_clamp_with_different_currents(hh_model):
     duration = 50  # ms
     time_step = 0.01  # ms
 
-    # Create a custom model with our desired time step
-    custom_model = HodgkinHuxley(time_step=time_step)
+    # Create a custom model for testing
+    custom_model = HodgkinHuxley()
 
     # Calculate the number of time steps
     num_time_steps = int(duration / time_step) + 1
@@ -248,7 +266,11 @@ def test_simulate_current_clamp_with_different_currents(hh_model):
     )
 
     # Run the simulation with the time-varying current
-    result = simulate_current_clamp(custom_model, current_external=current_waveform)
+    result = simulate_current_clamp(
+        custom_model,
+        current_external=current_waveform,
+        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
+    )
 
     # Check basic properties of the result
     assert isinstance(result, pd.DataFrame)
@@ -276,8 +298,8 @@ def test_simulation_time_from_current_waveform(hh_model):
     """Test that simulation time is correctly derived from the current waveform
     length.
     """
-    time_step = 0.01
-    custom_model = HodgkinHuxley(time_step=time_step)
+    time_step = 0.01  # ms
+    custom_model = HodgkinHuxley()
 
     # Create a current waveform of specific length
     duration = 75.0  # ms
@@ -285,7 +307,11 @@ def test_simulation_time_from_current_waveform(hh_model):
     current_waveform = np.ones(num_steps) * 20.0  # constant current
 
     # Run simulation with only the current waveform, no simulation_time
-    result = simulate_current_clamp(custom_model, current_external=current_waveform)
+    result = simulate_current_clamp(
+        custom_model,
+        current_external=current_waveform,
+        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
+    )
 
     # Check that the simulation time matches what we expect from the current array
     # length

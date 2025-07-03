@@ -19,7 +19,7 @@ def test_simulate_voltage_clamp_returns_dataframe(hh_model):
     """Test that simulate_voltage_clamp returns a DataFrame with correct structure."""
     # Create a voltage protocol for a 10ms simulation
     duration = 10  # ms
-    time_step = hh_model.time_step
+    time_step = 0.01  # ms
     num_steps = int(duration / time_step) + 1
     voltage = np.full(num_steps, -65.0)  # constant voltage at resting potential
 
@@ -53,7 +53,7 @@ def test_voltage_clamp_constant_voltage(hh_model):
     """Test voltage clamp with constant voltage."""
     # Create voltage protocol at different voltage levels
     duration = 20  # ms
-    time_step = hh_model.time_step
+    time_step = 0.01  # ms
     num_steps = int(duration / time_step) + 1
 
     # Test at resting potential
@@ -89,9 +89,9 @@ def test_voltage_clamp_constant_voltage(hh_model):
 
 def test_voltage_step_protocol(hh_model):
     """Test voltage clamp with a step protocol."""
-    # Create a custom model with specific time_step for testing
-    custom_model = HodgkinHuxley(time_step=0.05)
-    time_step = custom_model.time_step
+    # Create a custom model for testing
+    custom_model = HodgkinHuxley()
+    time_step = 0.05  # ms
 
     # Create a voltage step protocol: hold at -80 mV, step to 0 mV, return to -80 mV
     hold_steps = int(5 / time_step)  # 5 ms holding period
@@ -106,7 +106,11 @@ def test_voltage_step_protocol(hh_model):
         ]
     )
 
-    result = simulate_voltage_clamp(custom_model, voltage_protocol=voltage_protocol)
+    result = simulate_voltage_clamp(
+        custom_model,
+        voltage_protocol=voltage_protocol,
+        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
+    )
 
     # Verify voltage protocol was applied correctly
     assert result["voltage"].iloc[0] == -80.0
@@ -140,8 +144,9 @@ def test_voltage_step_protocol(hh_model):
 
 def test_voltage_clamp_i_v_relationship(hh_model):
     """Test the current-voltage relationship in voltage clamp."""
-    # Create a custom model with larger time steps for efficiency
-    custom_model = HodgkinHuxley(time_step=0.1)
+    # Create a custom model for testing
+    custom_model = HodgkinHuxley()
+    time_step = 0.1  # ms for efficiency
 
     # Test voltage range
     voltages = np.arange(-100, 51, 10)  # -100 to +50 mV in steps of 10 mV
@@ -149,13 +154,16 @@ def test_voltage_clamp_i_v_relationship(hh_model):
     peak_na_currents = []
 
     duration = 20  # ms, long enough to reach steady state
-    time_step = custom_model.time_step
     num_steps = int(duration / time_step) + 1
 
     # Run voltage clamp at each test voltage
     for v in voltages:
         voltage_protocol = np.full(num_steps, v)
-        result = simulate_voltage_clamp(custom_model, voltage_protocol=voltage_protocol)
+        result = simulate_voltage_clamp(
+            custom_model,
+            voltage_protocol=voltage_protocol,
+            sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
+        )
 
         # Get steady-state total current (last time point)
         steady_state_currents.append(result["total_current"].iloc[-1])
@@ -199,16 +207,20 @@ def test_voltage_clamp_i_v_relationship(hh_model):
 
 def test_voltage_ramp_protocol(hh_model):
     """Test voltage clamp with a voltage ramp protocol."""
-    # Create a custom model with specific time_step for testing
-    custom_model = HodgkinHuxley(time_step=0.05)
-    time_step = custom_model.time_step
+    # Create a custom model for testing
+    custom_model = HodgkinHuxley()
+    time_step = 0.05  # ms
 
     # Create a voltage ramp protocol from -80 mV to +40 mV over 20 ms
     duration = 20  # ms
     num_steps = int(duration / time_step) + 1
     voltage_protocol = np.linspace(-80, 40, num_steps)
 
-    result = simulate_voltage_clamp(custom_model, voltage_protocol=voltage_protocol)
+    result = simulate_voltage_clamp(
+        custom_model,
+        voltage_protocol=voltage_protocol,
+        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
+    )
 
     # Verify voltage protocol was applied correctly
     assert np.isclose(result["voltage"].iloc[0], -80.0)

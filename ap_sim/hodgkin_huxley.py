@@ -22,7 +22,6 @@ class HodgkinHuxley:
         E_K (float): Potassium reversal potential in mV.
         E_L (float): Leak reversal potential in mV.
         v_rest (float): Resting potential in mV.
-        time_step (float): Time step for simulation in ms.
     """
 
     def __init__(
@@ -31,7 +30,6 @@ class HodgkinHuxley:
         g_K: float = 36.0,
         g_L: float = 0.3,
         v_rest: float = -65.0,
-        time_step: float = 0.01,
     ) -> None:
         """
         Initialize the Hodgkin-Huxley model with default or user-defined parameters.
@@ -41,14 +39,12 @@ class HodgkinHuxley:
             g_K (float): Potassium conductance in mS/cm^2.
             g_L (float): Leak conductance in mS/cm^2.
             v_rest (float): Resting membrane potential in mV.
-            time_step (float): Time step for simulation in ms.
         """
         self.C_m: float = 1.0
         self.g_Na: float = g_Na
         self.g_K: float = g_K
         self.g_L: float = g_L
         self.v_rest: float = v_rest
-        self.time_step: float = time_step
 
         # Ion concentrations (in mM)
         Na_out: float = 145.0  # Extracellular sodium

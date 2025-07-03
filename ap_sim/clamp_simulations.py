@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 def simulate_voltage_clamp(
     neuron: "HodgkinHuxley",
     voltage_protocol: Union[np.ndarray, list],
+    sampling_frequency: float = 100000.0,  # Hz (100 kHz default)
 ) -> pd.DataFrame:
     """
     Simulate a voltage clamp experiment using the Hodgkin-Huxley model.
@@ -31,6 +32,9 @@ def simulate_voltage_clamp(
             the membrane at for each time step. Must be an array/list for a
             time-varying voltage protocol. The length of the array determines the
             simulation duration.
+        sampling_frequency (float): Sampling frequency in Hz for the simulation.
+            Default is 100 kHz (0.01 ms time steps). Higher frequencies give
+            finer temporal resolution but increase computation time.
 
     Returns:
         pd.DataFrame: DataFrame with time points and corresponding current values
@@ -42,12 +46,15 @@ def simulate_voltage_clamp(
     voltage_array = np.asarray(voltage_protocol)
     num_time_steps = len(voltage_array)
 
+    # Calculate time step from sampling frequency
+    time_step = 1.0 / sampling_frequency * 1000.0  # Convert Hz to milliseconds
+
     # Calculate the actual simulation time
-    actual_simulation_time = (num_time_steps - 1) * neuron.time_step
+    actual_simulation_time = (num_time_steps - 1) * time_step
 
     # Create time array for the entire simulation
     time_array = np.round(
-        np.arange(0, actual_simulation_time + neuron.time_step, neuron.time_step), 10
+        np.arange(0, actual_simulation_time + time_step, time_step), 10
     )
 
     # Ensure the time array matches the voltage array length
@@ -136,9 +143,9 @@ def simulate_voltage_clamp(
         )
 
         # Update gating variables
-        new_potassium_activation = potassium_activation + dn * neuron.time_step
-        new_sodium_activation = sodium_activation + dm * neuron.time_step
-        new_sodium_inactivation = sodium_inactivation + dh * neuron.time_step
+        new_potassium_activation = potassium_activation + dn * time_step
+        new_sodium_activation = sodium_activation + dm * time_step
+        new_sodium_inactivation = sodium_inactivation + dh * time_step
 
         # Ensure gating variables remain within physiological bounds (0 to 1)
         results.loc[t, "potassium_activation"] = np.clip(new_potassium_activation, 0, 1)
@@ -171,6 +178,7 @@ def simulate_voltage_clamp(
 def simulate_current_clamp(
     neuron: "HodgkinHuxley",
     current_external: Union[np.ndarray, list],
+    sampling_frequency: float = 100000.0,  # Hz (100 kHz default)
 ) -> pd.DataFrame:
     """
     Simulate a current clamp experiment using the Hodgkin-Huxley model.
@@ -185,6 +193,9 @@ def simulate_current_clamp(
         current_external (Union[np.ndarray, list]): External current in uA/cm^2.
             Must be an array/list for a time-varying current waveform.
             The length of the array determines the simulation duration.
+        sampling_frequency (float): Sampling frequency in Hz for the simulation.
+            Default is 100 kHz (0.01 ms time steps). Higher frequencies give
+            finer temporal resolution but increase computation time.
 
     Returns:
         pd.DataFrame: DataFrame with time points and corresponding voltage values,
@@ -195,12 +206,15 @@ def simulate_current_clamp(
     current_array = np.asarray(current_external)
     num_time_steps = len(current_array)
 
+    # Calculate time step from sampling frequency
+    time_step = 1.0 / sampling_frequency * 1000.0  # Convert Hz to milliseconds
+
     # Calculate the actual simulation time
-    actual_simulation_time = (num_time_steps - 1) * neuron.time_step
+    actual_simulation_time = (num_time_steps - 1) * time_step
 
     # Create time array for the entire simulation
     time_array = np.round(
-        np.arange(0, actual_simulation_time + neuron.time_step, neuron.time_step), 10
+        np.arange(0, actual_simulation_time + time_step, time_step), 10
     )
 
     # Ensure the time array matches the current array length
@@ -271,10 +285,10 @@ def simulate_current_clamp(
         )
 
         # Calculate new values
-        new_voltage = voltage + dV * neuron.time_step
-        new_potassium_activation = potassium_activation + dn * neuron.time_step
-        new_sodium_activation = sodium_activation + dm * neuron.time_step
-        new_sodium_inactivation = sodium_inactivation + dh * neuron.time_step
+        new_voltage = voltage + dV * time_step
+        new_potassium_activation = potassium_activation + dn * time_step
+        new_sodium_activation = sodium_activation + dm * time_step
+        new_sodium_inactivation = sodium_inactivation + dh * time_step
 
         # Ensure values remain within physiological bounds
         results.at[t, "voltage"] = float(np.clip(new_voltage, min_voltage, max_voltage))
