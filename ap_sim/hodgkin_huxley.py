@@ -3,12 +3,14 @@ This module implements the Hodgkin-Huxley model for simulating action potentials
 The model includes equations for ion channel dynamics and membrane voltage.
 """
 
+from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 from .nernst_neuron import nernst_potential
 from .utils import safe_exp, FloatOrArray
 
 
+@dataclass
 class HodgkinHuxley:
     """
     Simulates the Hodgkin-Huxley model of action potentials.
@@ -24,28 +26,19 @@ class HodgkinHuxley:
         v_rest (float): Resting potential in mV.
     """
 
-    def __init__(
-        self,
-        g_Na: float = 120.0,
-        g_K: float = 36.0,
-        g_L: float = 0.3,
-        v_rest: float = -65.0,
-    ) -> None:
-        """
-        Initialize the Hodgkin-Huxley model with default or user-defined parameters.
+    g_Na: float = 120.0
+    g_K: float = 36.0
+    g_L: float = 0.3
+    v_rest: float = -65.0
+    C_m: float = field(default=1.0, init=False)
+    E_Na: float = field(init=False)
+    E_K: float = field(init=False)
+    E_L: float = field(init=False)
 
-        Args:
-            g_Na (float): Sodium conductance in mS/cm^2.
-            g_K (float): Potassium conductance in mS/cm^2.
-            g_L (float): Leak conductance in mS/cm^2.
-            v_rest (float): Resting membrane potential in mV.
+    def __post_init__(self) -> None:
         """
-        self.C_m: float = 1.0
-        self.g_Na: float = g_Na
-        self.g_K: float = g_K
-        self.g_L: float = g_L
-        self.v_rest: float = v_rest
-
+        Calculate reversal potentials after initialization.
+        """
         # Ion concentrations (in mM)
         Na_out: float = 145.0  # Extracellular sodium
         Na_in: float = 15.0  # Intracellular sodium
@@ -59,11 +52,11 @@ class HodgkinHuxley:
         # cells.
         T: float = 310.15
         # Sodium reversal potential
-        self.E_Na: float = nernst_potential(1, T, Na_out, Na_in)
+        self.E_Na = nernst_potential(1, T, Na_out, Na_in)
         # Potassium reversal potential
-        self.E_K: float = nernst_potential(1, T, K_out, K_in)
+        self.E_K = nernst_potential(1, T, K_out, K_in)
         # Leak reversal potential
-        self.E_L: float = nernst_potential(-1, T, Cl_out, Cl_in)
+        self.E_L = nernst_potential(-1, T, Cl_out, Cl_in)
 
     def alpha_n(self, V: FloatOrArray) -> FloatOrArray:
         """
