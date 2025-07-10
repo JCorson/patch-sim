@@ -5,15 +5,9 @@ This module contains shared utility functions used across different modules.
 """
 
 import numpy as np
-from numpy.typing import NDArray
-import pandas as pd
-from typing import Union
-
-# Type aliases to support both scalar and array inputs
-FloatOrArray = Union[float, NDArray[np.float64], pd.Series]
 
 
-def safe_exp(x: FloatOrArray) -> FloatOrArray:
+def safe_exp(x: float) -> float:
     """
     Safely compute the exponential to avoid overflow and underflow.
 
@@ -23,9 +17,9 @@ def safe_exp(x: FloatOrArray) -> FloatOrArray:
     very small.
 
     Parameters:
-        x (FloatOrArray): The input value or array.
+        x (float): The input value.
 
     Returns:
-        FloatOrArray: The computed exponential value, capped to prevent overflow.
+        float: The computed exponential value, capped to prevent overflow.
     """
     return np.exp(np.clip(x, -100, 100))

@@ -74,7 +74,7 @@ def simulate_voltage_clamp(
             "sodium_activation",
             "sodium_inactivation",
         ],
-        dtype=np.float64,  # Set float dtype for all columns
+        dtype=np.float64,
     )
     results.index.name = "time"
 
@@ -91,10 +91,11 @@ def simulate_voltage_clamp(
         neuron.alpha_h(initial_voltage) + neuron.beta_h(initial_voltage)
     )
 
-    # Calculate initial currents
-    sodium_activation = results.loc[0, "sodium_activation"]
-    sodium_inactivation = results.loc[0, "sodium_inactivation"]
-    potassium_activation = results.loc[0, "potassium_activation"]
+    # Calculate initial currents (ignore typechecking because pandas column dtypes are
+    # not checked by mypy and pandas-stubs)
+    sodium_activation = float(results.loc[0, "sodium_activation"])  # type: ignore
+    sodium_inactivation = float(results.loc[0, "sodium_inactivation"])  # type: ignore
+    potassium_activation = float(results.loc[0, "potassium_activation"])  # type: ignore
 
     # Calculate conductances and currents
     conductance_Na = neuron.g_Na * (sodium_activation**3) * sodium_inactivation
@@ -123,10 +124,11 @@ def simulate_voltage_clamp(
         voltage = voltage_array[i]
         results.loc[t, "voltage"] = voltage
 
-        # Get previous state variables
-        potassium_activation = results.loc[previous_time, "potassium_activation"]
-        sodium_activation = results.loc[previous_time, "sodium_activation"]
-        sodium_inactivation = results.loc[previous_time, "sodium_inactivation"]
+        # Get previous state variables (ignore typechecking because pandas column dtypes
+        # are not checked by mypy and pandas-stubs)
+        potassium_activation = float(results.loc[previous_time, "potassium_activation"])  # type: ignore
+        sodium_activation = float(results.loc[previous_time, "sodium_activation"])  # type: ignore
+        sodium_inactivation = float(results.loc[previous_time, "sodium_inactivation"])  # type: ignore
 
         # Calculate rate of change for gating variables
         dn = (
@@ -254,10 +256,13 @@ def simulate_current_clamp(
     for i, t in enumerate(results.index[1:], start=1):
         previous_idx = i - 1
         previous_time = results.index[previous_idx]
-        voltage = results.loc[previous_time, "voltage"]
-        potassium_activation = results.loc[previous_time, "potassium_activation"]
-        sodium_activation = results.loc[previous_time, "sodium_activation"]
-        sodium_inactivation = results.loc[previous_time, "sodium_inactivation"]
+
+        # Ignore typechecking because pandas column dtypes are not checked by mypy and
+        # pandas-stubs
+        voltage = float(results.loc[previous_time, "voltage"])  # type: ignore
+        potassium_activation = float(results.loc[previous_time, "potassium_activation"])  # type: ignore
+        sodium_activation = float(results.loc[previous_time, "sodium_activation"])  # type: ignore
+        sodium_inactivation = float(results.loc[previous_time, "sodium_inactivation"])  # type: ignore
 
         conductance_Na = neuron.g_Na * (sodium_activation**3) * sodium_inactivation
         conductance_K = neuron.g_K * (potassium_activation**4)
