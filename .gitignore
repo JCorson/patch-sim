@@ -2,7 +2,10 @@
 *.db
 assets/external/
 *.py[cod]
-.web
+.mypy_cache/
+.pytest_cache/
+.coverage
+
 # Python-generated files
 __pycache__/
 *.py[oc]
