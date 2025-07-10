@@ -19,7 +19,7 @@ select = ["E", "F", "W"]
 ignore = []
 
 [project.optional-dependencies]
-dev = ["ruff", "pytest", "mypy"]
+dev = ["ruff", "pytest", "mypy", "pandas-stubs"]
 
 [tool.uv.sources]
 ap_sim = {path = "./ap_sim", editable = true}
