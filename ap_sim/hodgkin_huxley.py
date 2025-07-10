@@ -3,7 +3,8 @@ This module implements the Hodgkin-Huxley model for simulating action potentials
 The model includes equations for ion channel dynamics and membrane voltage.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from functools import cached_property
 import numpy as np
 import pandas as pd
 from .nernst_neuron import nernst_potential
@@ -24,39 +25,47 @@ class HodgkinHuxley:
         E_K (float): Potassium reversal potential in mV.
         E_L (float): Leak reversal potential in mV.
         v_rest (float): Resting potential in mV.
+        Na_out (float): Extracellular sodium concentration in mM.
+        Na_in (float): Intracellular sodium concentration in mM.
+        K_out (float): Extracellular potassium concentration in mM.
+        K_in (float): Intracellular potassium concentration in mM.
+        Cl_out (float): Extracellular chloride concentration in mM.
+        Cl_in (float): Intracellular chloride concentration in mM.
+        T (float): Temperature in Kelvin.
     """
 
+    # Membrane properties
     g_Na: float = 120.0
     g_K: float = 36.0
     g_L: float = 0.3
+    C_m: float = 1.0
     v_rest: float = -65.0
-    C_m: float = field(default=1.0, init=False)
-    E_Na: float = field(init=False)
-    E_K: float = field(init=False)
-    E_L: float = field(init=False)
 
-    def __post_init__(self) -> None:
-        """
-        Calculate reversal potentials after initialization.
-        """
-        # Ion concentrations (in mM)
-        Na_out: float = 145.0  # Extracellular sodium
-        Na_in: float = 15.0  # Intracellular sodium
-        K_out: float = 5.0  # Extracellular potassium
-        K_in: float = 140.0  # Intracellular potassium
-        Cl_out: float = 120.0  # Extracellular chloride
-        Cl_in: float = 10.0  # Intracellular chloride
+    # Ion concentrations (in mM)
+    Na_out: float = 145.0
+    Na_in: float = 15.0
+    K_out: float = 5.0
+    K_in: float = 140.0
+    Cl_out: float = 120.0
+    Cl_in: float = 10.0
 
-        # Calculate reversal potentials using the Nernst equation
-        # Temperature in Kelvin set to 310.15 K (37°C), which is typical for mammalian
-        # cells.
-        T: float = 310.15
-        # Sodium reversal potential
-        self.E_Na = nernst_potential(1, T, Na_out, Na_in)
-        # Potassium reversal potential
-        self.E_K = nernst_potential(1, T, K_out, K_in)
-        # Leak reversal potential
-        self.E_L = nernst_potential(-1, T, Cl_out, Cl_in)
+    # Temperature in Kelvin (37°C for mammalian cells)
+    T: float = 310.15
+
+    @cached_property
+    def E_Na(self) -> float:
+        """Sodium reversal potential in mV."""
+        return nernst_potential(1, self.T, self.Na_out, self.Na_in)
+
+    @cached_property
+    def E_K(self) -> float:
+        """Potassium reversal potential in mV."""
+        return nernst_potential(1, self.T, self.K_out, self.K_in)
+
+    @cached_property
+    def E_L(self) -> float:
+        """Leak reversal potential in mV."""
+        return nernst_potential(-1, self.T, self.Cl_out, self.Cl_in)
 
     def alpha_n(self, V: FloatOrArray) -> FloatOrArray:
         """
