@@ -5,10 +5,8 @@ The model includes equations for ion channel dynamics and membrane voltage.
 
 from dataclasses import dataclass
 from functools import cached_property
-import numpy as np
-import pandas as pd
 from .nernst_neuron import nernst_potential
-from .utils import safe_exp, FloatOrArray
+from .utils import safe_exp
 
 
 @dataclass
@@ -67,124 +65,86 @@ class HodgkinHuxley:
         """Leak reversal potential in mV."""
         return nernst_potential(-1, self.T, self.Cl_out, self.Cl_in)
 
-    def alpha_n(self, V: FloatOrArray) -> FloatOrArray:
+    def alpha_n(self, V: float) -> float:
         """
         Calculate the rate constant alpha_n for potassium channel activation.
 
         Parameters:
-            V (FloatOrArray): Membrane voltage in mV.
+            V (float): Membrane voltage in mV.
 
         Returns:
-            FloatOrArray: The rate constant alpha_n.
+            float: The rate constant alpha_n.
         """
-        # Handle array input
-        if isinstance(V, (np.ndarray, pd.Series)):
-            # Create a copy to avoid modifying the original array
-            result = np.zeros_like(V, dtype=float)
-
-            # Calculate values for non-edge cases
-            mask = np.abs(V + 55) > 1e-6  # Points not at the singularity
-            safe_V = V[mask]
-            denominator = 1 - safe_exp(-(safe_V + 55) / 10)
-            result[mask] = 0.01 * (safe_V + 55) / denominator
-
-            # Handle near-singularity cases using L'Hôpital's rule approximation
-            # When V ≈ -55, the function approaches 0.1
-            # This value is derived from the limit as V approaches -55
-            result[~mask] = 0.1
-
-            return result
+        if abs(V + 55) < 1e-6:
+            # Handle near-singularity case
+            # This is the limit as V approaches -55
+            return 0.1
         else:
-            # Handle scalar input
-            if abs(V + 55) < 1e-6:
-                # Handle near-singularity case
-                # This is the limit as V approaches -55
-                return 0.1
-            else:
-                denominator = 1 - safe_exp(-(V + 55) / 10)
-                return 0.01 * (V + 55) / denominator
+            denominator = 1 - safe_exp(-(V + 55) / 10)
+            return 0.01 * (V + 55) / denominator
 
-    def beta_n(self, V: FloatOrArray) -> FloatOrArray:
+    def beta_n(self, V: float) -> float:
         """
         Calculate the rate constant beta_n for potassium channel deactivation.
 
         Parameters:
-            V (FloatOrArray): Membrane voltage in mV.
+            V (float): Membrane voltage in mV.
 
         Returns:
-            FloatOrArray: The rate constant beta_n.
+            float: The rate constant beta_n.
         """
         return 0.125 * safe_exp(-(V + 65) / 80)
 
-    def alpha_m(self, V: FloatOrArray) -> FloatOrArray:
+    def alpha_m(self, V: float) -> float:
         """
         Calculate the rate constant alpha_m for sodium channel activation.
 
         Parameters:
-            V (FloatOrArray): Membrane voltage in mV.
+            V (float): Membrane voltage in mV.
 
         Returns:
-            FloatOrArray: The rate constant alpha_m.
+            float: The rate constant alpha_m.
         """
-        # Handle array input
-        if isinstance(V, (np.ndarray, pd.Series)):
-            # Create a copy to avoid modifying the original array
-            result = np.zeros_like(V, dtype=float)
-
-            # Calculate values for non-edge cases
-            mask = np.abs(V + 40) > 1e-6  # Points not at the singularity
-            safe_V = V[mask]
-            denominator = 1 - safe_exp(-(safe_V + 40) / 10)
-            result[mask] = 0.1 * (safe_V + 40) / denominator
-
-            # Handle near-singularity cases using L'Hôpital's rule approximation
-            # When V ≈ -40, the function approaches 1.0
-            # This value is derived from the limit as V approaches -40
-            result[~mask] = 1.0
-
-            return result
+        if abs(V + 40) < 1e-6:
+            # Handle near-singularity case
+            # This is the limit as V approaches -40
+            return 1.0
         else:
-            # Handle scalar input
-            if abs(V + 40) < 1e-6:
-                # Handle near-singularity case
-                # This is the limit as V approaches -40
-                return 1.0
-            else:
-                denominator = 1 - safe_exp(-(V + 40) / 10)
-                return 0.1 * (V + 40) / denominator
+            denominator = 1 - safe_exp(-(V + 40) / 10)
+            return 0.1 * (V + 40) / denominator
 
-    def beta_m(self, V: FloatOrArray) -> FloatOrArray:
+    def beta_m(self, V: float) -> float:
         """
         Calculate the rate constant beta_m for sodium channel deactivation.
 
         Parameters:
-            V (FloatOrArray): Membrane voltage in mV.
+            V (float): Membrane voltage in mV.
 
         Returns:
-            FloatOrArray: The rate constant beta_m.
+            float: The rate constant beta_m.
         """
         return 4.0 * safe_exp(-(V + 65) / 18)
 
-    def alpha_h(self, V: FloatOrArray) -> FloatOrArray:
+    def alpha_h(self, V: float) -> float:
         """
         Calculate the rate constant alpha_h for sodium channel inactivation.
 
         Parameters:
-            V (FloatOrArray): Membrane voltage in mV.
+            V (float): Membrane voltage in mV.
 
         Returns:
-            FloatOrArray: The rate constant alpha_h.
+            float: The rate constant alpha_h.
         """
         return 0.07 * safe_exp(-(V + 65) / 20)
 
-    def beta_h(self, V: FloatOrArray) -> FloatOrArray:
+    def beta_h(self, V: float) -> float:
         """
         Calculate the rate constant beta_h for sodium channel reactivation.
 
         Parameters:
-            V (FloatOrArray): Membrane voltage in mV.
+            V (float): Membrane voltage in mV.
 
         Returns:
-            FloatOrArray: The rate constant beta_h.
+            float: The rate constant beta_h.
         """
         return 1 / (1 + safe_exp(-(V + 35) / 10))
