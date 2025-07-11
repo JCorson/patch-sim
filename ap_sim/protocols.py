@@ -11,7 +11,7 @@ from typing import Optional, Tuple
 
 def _calculate_time_parameters(
     duration: float, sampling_frequency: float
-) -> Tuple[float, int, np.ndarray]:
+) -> Tuple[int, np.ndarray]:
     """
     Calculate common time parameters for protocol generation.
 
@@ -20,12 +20,12 @@ def _calculate_time_parameters(
         sampling_frequency: Sampling frequency in Hz
 
     Returns:
-        Tuple of (time_step_ms, num_points, time_array)
+        Tuple of (num_points, time_array)
     """
     time_step = 1.0 / sampling_frequency * 1000.0  # Convert Hz to milliseconds
     num_points = int(duration / time_step) + 1
     time_array = np.linspace(0, duration, num_points)
-    return time_step, num_points, time_array
+    return num_points, time_array
 
 
 def _apply_time_window(
@@ -81,7 +81,7 @@ def _generate_step_protocol(
     if step_duration is None:
         step_duration = duration - step_start
 
-    _, num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
+    num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
 
     # Initialize array with baseline
     protocol_array = np.full(num_points, baseline)
@@ -122,7 +122,7 @@ def _generate_ramp_protocol(
     if ramp_duration is None:
         ramp_duration = duration - ramp_start
 
-    _, num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
+    num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
 
     # Initialize array with baseline
     protocol_array = np.full(num_points, baseline)
@@ -168,7 +168,7 @@ def _generate_pulse_train_protocol(
     Returns:
         Array of protocol values
     """
-    _, num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
+    num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
 
     # Initialize array with baseline
     protocol_array = np.full(num_points, baseline)
@@ -338,9 +338,7 @@ def sinusoidal_current(
         np.ndarray: Array of current values in uA/cm^2.
     """
     # Calculate time step and number of points
-    time_step, num_points, time_array = _calculate_time_parameters(
-        duration, sampling_frequency
-    )
+    num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
 
     # Generate sinusoidal current
     time_array_seconds = time_array / 1000.0  # Convert to seconds
@@ -377,9 +375,7 @@ def chirp_current(
         np.ndarray: Array of current values in uA/cm^2.
     """
     # Calculate time step and number of points
-    time_step, num_points, time_array = _calculate_time_parameters(
-        duration, sampling_frequency
-    )
+    num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
 
     # Calculate instantaneous frequency
     time_array_seconds = time_array / 1000.0  # Convert to seconds
@@ -429,9 +425,7 @@ def noise_current(
         np.random.seed(seed)
 
     # Calculate time step and number of points
-    time_step, num_points, time_array = _calculate_time_parameters(
-        duration, sampling_frequency
-    )
+    num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
 
     # Generate Gaussian noise
     current_array = np.random.normal(mean_current, std_current, num_points)
@@ -601,7 +595,7 @@ def iv_curve_protocol(
     sweep_duration = pre_pulse_duration + step_duration + post_pulse_duration
     total_duration = sweep_duration * len(voltages)
 
-    _, num_points, time_array = _calculate_time_parameters(
+    num_points, time_array = _calculate_time_parameters(
         total_duration, sampling_frequency
     )
 
@@ -664,7 +658,7 @@ def activation_protocol(
     )
     total_duration = sweep_duration * len(test_voltages)
 
-    _, num_points, time_array = _calculate_time_parameters(
+    num_points, time_array = _calculate_time_parameters(
         total_duration, sampling_frequency
     )
 
