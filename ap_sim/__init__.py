@@ -15,6 +15,12 @@ from .protocols import (
     sinusoidal_current,
     chirp_current,
     noise_current,
+    # Voltage clamp protocols
+    step_voltage,
+    ramp_voltage,
+    pulse_train_voltage,
+    iv_curve_protocol,
+    activation_protocol,
 )
 
 __all__ = [
@@ -29,4 +35,10 @@ __all__ = [
     "sinusoidal_current",
     "chirp_current",
     "noise_current",
+    # Voltage clamp protocols
+    "step_voltage",
+    "ramp_voltage",
+    "pulse_train_voltage",
+    "iv_curve_protocol",
+    "activation_protocol",
 ]
