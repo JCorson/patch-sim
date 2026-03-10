@@ -411,7 +411,7 @@ class TestNoiseCurrent:
         duration = 10.0  # ms
         mean_current = 2.0  # uA/cm^2
         std_current = 0.5  # uA/cm^2
-        sampling_frequency = 10000.0  # Hz
+        sampling_frequency = 100000.0  # Hz (100 kHz gives ~1001 samples for reliable stats)
         seed = 42
 
         current = noise_current(
