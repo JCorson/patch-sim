@@ -338,7 +338,7 @@ def sinusoidal_current(
         np.ndarray: Array of current values in uA/cm^2.
     """
     # Calculate time step and number of points
-    num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
+    _, time_array = _calculate_time_parameters(duration, sampling_frequency)
 
     # Generate sinusoidal current
     time_array_seconds = time_array / 1000.0  # Convert to seconds
@@ -375,7 +375,7 @@ def chirp_current(
         np.ndarray: Array of current values in uA/cm^2.
     """
     # Calculate time step and number of points
-    num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
+    _, time_array = _calculate_time_parameters(duration, sampling_frequency)
 
     # Calculate instantaneous frequency
     time_array_seconds = time_array / 1000.0  # Convert to seconds
