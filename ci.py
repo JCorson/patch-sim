@@ -84,12 +84,6 @@ def lint() -> None:
     click.secho("All lint checks passed", fg="green")
 
 
-@cli.command("serve")
-def run_server() -> None:
-    """Run the application."""
-    pass
-
-
 @cli.command("test")
 def test() -> None:
     """Run Python unit tests for all packages."""
