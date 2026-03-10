@@ -20,13 +20,15 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv run ci.py install
+        run: uv sync --frozen --extra=dev
 
       - name: Lint
-        run: uv run ci.py lint
+        run: |
+          uv tool run ruff check .
+          uv tool run ruff format --check .
 
       - name: Type check
-        run: uv run ci.py typecheck
+        run: uv run --frozen -m mypy .
 
       - name: Test
-        run: uv run ci.py test
+        run: uv run --frozen -m pytest --verbose

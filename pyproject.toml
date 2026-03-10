@@ -24,7 +24,6 @@ dev = ["ruff", "pytest", "mypy", "pandas-stubs"]
 ap_sim = {path = "./ap_sim", editable = true}
 
 [tool.mypy]
-exclude = ["ci.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

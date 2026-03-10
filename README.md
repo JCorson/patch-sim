@@ -1,3 +1,28 @@
+## ap-sim: Action Potential Simulator
+
+`ap_sim` is a Python library for simulating neuronal electrophysiology using the
+[Hodgkin-Huxley model](https://en.wikipedia.org/wiki/Hodgkin%E2%80%93Huxley_model).
+It models how action potentials arise at a neuron's membrane by simulating the dynamics
+of voltage-gated ion channels (sodium, potassium, and leak) over time.
+
+Key features:
+
+- **Hodgkin-Huxley neuron model** with configurable conductances, ion concentrations,
+  and temperature. Reversal potentials are automatically derived from ion concentration
+  gradients via the Nernst equation.
+- **Current clamp** simulations: inject a stimulus current and record the resulting
+  membrane voltage response.
+- **Voltage clamp** simulations: hold the membrane at a commanded voltage and record the
+  resulting ionic currents.
+- A library of **stimulation protocols** covering step, ramp, pulse train, sinusoidal,
+  chirp, noise, I-V curve, and activation waveforms.
+- Simulation results are returned as `pandas.DataFrame` objects indexed by time (ms),
+  making them straightforward to analyse or plot with standard Python tools.
+- Numerically stable handling of the singularity points in the Hodgkin-Huxley rate
+  equations.
+
+---
+
 ## Getting started with development
 
 ### Prerequisites
@@ -6,91 +31,58 @@ You should have the following installed:
 
 - [uv](https://docs.astral.sh/uv/getting-started/installation/): Python package manager
 
-Note that `uv` should be installed via the stand-alone installer (i.e. not via `pip install uv`) in order to make use
-of all the features that we depend on.
-
 
 ### Development tooling
 
-The `ci.py` script at the top level of the repository provides a `click`-based
-CLI for performing common development tasks. It's designed to be run with
-`uv run`. To see an overview of available commands, execute
-
-    uv run ci.py
-
-Developers may want to set up a shell alias, for example with
-
-  - **bash/zsh**
-
-        alias ci="uv --quiet run ci.py"
-
-The following documentation assumes the existence of such an alias.
+Common development tasks are run directly via `uv`. The commands below assume
+you are at the top level of the repository.
 
 #### Installing the development environment
 
-You can install the Python packages necessary for development using:
-
 ```
-ci install
+uv sync --frozen --extra=dev
 ```
 
 This creates a Python `venv` virtual environment under the name `.venv`
-in the top-level directory of the repository. If necessary, that virtual
-environment can be activated in the normal way with
-
-   - **macOS/Linux**
-
-     ```
-     source .venv/bin/activate
-     ```
-
-   - **Windows**
-     ```
-     .venv\Scripts\activate
-     ```
-
-However, it's not necessary to activate the environment to run the `ci`
-commands: the expected workflow is that the `ci` commands are run _outside_ the
-activated environment.
+in the top-level directory of the repository.
 
 #### Managing dependencies
 
 To regenerate all project dependencies files, run:
 
 ```
-ci update-dependencies
+uv lock --upgrade
 ```
-
-In general, there's no need to run this command on a daily or even weekly basis.
-Dependencies should be updated:
-
-- whenever you change the list of packages in any tracked `pyproject.toml` file
-- occasionally (say every few weeks) to ensure that you're using packages with the
-  latest bugfixes and security fixes, and to get early warning about potential
-  incompatibilities with future versions of packages
-- not just before a release!
 
 #### Unit tests
 
 The full unit test suite can be run using:
 
 ```
-ci test
+uv run --frozen -m pytest --verbose
 ```
 
 #### Linting and code style
 
-Python code is styled using Ruff. Ruff is configured in the ci commands to
-cover typical flake8, black and isort behavior.
+Python code is styled using Ruff. Ruff is configured to cover typical flake8,
+black and isort behavior.
 
-Formatting fixes for most code style rules can be applied using:
+Formatting fixes can be applied using:
 
 ```
-ci format
+uv tool run ruff format .
+uv tool run ruff check . --fix-only
 ```
 
 Conformance to the styling rules can be checked with:
 
 ```
-ci lint
+uv tool run ruff check .
+uv tool run ruff format --check .
+```
+
+#### Type checking
+
+```
+uv run --frozen -m mypy .
 ```
