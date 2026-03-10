@@ -5,7 +5,6 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "reflex>=0.7.6",
     "numpy",
     "matplotlib",
     "pandas",
@@ -20,6 +19,7 @@ ignore = []
 
 [project.optional-dependencies]
 dev = ["ruff", "pytest", "mypy", "pandas-stubs"]
+web = ["reflex>=0.7.6"]
 
 [tool.uv.sources]
 ap_sim = {path = "./ap_sim", editable = true}
