@@ -19,7 +19,6 @@ ignore = []
 
 [project.optional-dependencies]
 dev = ["ruff", "pytest", "mypy", "pandas-stubs"]
-web = ["reflex>=0.7.6"]
 
 [tool.uv.sources]
 ap_sim = {path = "./ap_sim", editable = true}
