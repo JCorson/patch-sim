@@ -3,25 +3,25 @@ This module implements the Hodgkin-Huxley model for simulating action potentials
 The model includes equations for ion channel dynamics and membrane voltage.
 """
 
-from dataclasses import dataclass
-from functools import cached_property
+from dataclasses import dataclass, field
 from .nernst_neuron import nernst_potential
 from .utils import safe_exp
 
 
-@dataclass
+@dataclass(frozen=True)
 class HodgkinHuxley:
     """
     Simulates the Hodgkin-Huxley model of action potentials.
+
+    All parameters are fixed at construction time. The class is immutable
+    (frozen) to prevent accidental mutation of parameters after the reversal
+    potentials have been computed.
 
     Attributes:
         C_m (float): Membrane capacitance in uF/cm^2.
         g_Na (float): Maximum sodium conductance in mS/cm^2.
         g_K (float): Maximum potassium conductance in mS/cm^2.
         g_L (float): Leak conductance in mS/cm^2.
-        E_Na (float): Sodium reversal potential in mV.
-        E_K (float): Potassium reversal potential in mV.
-        E_L (float): Leak reversal potential in mV.
         v_rest (float): Resting potential in mV.
         Na_out (float): Extracellular sodium concentration in mM.
         Na_in (float): Intracellular sodium concentration in mM.
@@ -30,6 +30,11 @@ class HodgkinHuxley:
         Cl_out (float): Extracellular chloride concentration in mM.
         Cl_in (float): Intracellular chloride concentration in mM.
         T (float): Temperature in Kelvin.
+
+    Computed properties (derived from ion concentrations at construction time):
+        E_Na (float): Sodium reversal potential in mV.
+        E_K (float): Potassium reversal potential in mV.
+        E_L (float): Leak reversal potential in mV.
     """
 
     # Membrane properties
@@ -50,20 +55,24 @@ class HodgkinHuxley:
     # Temperature in Kelvin (37°C for mammalian cells)
     T: float = 310.15
 
-    @cached_property
-    def E_Na(self) -> float:
-        """Sodium reversal potential in mV."""
-        return nernst_potential(1, self.T, self.Na_out, self.Na_in)
+    # Reversal potentials — computed from ion concentrations in __post_init__
+    # and stored as regular fields. Use field(init=False) so they are not
+    # accepted as constructor arguments.
+    E_Na: float = field(init=False)
+    E_K: float = field(init=False)
+    E_L: float = field(init=False)
 
-    @cached_property
-    def E_K(self) -> float:
-        """Potassium reversal potential in mV."""
-        return nernst_potential(1, self.T, self.K_out, self.K_in)
-
-    @cached_property
-    def E_L(self) -> float:
-        """Leak reversal potential in mV."""
-        return nernst_potential(-1, self.T, self.Cl_out, self.Cl_in)
+    def __post_init__(self) -> None:
+        # frozen=True prevents normal attribute assignment, so use object.__setattr__
+        object.__setattr__(
+            self, "E_Na", nernst_potential(1, self.T, self.Na_out, self.Na_in)
+        )
+        object.__setattr__(
+            self, "E_K", nernst_potential(1, self.T, self.K_out, self.K_in)
+        )
+        object.__setattr__(
+            self, "E_L", nernst_potential(-1, self.T, self.Cl_out, self.Cl_in)
+        )
 
     def alpha_n(self, V: float) -> float:
         """
