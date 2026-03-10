@@ -7,7 +7,7 @@ that can be performed on Hodgkin-Huxley neuron objects.
 
 import numpy as np
 import pandas as pd
-from typing import Union, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .hodgkin_huxley import HodgkinHuxley
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 def simulate_voltage_clamp(
     neuron: "HodgkinHuxley",
-    voltage_protocol: Union[np.ndarray, list],
+    voltage_protocol: np.ndarray | list[float],
     sampling_frequency: float = 100000.0,  # Hz (100 kHz default)
 ) -> pd.DataFrame:
     """
@@ -28,7 +28,7 @@ def simulate_voltage_clamp(
 
     Parameters:
         neuron (HodgkinHuxley): The Hodgkin-Huxley neuron object to simulate.
-        voltage_protocol (Union[np.ndarray, list]): Voltage values in mV to clamp
+        voltage_protocol (np.ndarray | list[float]): Voltage values in mV to clamp
             the membrane at for each time step. Must be an array/list for a
             time-varying voltage protocol. The length of the array determines the
             simulation duration.
@@ -127,7 +127,7 @@ def simulate_voltage_clamp(
 
 def simulate_current_clamp(
     neuron: "HodgkinHuxley",
-    current_external: Union[np.ndarray, list],
+    current_external: np.ndarray | list[float],
     sampling_frequency: float = 100000.0,  # Hz (100 kHz default)
 ) -> pd.DataFrame:
     """
@@ -140,7 +140,7 @@ def simulate_current_clamp(
 
     Parameters:
         neuron (HodgkinHuxley): The Hodgkin-Huxley neuron object to simulate.
-        current_external (Union[np.ndarray, list]): External current in uA/cm^2.
+        current_external (np.ndarray | list[float]): External current in uA/cm^2.
             Must be an array/list for a time-varying current waveform.
             The length of the array determines the simulation duration.
         sampling_frequency (float): Sampling frequency in Hz for the simulation.

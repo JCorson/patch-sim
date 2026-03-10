@@ -5,8 +5,6 @@ This module provides functions to generate typical voltage stimulation
 protocols that can be used with voltage clamp simulations.
 """
 
-from typing import Optional
-
 import numpy as np
 
 from .common import (
@@ -22,7 +20,7 @@ def step_voltage(
     duration: float,
     voltage_amplitude: float,
     step_start: float = 0.0,
-    step_duration: Optional[float] = None,
+    step_duration: float | None = None,
     holding_voltage: float = -70.0,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
@@ -59,7 +57,7 @@ def ramp_voltage(
     start_voltage: float,
     end_voltage: float,
     ramp_start: float = 0.0,
-    ramp_duration: Optional[float] = None,
+    ramp_duration: float | None = None,
     holding_voltage: float = -70.0,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
@@ -99,7 +97,7 @@ def pulse_train_voltage(
     pulse_width: float,
     pulse_interval: float,
     train_start: float = 0.0,
-    num_pulses: Optional[int] = None,
+    num_pulses: int | None = None,
     holding_voltage: float = -70.0,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:

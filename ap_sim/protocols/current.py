@@ -5,8 +5,6 @@ This module provides functions to generate typical current stimulation
 protocols that can be used with current clamp simulations.
 """
 
-from typing import Optional
-
 import numpy as np
 
 from .common import (
@@ -21,7 +19,7 @@ def step_current(
     duration: float,
     current_amplitude: float,
     step_start: float = 0.0,
-    step_duration: Optional[float] = None,
+    step_duration: float | None = None,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
     """
@@ -56,7 +54,7 @@ def ramp_current(
     start_current: float,
     end_current: float,
     ramp_start: float = 0.0,
-    ramp_duration: Optional[float] = None,
+    ramp_duration: float | None = None,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
     """
@@ -94,7 +92,7 @@ def pulse_train(
     pulse_width: float,
     pulse_interval: float,
     train_start: float = 0.0,
-    num_pulses: Optional[int] = None,
+    num_pulses: int | None = None,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
     """
@@ -220,7 +218,7 @@ def noise_current(
     mean_current: float,
     std_current: float,
     sampling_frequency: float = 100000.0,
-    seed: Optional[int] = None,
+    seed: int | None = None,
 ) -> np.ndarray:
     """
     Generate a Gaussian white noise current protocol.

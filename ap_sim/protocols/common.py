@@ -5,14 +5,12 @@ These private functions are used by both current and voltage clamp protocol
 modules to avoid duplication.
 """
 
-from typing import Optional, Tuple
-
 import numpy as np
 
 
 def _calculate_time_parameters(
     duration: float, sampling_frequency: float
-) -> Tuple[int, np.ndarray]:
+) -> tuple[int, np.ndarray]:
     """
     Calculate common time parameters for protocol generation.
 
@@ -58,7 +56,7 @@ def _generate_step_protocol(
     amplitude: float,
     baseline: float = 0.0,
     step_start: float = 0.0,
-    step_duration: Optional[float] = None,
+    step_duration: float | None = None,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
     """
@@ -98,7 +96,7 @@ def _generate_ramp_protocol(
     end_value: float,
     baseline: float = 0.0,
     ramp_start: float = 0.0,
-    ramp_duration: Optional[float] = None,
+    ramp_duration: float | None = None,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
     """
@@ -149,7 +147,7 @@ def _generate_pulse_train_protocol(
     pulse_interval: float,
     baseline: float = 0.0,
     train_start: float = 0.0,
-    num_pulses: Optional[int] = None,
+    num_pulses: int | None = None,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
     """
