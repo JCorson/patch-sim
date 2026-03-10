@@ -420,15 +420,14 @@ def noise_current(
     Returns:
         np.ndarray: Array of current values in uA/cm^2.
     """
-    # Set random seed if provided
-    if seed is not None:
-        np.random.seed(seed)
+    # Create a local RNG instance to avoid mutating global state
+    rng = np.random.default_rng(seed)
 
     # Calculate time step and number of points
     num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
 
     # Generate Gaussian noise
-    current_array = np.random.normal(mean_current, std_current, num_points)
+    current_array = rng.normal(mean_current, std_current, num_points)
 
     return current_array
 
