@@ -118,3 +118,66 @@ def test_singularity_guards(hh_model):
     # Values just outside the guard threshold should be continuous with the limit
     result_near = hh_model.alpha_m(-40.0 + 1e-5)
     assert result_near == pytest.approx(1.0, rel=1e-3)
+
+
+# ---------------------------------------------------------------------------
+# Error-path tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("g_Na", [-1.0, -0.001])
+def test_negative_g_Na_raises(g_Na: float):
+    """Negative sodium conductance must raise ValueError."""
+    with pytest.raises(ValueError, match="g_Na"):
+        HodgkinHuxley(g_Na=g_Na)
+
+
+@pytest.mark.parametrize("g_K", [-1.0, -0.001])
+def test_negative_g_K_raises(g_K: float):
+    """Negative potassium conductance must raise ValueError."""
+    with pytest.raises(ValueError, match="g_K"):
+        HodgkinHuxley(g_K=g_K)
+
+
+@pytest.mark.parametrize("g_L", [-1.0, -0.001])
+def test_negative_g_L_raises(g_L: float):
+    """Negative leak conductance must raise ValueError."""
+    with pytest.raises(ValueError, match="g_L"):
+        HodgkinHuxley(g_L=g_L)
+
+
+@pytest.mark.parametrize("C_m", [0.0, -1.0])
+def test_non_positive_capacitance_raises(C_m: float):
+    """Non-positive membrane capacitance must raise ValueError."""
+    with pytest.raises(ValueError, match="C_m"):
+        HodgkinHuxley(C_m=C_m)
+
+
+@pytest.mark.parametrize("T", [0.0, -1.0])
+def test_non_positive_temperature_raises(T: float):
+    """Non-positive temperature must raise ValueError."""
+    with pytest.raises(ValueError, match="Temperature"):
+        HodgkinHuxley(T=T)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"Na_out": 0.0},
+        {"Na_out": -1.0},
+        {"Na_in": 0.0},
+        {"Na_in": -1.0},
+        {"K_out": 0.0},
+        {"K_out": -1.0},
+        {"K_in": 0.0},
+        {"K_in": -1.0},
+        {"Cl_out": 0.0},
+        {"Cl_out": -1.0},
+        {"Cl_in": 0.0},
+        {"Cl_in": -1.0},
+    ],
+)
+def test_non_positive_ion_concentration_raises(kwargs: dict):
+    """Non-positive ion concentration must raise ValueError."""
+    with pytest.raises(ValueError, match="concentration"):
+        HodgkinHuxley(**kwargs)

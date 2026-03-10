@@ -33,3 +33,35 @@ def test_calcium():
     expected = 130.87  # Expected result in mV (approximate)
     result = nernst_potential(z, T, ion_concentration_out, ion_concentration_in)
     assert pytest.approx(result, 0.01) == expected
+
+
+# ---------------------------------------------------------------------------
+# Error-path tests
+# ---------------------------------------------------------------------------
+
+
+def test_zero_valence_raises():
+    """z=0 causes division by zero — must raise ValueError."""
+    with pytest.raises(ValueError, match="Valence"):
+        nernst_potential(0, 310, 5.0, 140.0)
+
+
+@pytest.mark.parametrize("T", [0, -1, -273.15])
+def test_non_positive_temperature_raises(T: float):
+    """T <= 0 is physically meaningless — must raise ValueError."""
+    with pytest.raises(ValueError, match="Temperature"):
+        nernst_potential(1, T, 5.0, 140.0)
+
+
+@pytest.mark.parametrize("c_out", [0, -1.0])
+def test_non_positive_extracellular_concentration_raises(c_out: float):
+    """ion_concentration_out <= 0 causes log(0) or log(negative) — must raise."""
+    with pytest.raises(ValueError, match="Extracellular"):
+        nernst_potential(1, 310, c_out, 140.0)
+
+
+@pytest.mark.parametrize("c_in", [0, -1.0])
+def test_non_positive_intracellular_concentration_raises(c_in: float):
+    """ion_concentration_in <= 0 causes log(0) or log(negative) — must raise."""
+    with pytest.raises(ValueError, match="Intracellular"):
+        nernst_potential(1, 310, 5.0, c_in)

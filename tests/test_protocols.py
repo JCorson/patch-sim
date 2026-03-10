@@ -4,6 +4,7 @@ Tests for the protocols module.
 This module contains unit tests for all protocol functions.
 """
 
+import pytest
 import numpy as np
 from ap_sim.protocols import (
     step_current,
@@ -1042,3 +1043,78 @@ class TestVoltageProtocolIntegration:
         # Test that voltage range is respected
         voltage_range = np.max(voltage) - np.min(voltage)
         assert voltage_range >= 0  # Should not be negative
+
+
+# =============================================================================
+# Error-path tests
+# =============================================================================
+
+
+class TestProtocolValidation:
+    """Tests that all protocol functions raise ValueError on invalid inputs."""
+
+    # --- duration and sampling_frequency (shared path via _calculate_time_parameters)
+
+    @pytest.mark.parametrize("duration", [0.0, -1.0])
+    def test_non_positive_duration_raises(self, duration: float):
+        """duration <= 0 must raise ValueError for all protocol functions."""
+        with pytest.raises(ValueError, match="duration"):
+            step_current(duration, 1.0)
+
+    @pytest.mark.parametrize("sf", [0.0, -1.0])
+    def test_non_positive_sampling_frequency_raises(self, sf: float):
+        """sampling_frequency <= 0 must raise ValueError for all protocol functions."""
+        with pytest.raises(ValueError, match="sampling_frequency"):
+            step_current(10.0, 1.0, sampling_frequency=sf)
+
+    def test_non_positive_duration_voltage_protocol(self):
+        """duration <= 0 must raise ValueError for voltage protocols."""
+        with pytest.raises(ValueError, match="duration"):
+            step_voltage(0.0, -30.0)
+
+    def test_non_positive_sampling_frequency_voltage_protocol(self):
+        """sampling_frequency <= 0 must raise ValueError for voltage protocols."""
+        with pytest.raises(ValueError, match="sampling_frequency"):
+            step_voltage(10.0, -30.0, sampling_frequency=0.0)
+
+    # --- ramp_duration == 0
+
+    def test_zero_ramp_duration_raises_current(self):
+        """ramp_duration=0 causes division by zero — must raise ValueError."""
+        with pytest.raises(ValueError, match="ramp_duration"):
+            ramp_current(10.0, 0.0, 5.0, ramp_duration=0.0)
+
+    def test_zero_ramp_duration_raises_voltage(self):
+        """ramp_duration=0 causes division by zero — must raise ValueError."""
+        with pytest.raises(ValueError, match="ramp_duration"):
+            ramp_voltage(10.0, -80.0, 40.0, ramp_duration=0.0)
+
+    # --- pulse_width >= pulse_interval
+
+    @pytest.mark.parametrize(
+        "pulse_width, pulse_interval",
+        [
+            (2.0, 2.0),  # equal — overlap at boundary
+            (3.0, 2.0),  # width > interval
+        ],
+    )
+    def test_overlapping_pulse_width_raises_current(
+        self, pulse_width: float, pulse_interval: float
+    ):
+        """pulse_width >= pulse_interval must raise ValueError."""
+        with pytest.raises(ValueError, match="pulse_width"):
+            pulse_train(20.0, 1.0, pulse_width, pulse_interval)
+
+    @pytest.mark.parametrize(
+        "pulse_width, pulse_interval",
+        [
+            (2.0, 2.0),
+            (3.0, 2.0),
+        ],
+    )
+    def test_overlapping_pulse_width_raises_voltage(
+        self, pulse_width: float, pulse_interval: float
+    ):
+        """pulse_width >= pulse_interval must raise ValueError."""
+        with pytest.raises(ValueError, match="pulse_width"):
+            pulse_train_voltage(20.0, 0.0, pulse_width, pulse_interval)

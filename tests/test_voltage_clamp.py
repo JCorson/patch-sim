@@ -241,3 +241,37 @@ def test_voltage_ramp_protocol(hh_model):
     assert (
         k_current_segments[1] > k_current_segments[0]
     )  # More outward K+ current later in ramp
+
+
+# ---------------------------------------------------------------------------
+# Error-path tests
+# ---------------------------------------------------------------------------
+
+
+def test_empty_voltage_array_raises(hh_model):
+    """An empty voltage array must raise ValueError."""
+    with pytest.raises(ValueError, match="empty"):
+        simulate_voltage_clamp(hh_model, voltage_protocol=np.array([]))
+
+
+@pytest.mark.parametrize("sf", [0, -1.0, -100000.0])
+def test_non_positive_sampling_frequency_raises(hh_model, sf: float):
+    """sampling_frequency <= 0 must raise ValueError."""
+    with pytest.raises(ValueError, match="sampling_frequency"):
+        simulate_voltage_clamp(
+            hh_model, voltage_protocol=np.array([-65.0, -65.0]), sampling_frequency=sf
+        )
+
+
+def test_nan_in_voltage_array_raises(hh_model):
+    """A voltage array containing NaN must raise ValueError."""
+    voltage = np.array([-65.0, float("nan"), -65.0])
+    with pytest.raises(ValueError, match="NaN"):
+        simulate_voltage_clamp(hh_model, voltage_protocol=voltage)
+
+
+def test_inf_in_voltage_array_raises(hh_model):
+    """A voltage array containing Inf must raise ValueError."""
+    voltage = np.array([-65.0, float("inf"), -65.0])
+    with pytest.raises(ValueError, match="Inf"):
+        simulate_voltage_clamp(hh_model, voltage_protocol=voltage)

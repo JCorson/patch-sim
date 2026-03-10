@@ -168,3 +168,29 @@ class TestSafeExp:
         regular_result = np.exp(normal_values)
 
         np.testing.assert_array_almost_equal(safe_result, regular_result)
+
+    def test_safe_exp_nan_input_returns_nan(self):
+        """NaN input should propagate through (clip is a no-op for NaN)."""
+        result = safe_exp(float("nan"))
+        assert np.isnan(result)
+
+    def test_safe_exp_positive_inf_clips_to_exp_100(self):
+        """Positive Inf is clipped to 100 before exp, yielding exp(100)."""
+        result = safe_exp(float("inf"))
+        assert result == pytest.approx(np.exp(100.0))
+
+    def test_safe_exp_negative_inf_clips_to_exp_neg_100(self):
+        """Negative Inf is clipped to -100 before exp, yielding exp(-100)."""
+        result = safe_exp(float("-inf"))
+        assert result == pytest.approx(np.exp(-100.0))
+
+    def test_safe_exp_integer_input(self):
+        """Integer input should work identically to float input."""
+        assert safe_exp(0) == pytest.approx(1.0)
+        assert safe_exp(1) == pytest.approx(np.exp(1.0))
+        assert safe_exp(-1) == pytest.approx(np.exp(-1.0))
+
+    def test_safe_exp_boolean_input(self):
+        """Boolean input (True=1, False=0) should be handled without error."""
+        assert safe_exp(True) == pytest.approx(np.exp(1.0))
+        assert safe_exp(False) == pytest.approx(1.0)

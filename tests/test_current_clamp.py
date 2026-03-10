@@ -320,3 +320,37 @@ def test_simulation_time_from_current_waveform(hh_model):
 
     assert actual_simulation_time == pytest.approx(expected_simulation_time)
     assert len(result) == num_steps
+
+
+# ---------------------------------------------------------------------------
+# Error-path tests
+# ---------------------------------------------------------------------------
+
+
+def test_empty_current_array_raises(hh_model):
+    """An empty current array must raise ValueError."""
+    with pytest.raises(ValueError, match="empty"):
+        simulate_current_clamp(hh_model, current_external=np.array([]))
+
+
+@pytest.mark.parametrize("sf", [0, -1.0, -100000.0])
+def test_non_positive_sampling_frequency_raises(hh_model, sf: float):
+    """sampling_frequency <= 0 must raise ValueError."""
+    with pytest.raises(ValueError, match="sampling_frequency"):
+        simulate_current_clamp(
+            hh_model, current_external=np.array([0.0, 0.0]), sampling_frequency=sf
+        )
+
+
+def test_nan_in_current_array_raises(hh_model):
+    """A current array containing NaN must raise ValueError."""
+    current = np.array([0.0, float("nan"), 0.0])
+    with pytest.raises(ValueError, match="NaN"):
+        simulate_current_clamp(hh_model, current_external=current)
+
+
+def test_inf_in_current_array_raises(hh_model):
+    """A current array containing Inf must raise ValueError."""
+    current = np.array([0.0, float("inf"), 0.0])
+    with pytest.raises(ValueError, match="Inf"):
+        simulate_current_clamp(hh_model, current_external=current)
