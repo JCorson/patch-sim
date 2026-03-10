@@ -23,6 +23,10 @@ def _calculate_time_parameters(
         Tuple of (num_points, time_array)
     """
     time_step = 1.0 / sampling_frequency * 1000.0  # Convert Hz to milliseconds
+    if duration <= 0:
+        raise ValueError("duration must be positive.")
+    if sampling_frequency <= 0:
+        raise ValueError("sampling_frequency must be positive.")
     num_points = int(duration / time_step) + 1
     time_array = np.linspace(0, duration, num_points)
     return num_points, time_array
@@ -116,6 +120,9 @@ def _generate_ramp_protocol(
     if ramp_duration is None:
         ramp_duration = duration - ramp_start
 
+    if ramp_duration == 0:
+        raise ValueError("ramp_duration must not be zero.")
+
     num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
 
     # Initialize array with baseline
@@ -162,6 +169,11 @@ def _generate_pulse_train_protocol(
     Returns:
         Array of protocol values
     """
+    if pulse_width >= pulse_interval:
+        raise ValueError(
+            "pulse_width must be less than pulse_interval to avoid overlapping pulses."
+        )
+
     num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
 
     # Initialize array with baseline

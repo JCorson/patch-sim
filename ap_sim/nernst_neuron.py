@@ -28,6 +28,15 @@ def nernst_potential(
     Returns:
         float: Nernst potential in millivolts (mV).
     """
+    if z == 0:
+        raise ValueError("Valence (z) must not be zero.")
+    if T <= 0:
+        raise ValueError("Temperature (T) must be positive (in Kelvin).")
+    if ion_concentration_out <= 0:
+        raise ValueError("Extracellular ion concentration must be positive.")
+    if ion_concentration_in <= 0:
+        raise ValueError("Intracellular ion concentration must be positive.")
+
     # Convert to millivolts
     return (
         (R * T / (z * F)) * 1000 * np.log(ion_concentration_out / ion_concentration_in)

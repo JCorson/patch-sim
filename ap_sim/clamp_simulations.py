@@ -46,6 +46,13 @@ def simulate_voltage_clamp(
     voltage_array = np.asarray(voltage_protocol, dtype=float)
     num_time_steps = len(voltage_array)
 
+    if num_time_steps == 0:
+        raise ValueError("voltage_protocol must not be empty.")
+    if sampling_frequency <= 0:
+        raise ValueError("sampling_frequency must be positive.")
+    if not np.all(np.isfinite(voltage_array)):
+        raise ValueError("voltage_protocol must not contain NaN or Inf values.")
+
     # Calculate time step from sampling frequency
     time_step = 1.0 / sampling_frequency * 1000.0  # Convert Hz to milliseconds
 
@@ -148,6 +155,13 @@ def simulate_current_clamp(
     # Convert current_external to numpy array if it's a list
     current_array = np.asarray(current_external, dtype=float)
     num_time_steps = len(current_array)
+
+    if num_time_steps == 0:
+        raise ValueError("current_external must not be empty.")
+    if sampling_frequency <= 0:
+        raise ValueError("sampling_frequency must be positive.")
+    if not np.all(np.isfinite(current_array)):
+        raise ValueError("current_external must not contain NaN or Inf values.")
 
     # Calculate time step from sampling frequency
     time_step = 1.0 / sampling_frequency * 1000.0  # Convert Hz to milliseconds

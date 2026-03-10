@@ -63,6 +63,27 @@ class HodgkinHuxley:
     E_L: float = field(init=False)
 
     def __post_init__(self) -> None:
+        if self.g_Na < 0:
+            raise ValueError("Sodium conductance (g_Na) must be non-negative.")
+        if self.g_K < 0:
+            raise ValueError("Potassium conductance (g_K) must be non-negative.")
+        if self.g_L < 0:
+            raise ValueError("Leak conductance (g_L) must be non-negative.")
+        if self.C_m <= 0:
+            raise ValueError("Membrane capacitance (C_m) must be positive.")
+        if self.T <= 0:
+            raise ValueError("Temperature (T) must be positive (in Kelvin).")
+        for name, value in [
+            ("Na_out", self.Na_out),
+            ("Na_in", self.Na_in),
+            ("K_out", self.K_out),
+            ("K_in", self.K_in),
+            ("Cl_out", self.Cl_out),
+            ("Cl_in", self.Cl_in),
+        ]:
+            if value <= 0:
+                raise ValueError(f"Ion concentration ({name}) must be positive.")
+
         # frozen=True prevents normal attribute assignment, so use object.__setattr__
         object.__setattr__(
             self, "E_Na", nernst_potential(1, self.T, self.Na_out, self.Na_in)
