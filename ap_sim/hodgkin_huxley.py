@@ -4,7 +4,7 @@ The model includes equations for ion channel dynamics and membrane voltage.
 """
 
 from dataclasses import dataclass, field
-from .nernst_neuron import nernst_potential
+from .nernst import nernst_potential
 from .utils import safe_exp
 
 

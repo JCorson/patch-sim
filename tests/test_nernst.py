@@ -1,5 +1,5 @@
 import pytest
-from ap_sim.nernst_neuron import nernst_potential
+from ap_sim.nernst import nernst_potential
 
 
 def test_potassium():
