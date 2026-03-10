@@ -5,7 +5,6 @@ description = "Action potential simulator implementing the Hodgkin-Huxley model 
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "reflex>=0.7.6",
     "numpy",
     "matplotlib",
     "pandas",
