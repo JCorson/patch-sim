@@ -97,3 +97,24 @@ def test_custom_initialization():
     assert custom_model.C_m == pytest.approx(1.0)
     assert custom_model.g_K == pytest.approx(36.0)
     assert custom_model.g_L == pytest.approx(0.3)
+
+
+def test_singularity_guards(hh_model):
+    """Test the near-singularity guards in alpha_n and alpha_m."""
+    # alpha_n has a removable singularity at V = -55 mV
+    # The limit as V -> -55 is 0.1
+    result = hh_model.alpha_n(-55.0)
+    assert result == pytest.approx(0.1)
+
+    # Values just outside the guard threshold should be continuous with the limit
+    result_near = hh_model.alpha_n(-55.0 + 1e-5)
+    assert result_near == pytest.approx(0.1, rel=1e-3)
+
+    # alpha_m has a removable singularity at V = -40 mV
+    # The limit as V -> -40 is 1.0
+    result = hh_model.alpha_m(-40.0)
+    assert result == pytest.approx(1.0)
+
+    # Values just outside the guard threshold should be continuous with the limit
+    result_near = hh_model.alpha_m(-40.0 + 1e-5)
+    assert result_near == pytest.approx(1.0, rel=1e-3)

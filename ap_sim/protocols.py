@@ -31,8 +31,7 @@ def _calculate_time_parameters(
 def _apply_time_window(
     time_array: np.ndarray,
     start_time: float,
-    duration: Optional[float] = None,
-    end_time: Optional[float] = None,
+    duration: float,
 ) -> np.ndarray:
     """
     Create a boolean mask for a time window.
@@ -40,17 +39,12 @@ def _apply_time_window(
     Args:
         time_array: Array of time points
         start_time: Start time of the window
-        duration: Duration of the window (if end_time not provided)
-        end_time: End time of the window (if duration not provided)
+        duration: Duration of the window
 
     Returns:
         Boolean mask array
     """
-    if end_time is None:
-        if duration is None:
-            raise ValueError("Either duration or end_time must be provided")
-        end_time = start_time + duration
-
+    end_time = start_time + duration
     return (time_array >= start_time) & (time_array <= end_time)
 
 

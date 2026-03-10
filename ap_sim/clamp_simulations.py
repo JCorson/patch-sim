@@ -53,15 +53,9 @@ def simulate_voltage_clamp(
     actual_simulation_time = (num_time_steps - 1) * time_step
 
     # Create time array for the entire simulation
-    time_array = np.round(
-        np.arange(0, actual_simulation_time + time_step, time_step), 10
-    )
+    time_array = np.linspace(0, actual_simulation_time, num_time_steps)
 
-    # Ensure the time array matches the voltage array length
-    if len(time_array) != len(voltage_array):
-        time_array = np.linspace(0, actual_simulation_time, num_time_steps)
-
-    # Create the DataFrame at the start of the method
+    # Create the DataFrame
     results = pd.DataFrame(
         index=time_array,
         columns=[
@@ -215,15 +209,9 @@ def simulate_current_clamp(
     actual_simulation_time = (num_time_steps - 1) * time_step
 
     # Create time array for the entire simulation
-    time_array = np.round(
-        np.arange(0, actual_simulation_time + time_step, time_step), 10
-    )
+    time_array = np.linspace(0, actual_simulation_time, num_time_steps)
 
-    # Ensure the time array matches the current array length
-    if len(time_array) != len(current_array):
-        time_array = np.linspace(0, actual_simulation_time, num_time_steps)
-
-    # Create the DataFrame at the start of the method
+    # Create the DataFrame
     results = pd.DataFrame(
         index=time_array,
         columns=[

@@ -145,12 +145,8 @@ class TestRampCurrent:
             time_array <= ramp_start + ramp_duration
         )
         ramp_currents = current[ramp_mask]
-        # Should be monotonically increasing (or decreasing)
-        if end_current > start_current:
-            # Allow for numerical precision
-            assert np.all(np.diff(ramp_currents) >= -1e-10)
-        else:
-            assert np.all(np.diff(ramp_currents) <= 1e-10)
+        # end_current > start_current, so ramp should be monotonically increasing
+        assert np.all(np.diff(ramp_currents) >= -1e-10)
 
         # Check end current after ramp
         post_ramp_mask = time_array > ramp_start + ramp_duration
@@ -177,6 +173,34 @@ class TestRampCurrent:
 
         assert np.isclose(coefficients[0], expected_slope, rtol=1e-6)
         assert np.isclose(coefficients[1], start_current, atol=1e-6)
+
+    def test_ramp_decreasing(self):
+        """Test ramp current with decreasing values."""
+        duration = 20.0  # ms
+        start_current = 6.0  # uA/cm^2
+        end_current = 1.0  # uA/cm^2
+        ramp_start = 5.0  # ms
+        ramp_duration = 10.0  # ms
+        sampling_frequency = 10000.0  # Hz
+
+        current = ramp_current(
+            duration=duration,
+            start_current=start_current,
+            end_current=end_current,
+            ramp_start=ramp_start,
+            ramp_duration=ramp_duration,
+            sampling_frequency=sampling_frequency,
+        )
+
+        time_step = 1000.0 / sampling_frequency
+        time_array = np.arange(0, duration + time_step, time_step)
+
+        ramp_mask = (time_array >= ramp_start) & (
+            time_array <= ramp_start + ramp_duration
+        )
+        ramp_currents = current[ramp_mask]
+        # end_current < start_current, so ramp should be monotonically decreasing
+        assert np.all(np.diff(ramp_currents) <= 1e-10)
 
 
 class TestPulseTrain:
@@ -690,16 +714,42 @@ class TestRampVoltage:
             time_array <= ramp_start + ramp_duration
         )
         ramp_voltages = voltage[ramp_mask]
-        # Should be monotonically increasing (or decreasing)
-        if end_voltage > start_voltage:
-            # Allow for numerical precision
-            assert np.all(np.diff(ramp_voltages) >= -1e-10)
-        else:
-            assert np.all(np.diff(ramp_voltages) <= 1e-10)
+        # end_voltage > start_voltage, so ramp should be monotonically increasing
+        assert np.all(np.diff(ramp_voltages) >= -1e-10)
 
         # Check holding voltage after ramp
         post_ramp_mask = time_array > ramp_start + ramp_duration
         assert np.allclose(voltage[post_ramp_mask], holding_voltage)
+
+    def test_ramp_decreasing(self):
+        """Test ramp voltage with decreasing values."""
+        duration = 20.0  # ms
+        start_voltage = 60.0  # mV
+        end_voltage = -100.0  # mV
+        ramp_start = 5.0  # ms
+        ramp_duration = 10.0  # ms
+        holding_voltage = -70.0  # mV
+        sampling_frequency = 10000.0  # Hz
+
+        voltage = ramp_voltage(
+            duration=duration,
+            start_voltage=start_voltage,
+            end_voltage=end_voltage,
+            ramp_start=ramp_start,
+            ramp_duration=ramp_duration,
+            holding_voltage=holding_voltage,
+            sampling_frequency=sampling_frequency,
+        )
+
+        time_step = 1000.0 / sampling_frequency
+        time_array = np.arange(0, duration + time_step, time_step)
+
+        ramp_mask = (time_array >= ramp_start) & (
+            time_array <= ramp_start + ramp_duration
+        )
+        ramp_voltages = voltage[ramp_mask]
+        # end_voltage < start_voltage, so ramp should be monotonically decreasing
+        assert np.all(np.diff(ramp_voltages) <= 1e-10)
 
 
 class TestPulseTrainVoltage:
