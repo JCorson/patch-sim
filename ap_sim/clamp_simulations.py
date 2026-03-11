@@ -13,6 +13,41 @@ if TYPE_CHECKING:
     from .hodgkin_huxley import HodgkinHuxley
 
 
+def _setup_simulation(
+    num_time_steps: int, sampling_frequency: float
+) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    time_step = 1.0 / sampling_frequency * 1000.0
+    actual_simulation_time = (num_time_steps - 1) * time_step
+    time_array = np.linspace(0, actual_simulation_time, num_time_steps)
+    n_arr = np.empty(num_time_steps)
+    m_arr = np.empty(num_time_steps)
+    h_arr = np.empty(num_time_steps)
+    return time_step, time_array, n_arr, m_arr, h_arr
+
+
+def _initialize_gating_variables(
+    neuron: "HodgkinHuxley", initial_voltage: float
+) -> tuple[float, float, float]:
+    V0 = initial_voltage
+    an0, bn0 = neuron.alpha_n(V0), neuron.beta_n(V0)
+    am0, bm0 = neuron.alpha_m(V0), neuron.beta_m(V0)
+    ah0, bh0 = neuron.alpha_h(V0), neuron.beta_h(V0)
+    return an0 / (an0 + bn0), am0 / (am0 + bm0), ah0 / (ah0 + bh0)
+
+
+def _update_gating_variables(
+    neuron: "HodgkinHuxley", V: float, n: float, m: float, h: float, dt: float
+) -> tuple[float, float, float]:
+    dn = neuron.alpha_n(V) * (1 - n) - neuron.beta_n(V) * n
+    dm = neuron.alpha_m(V) * (1 - m) - neuron.beta_m(V) * m
+    dh = neuron.alpha_h(V) * (1 - h) - neuron.beta_h(V) * h
+    return (
+        float(np.clip(n + dn * dt, 0, 1)),
+        float(np.clip(m + dm * dt, 0, 1)),
+        float(np.clip(h + dh * dt, 0, 1)),
+    )
+
+
 def simulate_voltage_clamp(
     neuron: "HodgkinHuxley",
     voltage_protocol: np.ndarray,
@@ -50,32 +85,23 @@ def simulate_voltage_clamp(
     if not np.all(np.isfinite(voltage_protocol)):
         raise ValueError("voltage_protocol must not contain NaN or Inf values.")
 
-    # Calculate time step from sampling frequency
-    time_step = 1.0 / sampling_frequency * 1000.0  # Convert Hz to milliseconds
+    time_step, time_array, n_arr, m_arr, h_arr = _setup_simulation(
+        num_time_steps, sampling_frequency
+    )
 
-    # Calculate the actual simulation time and build time array
-    actual_simulation_time = (num_time_steps - 1) * time_step
-    time_array = np.linspace(0, actual_simulation_time, num_time_steps)
-
-    # Pre-allocate output arrays
-    n_arr = np.empty(num_time_steps)  # potassium activation
-    m_arr = np.empty(num_time_steps)  # sodium activation
-    h_arr = np.empty(num_time_steps)  # sodium inactivation
+    # Pre-allocate voltage-clamp-specific output arrays
     I_Na = np.empty(num_time_steps)
     I_K = np.empty(num_time_steps)
     I_L = np.empty(num_time_steps)
     I_total = np.empty(num_time_steps)
 
     # Initialise gating variables at steady state for the first voltage
-    V0 = voltage_protocol[0]
-    an0, bn0 = neuron.alpha_n(V0), neuron.beta_n(V0)
-    am0, bm0 = neuron.alpha_m(V0), neuron.beta_m(V0)
-    ah0, bh0 = neuron.alpha_h(V0), neuron.beta_h(V0)
-    n_arr[0] = an0 / (an0 + bn0)
-    m_arr[0] = am0 / (am0 + bm0)
-    h_arr[0] = ah0 / (ah0 + bh0)
+    n_arr[0], m_arr[0], h_arr[0] = _initialize_gating_variables(
+        neuron, voltage_protocol[0]
+    )
 
     # Compute initial currents
+    V0 = voltage_protocol[0]
     g_Na0 = neuron.g_Na * (m_arr[0] ** 3) * h_arr[0]
     g_K0 = neuron.g_K * (n_arr[0] ** 4)
     I_Na[0] = g_Na0 * (V0 - neuron.E_Na)
@@ -88,14 +114,9 @@ def simulate_voltage_clamp(
         V = voltage_protocol[i]
         n_prev, m_prev, h_prev = n_arr[i - 1], m_arr[i - 1], h_arr[i - 1]
 
-        dn = neuron.alpha_n(V) * (1 - n_prev) - neuron.beta_n(V) * n_prev
-        dm = neuron.alpha_m(V) * (1 - m_prev) - neuron.beta_m(V) * m_prev
-        dh = neuron.alpha_h(V) * (1 - h_prev) - neuron.beta_h(V) * h_prev
-
-        # Clip to physiological bounds; use clipped values for currents too
-        n = float(np.clip(n_prev + dn * time_step, 0, 1))
-        m = float(np.clip(m_prev + dm * time_step, 0, 1))
-        h = float(np.clip(h_prev + dh * time_step, 0, 1))
+        n, m, h = _update_gating_variables(
+            neuron, V, n_prev, m_prev, h_prev, time_step
+        )
         n_arr[i], m_arr[i], h_arr[i] = n, m, h
 
         g_Na = neuron.g_Na * (m**3) * h
@@ -158,32 +179,21 @@ def simulate_current_clamp(
     if not np.all(np.isfinite(current_external)):
         raise ValueError("current_external must not contain NaN or Inf values.")
 
-    # Calculate time step from sampling frequency
-    time_step = 1.0 / sampling_frequency * 1000.0  # Convert Hz to milliseconds
+    time_step, time_array, n_arr, m_arr, h_arr = _setup_simulation(
+        num_time_steps, sampling_frequency
+    )
 
-    # Calculate the actual simulation time and build time array
-    actual_simulation_time = (num_time_steps - 1) * time_step
-    time_array = np.linspace(0, actual_simulation_time, num_time_steps)
-
-    # Pre-allocate output arrays
     V_arr = np.empty(num_time_steps)
-    n_arr = np.empty(num_time_steps)  # potassium activation
-    m_arr = np.empty(num_time_steps)  # sodium activation
-    h_arr = np.empty(num_time_steps)  # sodium inactivation
 
     # Define physiological limits for membrane voltage
     min_voltage = -100.0  # mV
     max_voltage = 60.0  # mV
 
     # Initialise gating variables at steady state for resting potential
-    V0 = neuron.v_rest
-    an0, bn0 = neuron.alpha_n(V0), neuron.beta_n(V0)
-    am0, bm0 = neuron.alpha_m(V0), neuron.beta_m(V0)
-    ah0, bh0 = neuron.alpha_h(V0), neuron.beta_h(V0)
-    V_arr[0] = V0
-    n_arr[0] = an0 / (an0 + bn0)
-    m_arr[0] = am0 / (am0 + bm0)
-    h_arr[0] = ah0 / (ah0 + bh0)
+    V_arr[0] = neuron.v_rest
+    n_arr[0], m_arr[0], h_arr[0] = _initialize_gating_variables(
+        neuron, neuron.v_rest
+    )
 
     # Main simulation loop — all state in plain numpy scalars
     for i in range(1, num_time_steps):
@@ -198,14 +208,11 @@ def simulate_current_clamp(
         I_L = neuron.g_L * (V - neuron.E_L)
 
         dV = (current_external[i] - I_Na - I_K - I_L) / neuron.C_m
-        dn = neuron.alpha_n(V) * (1 - n) - neuron.beta_n(V) * n
-        dm = neuron.alpha_m(V) * (1 - m) - neuron.beta_m(V) * m
-        dh = neuron.alpha_h(V) * (1 - h) - neuron.beta_h(V) * h
 
         V_arr[i] = float(np.clip(V + dV * time_step, min_voltage, max_voltage))
-        n_arr[i] = float(np.clip(n + dn * time_step, 0, 1))
-        m_arr[i] = float(np.clip(m + dm * time_step, 0, 1))
-        h_arr[i] = float(np.clip(h + dh * time_step, 0, 1))
+        n_arr[i], m_arr[i], h_arr[i] = _update_gating_variables(
+            neuron, V, n, m, h, time_step
+        )
 
     results = pd.DataFrame(
         {
