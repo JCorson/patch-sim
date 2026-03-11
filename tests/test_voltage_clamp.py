@@ -81,7 +81,7 @@ def test_voltage_clamp_constant_voltage(hh_model):
     assert k_currents.iloc[-1] > 0.8 * max(k_currents)  # K+ current remains high
 
 
-def test_voltage_step_protocol(hh_model):
+def test_voltage_step_protocol():
     """Test voltage clamp with a step protocol."""
     # Create a custom model for testing
     custom_model = HodgkinHuxley()
@@ -136,7 +136,7 @@ def test_voltage_step_protocol(hh_model):
     assert max(k_currents_during_step) > 10.0
 
 
-def test_voltage_clamp_i_v_relationship(hh_model):
+def test_voltage_clamp_i_v_relationship():
     """Test the current-voltage relationship in voltage clamp."""
     # Create a custom model for testing
     custom_model = HodgkinHuxley()
@@ -199,7 +199,7 @@ def test_voltage_clamp_i_v_relationship(hh_model):
         assert peak_na_currents[-1] > peak_na_currents[middle_voltage_idx]
 
 
-def test_voltage_ramp_protocol(hh_model):
+def test_voltage_ramp_protocol():
     """Test voltage clamp with a voltage ramp protocol."""
     # Create a custom model for testing
     custom_model = HodgkinHuxley()

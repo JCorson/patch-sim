@@ -54,7 +54,7 @@ def test_simulate_current_clamp_returns_dataframe(hh_model):
     assert result["voltage"].max() <= 60  # mV
 
 
-def test_simulation_dynamics(hh_model):
+def test_simulation_dynamics():
     """Test that the simulation shows expected dynamics."""
     # Create model for testing
     custom_model = HodgkinHuxley()
@@ -121,7 +121,7 @@ def test_simulate_current_clamp_with_zero_current(hh_model):
     )
 
 
-def test_simulate_current_clamp_with_non_zero_currents(hh_model):
+def test_simulate_current_clamp_with_non_zero_currents():
     """Test the simulate_current_clamp method with various non-zero external
     currents."""
     currents = [10.0, 20.0, 50.0]  # Different external currents to test
@@ -173,7 +173,7 @@ def test_simulate_current_clamp_with_non_zero_currents(hh_model):
             assert (result[gating_var] <= 1).all()
 
 
-def test_physiological_limits_and_action_potentials(hh_model):
+def test_physiological_limits_and_action_potentials():
     """
     Test that the voltage does not exceed physiological limits and that increasing
     current generates more action potentials.
@@ -233,7 +233,7 @@ def test_physiological_limits_and_action_potentials(hh_model):
     )
 
 
-def test_simulate_current_clamp_with_different_currents(hh_model):
+def test_simulate_current_clamp_with_different_currents():
     """Test the simulate_current_clamp method with a time-varying current waveform."""
     duration = 50  # ms
     time_step = 0.01  # ms
@@ -282,7 +282,7 @@ def test_simulate_current_clamp_with_different_currents(hh_model):
     )
 
 
-def test_simulation_time_from_current_waveform(hh_model):
+def test_simulation_time_from_current_waveform():
     """Test that simulation time is correctly derived from the current waveform
     length.
     """
