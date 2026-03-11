@@ -8,8 +8,22 @@ import numpy as np
 import pandas as pd
 from typing import TYPE_CHECKING
 
+from .protocols.common import DEFAULT_SAMPLING_FREQUENCY
+
 if TYPE_CHECKING:
     from .hodgkin_huxley import HodgkinHuxley
+
+# Physiological bounds (mV) used to clip membrane voltage in current-clamp
+# simulation. Prevents numerical blow-up during strong stimulation while
+# covering the full range of biologically observed membrane potentials.
+VOLTAGE_CLIP_MIN = -100.0  # mV
+VOLTAGE_CLIP_MAX = 60.0  # mV
+
+# Valid range for Hodgkin-Huxley gating variables (dimensionless probabilities).
+# Values are clipped to [0, 1] after each Euler step to enforce the physical
+# constraint that opening probabilities cannot exceed 0 or 1.
+GATING_VAR_MIN = 0
+GATING_VAR_MAX = 1
 
 
 def _setup_simulation(
@@ -73,16 +87,16 @@ def _update_gating_variables(
     dm = neuron.alpha_m(V) * (1 - m) - neuron.beta_m(V) * m
     dh = neuron.alpha_h(V) * (1 - h) - neuron.beta_h(V) * h
     return (
-        float(np.clip(n + dn * dt, 0, 1)),
-        float(np.clip(m + dm * dt, 0, 1)),
-        float(np.clip(h + dh * dt, 0, 1)),
+        float(np.clip(n + dn * dt, GATING_VAR_MIN, GATING_VAR_MAX)),
+        float(np.clip(m + dm * dt, GATING_VAR_MIN, GATING_VAR_MAX)),
+        float(np.clip(h + dh * dt, GATING_VAR_MIN, GATING_VAR_MAX)),
     )
 
 
 def simulate_voltage_clamp(
     neuron: "HodgkinHuxley",
     voltage_protocol: np.ndarray,
-    sampling_frequency: float = 100000.0,  # Hz (100 kHz default)
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> pd.DataFrame:
     """Simulate a voltage clamp experiment using the Hodgkin-Huxley model.
 
@@ -172,7 +186,7 @@ def simulate_voltage_clamp(
 def simulate_current_clamp(
     neuron: "HodgkinHuxley",
     current_external: np.ndarray,
-    sampling_frequency: float = 100000.0,  # Hz (100 kHz default)
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> pd.DataFrame:
     """Simulate a current clamp experiment using the Hodgkin-Huxley model.
 
@@ -208,10 +222,6 @@ def simulate_current_clamp(
 
     V_arr = np.empty(num_time_steps)
 
-    # Define physiological limits for membrane voltage
-    min_voltage = -100.0  # mV
-    max_voltage = 60.0  # mV
-
     # Initialise gating variables at steady state for resting potential
     V_arr[0] = neuron.v_rest
     n_arr[0], m_arr[0], h_arr[0] = _initialize_gating_variables(neuron, neuron.v_rest)
@@ -230,7 +240,9 @@ def simulate_current_clamp(
 
         dV = (current_external[i] - I_Na - I_K - I_L) / neuron.C_m
 
-        V_arr[i] = float(np.clip(V + dV * time_step, min_voltage, max_voltage))
+        V_arr[i] = float(
+            np.clip(V + dV * time_step, VOLTAGE_CLIP_MIN, VOLTAGE_CLIP_MAX)
+        )
         n_arr[i], m_arr[i], h_arr[i] = _update_gating_variables(
             neuron, V, n, m, h, time_step
         )

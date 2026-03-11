@@ -12,6 +12,7 @@ from .common import (
     _generate_pulse_train_protocol,
     _generate_ramp_protocol,
     _generate_step_protocol,
+    DEFAULT_SAMPLING_FREQUENCY,
 )
 
 
@@ -21,7 +22,7 @@ def step_voltage(
     step_start: float = 0.0,
     step_duration: float | None = None,
     holding_voltage: float = -70.0,
-    sampling_frequency: float = 100000.0,
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> np.ndarray:
     """Generate a step voltage protocol for voltage clamp experiments.
 
@@ -57,7 +58,7 @@ def ramp_voltage(
     ramp_start: float = 0.0,
     ramp_duration: float | None = None,
     holding_voltage: float = -70.0,
-    sampling_frequency: float = 100000.0,
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> np.ndarray:
     """Generate a ramp voltage protocol for voltage clamp experiments.
 
@@ -96,7 +97,7 @@ def pulse_train_voltage(
     train_start: float = 0.0,
     num_pulses: int | None = None,
     holding_voltage: float = -70.0,
-    sampling_frequency: float = 100000.0,
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> np.ndarray:
     """Generate a pulse train voltage protocol for voltage clamp experiments.
 
@@ -139,7 +140,7 @@ def iv_curve_protocol(
     pre_pulse_duration: float = 10.0,
     post_pulse_duration: float = 10.0,
     holding_voltage: float = -70.0,
-    sampling_frequency: float = 100000.0,
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> np.ndarray:
     """Generate an I-V curve protocol for voltage clamp experiments.
 
@@ -195,7 +196,7 @@ def activation_protocol(
     voltage_step: float = 10.0,
     interpulse_duration: float = 10.0,
     holding_voltage: float = -70.0,
-    sampling_frequency: float = 100000.0,
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> np.ndarray:
     """Generate an activation protocol for voltage clamp experiments.
 

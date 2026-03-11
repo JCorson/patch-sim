@@ -9,6 +9,11 @@ from functools import cached_property
 from .nernst import nernst_potential
 from .utils import safe_exp
 
+# Threshold for detecting near-singularity in GHK-style rate equations.
+# When the denominator voltage term is within this tolerance of zero, the
+# L'Hôpital limit is used instead to avoid division by zero.
+SINGULARITY_THRESHOLD = 1e-6
+
 
 @dataclass(frozen=True)
 class HodgkinHuxley:
@@ -106,7 +111,7 @@ class HodgkinHuxley:
         Returns:
             The rate constant alpha_n.
         """
-        if abs(V + 55) < 1e-6:
+        if abs(V + 55) < SINGULARITY_THRESHOLD:
             # Handle near-singularity case
             # This is the limit as V approaches -55
             return 0.1
@@ -134,7 +139,7 @@ class HodgkinHuxley:
         Returns:
             The rate constant alpha_m.
         """
-        if abs(V + 40) < 1e-6:
+        if abs(V + 40) < SINGULARITY_THRESHOLD:
             # Handle near-singularity case
             # This is the limit as V approaches -40
             return 1.0

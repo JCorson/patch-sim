@@ -6,6 +6,11 @@ modules to avoid duplication.
 
 import numpy as np
 
+# Default sampling frequency (Hz) for all protocol and simulation functions.
+# 100 kHz gives a 10 µs time step, which is sufficient to resolve the fastest
+# Hodgkin-Huxley gating kinetics while keeping array sizes manageable.
+DEFAULT_SAMPLING_FREQUENCY = 100_000.0
+
 
 def _calculate_time_parameters(
     duration: float, sampling_frequency: float
@@ -54,7 +59,7 @@ def _generate_step_protocol(
     baseline: float = 0.0,
     step_start: float = 0.0,
     step_duration: float | None = None,
-    sampling_frequency: float = 100000.0,
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> np.ndarray:
     """Generate a generic step protocol (current or voltage).
 
@@ -93,7 +98,7 @@ def _generate_ramp_protocol(
     baseline: float = 0.0,
     ramp_start: float = 0.0,
     ramp_duration: float | None = None,
-    sampling_frequency: float = 100000.0,
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> np.ndarray:
     """Generate a generic ramp protocol (current or voltage).
 
@@ -143,7 +148,7 @@ def _generate_pulse_train_protocol(
     baseline: float = 0.0,
     train_start: float = 0.0,
     num_pulses: int | None = None,
-    sampling_frequency: float = 100000.0,
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> np.ndarray:
     """Generate a generic pulse train protocol (current or voltage).
 

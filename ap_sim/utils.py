@@ -5,6 +5,12 @@ This module contains shared utility functions used across different modules.
 
 import numpy as np
 
+# Clipping bounds for safe_exp: chosen so that exp(100) ≈ 2.7e43, well below
+# float64 overflow (~e308), while still covering all physiologically relevant
+# voltage-derived exponents in the Hodgkin-Huxley rate equations.
+SAFE_EXP_CLIP_MIN = -100
+SAFE_EXP_CLIP_MAX = 100
+
 
 def safe_exp(x: float) -> float:
     """Safely compute the exponential to avoid overflow and underflow.
@@ -20,4 +26,4 @@ def safe_exp(x: float) -> float:
     Returns:
         The computed exponential value, capped to prevent overflow.
     """
-    return np.exp(np.clip(x, -100, 100))
+    return np.exp(np.clip(x, SAFE_EXP_CLIP_MIN, SAFE_EXP_CLIP_MAX))
