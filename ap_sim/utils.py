@@ -26,4 +26,4 @@ def safe_exp(x: float) -> float:
     Returns:
         The computed exponential value, capped to prevent overflow.
     """
-    return np.exp(np.clip(x, SAFE_EXP_CLIP_MIN, SAFE_EXP_CLIP_MAX))
+    return float(np.exp(np.clip(x, SAFE_EXP_CLIP_MIN, SAFE_EXP_CLIP_MAX)))
