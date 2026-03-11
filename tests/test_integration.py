@@ -323,46 +323,7 @@ def test_activation_protocol_to_simulation(hh_model: HodgkinHuxley) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Section 3 — list input compatibility
-# ---------------------------------------------------------------------------
-
-
-def test_list_input_current_clamp() -> None:
-    """list input to simulate_current_clamp gives the same result as np.ndarray."""
-    protocol_array = step_current(duration=20.0, current_amplitude=10.0)
-    protocol_list = protocol_array.tolist()
-
-    result_array = simulate_current_clamp(
-        HodgkinHuxley(), current_external=protocol_array
-    )
-    result_list = simulate_current_clamp(
-        HodgkinHuxley(), current_external=protocol_list
-    )
-
-    _assert_current_clamp_dataframe(result_list)
-    pd.testing.assert_frame_equal(result_array, result_list)
-
-
-def test_list_input_voltage_clamp() -> None:
-    """list input to simulate_voltage_clamp gives the same result as np.ndarray."""
-    protocol_array = step_voltage(
-        duration=20.0, voltage_amplitude=0.0, step_start=5.0, step_duration=10.0
-    )
-    protocol_list = protocol_array.tolist()
-
-    result_array = simulate_voltage_clamp(
-        HodgkinHuxley(), voltage_protocol=protocol_array
-    )
-    result_list = simulate_voltage_clamp(
-        HodgkinHuxley(), voltage_protocol=protocol_list
-    )
-
-    _assert_voltage_clamp_dataframe(result_list)
-    pd.testing.assert_frame_equal(result_array, result_list)
-
-
-# ---------------------------------------------------------------------------
-# Section 4 — Physiological plausibility
+# Section 3 — Physiological plausibility
 # ---------------------------------------------------------------------------
 
 

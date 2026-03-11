@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 def simulate_voltage_clamp(
     neuron: "HodgkinHuxley",
-    voltage_protocol: np.ndarray | list[float],
+    voltage_protocol: np.ndarray,
     sampling_frequency: float = 100000.0,  # Hz (100 kHz default)
 ) -> pd.DataFrame:
     """
@@ -28,10 +28,9 @@ def simulate_voltage_clamp(
 
     Parameters:
         neuron (HodgkinHuxley): The Hodgkin-Huxley neuron object to simulate.
-        voltage_protocol (np.ndarray | list[float]): Voltage values in mV to clamp
-            the membrane at for each time step. Must be an array/list for a
-            time-varying voltage protocol. The length of the array determines the
-            simulation duration.
+        voltage_protocol (np.ndarray): Voltage values in mV to clamp the
+            membrane at for each time step. The length of the array determines
+            the simulation duration.
         sampling_frequency (float): Sampling frequency in Hz for the simulation.
             Default is 100 kHz (0.01 ms time steps). Higher frequencies give
             finer temporal resolution but increase computation time.
@@ -42,15 +41,13 @@ def simulate_voltage_clamp(
             potassium_current, leak_current, potassium_activation,
             sodium_activation, sodium_inactivation.
     """
-    # Convert voltage_protocol to numpy array if it's a list
-    voltage_array = np.asarray(voltage_protocol, dtype=float)
-    num_time_steps = len(voltage_array)
+    num_time_steps = len(voltage_protocol)
 
     if num_time_steps == 0:
         raise ValueError("voltage_protocol must not be empty.")
     if sampling_frequency <= 0:
         raise ValueError("sampling_frequency must be positive.")
-    if not np.all(np.isfinite(voltage_array)):
+    if not np.all(np.isfinite(voltage_protocol)):
         raise ValueError("voltage_protocol must not contain NaN or Inf values.")
 
     # Calculate time step from sampling frequency
@@ -70,7 +67,7 @@ def simulate_voltage_clamp(
     I_total = np.empty(num_time_steps)
 
     # Initialise gating variables at steady state for the first voltage
-    V0 = voltage_array[0]
+    V0 = voltage_protocol[0]
     an0, bn0 = neuron.alpha_n(V0), neuron.beta_n(V0)
     am0, bm0 = neuron.alpha_m(V0), neuron.beta_m(V0)
     ah0, bh0 = neuron.alpha_h(V0), neuron.beta_h(V0)
@@ -88,7 +85,7 @@ def simulate_voltage_clamp(
 
     # Main simulation loop — all state in plain numpy scalars
     for i in range(1, num_time_steps):
-        V = voltage_array[i]
+        V = voltage_protocol[i]
         n_prev, m_prev, h_prev = n_arr[i - 1], m_arr[i - 1], h_arr[i - 1]
 
         dn = neuron.alpha_n(V) * (1 - n_prev) - neuron.beta_n(V) * n_prev
@@ -110,7 +107,7 @@ def simulate_voltage_clamp(
 
     results = pd.DataFrame(
         {
-            "voltage": voltage_array,
+            "voltage": voltage_protocol,
             "total_current": I_total,
             "sodium_current": I_Na,
             "potassium_current": I_K,
@@ -127,7 +124,7 @@ def simulate_voltage_clamp(
 
 def simulate_current_clamp(
     neuron: "HodgkinHuxley",
-    current_external: np.ndarray | list[float],
+    current_external: np.ndarray,
     sampling_frequency: float = 100000.0,  # Hz (100 kHz default)
 ) -> pd.DataFrame:
     """
@@ -140,9 +137,9 @@ def simulate_current_clamp(
 
     Parameters:
         neuron (HodgkinHuxley): The Hodgkin-Huxley neuron object to simulate.
-        current_external (np.ndarray | list[float]): External current in uA/cm^2.
-            Must be an array/list for a time-varying current waveform.
-            The length of the array determines the simulation duration.
+        current_external (np.ndarray): External current in uA/cm^2 for a
+            time-varying current waveform. The length of the array determines
+            the simulation duration.
         sampling_frequency (float): Sampling frequency in Hz for the simulation.
             Default is 100 kHz (0.01 ms time steps). Higher frequencies give
             finer temporal resolution but increase computation time.
@@ -152,15 +149,13 @@ def simulate_current_clamp(
             with columns: voltage, potassium_activation, sodium_activation,
             sodium_inactivation.
     """
-    # Convert current_external to numpy array if it's a list
-    current_array = np.asarray(current_external, dtype=float)
-    num_time_steps = len(current_array)
+    num_time_steps = len(current_external)
 
     if num_time_steps == 0:
         raise ValueError("current_external must not be empty.")
     if sampling_frequency <= 0:
         raise ValueError("sampling_frequency must be positive.")
-    if not np.all(np.isfinite(current_array)):
+    if not np.all(np.isfinite(current_external)):
         raise ValueError("current_external must not contain NaN or Inf values.")
 
     # Calculate time step from sampling frequency
@@ -202,7 +197,7 @@ def simulate_current_clamp(
         I_K = g_K * (V - neuron.E_K)
         I_L = neuron.g_L * (V - neuron.E_L)
 
-        dV = (current_array[i] - I_Na - I_K - I_L) / neuron.C_m
+        dV = (current_external[i] - I_Na - I_K - I_L) / neuron.C_m
         dn = neuron.alpha_n(V) * (1 - n) - neuron.beta_n(V) * n
         dm = neuron.alpha_m(V) * (1 - m) - neuron.beta_m(V) * m
         dh = neuron.alpha_h(V) * (1 - h) - neuron.beta_h(V) * h
