@@ -6,12 +6,6 @@ import pytest
 from ap_sim.hodgkin_huxley import HodgkinHuxley
 
 
-@pytest.fixture
-def hh_model():
-    """Fixture to create a HodgkinHuxley model instance for testing."""
-    return HodgkinHuxley()
-
-
 def test_initialization(hh_model):
     """Test that the model is initialized with correct parameters."""
     assert hh_model.C_m == pytest.approx(1.0)

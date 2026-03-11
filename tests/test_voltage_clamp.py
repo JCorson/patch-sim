@@ -9,12 +9,6 @@ from ap_sim.hodgkin_huxley import HodgkinHuxley
 from ap_sim.clamp_simulations import simulate_voltage_clamp
 
 
-@pytest.fixture
-def hh_model():
-    """Fixture to create a HodgkinHuxley model instance for testing."""
-    return HodgkinHuxley()
-
-
 def test_simulate_voltage_clamp_returns_dataframe(hh_model):
     """Test that simulate_voltage_clamp returns a DataFrame with correct structure."""
     # Create a voltage protocol for a 10ms simulation

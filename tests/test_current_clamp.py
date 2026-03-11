@@ -9,19 +9,7 @@ from ap_sim.hodgkin_huxley import HodgkinHuxley
 from ap_sim.clamp_simulations import simulate_current_clamp
 
 
-@pytest.fixture
-def hh_model():
-    """Fixture to create a HodgkinHuxley model instance for testing."""
-    return HodgkinHuxley()
-
-
-@pytest.fixture
-def hh_model_custom_timestep():
-    """Fixture to create a HodgkinHuxley model instance."""
-    return HodgkinHuxley()
-
-
-def test_simulate_current_clamp_returns_dataframe(hh_model_custom_timestep):
+def test_simulate_current_clamp_returns_dataframe(hh_model):
     """Test that simulate_current_clamp method returns a pandas DataFrame with correct
     structure.
 
@@ -34,7 +22,7 @@ def test_simulate_current_clamp_returns_dataframe(hh_model_custom_timestep):
     current = np.full(num_steps, 20.0)  # constant current
 
     result = simulate_current_clamp(
-        hh_model_custom_timestep,
+        hh_model,
         current_external=current,
         sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
     )
@@ -96,7 +84,7 @@ def test_simulation_dynamics(hh_model):
     assert result["sodium_activation"].max() > result["sodium_activation"].iloc[0]
 
 
-def test_simulate_current_clamp_with_zero_current(hh_model_custom_timestep):
+def test_simulate_current_clamp_with_zero_current(hh_model):
     """
     Test the simulate_current_clamp method with zero external current.
     Small fluctuations in voltage may occur due to intrinsic dynamics.
@@ -108,7 +96,7 @@ def test_simulate_current_clamp_with_zero_current(hh_model_custom_timestep):
     zero_current = np.zeros(num_steps)  # zero current array
 
     result = simulate_current_clamp(
-        hh_model_custom_timestep,
+        hh_model,
         current_external=zero_current,
         sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
     )

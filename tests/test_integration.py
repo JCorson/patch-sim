@@ -8,7 +8,6 @@ the full end-to-end workflow rather than either component in isolation.
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from ap_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from ap_sim.hodgkin_huxley import HodgkinHuxley
@@ -27,7 +26,7 @@ from ap_sim.protocols import (
 )
 
 # ---------------------------------------------------------------------------
-# Shared fixtures
+# Shared constants and helpers
 # ---------------------------------------------------------------------------
 
 CURRENT_CLAMP_COLUMNS = [
@@ -47,12 +46,6 @@ VOLTAGE_CLAMP_COLUMNS = [
     "sodium_activation",
     "sodium_inactivation",
 ]
-
-
-@pytest.fixture
-def hh_model() -> HodgkinHuxley:
-    """Default Hodgkin-Huxley neuron for all integration tests."""
-    return HodgkinHuxley()
 
 
 def _assert_current_clamp_dataframe(result: pd.DataFrame) -> None:
