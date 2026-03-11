@@ -114,9 +114,7 @@ def simulate_voltage_clamp(
         V = voltage_protocol[i]
         n_prev, m_prev, h_prev = n_arr[i - 1], m_arr[i - 1], h_arr[i - 1]
 
-        n, m, h = _update_gating_variables(
-            neuron, V, n_prev, m_prev, h_prev, time_step
-        )
+        n, m, h = _update_gating_variables(neuron, V, n_prev, m_prev, h_prev, time_step)
         n_arr[i], m_arr[i], h_arr[i] = n, m, h
 
         g_Na = neuron.g_Na * (m**3) * h
@@ -191,9 +189,7 @@ def simulate_current_clamp(
 
     # Initialise gating variables at steady state for resting potential
     V_arr[0] = neuron.v_rest
-    n_arr[0], m_arr[0], h_arr[0] = _initialize_gating_variables(
-        neuron, neuron.v_rest
-    )
+    n_arr[0], m_arr[0], h_arr[0] = _initialize_gating_variables(neuron, neuron.v_rest)
 
     # Main simulation loop — all state in plain numpy scalars
     for i in range(1, num_time_steps):
