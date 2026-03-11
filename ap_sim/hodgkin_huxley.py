@@ -3,7 +3,9 @@ This module implements the Hodgkin-Huxley model for simulating action potentials
 The model includes equations for ion channel dynamics and membrane voltage.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from functools import cached_property
+
 from .nernst import nernst_potential
 from .utils import safe_exp
 
@@ -31,7 +33,7 @@ class HodgkinHuxley:
         Cl_in (float): Intracellular chloride concentration in mM.
         T (float): Temperature in Kelvin.
 
-    Computed properties (derived from ion concentrations at construction time):
+    Cached properties (derived from ion concentrations on first access):
         E_Na (float): Sodium reversal potential in mV.
         E_K (float): Potassium reversal potential in mV.
         E_L (float): Leak reversal potential in mV.
@@ -55,13 +57,6 @@ class HodgkinHuxley:
     # Temperature in Kelvin (37°C for mammalian cells)
     T: float = 310.15
 
-    # Reversal potentials — computed from ion concentrations in __post_init__
-    # and stored as regular fields. Use field(init=False) so they are not
-    # accepted as constructor arguments.
-    E_Na: float = field(init=False)
-    E_K: float = field(init=False)
-    E_L: float = field(init=False)
-
     def __post_init__(self) -> None:
         if self.g_Na < 0:
             raise ValueError("Sodium conductance (g_Na) must be non-negative.")
@@ -84,16 +79,23 @@ class HodgkinHuxley:
             if value <= 0:
                 raise ValueError(f"Ion concentration ({name}) must be positive.")
 
-        # frozen=True prevents normal attribute assignment, so use object.__setattr__
-        object.__setattr__(
-            self, "E_Na", nernst_potential(1, self.T, self.Na_out, self.Na_in)
-        )
-        object.__setattr__(
-            self, "E_K", nernst_potential(1, self.T, self.K_out, self.K_in)
-        )
-        object.__setattr__(
-            self, "E_L", nernst_potential(-1, self.T, self.Cl_out, self.Cl_in)
-        )
+    # Reversal potentials — derived from ion concentrations via the Nernst
+    # equation.  Using @cached_property avoids the object.__setattr__ hack
+    # that would otherwise be needed in __post_init__ on a frozen dataclass.
+    @cached_property
+    def E_Na(self) -> float:
+        """Sodium reversal potential in mV."""
+        return nernst_potential(1, self.T, self.Na_out, self.Na_in)
+
+    @cached_property
+    def E_K(self) -> float:
+        """Potassium reversal potential in mV."""
+        return nernst_potential(1, self.T, self.K_out, self.K_in)
+
+    @cached_property
+    def E_L(self) -> float:
+        """Leak reversal potential in mV."""
+        return nernst_potential(-1, self.T, self.Cl_out, self.Cl_in)
 
     def alpha_n(self, V: float) -> float:
         """
