@@ -1,5 +1,4 @@
-"""
-Tests for current clamp protocols.
+"""Tests for current clamp protocols.
 
 This module contains unit tests for all current clamp protocol functions.
 """
@@ -597,7 +596,7 @@ class TestCurrentProtocolValidation:
 
     @pytest.mark.parametrize("duration", [0.0, -1.0])
     def test_non_positive_duration_raises(self, duration: float):
-        """duration <= 0 must raise ValueError for all protocol functions."""
+        """Duration <= 0 must raise ValueError for all protocol functions."""
         with pytest.raises(ValueError, match="duration"):
             step_current(duration, 1.0)
 

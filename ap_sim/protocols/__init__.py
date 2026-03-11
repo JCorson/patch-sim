@@ -1,5 +1,4 @@
-"""
-Protocol generation utilities for both current and voltage clamp experiments.
+"""Protocol generation utilities for both current and voltage clamp experiments.
 
 This package provides functions to generate typical stimulation protocols
 that can be used with current and voltage clamp simulations.

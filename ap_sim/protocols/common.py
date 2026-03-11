@@ -1,5 +1,4 @@
-"""
-Shared helpers for protocol generation.
+"""Shared helpers for protocol generation.
 
 These private functions are used by both current and voltage clamp protocol
 modules to avoid duplication.
@@ -11,8 +10,7 @@ import numpy as np
 def _calculate_time_parameters(
     duration: float, sampling_frequency: float
 ) -> tuple[int, np.ndarray]:
-    """
-    Calculate common time parameters for protocol generation.
+    """Calculate common time parameters for protocol generation.
 
     Args:
         duration: Total duration in milliseconds
@@ -36,8 +34,7 @@ def _apply_time_window(
     start_time: float,
     duration: float,
 ) -> np.ndarray:
-    """
-    Create a boolean mask for a time window.
+    """Create a boolean mask for a time window.
 
     Args:
         time_array: Array of time points
@@ -59,8 +56,7 @@ def _generate_step_protocol(
     step_duration: float | None = None,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
-    """
-    Generate a generic step protocol (current or voltage).
+    """Generate a generic step protocol (current or voltage).
 
     This is a shared implementation for both current and voltage step protocols.
 
@@ -99,8 +95,7 @@ def _generate_ramp_protocol(
     ramp_duration: float | None = None,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
-    """
-    Generate a generic ramp protocol (current or voltage).
+    """Generate a generic ramp protocol (current or voltage).
 
     This is a shared implementation for both current and voltage ramp protocols.
 
@@ -150,8 +145,7 @@ def _generate_pulse_train_protocol(
     num_pulses: int | None = None,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
-    """
-    Generate a generic pulse train protocol (current or voltage).
+    """Generate a generic pulse train protocol (current or voltage).
 
     This is a shared implementation for both current and voltage pulse train protocols.
 

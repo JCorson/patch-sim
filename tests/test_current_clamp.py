@@ -1,6 +1,4 @@
-"""
-Tests for the current clamp simulation in the Hodgkin-Huxley model.
-"""
+"""Tests for the current clamp simulation in the Hodgkin-Huxley model."""
 
 import pytest
 import pandas as pd
@@ -10,8 +8,7 @@ from ap_sim.clamp_simulations import simulate_current_clamp
 
 
 def test_simulate_current_clamp_returns_dataframe(hh_model):
-    """Test that simulate_current_clamp method returns a pandas DataFrame with correct
-    structure.
+    """Test that simulate_current_clamp returns a DataFrame with the correct structure.
 
     Validates the data types and structure of the returned DataFrame.
     """
@@ -85,8 +82,8 @@ def test_simulation_dynamics():
 
 
 def test_simulate_current_clamp_with_zero_current(hh_model):
-    """
-    Test the simulate_current_clamp method with zero external current.
+    """Test simulate_current_clamp with zero external current.
+
     Small fluctuations in voltage may occur due to intrinsic dynamics.
     """
     # Create zero current array for a 10ms simulation
@@ -123,8 +120,7 @@ def test_simulate_current_clamp_with_zero_current(hh_model):
 
 @pytest.mark.parametrize("current_amplitude", [10.0, 20.0, 50.0])
 def test_simulate_current_clamp_with_non_zero_currents(current_amplitude: float):
-    """Test the simulate_current_clamp method with various non-zero external
-    currents."""
+    """Test simulate_current_clamp with various non-zero external currents."""
     duration = 10  # ms
 
     # Create a model for testing
@@ -173,10 +169,7 @@ def test_simulate_current_clamp_with_non_zero_currents(current_amplitude: float)
 
 
 def test_physiological_limits_and_action_potentials():
-    """
-    Test that the voltage does not exceed physiological limits and that increasing
-    current generates more action potentials.
-    """
+    """Voltage stays in physiological range; higher current generates more APs."""
     # Physiological limits for membrane voltage
     min_physiological_voltage = -100  # mV
     max_physiological_voltage = 60  # mV
@@ -282,9 +275,7 @@ def test_simulate_current_clamp_with_different_currents():
 
 
 def test_simulation_time_from_current_waveform():
-    """Test that simulation time is correctly derived from the current waveform
-    length.
-    """
+    """Test that simulation time is derived from the current waveform length."""
     time_step = 0.01  # ms
     custom_model = HodgkinHuxley()
 

@@ -1,5 +1,4 @@
-"""
-Tests for voltage clamp protocols.
+"""Tests for voltage clamp protocols.
 
 This module contains unit tests for all voltage clamp protocol functions.
 """
@@ -477,7 +476,7 @@ class TestVoltageProtocolValidation:
     # --- duration and sampling_frequency (shared path via _calculate_time_parameters)
 
     def test_non_positive_duration_voltage_protocol(self):
-        """duration <= 0 must raise ValueError for voltage protocols."""
+        """Duration <= 0 must raise ValueError for voltage protocols."""
         with pytest.raises(ValueError, match="duration"):
             step_voltage(0.0, -30.0)
 

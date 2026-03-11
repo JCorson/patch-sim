@@ -1,3 +1,5 @@
+"""Tests for the Nernst potential calculation module."""
+
 import pytest
 from ap_sim.nernst import nernst_potential
 

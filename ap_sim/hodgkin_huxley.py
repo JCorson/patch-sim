@@ -1,5 +1,5 @@
-"""
-This module implements the Hodgkin-Huxley model for simulating action potentials.
+"""This module implements the Hodgkin-Huxley model for simulating action potentials.
+
 The model includes equations for ion channel dynamics and membrane voltage.
 """
 
@@ -12,8 +12,7 @@ from .utils import safe_exp
 
 @dataclass(frozen=True)
 class HodgkinHuxley:
-    """
-    Simulates the Hodgkin-Huxley model of action potentials.
+    """Simulates the Hodgkin-Huxley model of action potentials.
 
     All parameters are fixed at construction time. The class is immutable
     (frozen) to prevent accidental mutation of parameters after the reversal
@@ -58,6 +57,7 @@ class HodgkinHuxley:
     T: float = 310.15
 
     def __post_init__(self) -> None:
+        """Validate parameter values on construction."""
         if self.g_Na < 0:
             raise ValueError("Sodium conductance (g_Na) must be non-negative.")
         if self.g_K < 0:
@@ -98,14 +98,13 @@ class HodgkinHuxley:
         return nernst_potential(-1, self.T, self.Cl_out, self.Cl_in)
 
     def alpha_n(self, V: float) -> float:
-        """
-        Calculate the rate constant alpha_n for potassium channel activation.
+        """Calculate the rate constant alpha_n for potassium channel activation.
 
-        Parameters:
-            V (float): Membrane voltage in mV.
+        Args:
+            V: Membrane voltage in mV.
 
         Returns:
-            float: The rate constant alpha_n.
+            The rate constant alpha_n.
         """
         if abs(V + 55) < 1e-6:
             # Handle near-singularity case
@@ -116,26 +115,24 @@ class HodgkinHuxley:
             return 0.01 * (V + 55) / denominator
 
     def beta_n(self, V: float) -> float:
-        """
-        Calculate the rate constant beta_n for potassium channel deactivation.
+        """Calculate the rate constant beta_n for potassium channel deactivation.
 
-        Parameters:
-            V (float): Membrane voltage in mV.
+        Args:
+            V: Membrane voltage in mV.
 
         Returns:
-            float: The rate constant beta_n.
+            The rate constant beta_n.
         """
         return 0.125 * safe_exp(-(V + 65) / 80)
 
     def alpha_m(self, V: float) -> float:
-        """
-        Calculate the rate constant alpha_m for sodium channel activation.
+        """Calculate the rate constant alpha_m for sodium channel activation.
 
-        Parameters:
-            V (float): Membrane voltage in mV.
+        Args:
+            V: Membrane voltage in mV.
 
         Returns:
-            float: The rate constant alpha_m.
+            The rate constant alpha_m.
         """
         if abs(V + 40) < 1e-6:
             # Handle near-singularity case
@@ -146,37 +143,34 @@ class HodgkinHuxley:
             return 0.1 * (V + 40) / denominator
 
     def beta_m(self, V: float) -> float:
-        """
-        Calculate the rate constant beta_m for sodium channel deactivation.
+        """Calculate the rate constant beta_m for sodium channel deactivation.
 
-        Parameters:
-            V (float): Membrane voltage in mV.
+        Args:
+            V: Membrane voltage in mV.
 
         Returns:
-            float: The rate constant beta_m.
+            The rate constant beta_m.
         """
         return 4.0 * safe_exp(-(V + 65) / 18)
 
     def alpha_h(self, V: float) -> float:
-        """
-        Calculate the rate constant alpha_h for sodium channel inactivation.
+        """Calculate the rate constant alpha_h for sodium channel inactivation.
 
-        Parameters:
-            V (float): Membrane voltage in mV.
+        Args:
+            V: Membrane voltage in mV.
 
         Returns:
-            float: The rate constant alpha_h.
+            The rate constant alpha_h.
         """
         return 0.07 * safe_exp(-(V + 65) / 20)
 
     def beta_h(self, V: float) -> float:
-        """
-        Calculate the rate constant beta_h for sodium channel reactivation.
+        """Calculate the rate constant beta_h for sodium channel reactivation.
 
-        Parameters:
-            V (float): Membrane voltage in mV.
+        Args:
+            V: Membrane voltage in mV.
 
         Returns:
-            float: The rate constant beta_h.
+            The rate constant beta_h.
         """
         return 1 / (1 + safe_exp(-(V + 35) / 10))

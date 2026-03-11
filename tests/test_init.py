@@ -1,6 +1,4 @@
-"""
-Tests for the ap_sim package's public API (__all__).
-"""
+"""Tests for the ap_sim package's public API (__all__)."""
 
 import ap_sim
 

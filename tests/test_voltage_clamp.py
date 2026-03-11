@@ -1,6 +1,4 @@
-"""
-Tests for the voltage clamp simulation in the Hodgkin-Huxley model.
-"""
+"""Tests for the voltage clamp simulation in the Hodgkin-Huxley model."""
 
 import pytest
 import pandas as pd

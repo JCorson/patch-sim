@@ -1,5 +1,4 @@
-"""
-This module provides functionality to compute the Nernst potential for ions.
+"""This module provides functionality to compute the Nernst potential for ions.
 
 It includes:
 - A function to calculate the Nernst potential for a single ion based on its valence,
@@ -16,17 +15,16 @@ F = 96485  # Faraday's constant, C/mol
 def nernst_potential(
     z: int, T: float, ion_concentration_out: float, ion_concentration_in: float
 ) -> float:
-    """
-    Calculate the Nernst potential for a given ion.
+    """Calculate the Nernst potential for a given ion.
 
-    Parameters:
-        z (int): Valence of the ion (e.g., +1 for K+, +2 for Ca2+).
-        T (float): Temperature in Kelvin.
-        ion_concentration_out (float): Extracellular ion concentration (mM).
-        ion_concentration_in (float): Intracellular ion concentration (mM).
+    Args:
+        z: Valence of the ion (e.g., +1 for K+, +2 for Ca2+).
+        T: Temperature in Kelvin.
+        ion_concentration_out: Extracellular ion concentration (mM).
+        ion_concentration_in: Intracellular ion concentration (mM).
 
     Returns:
-        float: Nernst potential in millivolts (mV).
+        Nernst potential in millivolts (mV).
     """
     if z == 0:
         raise ValueError("Valence (z) must not be zero.")

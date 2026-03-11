@@ -1,5 +1,4 @@
-"""
-Voltage clamp protocol generation utilities.
+"""Voltage clamp protocol generation utilities.
 
 This module provides functions to generate typical voltage stimulation
 protocols that can be used with voltage clamp simulations.
@@ -24,23 +23,22 @@ def step_voltage(
     holding_voltage: float = -70.0,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
-    """
-    Generate a step voltage protocol for voltage clamp experiments.
+    """Generate a step voltage protocol for voltage clamp experiments.
 
     Creates a voltage protocol with a rectangular step of specified amplitude
     and duration, useful for studying ionic currents and gating kinetics.
 
-    Parameters:
-        duration (float): Total duration of the protocol in milliseconds.
-        voltage_amplitude (float): Amplitude of the voltage step in mV.
-        step_start (float): Time when the step begins in milliseconds. Default is 0.0.
-        step_duration (float): Duration of the voltage step in milliseconds.
+    Args:
+        duration: Total duration of the protocol in milliseconds.
+        voltage_amplitude: Amplitude of the voltage step in mV.
+        step_start: Time when the step begins in milliseconds. Default is 0.0.
+        step_duration: Duration of the voltage step in milliseconds.
             If None, the step lasts for the entire duration.
-        holding_voltage (float): Holding voltage in mV. Default is -70.0 mV.
-        sampling_frequency (float): Sampling frequency in Hz. Default is 100 kHz.
+        holding_voltage: Holding voltage in mV. Default is -70.0 mV.
+        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
 
     Returns:
-        np.ndarray: Array of voltage values in mV.
+        Array of voltage values in mV.
     """
     return _generate_step_protocol(
         duration,
@@ -61,24 +59,23 @@ def ramp_voltage(
     holding_voltage: float = -70.0,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
-    """
-    Generate a ramp voltage protocol for voltage clamp experiments.
+    """Generate a ramp voltage protocol for voltage clamp experiments.
 
     Creates a voltage protocol with a linear ramp from start to end voltage,
     useful for studying voltage-dependent activation and I-V relationships.
 
-    Parameters:
-        duration (float): Total duration of the protocol in milliseconds.
-        start_voltage (float): Starting voltage in mV.
-        end_voltage (float): Ending voltage in mV.
-        ramp_start (float): Time when the ramp begins in milliseconds. Default is 0.0.
-        ramp_duration (float): Duration of the ramp in milliseconds.
+    Args:
+        duration: Total duration of the protocol in milliseconds.
+        start_voltage: Starting voltage in mV.
+        end_voltage: Ending voltage in mV.
+        ramp_start: Time when the ramp begins in milliseconds. Default is 0.0.
+        ramp_duration: Duration of the ramp in milliseconds.
             If None, the ramp lasts for the entire duration.
-        holding_voltage (float): Holding voltage in mV. Default is -70.0 mV.
-        sampling_frequency (float): Sampling frequency in Hz. Default is 100 kHz.
+        holding_voltage: Holding voltage in mV. Default is -70.0 mV.
+        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
 
     Returns:
-        np.ndarray: Array of voltage values in mV.
+        Array of voltage values in mV.
     """
     return _generate_ramp_protocol(
         duration,
@@ -101,27 +98,26 @@ def pulse_train_voltage(
     holding_voltage: float = -70.0,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
-    """
-    Generate a pulse train voltage protocol for voltage clamp experiments.
+    """Generate a pulse train voltage protocol for voltage clamp experiments.
 
     Creates a series of rectangular voltage pulses with specified amplitude,
     width, and interval, useful for studying synaptic currents and
     channel inactivation.
 
-    Parameters:
-        duration (float): Total duration of the protocol in milliseconds.
-        pulse_amplitude (float): Amplitude of each pulse in mV.
-        pulse_width (float): Width of each pulse in milliseconds.
-        pulse_interval (float): Time between pulse onsets in milliseconds.
-        train_start (float): Time when the pulse train begins in milliseconds.
+    Args:
+        duration: Total duration of the protocol in milliseconds.
+        pulse_amplitude: Amplitude of each pulse in mV.
+        pulse_width: Width of each pulse in milliseconds.
+        pulse_interval: Time between pulse onsets in milliseconds.
+        train_start: Time when the pulse train begins in milliseconds.
             Default is 0.0.
-        num_pulses (int): Number of pulses in the train. If None, pulses
+        num_pulses: Number of pulses in the train. If None, pulses
             continue until the end of the duration.
-        holding_voltage (float): Holding voltage in mV. Default is -70.0 mV.
-        sampling_frequency (float): Sampling frequency in Hz. Default is 100 kHz.
+        holding_voltage: Holding voltage in mV. Default is -70.0 mV.
+        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
 
     Returns:
-        np.ndarray: Array of voltage values in mV.
+        Array of voltage values in mV.
     """
     return _generate_pulse_train_protocol(
         duration,
@@ -145,26 +141,25 @@ def iv_curve_protocol(
     holding_voltage: float = -70.0,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
-    """
-    Generate an I-V curve protocol for voltage clamp experiments.
+    """Generate an I-V curve protocol for voltage clamp experiments.
 
     Creates a series of voltage steps from minimum to maximum voltage,
     useful for characterizing current-voltage relationships.
 
-    Parameters:
-        step_duration (float): Duration of each voltage step in milliseconds.
-        voltage_min (float): Minimum voltage in mV. Default is -100 mV.
-        voltage_max (float): Maximum voltage in mV. Default is 60 mV.
-        voltage_step (float): Voltage increment between steps in mV. Default is 10 mV.
-        pre_pulse_duration (float): Duration before each step in milliseconds.
+    Args:
+        step_duration: Duration of each voltage step in milliseconds.
+        voltage_min: Minimum voltage in mV. Default is -100 mV.
+        voltage_max: Maximum voltage in mV. Default is 60 mV.
+        voltage_step: Voltage increment between steps in mV. Default is 10 mV.
+        pre_pulse_duration: Duration before each step in milliseconds.
             Default is 10 ms.
-        post_pulse_duration (float): Duration after each step in milliseconds.
+        post_pulse_duration: Duration after each step in milliseconds.
             Default is 10 ms.
-        holding_voltage (float): Holding voltage in mV. Default is -70.0 mV.
-        sampling_frequency (float): Sampling frequency in Hz. Default is 100 kHz.
+        holding_voltage: Holding voltage in mV. Default is -70.0 mV.
+        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
 
     Returns:
-        np.ndarray: Array of voltage values in mV for the complete protocol.
+        Array of voltage values in mV for the complete protocol.
     """
     # Calculate voltage steps
     voltages = np.arange(voltage_min, voltage_max + voltage_step, voltage_step)
@@ -202,28 +197,25 @@ def activation_protocol(
     holding_voltage: float = -70.0,
     sampling_frequency: float = 100000.0,
 ) -> np.ndarray:
-    """
-    Generate an activation protocol for voltage clamp experiments.
+    """Generate an activation protocol for voltage clamp experiments.
 
     Creates a protocol with prepulses followed by test pulses at different
     voltages, useful for studying channel activation kinetics.
 
-    Parameters:
-        test_duration (float): Duration of each test pulse in milliseconds.
-        prepulse_voltage (float): Prepulse voltage in mV. Default is -100 mV.
-        prepulse_duration (float): Duration of prepulse in milliseconds.
-            Default is 500 ms.
-        test_voltage_min (float): Minimum test voltage in mV. Default is -80 mV.
-        test_voltage_max (float): Maximum test voltage in mV. Default is 60 mV.
-        voltage_step (float): Voltage increment between test steps in mV.
-            Default is 10 mV.
-        interpulse_duration (float): Duration between prepulse and test pulse
-            in milliseconds. Default is 10 ms.
-        holding_voltage (float): Holding voltage in mV. Default is -70.0 mV.
-        sampling_frequency (float): Sampling frequency in Hz. Default is 100 kHz.
+    Args:
+        test_duration: Duration of each test pulse in milliseconds.
+        prepulse_voltage: Prepulse voltage in mV. Default is -100 mV.
+        prepulse_duration: Duration of prepulse in milliseconds. Default is 500 ms.
+        test_voltage_min: Minimum test voltage in mV. Default is -80 mV.
+        test_voltage_max: Maximum test voltage in mV. Default is 60 mV.
+        voltage_step: Voltage increment between test steps in mV. Default is 10 mV.
+        interpulse_duration: Duration between prepulse and test pulse in milliseconds.
+            Default is 10 ms.
+        holding_voltage: Holding voltage in mV. Default is -70.0 mV.
+        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
 
     Returns:
-        np.ndarray: Array of voltage values in mV for the complete protocol.
+        Array of voltage values in mV for the complete protocol.
     """
     # Calculate test voltages
     test_voltages = np.arange(

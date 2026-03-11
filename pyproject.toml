@@ -14,8 +14,11 @@ dependencies = [
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "W"]
+select = ["E", "F", "W", "D"]
 ignore = []
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [project.optional-dependencies]
 dev = ["ruff", "pytest", "mypy", "pandas-stubs"]

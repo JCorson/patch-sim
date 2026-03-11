@@ -1,5 +1,4 @@
-"""
-Action Potential Simulator
+"""Action Potential Simulator.
 
 A package for simulating action potentials using the Hodgkin-Huxley model.
 """

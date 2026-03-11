@@ -1,6 +1,4 @@
-"""
-Tests for the core Hodgkin-Huxley model functionality.
-"""
+"""Tests for the core Hodgkin-Huxley model functionality."""
 
 import dataclasses
 import pytest
@@ -140,15 +138,13 @@ def test_singularity_guards(hh_model):
 
 
 def test_frozen_immutability(hh_model):
-    """Assigning to a regular field on the frozen dataclass must raise
-    FrozenInstanceError."""
+    """Assigning to a frozen dataclass field must raise FrozenInstanceError."""
     with pytest.raises(dataclasses.FrozenInstanceError):
         hh_model.g_Na = 999.0  # type: ignore[misc]
 
 
 def test_reversal_potentials_match_nernst(hh_model):
-    """E_Na, E_K, and E_L must equal the Nernst equation applied to default
-    concentrations."""
+    """E_Na, E_K, E_L must match Nernst equation for default concentrations."""
     expected_E_Na = nernst_potential(1, hh_model.T, hh_model.Na_out, hh_model.Na_in)
     expected_E_K = nernst_potential(1, hh_model.T, hh_model.K_out, hh_model.K_in)
     expected_E_L = nernst_potential(-1, hh_model.T, hh_model.Cl_out, hh_model.Cl_in)

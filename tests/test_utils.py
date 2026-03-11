@@ -1,6 +1,4 @@
-"""
-Tests for the utilities module.
-"""
+"""Tests for the utilities module."""
 
 import pytest
 import numpy as np

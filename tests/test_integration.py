@@ -1,5 +1,4 @@
-"""
-Integration tests for the protocol → simulation pipeline.
+"""Integration tests for the protocol → simulation pipeline.
 
 Each test generates a stimulus protocol via ap_sim.protocols and feeds it
 directly into simulate_current_clamp() or simulate_voltage_clamp(), exercising

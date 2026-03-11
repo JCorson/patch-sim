@@ -1,5 +1,4 @@
-"""
-Clamp simulation functions for the Hodgkin-Huxley model.
+"""Clamp simulation functions for the Hodgkin-Huxley model.
 
 This module contains functions for voltage clamp and current clamp experiments
 that can be performed on Hodgkin-Huxley neuron objects.
@@ -16,6 +15,16 @@ if TYPE_CHECKING:
 def _setup_simulation(
     num_time_steps: int, sampling_frequency: float
 ) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Allocate time array and gating variable output arrays for a simulation run.
+
+    Args:
+        num_time_steps: Total number of time steps in the simulation.
+        sampling_frequency: Sampling frequency in Hz.
+
+    Returns:
+        Tuple of (time_step, time_array, n_arr, m_arr, h_arr) where time_step
+        is in milliseconds and arrays are pre-allocated numpy arrays.
+    """
     time_step = 1.0 / sampling_frequency * 1000.0
     actual_simulation_time = (num_time_steps - 1) * time_step
     time_array = np.linspace(0, actual_simulation_time, num_time_steps)
@@ -28,6 +37,15 @@ def _setup_simulation(
 def _initialize_gating_variables(
     neuron: "HodgkinHuxley", initial_voltage: float
 ) -> tuple[float, float, float]:
+    """Compute steady-state gating variables at a given initial voltage.
+
+    Args:
+        neuron: The Hodgkin-Huxley neuron model.
+        initial_voltage: Initial membrane voltage in mV.
+
+    Returns:
+        Tuple of (n0, m0, h0) steady-state gating variable values.
+    """
     V0 = initial_voltage
     an0, bn0 = neuron.alpha_n(V0), neuron.beta_n(V0)
     am0, bm0 = neuron.alpha_m(V0), neuron.beta_m(V0)
@@ -38,6 +56,19 @@ def _initialize_gating_variables(
 def _update_gating_variables(
     neuron: "HodgkinHuxley", V: float, n: float, m: float, h: float, dt: float
 ) -> tuple[float, float, float]:
+    """Advance gating variables by one Euler time step.
+
+    Args:
+        neuron: The Hodgkin-Huxley neuron model.
+        V: Current membrane voltage in mV.
+        n: Current potassium activation gating variable.
+        m: Current sodium activation gating variable.
+        h: Current sodium inactivation gating variable.
+        dt: Time step in milliseconds.
+
+    Returns:
+        Tuple of updated (n, m, h) gating variables, clipped to [0, 1].
+    """
     dn = neuron.alpha_n(V) * (1 - n) - neuron.beta_n(V) * n
     dm = neuron.alpha_m(V) * (1 - m) - neuron.beta_m(V) * m
     dh = neuron.alpha_h(V) * (1 - h) - neuron.beta_h(V) * h
@@ -53,28 +84,25 @@ def simulate_voltage_clamp(
     voltage_protocol: np.ndarray,
     sampling_frequency: float = 100000.0,  # Hz (100 kHz default)
 ) -> pd.DataFrame:
-    """
-    Simulate a voltage clamp experiment using the Hodgkin-Huxley model.
+    """Simulate a voltage clamp experiment using the Hodgkin-Huxley model.
 
     In a voltage clamp experiment, the membrane potential is held at specified
     values and the current required to maintain those voltages is measured. This
     function simulates this process by computing the ionic currents that would flow
     at each voltage step in the protocol.
 
-    Parameters:
-        neuron (HodgkinHuxley): The Hodgkin-Huxley neuron object to simulate.
-        voltage_protocol (np.ndarray): Voltage values in mV to clamp the
-            membrane at for each time step. The length of the array determines
-            the simulation duration.
-        sampling_frequency (float): Sampling frequency in Hz for the simulation.
-            Default is 100 kHz (0.01 ms time steps). Higher frequencies give
-            finer temporal resolution but increase computation time.
+    Args:
+        neuron: The Hodgkin-Huxley neuron object to simulate.
+        voltage_protocol: Voltage values in mV to clamp the membrane at for each
+            time step. The length of the array determines the simulation duration.
+        sampling_frequency: Sampling frequency in Hz for the simulation. Default
+            is 100 kHz (0.01 ms time steps). Higher frequencies give finer
+            temporal resolution but increase computation time.
 
     Returns:
-        pd.DataFrame: DataFrame indexed by time in milliseconds (named 'time'),
-            with columns: voltage, total_current, sodium_current,
-            potassium_current, leak_current, potassium_activation,
-            sodium_activation, sodium_inactivation.
+        DataFrame indexed by time in milliseconds (named 'time'), with columns:
+        voltage, total_current, sodium_current, potassium_current, leak_current,
+        potassium_activation, sodium_activation, sodium_inactivation.
     """
     num_time_steps = len(voltage_protocol)
 
@@ -146,27 +174,24 @@ def simulate_current_clamp(
     current_external: np.ndarray,
     sampling_frequency: float = 100000.0,  # Hz (100 kHz default)
 ) -> pd.DataFrame:
-    """
-    Simulate a current clamp experiment using the Hodgkin-Huxley model.
+    """Simulate a current clamp experiment using the Hodgkin-Huxley model.
 
     In a current clamp experiment, current is injected into the cell membrane and
     the resulting voltage changes are recorded. This function simulates this process
     by computing the membrane voltage over time in response to the specified
     external current.
 
-    Parameters:
-        neuron (HodgkinHuxley): The Hodgkin-Huxley neuron object to simulate.
-        current_external (np.ndarray): External current in uA/cm^2 for a
-            time-varying current waveform. The length of the array determines
-            the simulation duration.
-        sampling_frequency (float): Sampling frequency in Hz for the simulation.
-            Default is 100 kHz (0.01 ms time steps). Higher frequencies give
-            finer temporal resolution but increase computation time.
+    Args:
+        neuron: The Hodgkin-Huxley neuron object to simulate.
+        current_external: External current in uA/cm^2 for a time-varying current
+            waveform. The length of the array determines the simulation duration.
+        sampling_frequency: Sampling frequency in Hz for the simulation. Default
+            is 100 kHz (0.01 ms time steps). Higher frequencies give finer
+            temporal resolution but increase computation time.
 
     Returns:
-        pd.DataFrame: DataFrame indexed by time in milliseconds (named 'time'),
-            with columns: voltage, potassium_activation, sodium_activation,
-            sodium_inactivation.
+        DataFrame indexed by time in milliseconds (named 'time'), with columns:
+        voltage, potassium_activation, sodium_activation, sodium_inactivation.
     """
     num_time_steps = len(current_external)
 
