@@ -121,10 +121,10 @@ def test_simulate_current_clamp_with_zero_current(hh_model):
     )
 
 
-def test_simulate_current_clamp_with_non_zero_currents():
+@pytest.mark.parametrize("current_amplitude", [10.0, 20.0, 50.0])
+def test_simulate_current_clamp_with_non_zero_currents(current_amplitude: float):
     """Test the simulate_current_clamp method with various non-zero external
     currents."""
-    currents = [10.0, 20.0, 50.0]  # Different external currents to test
     duration = 10  # ms
 
     # Create a model for testing
@@ -132,45 +132,44 @@ def test_simulate_current_clamp_with_non_zero_currents():
     time_step = 0.1  # ms
     num_steps = int(duration / time_step) + 1
 
-    for current_value in currents:
-        # Create constant current array for each value
-        current_array = np.full(num_steps, current_value)
+    # Create constant current array for the given amplitude
+    current_array = np.full(num_steps, current_amplitude)
 
-        result = simulate_current_clamp(
-            custom_model,
-            current_external=current_array,
-            sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
-        )
+    result = simulate_current_clamp(
+        custom_model,
+        current_external=current_array,
+        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
+    )
 
-        # Check result type and structure
-        assert isinstance(result, pd.DataFrame)
-        expected_columns = [
-            "voltage",
-            "potassium_activation",
-            "sodium_activation",
-            "sodium_inactivation",
-        ]
-        for col in expected_columns:
-            assert col in result.columns
+    # Check result type and structure
+    assert isinstance(result, pd.DataFrame)
+    expected_columns = [
+        "voltage",
+        "potassium_activation",
+        "sodium_activation",
+        "sodium_inactivation",
+    ]
+    for col in expected_columns:
+        assert col in result.columns
 
-        # For non-zero currents, voltage should change significantly
-        initial_voltage = result["voltage"].iloc[0]
-        max_change = abs(result["voltage"].max() - initial_voltage)
+    # For non-zero currents, voltage should change significantly
+    initial_voltage = result["voltage"].iloc[0]
+    max_change = abs(result["voltage"].max() - initial_voltage)
 
-        # Adjusted threshold based on observed behavior
-        assert max_change > 3.0, (
-            f"Voltage did not change significantly for current {current_value}"
-        )
+    # Adjusted threshold based on observed behavior
+    assert max_change > 3.0, (
+        f"Voltage did not change significantly for current {current_amplitude}"
+    )
 
-        # Check that gating variables are within physiological bounds
-        gating_vars = [
-            "potassium_activation",
-            "sodium_activation",
-            "sodium_inactivation",
-        ]
-        for gating_var in gating_vars:
-            assert (result[gating_var] >= 0).all()
-            assert (result[gating_var] <= 1).all()
+    # Check that gating variables are within physiological bounds
+    gating_vars = [
+        "potassium_activation",
+        "sodium_activation",
+        "sodium_inactivation",
+    ]
+    for gating_var in gating_vars:
+        assert (result[gating_var] >= 0).all()
+        assert (result[gating_var] <= 1).all()
 
 
 def test_physiological_limits_and_action_potentials():

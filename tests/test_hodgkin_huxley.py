@@ -19,11 +19,9 @@ def test_initialization(hh_model):
     assert -70.0 < hh_model.E_L < -40.0
 
 
-def test_rate_constants(hh_model):
-    """Test the rate constant calculation methods."""
-    voltage = -65.0
-
-    # Test each rate constant at resting potential
+@pytest.mark.parametrize("voltage", [-100.0, -65.0, 0.0, 40.0])
+def test_rate_constants(hh_model, voltage: float):
+    """Test that all rate constants are positive at a range of membrane voltages."""
     assert hh_model.alpha_n(voltage) > 0
     assert hh_model.beta_n(voltage) > 0
     assert hh_model.alpha_m(voltage) > 0
@@ -32,8 +30,28 @@ def test_rate_constants(hh_model):
     assert hh_model.beta_h(voltage) > 0
 
 
+@pytest.mark.parametrize("voltage", [-100.0, -65.0, 0.0, 40.0])
+def test_steady_state_gating_bounds(hh_model, voltage: float):
+    """Test that steady-state gating variables stay in [0, 1] at any voltage."""
+    alpha_n = hh_model.alpha_n(voltage)
+    beta_n = hh_model.beta_n(voltage)
+    n_inf = alpha_n / (alpha_n + beta_n)
+
+    alpha_m = hh_model.alpha_m(voltage)
+    beta_m = hh_model.beta_m(voltage)
+    m_inf = alpha_m / (alpha_m + beta_m)
+
+    alpha_h = hh_model.alpha_h(voltage)
+    beta_h = hh_model.beta_h(voltage)
+    h_inf = alpha_h / (alpha_h + beta_h)
+
+    assert 0 <= n_inf <= 1
+    assert 0 <= m_inf <= 1
+    assert 0 <= h_inf <= 1
+
+
 def test_steady_state_values(hh_model):
-    """Test that steady-state gating variable values are calculated correctly."""
+    """Test that steady-state gating variables have correct resting-potential values."""
     voltage = -65.0
 
     # Calculate steady-state values
@@ -48,11 +66,6 @@ def test_steady_state_values(hh_model):
     alpha_h = hh_model.alpha_h(voltage)
     beta_h = hh_model.beta_h(voltage)
     h_inf = alpha_h / (alpha_h + beta_h)
-
-    # Steady-state values should be between 0 and 1
-    assert 0 <= n_inf <= 1
-    assert 0 <= m_inf <= 1
-    assert 0 <= h_inf <= 1
 
     # At resting potential, h should be high, m and n should be low
     assert h_inf > 0.5  # Sodium inactivation high at rest
