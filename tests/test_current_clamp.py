@@ -341,3 +341,17 @@ def test_inf_in_current_array_raises(hh_model):
     current = np.array([0.0, float("inf"), 0.0])
     with pytest.raises(ValueError, match="Inf"):
         simulate_current_clamp(hh_model, current_external=current)
+
+
+# ---------------------------------------------------------------------------
+# Coverage-expansion tests (issue #18)
+# ---------------------------------------------------------------------------
+
+
+def test_single_element_current_protocol(hh_model):
+    """A single-element current array must return a one-row DataFrame."""
+    result = simulate_current_clamp(hh_model, current_external=np.array([0.0]))
+
+    assert isinstance(result, pd.DataFrame)
+    assert len(result) == 1
+    assert result["voltage"].iloc[0] == pytest.approx(hh_model.v_rest)

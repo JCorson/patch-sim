@@ -2,8 +2,10 @@
 Tests for the core Hodgkin-Huxley model functionality.
 """
 
+import dataclasses
 import pytest
 from ap_sim.hodgkin_huxley import HodgkinHuxley
+from ap_sim.nernst import nernst_potential
 
 
 def test_initialization(hh_model):
@@ -114,8 +116,13 @@ def test_singularity_guards(hh_model):
     assert result == pytest.approx(0.1)
 
     # Values just outside the guard threshold should be continuous with the limit
-    result_near = hh_model.alpha_n(-55.0 + 1e-5)
-    assert result_near == pytest.approx(0.1, rel=1e-3)
+    # — approach from above
+    result_near_above = hh_model.alpha_n(-55.0 + 1e-5)
+    assert result_near_above == pytest.approx(0.1, rel=1e-3)
+
+    # — approach from below
+    result_near_below = hh_model.alpha_n(-55.0 - 1e-5)
+    assert result_near_below == pytest.approx(0.1, rel=1e-3)
 
     # alpha_m has a removable singularity at V = -40 mV
     # The limit as V -> -40 is 1.0
@@ -123,8 +130,53 @@ def test_singularity_guards(hh_model):
     assert result == pytest.approx(1.0)
 
     # Values just outside the guard threshold should be continuous with the limit
-    result_near = hh_model.alpha_m(-40.0 + 1e-5)
-    assert result_near == pytest.approx(1.0, rel=1e-3)
+    # — approach from above
+    result_near_above = hh_model.alpha_m(-40.0 + 1e-5)
+    assert result_near_above == pytest.approx(1.0, rel=1e-3)
+
+    # — approach from below
+    result_near_below = hh_model.alpha_m(-40.0 - 1e-5)
+    assert result_near_below == pytest.approx(1.0, rel=1e-3)
+
+
+def test_frozen_immutability(hh_model):
+    """Assigning to a regular field on the frozen dataclass must raise
+    FrozenInstanceError."""
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        hh_model.g_Na = 999.0  # type: ignore[misc]
+
+
+def test_reversal_potentials_match_nernst(hh_model):
+    """E_Na, E_K, and E_L must equal the Nernst equation applied to default
+    concentrations."""
+    expected_E_Na = nernst_potential(1, hh_model.T, hh_model.Na_out, hh_model.Na_in)
+    expected_E_K = nernst_potential(1, hh_model.T, hh_model.K_out, hh_model.K_in)
+    expected_E_L = nernst_potential(-1, hh_model.T, hh_model.Cl_out, hh_model.Cl_in)
+
+    assert hh_model.E_Na == pytest.approx(expected_E_Na)
+    assert hh_model.E_K == pytest.approx(expected_E_K)
+    assert hh_model.E_L == pytest.approx(expected_E_L)
+
+
+def test_custom_ion_concentrations_shift_reversal_potentials():
+    """Changing ion concentrations must produce shifted reversal potentials."""
+    custom_model = HodgkinHuxley(Na_out=200.0, K_in=100.0, T=293.15)
+    default_model = HodgkinHuxley()
+
+    # Higher extracellular Na+ → more positive E_Na
+    assert custom_model.E_Na > default_model.E_Na
+
+    # Lower intracellular K+ (100 vs 140 mM) → K_out/K_in ratio is larger
+    # → more positive E_K
+    assert custom_model.E_K > default_model.E_K
+
+    # Values must still agree with direct Nernst calculation
+    assert custom_model.E_Na == pytest.approx(
+        nernst_potential(1, custom_model.T, custom_model.Na_out, custom_model.Na_in)
+    )
+    assert custom_model.E_K == pytest.approx(
+        nernst_potential(1, custom_model.T, custom_model.K_out, custom_model.K_in)
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -269,3 +269,51 @@ def test_inf_in_voltage_array_raises(hh_model):
     voltage = np.array([-65.0, float("inf"), -65.0])
     with pytest.raises(ValueError, match="Inf"):
         simulate_voltage_clamp(hh_model, voltage_protocol=voltage)
+
+
+# ---------------------------------------------------------------------------
+# Coverage-expansion tests (issue #18)
+# ---------------------------------------------------------------------------
+
+
+def test_current_conservation(hh_model):
+    """total_current must equal sodium + potassium + leak at every time step."""
+    duration = 5  # ms
+    time_step = 0.01  # ms
+    num_steps = int(duration / time_step) + 1
+    voltage = np.full(num_steps, 0.0)  # depolarised to maximise channel activity
+
+    result = simulate_voltage_clamp(hh_model, voltage_protocol=voltage)
+
+    reconstructed = (
+        result["sodium_current"] + result["potassium_current"] + result["leak_current"]
+    )
+    assert np.allclose(result["total_current"].to_numpy(), reconstructed.to_numpy())
+
+
+def test_gating_variable_initialisation(hh_model):
+    """At t=0, gating variables must equal the steady-state for the starting voltage."""
+    v_start = -80.0
+    voltage = np.full(3, v_start)
+
+    result = simulate_voltage_clamp(hh_model, voltage_protocol=voltage)
+
+    an = hh_model.alpha_n(v_start)
+    bn = hh_model.beta_n(v_start)
+    am = hh_model.alpha_m(v_start)
+    bm = hh_model.beta_m(v_start)
+    ah = hh_model.alpha_h(v_start)
+    bh = hh_model.beta_h(v_start)
+
+    assert result["potassium_activation"].iloc[0] == pytest.approx(an / (an + bn))
+    assert result["sodium_activation"].iloc[0] == pytest.approx(am / (am + bm))
+    assert result["sodium_inactivation"].iloc[0] == pytest.approx(ah / (ah + bh))
+
+
+def test_single_element_voltage_protocol(hh_model):
+    """A single-element voltage protocol must return a one-row DataFrame."""
+    result = simulate_voltage_clamp(hh_model, voltage_protocol=np.array([-65.0]))
+
+    assert isinstance(result, pd.DataFrame)
+    assert len(result) == 1
+    assert result["voltage"].iloc[0] == pytest.approx(-65.0)

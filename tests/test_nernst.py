@@ -8,12 +8,18 @@ from ap_sim.nernst import nernst_potential
         (1, 310, 5.0, 140.0, -88.54),  # K+
         (1, 310, 145.0, 10.0, 71.43),  # Na+
         (2, 310, 1.8, 0.0001, 130.87),  # Ca2+
+        (-1, 310, 120.0, 10.0, -66.38),  # Cl- (z=-1, as used for E_L in HH model)
     ],
 )
 def test_nernst_potential(z: int, T: float, c_out: float, c_in: float, expected: float):
     """Test Nernst potential for common physiological ions at 310 K."""
     result = nernst_potential(z, T, c_out, c_in)
     assert pytest.approx(result, 0.01) == expected
+
+
+def test_equal_concentrations_gives_zero():
+    """When c_out == c_in the Nernst potential must be 0 mV."""
+    assert nernst_potential(1, 310, 100.0, 100.0) == pytest.approx(0.0)
 
 
 # ---------------------------------------------------------------------------
