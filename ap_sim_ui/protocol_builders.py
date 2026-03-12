@@ -62,7 +62,7 @@ def build_current_protocol(
         Protocol array in µA/cm².
 
     Raises:
-        ValueError: If protocol_type is unrecognised or parameters are invalid.
+        ValueError: If protocol_type is unrecognized or parameters are invalid.
     """
     if protocol_type == "Step":
         return ap_sim.step_current(
@@ -179,7 +179,7 @@ def build_voltage_protocol(
         Protocol array in mV.
 
     Raises:
-        ValueError: If protocol_type is unrecognised or parameters are invalid.
+        ValueError: If protocol_type is unrecognized or parameters are invalid.
     """
     if protocol_type == "Step":
         return ap_sim.step_voltage(
