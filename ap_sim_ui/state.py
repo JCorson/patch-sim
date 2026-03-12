@@ -4,16 +4,17 @@ All reactive variables and event handlers live here. The state drives
 the Reflex component tree via computed properties.
 """
 
-import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from pydantic import BaseModel
 import reflex as rx
 
 import ap_sim
 from ap_sim_ui import constants, presets
+from ap_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
 
 
-class Sweep(rx.Base):
+class Sweep(BaseModel):
     """A saved simulation result for sweep overlay display."""
 
     label: str
@@ -284,6 +285,246 @@ class AppState(rx.State):
         for key, value in config.items():
             setattr(self, key, value)
 
+    # ------------------------------------------------------------------ #
+    # Numeric field setters                                              #
+    # ------------------------------------------------------------------ #
+    # Reflex's auto-generated set_X handlers are typed `value: float`,   #
+    # but rx.input.on_change passes str and rx.slider.on_change passes   #
+    # list[float].  These explicit thin wrappers accept both.            #
+
+    def _set_float(self, field: str, value: "str | list[float] | float") -> None:
+        """Coerce value to float and set the named field.
+
+        Args:
+            field: Name of the AppState attribute to update.
+            value: Raw value from an input or slider event.
+        """
+        v = value[0] if isinstance(value, list) else value
+        try:
+            setattr(self, field, float(v))
+        except (ValueError, TypeError):
+            pass
+
+    # Neuron parameters
+    def set_g_Na(self, value: "str | list[float]") -> None:
+        """Set g_Na from an input or slider event."""
+        self._set_float("g_Na", value)
+
+    def set_g_K(self, value: "str | list[float]") -> None:
+        """Set g_K from an input or slider event."""
+        self._set_float("g_K", value)
+
+    def set_g_L(self, value: "str | list[float]") -> None:
+        """Set g_L from an input or slider event."""
+        self._set_float("g_L", value)
+
+    def set_C_m(self, value: "str | list[float]") -> None:
+        """Set C_m from an input or slider event."""
+        self._set_float("C_m", value)
+
+    def set_v_rest(self, value: "str | list[float]") -> None:
+        """Set v_rest from an input or slider event."""
+        self._set_float("v_rest", value)
+
+    def set_Na_out(self, value: "str | list[float]") -> None:
+        """Set Na_out from an input or slider event."""
+        self._set_float("Na_out", value)
+
+    def set_Na_in(self, value: "str | list[float]") -> None:
+        """Set Na_in from an input or slider event."""
+        self._set_float("Na_in", value)
+
+    def set_K_out(self, value: "str | list[float]") -> None:
+        """Set K_out from an input or slider event."""
+        self._set_float("K_out", value)
+
+    def set_K_in(self, value: "str | list[float]") -> None:
+        """Set K_in from an input or slider event."""
+        self._set_float("K_in", value)
+
+    def set_Cl_out(self, value: "str | list[float]") -> None:
+        """Set Cl_out from an input or slider event."""
+        self._set_float("Cl_out", value)
+
+    def set_Cl_in(self, value: "str | list[float]") -> None:
+        """Set Cl_in from an input or slider event."""
+        self._set_float("Cl_in", value)
+
+    def set_T(self, value: "str | list[float]") -> None:
+        """Set T from an input or slider event."""
+        self._set_float("T", value)
+
+    # Shared protocol params
+    def set_sampling_frequency(self, value: "str | list[float]") -> None:
+        """Set sampling_frequency from an input or slider event."""
+        self._set_float("sampling_frequency", value)
+
+    def set_duration(self, value: "str | list[float]") -> None:
+        """Set duration from an input or slider event."""
+        self._set_float("duration", value)
+
+    # Current clamp protocol params
+    def set_current_amplitude(self, value: "str | list[float]") -> None:
+        """Set current_amplitude from an input or slider event."""
+        self._set_float("current_amplitude", value)
+
+    def set_step_start(self, value: "str | list[float]") -> None:
+        """Set step_start from an input or slider event."""
+        self._set_float("step_start", value)
+
+    def set_step_duration(self, value: "str | list[float]") -> None:
+        """Set step_duration from an input or slider event."""
+        self._set_float("step_duration", value)
+
+    def set_start_current(self, value: "str | list[float]") -> None:
+        """Set start_current from an input or slider event."""
+        self._set_float("start_current", value)
+
+    def set_end_current(self, value: "str | list[float]") -> None:
+        """Set end_current from an input or slider event."""
+        self._set_float("end_current", value)
+
+    def set_ramp_start(self, value: "str | list[float]") -> None:
+        """Set ramp_start from an input or slider event."""
+        self._set_float("ramp_start", value)
+
+    def set_ramp_duration(self, value: "str | list[float]") -> None:
+        """Set ramp_duration from an input or slider event."""
+        self._set_float("ramp_duration", value)
+
+    def set_pulse_amplitude(self, value: "str | list[float]") -> None:
+        """Set pulse_amplitude from an input or slider event."""
+        self._set_float("pulse_amplitude", value)
+
+    def set_pulse_width(self, value: "str | list[float]") -> None:
+        """Set pulse_width from an input or slider event."""
+        self._set_float("pulse_width", value)
+
+    def set_pulse_interval(self, value: "str | list[float]") -> None:
+        """Set pulse_interval from an input or slider event."""
+        self._set_float("pulse_interval", value)
+
+    def set_train_start(self, value: "str | list[float]") -> None:
+        """Set train_start from an input or slider event."""
+        self._set_float("train_start", value)
+
+    def set_dc_offset(self, value: "str | list[float]") -> None:
+        """Set dc_offset from an input or slider event."""
+        self._set_float("dc_offset", value)
+
+    def set_amplitude(self, value: "str | list[float]") -> None:
+        """Set amplitude from an input or slider event."""
+        self._set_float("amplitude", value)
+
+    def set_frequency(self, value: "str | list[float]") -> None:
+        """Set frequency from an input or slider event."""
+        self._set_float("frequency", value)
+
+    def set_start_frequency(self, value: "str | list[float]") -> None:
+        """Set start_frequency from an input or slider event."""
+        self._set_float("start_frequency", value)
+
+    def set_end_frequency(self, value: "str | list[float]") -> None:
+        """Set end_frequency from an input or slider event."""
+        self._set_float("end_frequency", value)
+
+    def set_mean_current(self, value: "str | list[float]") -> None:
+        """Set mean_current from an input or slider event."""
+        self._set_float("mean_current", value)
+
+    def set_std_current(self, value: "str | list[float]") -> None:
+        """Set std_current from an input or slider event."""
+        self._set_float("std_current", value)
+
+    # Voltage clamp protocol params
+    def set_vc_voltage_amplitude(self, value: "str | list[float]") -> None:
+        """Set vc_voltage_amplitude from an input or slider event."""
+        self._set_float("vc_voltage_amplitude", value)
+
+    def set_vc_step_start(self, value: "str | list[float]") -> None:
+        """Set vc_step_start from an input or slider event."""
+        self._set_float("vc_step_start", value)
+
+    def set_vc_step_duration(self, value: "str | list[float]") -> None:
+        """Set vc_step_duration from an input or slider event."""
+        self._set_float("vc_step_duration", value)
+
+    def set_vc_holding_voltage(self, value: "str | list[float]") -> None:
+        """Set vc_holding_voltage from an input or slider event."""
+        self._set_float("vc_holding_voltage", value)
+
+    def set_vc_start_voltage(self, value: "str | list[float]") -> None:
+        """Set vc_start_voltage from an input or slider event."""
+        self._set_float("vc_start_voltage", value)
+
+    def set_vc_end_voltage(self, value: "str | list[float]") -> None:
+        """Set vc_end_voltage from an input or slider event."""
+        self._set_float("vc_end_voltage", value)
+
+    def set_vc_ramp_start(self, value: "str | list[float]") -> None:
+        """Set vc_ramp_start from an input or slider event."""
+        self._set_float("vc_ramp_start", value)
+
+    def set_vc_ramp_duration(self, value: "str | list[float]") -> None:
+        """Set vc_ramp_duration from an input or slider event."""
+        self._set_float("vc_ramp_duration", value)
+
+    def set_vc_pulse_amplitude(self, value: "str | list[float]") -> None:
+        """Set vc_pulse_amplitude from an input or slider event."""
+        self._set_float("vc_pulse_amplitude", value)
+
+    def set_vc_pulse_width(self, value: "str | list[float]") -> None:
+        """Set vc_pulse_width from an input or slider event."""
+        self._set_float("vc_pulse_width", value)
+
+    def set_vc_pulse_interval(self, value: "str | list[float]") -> None:
+        """Set vc_pulse_interval from an input or slider event."""
+        self._set_float("vc_pulse_interval", value)
+
+    def set_vc_train_start(self, value: "str | list[float]") -> None:
+        """Set vc_train_start from an input or slider event."""
+        self._set_float("vc_train_start", value)
+
+    def set_vc_voltage_min(self, value: "str | list[float]") -> None:
+        """Set vc_voltage_min from an input or slider event."""
+        self._set_float("vc_voltage_min", value)
+
+    def set_vc_voltage_max(self, value: "str | list[float]") -> None:
+        """Set vc_voltage_max from an input or slider event."""
+        self._set_float("vc_voltage_max", value)
+
+    def set_vc_voltage_step(self, value: "str | list[float]") -> None:
+        """Set vc_voltage_step from an input or slider event."""
+        self._set_float("vc_voltage_step", value)
+
+    def set_vc_pre_pulse_duration(self, value: "str | list[float]") -> None:
+        """Set vc_pre_pulse_duration from an input or slider event."""
+        self._set_float("vc_pre_pulse_duration", value)
+
+    def set_vc_post_pulse_duration(self, value: "str | list[float]") -> None:
+        """Set vc_post_pulse_duration from an input or slider event."""
+        self._set_float("vc_post_pulse_duration", value)
+
+    def set_vc_prepulse_voltage(self, value: "str | list[float]") -> None:
+        """Set vc_prepulse_voltage from an input or slider event."""
+        self._set_float("vc_prepulse_voltage", value)
+
+    def set_vc_prepulse_duration(self, value: "str | list[float]") -> None:
+        """Set vc_prepulse_duration from an input or slider event."""
+        self._set_float("vc_prepulse_duration", value)
+
+    def set_vc_test_voltage_min(self, value: "str | list[float]") -> None:
+        """Set vc_test_voltage_min from an input or slider event."""
+        self._set_float("vc_test_voltage_min", value)
+
+    def set_vc_test_voltage_max(self, value: "str | list[float]") -> None:
+        """Set vc_test_voltage_max from an input or slider event."""
+        self._set_float("vc_test_voltage_max", value)
+
+    def set_vc_interpulse_duration(self, value: "str | list[float]") -> None:
+        """Set vc_interpulse_duration from an input or slider event."""
+        self._set_float("vc_interpulse_duration", value)
+
     def add_sweep(self) -> None:
         """Save the current simulation result as a named sweep."""
         if not self.has_result:
@@ -343,10 +584,58 @@ class AppState(rx.State):
             ptype = self.protocol_type
 
             if mode == "Current Clamp":
-                stimulus = self._build_current_protocol(fs, ptype)
+                stimulus = build_current_protocol(
+                    protocol_type=ptype,
+                    duration=self.duration,
+                    sampling_frequency=fs,
+                    current_amplitude=self.current_amplitude,
+                    step_start=self.step_start,
+                    step_duration=self.step_duration,
+                    start_current=self.start_current,
+                    end_current=self.end_current,
+                    ramp_start=self.ramp_start,
+                    ramp_duration=self.ramp_duration,
+                    pulse_amplitude=self.pulse_amplitude,
+                    pulse_width=self.pulse_width,
+                    pulse_interval=self.pulse_interval,
+                    train_start=self.train_start,
+                    dc_offset=self.dc_offset,
+                    amplitude=self.amplitude,
+                    frequency=self.frequency,
+                    start_frequency=self.start_frequency,
+                    end_frequency=self.end_frequency,
+                    mean_current=self.mean_current,
+                    std_current=self.std_current,
+                )
                 df = ap_sim.simulate_current_clamp(neuron, stimulus, fs)
             else:
-                stimulus = self._build_voltage_protocol(fs, ptype)
+                stimulus = build_voltage_protocol(
+                    protocol_type=ptype,
+                    duration=self.duration,
+                    sampling_frequency=fs,
+                    vc_holding_voltage=self.vc_holding_voltage,
+                    vc_voltage_amplitude=self.vc_voltage_amplitude,
+                    vc_step_start=self.vc_step_start,
+                    vc_step_duration=self.vc_step_duration,
+                    vc_start_voltage=self.vc_start_voltage,
+                    vc_end_voltage=self.vc_end_voltage,
+                    vc_ramp_start=self.vc_ramp_start,
+                    vc_ramp_duration=self.vc_ramp_duration,
+                    vc_pulse_amplitude=self.vc_pulse_amplitude,
+                    vc_pulse_width=self.vc_pulse_width,
+                    vc_pulse_interval=self.vc_pulse_interval,
+                    vc_train_start=self.vc_train_start,
+                    vc_voltage_min=self.vc_voltage_min,
+                    vc_voltage_max=self.vc_voltage_max,
+                    vc_voltage_step=self.vc_voltage_step,
+                    vc_pre_pulse_duration=self.vc_pre_pulse_duration,
+                    vc_post_pulse_duration=self.vc_post_pulse_duration,
+                    vc_prepulse_voltage=self.vc_prepulse_voltage,
+                    vc_prepulse_duration=self.vc_prepulse_duration,
+                    vc_test_voltage_min=self.vc_test_voltage_min,
+                    vc_test_voltage_max=self.vc_test_voltage_max,
+                    vc_interpulse_duration=self.vc_interpulse_duration,
+                )
                 df = ap_sim.simulate_voltage_clamp(neuron, stimulus, fs)
 
             time_vals = df.index.tolist()
@@ -385,127 +674,3 @@ class AppState(rx.State):
         finally:
             async with self:
                 self.is_running = False
-
-    def _build_current_protocol(self, fs: float, ptype: str) -> "np.ndarray":
-        """Build a current protocol array from current state variables.
-
-        Args:
-            fs: Sampling frequency in Hz.
-            ptype: Protocol type name.
-
-        Returns:
-            Current protocol array in uA/cm^2.
-        """
-        if ptype == "Step":
-            return ap_sim.step_current(
-                duration=self.duration,
-                current_amplitude=self.current_amplitude,
-                step_start=self.step_start,
-                step_duration=self.step_duration,
-                sampling_frequency=fs,
-            )
-        elif ptype == "Ramp":
-            return ap_sim.ramp_current(
-                duration=self.duration,
-                start_current=self.start_current,
-                end_current=self.end_current,
-                ramp_start=self.ramp_start,
-                ramp_duration=self.ramp_duration,
-                sampling_frequency=fs,
-            )
-        elif ptype == "Pulse Train":
-            return ap_sim.pulse_train(
-                duration=self.duration,
-                pulse_amplitude=self.pulse_amplitude,
-                pulse_width=self.pulse_width,
-                pulse_interval=self.pulse_interval,
-                train_start=self.train_start,
-                sampling_frequency=fs,
-            )
-        elif ptype == "Sinusoidal":
-            return ap_sim.sinusoidal_current(
-                duration=self.duration,
-                dc_offset=self.dc_offset,
-                amplitude=self.amplitude,
-                frequency=self.frequency,
-                sampling_frequency=fs,
-            )
-        elif ptype == "Chirp":
-            return ap_sim.chirp_current(
-                duration=self.duration,
-                dc_offset=self.dc_offset,
-                amplitude=self.amplitude,
-                start_frequency=self.start_frequency,
-                end_frequency=self.end_frequency,
-                sampling_frequency=fs,
-            )
-        else:  # Noise
-            return ap_sim.noise_current(
-                duration=self.duration,
-                mean_current=self.mean_current,
-                std_current=self.std_current,
-                sampling_frequency=fs,
-            )
-
-    def _build_voltage_protocol(self, fs: float, ptype: str) -> "np.ndarray":
-        """Build a voltage protocol array from current state variables.
-
-        Args:
-            fs: Sampling frequency in Hz.
-            ptype: Protocol type name.
-
-        Returns:
-            Voltage protocol array in mV.
-        """
-        if ptype == "Step":
-            return ap_sim.step_voltage(
-                duration=self.duration,
-                voltage_amplitude=self.vc_voltage_amplitude,
-                step_start=self.vc_step_start,
-                step_duration=self.vc_step_duration,
-                holding_voltage=self.vc_holding_voltage,
-                sampling_frequency=fs,
-            )
-        elif ptype == "Ramp":
-            return ap_sim.ramp_voltage(
-                duration=self.duration,
-                start_voltage=self.vc_start_voltage,
-                end_voltage=self.vc_end_voltage,
-                ramp_start=self.vc_ramp_start,
-                ramp_duration=self.vc_ramp_duration,
-                holding_voltage=self.vc_holding_voltage,
-                sampling_frequency=fs,
-            )
-        elif ptype == "Pulse Train":
-            return ap_sim.pulse_train_voltage(
-                duration=self.duration,
-                pulse_amplitude=self.vc_pulse_amplitude,
-                pulse_width=self.vc_pulse_width,
-                pulse_interval=self.vc_pulse_interval,
-                train_start=self.vc_train_start,
-                holding_voltage=self.vc_holding_voltage,
-                sampling_frequency=fs,
-            )
-        elif ptype == "I-V Curve":
-            return ap_sim.iv_curve_protocol(
-                step_duration=self.duration,
-                voltage_min=self.vc_voltage_min,
-                voltage_max=self.vc_voltage_max,
-                voltage_step=self.vc_voltage_step,
-                pre_pulse_duration=self.vc_pre_pulse_duration,
-                post_pulse_duration=self.vc_post_pulse_duration,
-                holding_voltage=self.vc_holding_voltage,
-                sampling_frequency=fs,
-            )
-        else:  # Activation
-            return ap_sim.activation_protocol(
-                test_duration=self.duration,
-                prepulse_voltage=self.vc_prepulse_voltage,
-                prepulse_duration=self.vc_prepulse_duration,
-                test_voltage_min=self.vc_test_voltage_min,
-                test_voltage_max=self.vc_test_voltage_max,
-                voltage_step=self.vc_voltage_step,
-                interpulse_duration=self.vc_interpulse_duration,
-                holding_voltage=self.vc_holding_voltage,
-                sampling_frequency=fs,
-            )
