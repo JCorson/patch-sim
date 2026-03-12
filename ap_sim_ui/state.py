@@ -4,8 +4,6 @@ All reactive variables and event handlers live here. The state drives
 the Reflex component tree via computed properties.
 """
 
-from typing import Any
-
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -248,17 +246,13 @@ class AppState(rx.State):
 
         if mode == "Current Clamp":
             fig.update_yaxes(title_text="Voltage (mV)", row=1, col=1)
-            fig.update_yaxes(
-                title_text="Current (µA/cm²)", row=stimulus_row, col=1
-            )
+            fig.update_yaxes(title_text="Current (µA/cm²)", row=stimulus_row, col=1)
         else:
             fig.update_yaxes(title_text="Current (µA/cm²)", row=1, col=1)
             fig.update_yaxes(title_text="Voltage (mV)", row=stimulus_row, col=1)
 
         if show_gating and gating_row is not None:
-            fig.update_yaxes(
-                title_text="Gating", row=gating_row, col=1, range=[0, 1]
-            )
+            fig.update_yaxes(title_text="Gating", row=gating_row, col=1, range=[0, 1])
 
         fig.update_xaxes(title_text="Time (ms)", row=stimulus_row, col=1)
         fig.update_layout(
@@ -368,9 +362,7 @@ class AppState(rx.State):
                         "potassium_activation"
                     ].tolist()
                     self.result_sodium_activation = df["sodium_activation"].tolist()
-                    self.result_sodium_inactivation = df[
-                        "sodium_inactivation"
-                    ].tolist()
+                    self.result_sodium_inactivation = df["sodium_inactivation"].tolist()
                     self.result_total_current = []
                     self.result_sodium_current = []
                     self.result_potassium_current = []
@@ -385,9 +377,7 @@ class AppState(rx.State):
                         "potassium_activation"
                     ].tolist()
                     self.result_sodium_activation = df["sodium_activation"].tolist()
-                    self.result_sodium_inactivation = df[
-                        "sodium_inactivation"
-                    ].tolist()
+                    self.result_sodium_inactivation = df["sodium_inactivation"].tolist()
 
         except ValueError as exc:
             async with self:
@@ -396,9 +386,7 @@ class AppState(rx.State):
             async with self:
                 self.is_running = False
 
-    def _build_current_protocol(
-        self, fs: float, ptype: str
-    ) -> "np.ndarray":
+    def _build_current_protocol(self, fs: float, ptype: str) -> "np.ndarray":
         """Build a current protocol array from current state variables.
 
         Args:
@@ -459,9 +447,7 @@ class AppState(rx.State):
                 sampling_frequency=fs,
             )
 
-    def _build_voltage_protocol(
-        self, fs: float, ptype: str
-    ) -> "np.ndarray":
+    def _build_voltage_protocol(self, fs: float, ptype: str) -> "np.ndarray":
         """Build a voltage protocol array from current state variables.
 
         Args:

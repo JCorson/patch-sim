@@ -30,7 +30,7 @@ ap_sim = {path = "./ap_sim", editable = true}
 [tool.mypy]
 
 [[tool.mypy.overrides]]
-module = ["ap_sim_ui.*", "reflex.*", "plotly.*"]
+module = ["ap_sim_ui.*", "reflex.*", "plotly.*", "rxconfig"]
 ignore_errors = true
 
 [tool.pytest.ini_options]
