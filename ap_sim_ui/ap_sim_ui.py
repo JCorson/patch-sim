@@ -52,8 +52,8 @@ def _error_banner() -> rx.Component:
     return rx.cond(
         AppState.error_message != "",
         rx.callout(
-            rx.icon("circle-x"),
-            rx.text(AppState.error_message, size="2"),
+            AppState.error_message,
+            icon="circle-x",
             color_scheme="red",
             variant="soft",
             width="100%",

@@ -327,8 +327,7 @@ def protocol_panel() -> rx.Component:
         rx.separator(),
         rx.text("Mode", size="2", weight="bold"),
         rx.radio_group(
-            rx.radio("Current Clamp", value="Current Clamp"),
-            rx.radio("Voltage Clamp", value="Voltage Clamp"),
+            ["Current Clamp", "Voltage Clamp"],
             value=AppState.clamp_mode,
             on_change=AppState.set_clamp_mode,
             direction="row",

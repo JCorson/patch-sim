@@ -177,7 +177,7 @@ class AppState(rx.State):
         return len(self.result_time) > 0
 
     @rx.var
-    def figure_data(self) -> dict:
+    def figure_data(self) -> go.Figure:
         """Plotly figure dict rebuilt whenever relevant state changes."""
         mode = self.result_clamp_mode or self.clamp_mode
         time = self.result_time
@@ -263,7 +263,7 @@ class AppState(rx.State):
             template="plotly_white",
             hovermode="x unified",
         )
-        return fig.to_dict()
+        return fig
 
     # ------------------------------------------------------------------ #
     # Event handlers                                                     #
