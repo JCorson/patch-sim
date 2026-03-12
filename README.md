@@ -23,6 +23,26 @@ Key features:
 
 ---
 
+## Web UI
+
+`ap_sim` includes an interactive web interface inspired by pClamp electrophysiology software. It lets you configure Hodgkin-Huxley neuron parameters, choose stimulation protocols, run simulations, and view stacked response/stimulus traces with sweep overlay support.
+
+### Installing the UI
+
+```
+uv sync --frozen --extra=ui
+```
+
+### Running the UI
+
+```
+uv run reflex run
+```
+
+Then open `http://localhost:3000` in your browser.
+
+---
+
 ## Getting started with development
 
 ### Prerequisites

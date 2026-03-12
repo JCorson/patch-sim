@@ -22,11 +22,16 @@ convention = "google"
 
 [project.optional-dependencies]
 dev = ["ruff", "pytest", "mypy", "pandas-stubs"]
+ui = ["reflex>=0.8", "plotly"]
 
 [tool.uv.sources]
 ap_sim = {path = "./ap_sim", editable = true}
 
 [tool.mypy]
+
+[[tool.mypy.overrides]]
+module = ["ap_sim_ui.*", "reflex.*", "plotly.*"]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
