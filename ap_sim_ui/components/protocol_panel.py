@@ -332,21 +332,6 @@ def protocol_panel() -> rx.Component:
             on_change=AppState.set_clamp_mode,
             direction="row",
         ),
-        rx.hstack(
-            rx.text("Fs (Hz)", size="2", color="gray"),
-            rx.spacer(),
-            rx.input(
-                value=AppState.sampling_frequency,
-                on_change=AppState.set_sampling_frequency,
-                width="100px",
-                size="1",
-                type="number",
-                min="1000",
-                max="100000",
-                step="1000",
-            ),
-            width="100%",
-        ),
         rx.separator(),
         rx.text("Protocol", size="2", weight="bold"),
         rx.select(

@@ -8,22 +8,12 @@ import numpy as np
 import pandas as pd
 from typing import TYPE_CHECKING
 
-from .protocols.common import DEFAULT_SAMPLING_FREQUENCY
-
 if TYPE_CHECKING:
     from .hodgkin_huxley import HodgkinHuxley
 
-# Physiological bounds (mV) used to clip membrane voltage in current-clamp
-# simulation. Prevents numerical blow-up during strong stimulation while
-# covering the full range of biologically observed membrane potentials.
-VOLTAGE_CLIP_MIN = -100.0  # mV
-VOLTAGE_CLIP_MAX = 60.0  # mV
-
-# Valid range for Hodgkin-Huxley gating variables (dimensionless probabilities).
-# Values are clipped to [0, 1] after each Euler step to enforce the physical
-# constraint that opening probabilities cannot exceed 0 or 1.
-GATING_VAR_MIN = 0
-GATING_VAR_MAX = 1
+#: Fixed simulation sampling frequency (Hz). dt = 1000 / SIM_SAMPLING_FREQ ms.
+#: 40 kHz (dt = 0.025 ms) is standard for Hodgkin-Huxley models.
+SIM_SAMPLING_FREQ: float = 40_000.0
 
 
 def _setup_simulation(
@@ -67,36 +57,169 @@ def _initialize_gating_variables(
     return an0 / (an0 + bn0), am0 / (am0 + bm0), ah0 / (ah0 + bh0)
 
 
-def _update_gating_variables(
-    neuron: "HodgkinHuxley", V: float, n: float, m: float, h: float, dt: float
-) -> tuple[float, float, float]:
-    """Advance gating variables by one Euler time step.
+def _hh_derivatives(
+    neuron: "HodgkinHuxley",
+    V: float,
+    n: float,
+    m: float,
+    h: float,
+    I_ext: float,
+) -> tuple[float, float, float, float]:
+    """Compute HH ODE derivatives for the current-clamp system.
 
     Args:
         neuron: The Hodgkin-Huxley neuron model.
-        V: Current membrane voltage in mV.
-        n: Current potassium activation gating variable.
-        m: Current sodium activation gating variable.
-        h: Current sodium inactivation gating variable.
-        dt: Time step in milliseconds.
+        V: Membrane voltage in mV.
+        n: Potassium activation gating variable.
+        m: Sodium activation gating variable.
+        h: Sodium inactivation gating variable.
+        I_ext: External current in uA/cm^2.
 
     Returns:
-        Tuple of updated (n, m, h) gating variables, clipped to [0, 1].
+        Tuple of (dV/dt, dn/dt, dm/dt, dh/dt).
+    """
+    I_Na = neuron.g_Na * (m**3) * h * (V - neuron.E_Na)
+    I_K = neuron.g_K * (n**4) * (V - neuron.E_K)
+    I_L = neuron.g_L * (V - neuron.E_L)
+    dV = (I_ext - I_Na - I_K - I_L) / neuron.C_m
+    dn = neuron.alpha_n(V) * (1 - n) - neuron.beta_n(V) * n
+    dm = neuron.alpha_m(V) * (1 - m) - neuron.beta_m(V) * m
+    dh = neuron.alpha_h(V) * (1 - h) - neuron.beta_h(V) * h
+    return dV, dn, dm, dh
+
+
+def _gating_derivatives(
+    neuron: "HodgkinHuxley",
+    V: float,
+    n: float,
+    m: float,
+    h: float,
+) -> tuple[float, float, float]:
+    """Compute gating variable derivatives for a prescribed voltage.
+
+    Args:
+        neuron: The Hodgkin-Huxley neuron model.
+        V: Prescribed membrane voltage in mV.
+        n: Potassium activation gating variable.
+        m: Sodium activation gating variable.
+        h: Sodium inactivation gating variable.
+
+    Returns:
+        Tuple of (dn/dt, dm/dt, dh/dt).
     """
     dn = neuron.alpha_n(V) * (1 - n) - neuron.beta_n(V) * n
     dm = neuron.alpha_m(V) * (1 - m) - neuron.beta_m(V) * m
     dh = neuron.alpha_h(V) * (1 - h) - neuron.beta_h(V) * h
-    return (
-        float(np.clip(n + dn * dt, GATING_VAR_MIN, GATING_VAR_MAX)),
-        float(np.clip(m + dm * dt, GATING_VAR_MIN, GATING_VAR_MAX)),
-        float(np.clip(h + dh * dt, GATING_VAR_MIN, GATING_VAR_MAX)),
+    return dn, dm, dh
+
+
+def _rk4_step_current_clamp(
+    neuron: "HodgkinHuxley",
+    V: float,
+    n: float,
+    m: float,
+    h: float,
+    I_ext: float,
+    dt: float,
+) -> tuple[float, float, float, float]:
+    """Advance the current-clamp state by one RK4 step.
+
+    Args:
+        neuron: The Hodgkin-Huxley neuron model.
+        V: Membrane voltage in mV.
+        n: Potassium activation gating variable.
+        m: Sodium activation gating variable.
+        h: Sodium inactivation gating variable.
+        I_ext: External current in uA/cm^2, held constant over the step.
+        dt: Time step in milliseconds.
+
+    Returns:
+        Tuple of updated (V, n, m, h) with gating variables clipped to [0, 1].
+    """
+    dV1, dn1, dm1, dh1 = _hh_derivatives(neuron, V, n, m, h, I_ext)
+    dV2, dn2, dm2, dh2 = _hh_derivatives(
+        neuron,
+        V + 0.5 * dt * dV1,
+        n + 0.5 * dt * dn1,
+        m + 0.5 * dt * dm1,
+        h + 0.5 * dt * dh1,
+        I_ext,
     )
+    dV3, dn3, dm3, dh3 = _hh_derivatives(
+        neuron,
+        V + 0.5 * dt * dV2,
+        n + 0.5 * dt * dn2,
+        m + 0.5 * dt * dm2,
+        h + 0.5 * dt * dh2,
+        I_ext,
+    )
+    dV4, dn4, dm4, dh4 = _hh_derivatives(
+        neuron,
+        V + dt * dV3,
+        n + dt * dn3,
+        m + dt * dm3,
+        h + dt * dh3,
+        I_ext,
+    )
+    V_new = V + (dt / 6.0) * (dV1 + 2 * dV2 + 2 * dV3 + dV4)
+    n_new = float(np.clip(n + (dt / 6.0) * (dn1 + 2 * dn2 + 2 * dn3 + dn4), 0, 1))
+    m_new = float(np.clip(m + (dt / 6.0) * (dm1 + 2 * dm2 + 2 * dm3 + dm4), 0, 1))
+    h_new = float(np.clip(h + (dt / 6.0) * (dh1 + 2 * dh2 + 2 * dh3 + dh4), 0, 1))
+    return V_new, n_new, m_new, h_new
+
+
+def _rk4_step_voltage_clamp(
+    neuron: "HodgkinHuxley",
+    V: float,
+    n: float,
+    m: float,
+    h: float,
+    dt: float,
+) -> tuple[float, float, float]:
+    """Advance voltage-clamp gating variables by one RK4 step.
+
+    Args:
+        neuron: The Hodgkin-Huxley neuron model.
+        V: Prescribed membrane voltage in mV.
+        n: Potassium activation gating variable.
+        m: Sodium activation gating variable.
+        h: Sodium inactivation gating variable.
+        dt: Time step in milliseconds.
+
+    Returns:
+        Tuple of updated (n, m, h) gating variables clipped to [0, 1].
+    """
+    dn1, dm1, dh1 = _gating_derivatives(neuron, V, n, m, h)
+    dn2, dm2, dh2 = _gating_derivatives(
+        neuron,
+        V,
+        n + 0.5 * dt * dn1,
+        m + 0.5 * dt * dm1,
+        h + 0.5 * dt * dh1,
+    )
+    dn3, dm3, dh3 = _gating_derivatives(
+        neuron,
+        V,
+        n + 0.5 * dt * dn2,
+        m + 0.5 * dt * dm2,
+        h + 0.5 * dt * dh2,
+    )
+    dn4, dm4, dh4 = _gating_derivatives(
+        neuron,
+        V,
+        n + dt * dn3,
+        m + dt * dm3,
+        h + dt * dh3,
+    )
+    n_new = float(np.clip(n + (dt / 6.0) * (dn1 + 2 * dn2 + 2 * dn3 + dn4), 0, 1))
+    m_new = float(np.clip(m + (dt / 6.0) * (dm1 + 2 * dm2 + 2 * dm3 + dm4), 0, 1))
+    h_new = float(np.clip(h + (dt / 6.0) * (dh1 + 2 * dh2 + 2 * dh3 + dh4), 0, 1))
+    return n_new, m_new, h_new
 
 
 def simulate_voltage_clamp(
     neuron: "HodgkinHuxley",
     voltage_protocol: np.ndarray,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> pd.DataFrame:
     """Simulate a voltage clamp experiment using the Hodgkin-Huxley model.
 
@@ -105,13 +228,13 @@ def simulate_voltage_clamp(
     function simulates this process by computing the ionic currents that would flow
     at each voltage step in the protocol.
 
+    The simulation always uses :data:`SIM_SAMPLING_FREQ` (40 kHz, dt = 0.025 ms)
+    as the integration time step.
+
     Args:
         neuron: The Hodgkin-Huxley neuron object to simulate.
         voltage_protocol: Voltage values in mV to clamp the membrane at for each
             time step. The length of the array determines the simulation duration.
-        sampling_frequency: Sampling frequency in Hz for the simulation. Default
-            is 100 kHz (0.01 ms time steps). Higher frequencies give finer
-            temporal resolution but increase computation time.
 
     Returns:
         DataFrame indexed by time in milliseconds (named 'time'), with columns:
@@ -122,13 +245,11 @@ def simulate_voltage_clamp(
 
     if num_time_steps == 0:
         raise ValueError("voltage_protocol must not be empty.")
-    if sampling_frequency <= 0:
-        raise ValueError("sampling_frequency must be positive.")
     if not np.all(np.isfinite(voltage_protocol)):
         raise ValueError("voltage_protocol must not contain NaN or Inf values.")
 
     time_step, time_array, n_arr, m_arr, h_arr = _setup_simulation(
-        num_time_steps, sampling_frequency
+        num_time_steps, SIM_SAMPLING_FREQ
     )
 
     # Pre-allocate voltage-clamp-specific output arrays
@@ -156,7 +277,7 @@ def simulate_voltage_clamp(
         V = voltage_protocol[i]
         n_prev, m_prev, h_prev = n_arr[i - 1], m_arr[i - 1], h_arr[i - 1]
 
-        n, m, h = _update_gating_variables(neuron, V, n_prev, m_prev, h_prev, time_step)
+        n, m, h = _rk4_step_voltage_clamp(neuron, V, n_prev, m_prev, h_prev, time_step)
         n_arr[i], m_arr[i], h_arr[i] = n, m, h
 
         g_Na = neuron.g_Na * (m**3) * h
@@ -186,7 +307,6 @@ def simulate_voltage_clamp(
 def simulate_current_clamp(
     neuron: "HodgkinHuxley",
     current_external: np.ndarray,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> pd.DataFrame:
     """Simulate a current clamp experiment using the Hodgkin-Huxley model.
 
@@ -195,13 +315,13 @@ def simulate_current_clamp(
     by computing the membrane voltage over time in response to the specified
     external current.
 
+    The simulation always uses :data:`SIM_SAMPLING_FREQ` (40 kHz, dt = 0.025 ms)
+    as the integration time step.
+
     Args:
         neuron: The Hodgkin-Huxley neuron object to simulate.
         current_external: External current in uA/cm^2 for a time-varying current
             waveform. The length of the array determines the simulation duration.
-        sampling_frequency: Sampling frequency in Hz for the simulation. Default
-            is 100 kHz (0.01 ms time steps). Higher frequencies give finer
-            temporal resolution but increase computation time.
 
     Returns:
         DataFrame indexed by time in milliseconds (named 'time'), with columns:
@@ -211,13 +331,11 @@ def simulate_current_clamp(
 
     if num_time_steps == 0:
         raise ValueError("current_external must not be empty.")
-    if sampling_frequency <= 0:
-        raise ValueError("sampling_frequency must be positive.")
     if not np.all(np.isfinite(current_external)):
         raise ValueError("current_external must not contain NaN or Inf values.")
 
     time_step, time_array, n_arr, m_arr, h_arr = _setup_simulation(
-        num_time_steps, sampling_frequency
+        num_time_steps, SIM_SAMPLING_FREQ
     )
 
     V_arr = np.empty(num_time_steps)
@@ -231,21 +349,12 @@ def simulate_current_clamp(
         V = V_arr[i - 1]
         n, m, h = n_arr[i - 1], m_arr[i - 1], h_arr[i - 1]
 
-        g_Na = neuron.g_Na * (m**3) * h
-        g_K = neuron.g_K * (n**4)
-
-        I_Na = g_Na * (V - neuron.E_Na)
-        I_K = g_K * (V - neuron.E_K)
-        I_L = neuron.g_L * (V - neuron.E_L)
-
-        dV = (current_external[i] - I_Na - I_K - I_L) / neuron.C_m
-
-        V_arr[i] = float(
-            np.clip(V + dV * time_step, VOLTAGE_CLIP_MIN, VOLTAGE_CLIP_MAX)
+        V_new, n_new, m_new, h_new = _rk4_step_current_clamp(
+            neuron, V, n, m, h, current_external[i - 1], time_step
         )
-        n_arr[i], m_arr[i], h_arr[i] = _update_gating_variables(
-            neuron, V, n, m, h, time_step
-        )
+
+        V_arr[i] = V_new
+        n_arr[i], m_arr[i], h_arr[i] = n_new, m_new, h_new
 
     results = pd.DataFrame(
         {

@@ -10,6 +10,7 @@ from pydantic import BaseModel
 import reflex as rx
 
 import ap_sim
+import ap_sim.clamp_simulations
 from ap_sim_ui import constants, presets
 from ap_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
 
@@ -56,7 +57,6 @@ class AppState(rx.State):
     # Experiment mode                                                     #
     # ------------------------------------------------------------------ #
     clamp_mode: str = "Current Clamp"  # "Current Clamp" | "Voltage Clamp"
-    sampling_frequency: float = constants.DEFAULT_SAMPLING_FREQUENCY
 
     # ------------------------------------------------------------------ #
     # Protocol parameters — shared                                       #
@@ -355,10 +355,6 @@ class AppState(rx.State):
         self._set_float("T", value)
 
     # Shared protocol params
-    def set_sampling_frequency(self, value: "str | list[float]") -> None:
-        """Set sampling_frequency from an input or slider event."""
-        self._set_float("sampling_frequency", value)
-
     def set_duration(self, value: "str | list[float]") -> None:
         """Set duration from an input or slider event."""
         self._set_float("duration", value)
@@ -579,7 +575,7 @@ class AppState(rx.State):
                 T=self.T,
             )
 
-            fs = self.sampling_frequency
+            fs = ap_sim.clamp_simulations.SIM_SAMPLING_FREQ
             mode = self.clamp_mode
             ptype = self.protocol_type
 
@@ -607,7 +603,7 @@ class AppState(rx.State):
                     mean_current=self.mean_current,
                     std_current=self.std_current,
                 )
-                df = ap_sim.simulate_current_clamp(neuron, stimulus, fs)
+                df = ap_sim.simulate_current_clamp(neuron, stimulus)
             else:
                 stimulus = build_voltage_protocol(
                     protocol_type=ptype,
@@ -636,7 +632,7 @@ class AppState(rx.State):
                     vc_test_voltage_max=self.vc_test_voltage_max,
                     vc_interpulse_duration=self.vc_interpulse_duration,
                 )
-                df = ap_sim.simulate_voltage_clamp(neuron, stimulus, fs)
+                df = ap_sim.simulate_voltage_clamp(neuron, stimulus)
 
             time_vals = df.index.tolist()
             stim_list = stimulus.tolist()

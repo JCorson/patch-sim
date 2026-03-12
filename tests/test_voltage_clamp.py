@@ -101,7 +101,6 @@ def test_voltage_step_protocol():
     result = simulate_voltage_clamp(
         custom_model,
         voltage_protocol=voltage_protocol,
-        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
     )
 
     # Verify voltage protocol was applied correctly
@@ -154,7 +153,6 @@ def test_voltage_clamp_i_v_relationship():
         result = simulate_voltage_clamp(
             custom_model,
             voltage_protocol=voltage_protocol,
-            sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
         )
 
         # Get steady-state total current (last time point)
@@ -211,7 +209,6 @@ def test_voltage_ramp_protocol():
     result = simulate_voltage_clamp(
         custom_model,
         voltage_protocol=voltage_protocol,
-        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
     )
 
     # Verify voltage protocol was applied correctly
@@ -244,15 +241,6 @@ def test_empty_voltage_array_raises(hh_model):
     """An empty voltage array must raise ValueError."""
     with pytest.raises(ValueError, match="empty"):
         simulate_voltage_clamp(hh_model, voltage_protocol=np.array([]))
-
-
-@pytest.mark.parametrize("sf", [0, -1.0, -100000.0])
-def test_non_positive_sampling_frequency_raises(hh_model, sf: float):
-    """sampling_frequency <= 0 must raise ValueError."""
-    with pytest.raises(ValueError, match="sampling_frequency"):
-        simulate_voltage_clamp(
-            hh_model, voltage_protocol=np.array([-65.0, -65.0]), sampling_frequency=sf
-        )
 
 
 def test_nan_in_voltage_array_raises(hh_model):

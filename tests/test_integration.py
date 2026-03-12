@@ -277,9 +277,7 @@ def test_iv_curve_protocol_to_simulation(hh_model: HodgkinHuxley) -> None:
         post_pulse_duration=5.0,
         sampling_frequency=10000.0,
     )
-    result = simulate_voltage_clamp(
-        hh_model, voltage_protocol=protocol, sampling_frequency=10000.0
-    )
+    result = simulate_voltage_clamp(hh_model, voltage_protocol=protocol)
 
     _assert_voltage_clamp_dataframe(result)
     assert len(result) == len(protocol)
@@ -306,9 +304,7 @@ def test_activation_protocol_to_simulation(hh_model: HodgkinHuxley) -> None:
         voltage_step=20.0,
         sampling_frequency=10000.0,
     )
-    result = simulate_voltage_clamp(
-        hh_model, voltage_protocol=protocol, sampling_frequency=10000.0
-    )
+    result = simulate_voltage_clamp(hh_model, voltage_protocol=protocol)
 
     _assert_voltage_clamp_dataframe(result)
     assert len(result) == len(protocol)

@@ -1,8 +1,5 @@
 """UI constants: defaults, parameter ranges, and colour palettes."""
 
-# Default sampling frequency (Hz) — 10 kHz keeps browser data size manageable
-DEFAULT_SAMPLING_FREQUENCY: float = 10000.0
-
 # Default neuron parameters (match HodgkinHuxley dataclass defaults)
 DEFAULT_G_NA: float = 120.0
 DEFAULT_G_K: float = 36.0

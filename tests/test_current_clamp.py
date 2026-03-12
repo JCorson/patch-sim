@@ -4,7 +4,7 @@ import pytest
 import pandas as pd
 import numpy as np
 from ap_sim.hodgkin_huxley import HodgkinHuxley
-from ap_sim.clamp_simulations import simulate_current_clamp
+from ap_sim.clamp_simulations import simulate_current_clamp, SIM_SAMPLING_FREQ
 
 
 def test_simulate_current_clamp_returns_dataframe(hh_model):
@@ -14,14 +14,12 @@ def test_simulate_current_clamp_returns_dataframe(hh_model):
     """
     # Create a current array for a 10ms simulation
     duration = 10  # ms
-    time_step = 0.1  # ms
-    num_steps = int(duration / time_step) + 1
+    num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
     current = np.full(num_steps, 20.0)  # constant current
 
     result = simulate_current_clamp(
         hh_model,
         current_external=current,
-        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
     )
 
     # Check result type
@@ -48,7 +46,7 @@ def test_simulate_current_clamp_returns_dataframe(hh_model):
 
     # Check that voltage is within reasonable physiological bounds
     assert result["voltage"].min() >= -100  # mV
-    assert result["voltage"].max() <= 60  # mV
+    assert result["voltage"].max() <= 70  # mV
 
 
 def test_simulation_dynamics():
@@ -58,14 +56,12 @@ def test_simulation_dynamics():
 
     # Create current array for a 50ms simulation
     duration = 50  # ms
-    time_step = 0.05  # ms
-    num_steps = int(duration / time_step) + 1
+    num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
     current = np.full(num_steps, 20.0)  # constant current
 
     result = simulate_current_clamp(
         custom_model,
         current_external=current,
-        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
     )
 
     # Voltage should change from initial value
@@ -88,14 +84,12 @@ def test_simulate_current_clamp_with_zero_current(hh_model):
     """
     # Create zero current array for a 10ms simulation
     duration = 10  # ms
-    time_step = 0.1  # ms
-    num_steps = int(duration / time_step) + 1
+    num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
     zero_current = np.zeros(num_steps)  # zero current array
 
     result = simulate_current_clamp(
         hh_model,
         current_external=zero_current,
-        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
     )
 
     # Check result type and structure
@@ -125,8 +119,7 @@ def test_simulate_current_clamp_with_non_zero_currents(current_amplitude: float)
 
     # Create a model for testing
     custom_model = HodgkinHuxley()
-    time_step = 0.1  # ms
-    num_steps = int(duration / time_step) + 1
+    num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
 
     # Create constant current array for the given amplitude
     current_array = np.full(num_steps, current_amplitude)
@@ -134,7 +127,6 @@ def test_simulate_current_clamp_with_non_zero_currents(current_amplitude: float)
     result = simulate_current_clamp(
         custom_model,
         current_external=current_array,
-        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
     )
 
     # Check result type and structure
@@ -172,7 +164,7 @@ def test_physiological_limits_and_action_potentials():
     """Voltage stays in physiological range; higher current generates more APs."""
     # Physiological limits for membrane voltage
     min_physiological_voltage = -100  # mV
-    max_physiological_voltage = 60  # mV
+    max_physiological_voltage = 70  # mV
 
     # Parameters for testing action potentials
     duration = 100  # ms, longer simulation to observe multiple APs
@@ -181,8 +173,7 @@ def test_physiological_limits_and_action_potentials():
 
     # Create a model for testing
     custom_model = HodgkinHuxley()
-    time_step = 0.1  # ms
-    num_steps = int(duration / time_step) + 1
+    num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
 
     ap_counts = []
 
@@ -193,7 +184,6 @@ def test_physiological_limits_and_action_potentials():
         result = simulate_current_clamp(
             custom_model,
             current_external=current_array,
-            sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
         )
 
         # Test that voltage stays within physiological limits
@@ -228,13 +218,13 @@ def test_physiological_limits_and_action_potentials():
 def test_simulate_current_clamp_with_different_currents():
     """Test the simulate_current_clamp method with a time-varying current waveform."""
     duration = 50  # ms
-    time_step = 0.01  # ms
+    dt = 1000.0 / SIM_SAMPLING_FREQ  # ms per step
 
     # Create a custom model for testing
     custom_model = HodgkinHuxley()
 
     # Calculate the number of time steps
-    num_time_steps = int(duration / time_step) + 1
+    num_time_steps = int(duration / dt) + 1
 
     # Create a simple current waveform
     # First half is 10 uA/cm², second half is 50 uA/cm²
@@ -249,7 +239,6 @@ def test_simulate_current_clamp_with_different_currents():
     result = simulate_current_clamp(
         custom_model,
         current_external=current_waveform,
-        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
     )
 
     # Check basic properties of the result
@@ -257,7 +246,7 @@ def test_simulate_current_clamp_with_different_currents():
     assert len(result) == num_time_steps
 
     # Find the point where current changes
-    midpoint_time = duration / 2
+    midpoint_time = (num_time_steps // 2) * dt
 
     # Get voltages before and after current change
     # (give some time for the effect to manifest)
@@ -276,24 +265,23 @@ def test_simulate_current_clamp_with_different_currents():
 
 def test_simulation_time_from_current_waveform():
     """Test that simulation time is derived from the current waveform length."""
-    time_step = 0.01  # ms
+    dt = 1000.0 / SIM_SAMPLING_FREQ  # ms per step
     custom_model = HodgkinHuxley()
 
     # Create a current waveform of specific length
     duration = 75.0  # ms
-    num_steps = int(duration / time_step) + 1
+    num_steps = int(duration / dt) + 1
     current_waveform = np.ones(num_steps) * 20.0  # constant current
 
     # Run simulation with only the current waveform, no simulation_time
     result = simulate_current_clamp(
         custom_model,
         current_external=current_waveform,
-        sampling_frequency=1000.0 / time_step,  # Convert ms to Hz
     )
 
     # Check that the simulation time matches what we expect from the current array
     # length
-    expected_simulation_time = (len(current_waveform) - 1) * time_step
+    expected_simulation_time = (len(current_waveform) - 1) * dt
     actual_simulation_time = result.index[-1]
 
     assert actual_simulation_time == pytest.approx(expected_simulation_time)
@@ -309,15 +297,6 @@ def test_empty_current_array_raises(hh_model):
     """An empty current array must raise ValueError."""
     with pytest.raises(ValueError, match="empty"):
         simulate_current_clamp(hh_model, current_external=np.array([]))
-
-
-@pytest.mark.parametrize("sf", [0, -1.0, -100000.0])
-def test_non_positive_sampling_frequency_raises(hh_model, sf: float):
-    """sampling_frequency <= 0 must raise ValueError."""
-    with pytest.raises(ValueError, match="sampling_frequency"):
-        simulate_current_clamp(
-            hh_model, current_external=np.array([0.0, 0.0]), sampling_frequency=sf
-        )
 
 
 def test_nan_in_current_array_raises(hh_model):
