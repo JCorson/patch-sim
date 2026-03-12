@@ -7,6 +7,8 @@ the Reflex component tree via computed properties.
 from typing import Any
 
 import numpy as np
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import reflex as rx
 
 import ap_sim
@@ -174,6 +176,99 @@ class AppState(rx.State):
     def has_result(self) -> bool:
         """Whether a simulation result is available."""
         return len(self.result_time) > 0
+
+    @rx.var
+    def figure_data(self) -> dict:
+        """Plotly figure dict rebuilt whenever relevant state changes."""
+        mode = self.result_clamp_mode or self.clamp_mode
+        time = self.result_time
+
+        show_gating = (
+            self.show_potassium_activation
+            or self.show_sodium_activation
+            or self.show_sodium_inactivation
+        )
+        rows = 3 if show_gating else 2
+        row_heights = [0.5, 0.25, 0.25] if show_gating else [0.6, 0.4]
+        stimulus_row = 3 if show_gating else 2
+        gating_row = 2 if show_gating else None
+
+        fig = make_subplots(
+            rows=rows,
+            cols=1,
+            shared_xaxes=True,
+            row_heights=row_heights,
+            vertical_spacing=0.08,
+        )
+
+        def _scatter(x, y, name, row, color=None):
+            """Add a scattergl trace."""
+            line = {"color": color} if color else {}
+            fig.add_trace(
+                go.Scattergl(x=x, y=y, name=name, mode="lines", line=line),
+                row=row,
+                col=1,
+            )
+
+        if self.has_result:
+            if mode == "Current Clamp":
+                if self.show_voltage:
+                    _scatter(time, self.result_voltage, "Voltage (mV)", 1)
+            else:
+                if self.show_total_current:
+                    _scatter(time, self.result_total_current, "Total I", 1)
+                if self.show_sodium_current:
+                    _scatter(time, self.result_sodium_current, "I_Na", 1)
+                if self.show_potassium_current:
+                    _scatter(time, self.result_potassium_current, "I_K", 1)
+                if self.show_leak_current:
+                    _scatter(time, self.result_leak_current, "I_L", 1)
+
+            if show_gating and gating_row is not None:
+                if self.show_potassium_activation:
+                    _scatter(time, self.result_potassium_activation, "n", gating_row)
+                if self.show_sodium_activation:
+                    _scatter(time, self.result_sodium_activation, "m", gating_row)
+                if self.show_sodium_inactivation:
+                    _scatter(time, self.result_sodium_inactivation, "h", gating_row)
+
+            stim_label = (
+                "Stimulus (µA/cm²)" if mode == "Current Clamp" else "Command (mV)"
+            )
+            _scatter(time, self.result_stimulus, stim_label, stimulus_row)
+
+        for sweep in self.sweeps:
+            c = sweep.color
+            if sweep.clamp_mode == "Current Clamp":
+                _scatter(sweep.time, sweep.voltage, f"{sweep.label} V", 1, c)
+            else:
+                _scatter(
+                    sweep.time, sweep.total_current, f"{sweep.label} I_total", 1, c
+                )
+
+        if mode == "Current Clamp":
+            fig.update_yaxes(title_text="Voltage (mV)", row=1, col=1)
+            fig.update_yaxes(
+                title_text="Current (µA/cm²)", row=stimulus_row, col=1
+            )
+        else:
+            fig.update_yaxes(title_text="Current (µA/cm²)", row=1, col=1)
+            fig.update_yaxes(title_text="Voltage (mV)", row=stimulus_row, col=1)
+
+        if show_gating and gating_row is not None:
+            fig.update_yaxes(
+                title_text="Gating", row=gating_row, col=1, range=[0, 1]
+            )
+
+        fig.update_xaxes(title_text="Time (ms)", row=stimulus_row, col=1)
+        fig.update_layout(
+            height=500,
+            margin={"l": 60, "r": 20, "t": 30, "b": 40},
+            legend={"orientation": "h", "y": 1.08},
+            template="plotly_white",
+            hovermode="x unified",
+        )
+        return fig.to_dict()
 
     # ------------------------------------------------------------------ #
     # Event handlers                                                     #
