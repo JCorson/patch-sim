@@ -17,7 +17,7 @@ Key features:
 - A library of **stimulation protocols** covering step, ramp, pulse train, sinusoidal,
   chirp, noise, I-V curve, and activation waveforms.
 - Simulation results are returned as `pandas.DataFrame` objects indexed by time (ms),
-  making them straightforward to analyse or plot with standard Python tools.
+  making them straightforward to analyze or plot with standard Python tools.
 - Numerically stable handling of the singularity points in the Hodgkin-Huxley rate
   equations.
 

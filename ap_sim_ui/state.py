@@ -20,7 +20,7 @@ class Sweep(BaseModel):
 
     label: str
     color: str
-    # Serialised as list[list[float]] — [time, ...] and [values, ...]
+    # Serialized as list[list[float]] — [time, ...] and [values, ...]
     time: list[float]
     voltage: list[float]
     sodium_current: list[float]
