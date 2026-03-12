@@ -1,18 +1,34 @@
 """UI constants: defaults, parameter ranges, and colour palettes."""
 
-# Default neuron parameters (match HodgkinHuxley dataclass defaults)
-DEFAULT_G_NA: float = 120.0
-DEFAULT_G_K: float = 36.0
-DEFAULT_G_L: float = 0.3
-DEFAULT_C_M: float = 1.0
-DEFAULT_V_REST: float = -65.0
-DEFAULT_NA_OUT: float = 145.0
-DEFAULT_NA_IN: float = 15.0
-DEFAULT_K_OUT: float = 5.0
-DEFAULT_K_IN: float = 140.0
-DEFAULT_CL_OUT: float = 120.0
-DEFAULT_CL_IN: float = 10.0
-DEFAULT_T: float = 310.15  # Kelvin (37°C)
+from ap_sim.constants import (
+    DEFAULT_C_M,
+    DEFAULT_CL_IN,
+    DEFAULT_CL_OUT,
+    DEFAULT_G_K,
+    DEFAULT_G_L,
+    DEFAULT_G_NA,
+    DEFAULT_K_IN,
+    DEFAULT_K_OUT,
+    DEFAULT_NA_IN,
+    DEFAULT_NA_OUT,
+    DEFAULT_T,
+    DEFAULT_V_REST,
+)
+
+__all__ = [
+    "DEFAULT_C_M",
+    "DEFAULT_CL_IN",
+    "DEFAULT_CL_OUT",
+    "DEFAULT_G_K",
+    "DEFAULT_G_L",
+    "DEFAULT_G_NA",
+    "DEFAULT_K_IN",
+    "DEFAULT_K_OUT",
+    "DEFAULT_NA_IN",
+    "DEFAULT_NA_OUT",
+    "DEFAULT_T",
+    "DEFAULT_V_REST",
+]
 
 # Slider ranges for neuron parameters
 PARAM_RANGES: dict[str, tuple[float, float, float]] = {

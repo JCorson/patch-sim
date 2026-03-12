@@ -3,6 +3,7 @@
 A package for simulating action potentials using the Hodgkin-Huxley model.
 """
 
+from . import constants
 from .hodgkin_huxley import HodgkinHuxley
 from .clamp_simulations import simulate_voltage_clamp, simulate_current_clamp
 from .nernst import nernst_potential
@@ -22,6 +23,7 @@ from .protocols import (
 )
 
 __all__ = [
+    "constants",
     "HodgkinHuxley",
     "simulate_voltage_clamp",
     "simulate_current_clamp",

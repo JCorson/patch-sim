@@ -6,6 +6,20 @@ The model includes equations for ion channel dynamics and membrane voltage.
 from dataclasses import dataclass
 from functools import cached_property
 
+from .constants import (
+    DEFAULT_C_M,
+    DEFAULT_CL_IN,
+    DEFAULT_CL_OUT,
+    DEFAULT_G_K,
+    DEFAULT_G_L,
+    DEFAULT_G_NA,
+    DEFAULT_K_IN,
+    DEFAULT_K_OUT,
+    DEFAULT_NA_IN,
+    DEFAULT_NA_OUT,
+    DEFAULT_T,
+    DEFAULT_V_REST,
+)
 from .nernst import nernst_potential
 from .utils import safe_exp
 
@@ -44,22 +58,22 @@ class HodgkinHuxley:
     """
 
     # Membrane properties
-    g_Na: float = 120.0
-    g_K: float = 36.0
-    g_L: float = 0.3
-    C_m: float = 1.0
-    v_rest: float = -65.0
+    g_Na: float = DEFAULT_G_NA
+    g_K: float = DEFAULT_G_K
+    g_L: float = DEFAULT_G_L
+    C_m: float = DEFAULT_C_M
+    v_rest: float = DEFAULT_V_REST
 
     # Ion concentrations (in mM)
-    Na_out: float = 145.0
-    Na_in: float = 15.0
-    K_out: float = 5.0
-    K_in: float = 140.0
-    Cl_out: float = 120.0
-    Cl_in: float = 10.0
+    Na_out: float = DEFAULT_NA_OUT
+    Na_in: float = DEFAULT_NA_IN
+    K_out: float = DEFAULT_K_OUT
+    K_in: float = DEFAULT_K_IN
+    Cl_out: float = DEFAULT_CL_OUT
+    Cl_in: float = DEFAULT_CL_IN
 
     # Temperature in Kelvin (37°C for mammalian cells)
-    T: float = 310.15
+    T: float = DEFAULT_T
 
     def __post_init__(self) -> None:
         """Validate parameter values on construction."""
