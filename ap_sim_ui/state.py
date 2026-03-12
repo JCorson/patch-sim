@@ -11,6 +11,20 @@ import reflex as rx
 
 import ap_sim
 import ap_sim.clamp_simulations
+from ap_sim.constants import (
+    DEFAULT_C_M,
+    DEFAULT_G_K,
+    DEFAULT_G_L,
+    DEFAULT_G_NA,
+    DEFAULT_K_IN,
+    DEFAULT_K_OUT,
+    DEFAULT_NA_IN,
+    DEFAULT_NA_OUT,
+    DEFAULT_T,
+    DEFAULT_V_REST,
+    DEFAULT_CL_IN,
+    DEFAULT_CL_OUT,
+)
 from ap_sim_ui import constants, presets
 from ap_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
 
@@ -40,18 +54,18 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     # Neuron parameters                                                   #
     # ------------------------------------------------------------------ #
-    g_Na: float = constants.DEFAULT_G_NA
-    g_K: float = constants.DEFAULT_G_K
-    g_L: float = constants.DEFAULT_G_L
-    C_m: float = constants.DEFAULT_C_M
-    v_rest: float = constants.DEFAULT_V_REST
-    Na_out: float = constants.DEFAULT_NA_OUT
-    Na_in: float = constants.DEFAULT_NA_IN
-    K_out: float = constants.DEFAULT_K_OUT
-    K_in: float = constants.DEFAULT_K_IN
-    Cl_out: float = constants.DEFAULT_CL_OUT
-    Cl_in: float = constants.DEFAULT_CL_IN
-    T: float = constants.DEFAULT_T
+    g_Na: float = DEFAULT_G_NA
+    g_K: float = DEFAULT_G_K
+    g_L: float = DEFAULT_G_L
+    C_m: float = DEFAULT_C_M
+    v_rest: float = DEFAULT_V_REST
+    Na_out: float = DEFAULT_NA_OUT
+    Na_in: float = DEFAULT_NA_IN
+    K_out: float = DEFAULT_K_OUT
+    K_in: float = DEFAULT_K_IN
+    Cl_out: float = DEFAULT_CL_OUT
+    Cl_in: float = DEFAULT_CL_IN
+    T: float = DEFAULT_T
 
     # ------------------------------------------------------------------ #
     # Experiment mode                                                     #

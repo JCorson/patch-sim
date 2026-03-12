@@ -1,34 +1,4 @@
-"""UI constants: defaults, parameter ranges, and colour palettes."""
-
-from ap_sim.constants import (
-    DEFAULT_C_M,
-    DEFAULT_CL_IN,
-    DEFAULT_CL_OUT,
-    DEFAULT_G_K,
-    DEFAULT_G_L,
-    DEFAULT_G_NA,
-    DEFAULT_K_IN,
-    DEFAULT_K_OUT,
-    DEFAULT_NA_IN,
-    DEFAULT_NA_OUT,
-    DEFAULT_T,
-    DEFAULT_V_REST,
-)
-
-__all__ = [
-    "DEFAULT_C_M",
-    "DEFAULT_CL_IN",
-    "DEFAULT_CL_OUT",
-    "DEFAULT_G_K",
-    "DEFAULT_G_L",
-    "DEFAULT_G_NA",
-    "DEFAULT_K_IN",
-    "DEFAULT_K_OUT",
-    "DEFAULT_NA_IN",
-    "DEFAULT_NA_OUT",
-    "DEFAULT_T",
-    "DEFAULT_V_REST",
-]
+"""UI constants: parameter ranges and colour palettes."""
 
 # Slider ranges for neuron parameters
 PARAM_RANGES: dict[str, tuple[float, float, float]] = {
