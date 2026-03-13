@@ -271,7 +271,7 @@ class AppState(rx.State):
 
         fig.update_xaxes(title_text="Time (ms)", row=stimulus_row, col=1)
         fig.update_layout(
-            height=500,
+            autosize=True,
             margin={"l": 60, "r": 20, "t": 30, "b": 40},
             legend={"orientation": "h", "y": 1.08},
             template="plotly_white",

@@ -10,7 +10,12 @@ def trace_display() -> rx.Component:
     return rx.box(
         rx.cond(
             AppState.has_result,
-            rx.plotly(data=AppState.figure_data, use_resize_handler=True),
+            rx.plotly(
+                data=AppState.figure_data,
+                use_resize_handler=True,
+                height="100%",
+                width="100%",
+            ),
             rx.center(
                 rx.vstack(
                     rx.icon("chart-line", size=48, color="gray"),
@@ -26,4 +31,5 @@ def trace_display() -> rx.Component:
             ),
         ),
         width="100%",
+        height="100%",
     )
