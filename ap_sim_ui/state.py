@@ -674,8 +674,6 @@ class AppState(rx.State):
                     self.vc_voltage_step,
                 )
                 new_sweeps: list[Sweep] = []
-                last_df = None
-                last_stimulus = None
                 for voltage in voltages:
                     protocol = ap_sim.step_voltage(
                         duration=sweep_duration,
@@ -709,26 +707,24 @@ class AppState(rx.State):
                             clamp_mode=mode,
                         )
                     )
-                    last_df = sweep_df
-                    last_stimulus = protocol
-
-                async with self:
-                    self.sweeps = new_sweeps
-                    if last_df is not None and last_stimulus is not None:
-                        last_sweep = new_sweeps[-1]
-                        self.result_time = last_sweep.time
-                        self.result_stimulus = last_sweep.stimulus
+                    current_sweep = new_sweeps[-1]
+                    async with self:
+                        self.sweeps = list(new_sweeps)
+                        self.result_time = current_sweep.time
+                        self.result_stimulus = current_sweep.stimulus
                         self.result_clamp_mode = mode
-                        self.result_voltage = last_sweep.voltage
-                        self.result_total_current = last_sweep.total_current
-                        self.result_sodium_current = last_sweep.sodium_current
-                        self.result_potassium_current = last_sweep.potassium_current
-                        self.result_leak_current = last_sweep.leak_current
+                        self.result_voltage = current_sweep.voltage
+                        self.result_total_current = current_sweep.total_current
+                        self.result_sodium_current = current_sweep.sodium_current
+                        self.result_potassium_current = current_sweep.potassium_current
+                        self.result_leak_current = current_sweep.leak_current
                         self.result_potassium_activation = (
-                            last_sweep.potassium_activation
+                            current_sweep.potassium_activation
                         )
-                        self.result_sodium_activation = last_sweep.sodium_activation
-                        self.result_sodium_inactivation = last_sweep.sodium_inactivation
+                        self.result_sodium_activation = current_sweep.sodium_activation
+                        self.result_sodium_inactivation = (
+                            current_sweep.sodium_inactivation
+                        )
 
             else:
                 stimulus = build_voltage_protocol(
