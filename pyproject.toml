@@ -35,6 +35,9 @@ ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = [
+    "ignore::pydantic.warnings.PydanticDeprecatedSince20",
+]
 
 [dependency-groups]
 dev = [

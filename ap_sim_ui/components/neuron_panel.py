@@ -2,51 +2,7 @@
 
 import reflex as rx
 
-from ap_sim_ui import constants
 from ap_sim_ui.state import AppState
-
-
-def _param_slider(
-    label: str,
-    state_var: str,
-    unit: str,
-) -> rx.Component:
-    """Render a labelled slider + numeric input for one neuron parameter."""
-    min_val, max_val, step = constants.PARAM_RANGES[state_var]
-    return rx.vstack(
-        rx.hstack(
-            rx.text(label, size="2", color="gray"),
-            rx.spacer(),
-            rx.text(unit, size="1", color="gray"),
-            width="100%",
-        ),
-        rx.hstack(
-            rx.slider(
-                min=min_val,
-                max=max_val,
-                step=step,
-                value=getattr(AppState, state_var),
-                on_change=AppState.__fields__[state_var].default  # type: ignore[attr-defined]
-                if False
-                else lambda v, sv=state_var: AppState.set_value(sv, v),
-                width="100%",
-            ),
-            rx.input(
-                value=getattr(AppState, state_var),
-                on_change=lambda v, sv=state_var: AppState.set_value(sv, v),
-                width="80px",
-                size="1",
-                type="number",
-                min=str(min_val),
-                max=str(max_val),
-                step=str(step),
-            ),
-            width="100%",
-            spacing="2",
-        ),
-        width="100%",
-        spacing="1",
-    )
 
 
 def _reversal_row(label: str, value: rx.Var, unit: str = "mV") -> rx.Component:
