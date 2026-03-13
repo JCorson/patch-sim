@@ -58,6 +58,19 @@ def example(x: float, y: int) -> str:
 
 mypy only enforces types in `ap_sim/` (core library). UI code (`ap_sim_ui/`) is excluded — see the `[[tool.mypy.overrides]]` section in `pyproject.toml`. Do not spend time fixing mypy errors in UI code.
 
+## Committing during multi-step plans
+
+When executing a plan that has discrete numbered steps, commit after each step
+rather than staging everything at the end. Each commit should cover exactly one
+logical change (one fix, one refactor, one feature addition) so that the git
+log reflects the plan's structure.
+
+If a step touches several files but they all belong to the same logical change,
+group them in a single commit. If a file contains changes from different plan
+steps, stage only the relevant hunks for each commit.
+
+Run the four checks listed below before every commit — not just at the end.
+
 ## Before finishing any task
 
 Run all four checks and ensure they pass before marking a task complete:
