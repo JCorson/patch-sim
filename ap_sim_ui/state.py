@@ -4,6 +4,7 @@ All reactive variables and event handlers live here. The state drives
 the Reflex component tree via computed properties.
 """
 
+import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pydantic import BaseModel
@@ -258,6 +259,7 @@ class AppState(rx.State):
                 _scatter(
                     sweep.time, sweep.total_current, f"{sweep.label} I_total", 1, c
                 )
+            _scatter(sweep.time, sweep.stimulus, sweep.label, stimulus_row, c)
 
         if mode == "Current Clamp":
             fig.update_yaxes(title_text="Voltage (mV)", row=1, col=1)
@@ -657,6 +659,77 @@ class AppState(rx.State):
                     std_current=self.std_current,
                 )
                 df = ap_sim.simulate_current_clamp(neuron, stimulus)
+            elif ptype in ("I-V Curve",):
+                # Run each voltage step as an independent sweep so that
+                # gating variables are reset between steps — matching real
+                # patch-clamp I-V curve experiments.
+                sweep_duration = (
+                    self.vc_pre_pulse_duration
+                    + self.duration
+                    + self.vc_post_pulse_duration
+                )
+                voltages = np.arange(
+                    self.vc_voltage_min,
+                    self.vc_voltage_max + self.vc_voltage_step,
+                    self.vc_voltage_step,
+                )
+                new_sweeps: list[Sweep] = []
+                last_df = None
+                last_stimulus = None
+                for voltage in voltages:
+                    protocol = ap_sim.step_voltage(
+                        duration=sweep_duration,
+                        voltage_amplitude=float(voltage),
+                        step_start=self.vc_pre_pulse_duration,
+                        step_duration=self.duration,
+                        holding_voltage=self.vc_holding_voltage,
+                        sampling_frequency=fs,
+                    )
+                    sweep_df = ap_sim.simulate_voltage_clamp(neuron, protocol)
+                    label = f"{voltage:+.0f} mV"
+                    color_index = len(new_sweeps) % len(constants.SWEEP_COLORS)
+                    new_sweeps.append(
+                        Sweep(
+                            label=label,
+                            color=constants.SWEEP_COLORS[color_index],
+                            time=sweep_df.index.tolist(),
+                            voltage=sweep_df["voltage"].tolist(),
+                            sodium_current=sweep_df["sodium_current"].tolist(),
+                            potassium_current=sweep_df["potassium_current"].tolist(),
+                            leak_current=sweep_df["leak_current"].tolist(),
+                            total_current=sweep_df["total_current"].tolist(),
+                            potassium_activation=sweep_df[
+                                "potassium_activation"
+                            ].tolist(),
+                            sodium_activation=sweep_df["sodium_activation"].tolist(),
+                            sodium_inactivation=sweep_df[
+                                "sodium_inactivation"
+                            ].tolist(),
+                            stimulus=protocol.tolist(),
+                            clamp_mode=mode,
+                        )
+                    )
+                    last_df = sweep_df
+                    last_stimulus = protocol
+
+                async with self:
+                    self.sweeps = new_sweeps
+                    if last_df is not None and last_stimulus is not None:
+                        last_sweep = new_sweeps[-1]
+                        self.result_time = last_sweep.time
+                        self.result_stimulus = last_sweep.stimulus
+                        self.result_clamp_mode = mode
+                        self.result_voltage = last_sweep.voltage
+                        self.result_total_current = last_sweep.total_current
+                        self.result_sodium_current = last_sweep.sodium_current
+                        self.result_potassium_current = last_sweep.potassium_current
+                        self.result_leak_current = last_sweep.leak_current
+                        self.result_potassium_activation = (
+                            last_sweep.potassium_activation
+                        )
+                        self.result_sodium_activation = last_sweep.sodium_activation
+                        self.result_sodium_inactivation = last_sweep.sodium_inactivation
+
             else:
                 stimulus = build_voltage_protocol(
                     protocol_type=ptype,
@@ -687,35 +760,40 @@ class AppState(rx.State):
                 )
                 df = ap_sim.simulate_voltage_clamp(neuron, stimulus)
 
-            time_vals = df.index.tolist()
-            stim_list = stimulus.tolist()
+            if ptype not in ("I-V Curve",):
+                time_vals = df.index.tolist()
+                stim_list = stimulus.tolist()
 
-            async with self:
-                self.result_time = time_vals
-                self.result_stimulus = stim_list
-                self.result_clamp_mode = mode
-                if mode == "Current Clamp":
-                    self.result_voltage = df["voltage"].tolist()
-                    self.result_potassium_activation = df[
-                        "potassium_activation"
-                    ].tolist()
-                    self.result_sodium_activation = df["sodium_activation"].tolist()
-                    self.result_sodium_inactivation = df["sodium_inactivation"].tolist()
-                    self.result_total_current = []
-                    self.result_sodium_current = []
-                    self.result_potassium_current = []
-                    self.result_leak_current = []
-                else:
-                    self.result_voltage = df["voltage"].tolist()
-                    self.result_total_current = df["total_current"].tolist()
-                    self.result_sodium_current = df["sodium_current"].tolist()
-                    self.result_potassium_current = df["potassium_current"].tolist()
-                    self.result_leak_current = df["leak_current"].tolist()
-                    self.result_potassium_activation = df[
-                        "potassium_activation"
-                    ].tolist()
-                    self.result_sodium_activation = df["sodium_activation"].tolist()
-                    self.result_sodium_inactivation = df["sodium_inactivation"].tolist()
+                async with self:
+                    self.result_time = time_vals
+                    self.result_stimulus = stim_list
+                    self.result_clamp_mode = mode
+                    if mode == "Current Clamp":
+                        self.result_voltage = df["voltage"].tolist()
+                        self.result_potassium_activation = df[
+                            "potassium_activation"
+                        ].tolist()
+                        self.result_sodium_activation = df["sodium_activation"].tolist()
+                        self.result_sodium_inactivation = df[
+                            "sodium_inactivation"
+                        ].tolist()
+                        self.result_total_current = []
+                        self.result_sodium_current = []
+                        self.result_potassium_current = []
+                        self.result_leak_current = []
+                    else:
+                        self.result_voltage = df["voltage"].tolist()
+                        self.result_total_current = df["total_current"].tolist()
+                        self.result_sodium_current = df["sodium_current"].tolist()
+                        self.result_potassium_current = df["potassium_current"].tolist()
+                        self.result_leak_current = df["leak_current"].tolist()
+                        self.result_potassium_activation = df[
+                            "potassium_activation"
+                        ].tolist()
+                        self.result_sodium_activation = df["sodium_activation"].tolist()
+                        self.result_sodium_inactivation = df[
+                            "sodium_inactivation"
+                        ].tolist()
 
         except ValueError as exc:
             async with self:
