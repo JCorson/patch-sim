@@ -82,6 +82,20 @@ The full unit test suite can be run using:
 uv run --frozen -m pytest --verbose
 ```
 
+#### Test coverage
+
+To see a line-by-line coverage report for the core library:
+
+```
+uv run --frozen -m pytest --cov=ap_sim --cov-report=term-missing
+```
+
+To generate an HTML report (written to `htmlcov/`):
+
+```
+uv run --frozen -m pytest --cov=ap_sim --cov-report=html
+```
+
 #### Linting and code style
 
 Python code is styled using Ruff. Ruff is configured to cover typical flake8,
