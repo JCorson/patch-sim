@@ -120,7 +120,7 @@ def sweep_manager() -> rx.Component:
         rx.separator(),
         rx.hstack(
             rx.text("Sweeps:", size="2", weight="bold"),
-            rx.foreach(AppState.sweeps, _sweep_chip),
+            rx.foreach(AppState.saved_sweeps, _sweep_chip),
             rx.spacer(),
             rx.button(
                 "Add sweep",
@@ -135,7 +135,7 @@ def sweep_manager() -> rx.Component:
                 size="1",
                 variant="soft",
                 color_scheme="red",
-                disabled=AppState.sweeps.length() == 0,
+                disabled=AppState.saved_sweeps.length() == 0,
             ),
             spacing="2",
             align="center",

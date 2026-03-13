@@ -2,6 +2,7 @@
 
 import reflex as rx
 
+from ap_sim_ui.constants import PARAM_RANGES
 from ap_sim_ui.state import AppState
 
 
@@ -19,6 +20,56 @@ def _reversal_row(label: str, value: rx.Var, unit: str = "mV") -> rx.Component:
     )
 
 
+def _param_row(
+    label: str,
+    var: rx.Var,
+    handler,
+    min_val: float,
+    max_val: float,
+    step: float,
+) -> rx.Component:
+    """Render a parameter label, number input, and slider as a grouped block.
+
+    Args:
+        label: Display label shown to the left of the input.
+        var: Reactive state variable bound to the input and slider.
+        handler: Event handler called on input change and slider change.
+        min_val: Minimum allowed value.
+        max_val: Maximum allowed value.
+        step: Increment step for the input and slider.
+
+    Returns:
+        A vstack containing an hstack (label + input) and a slider.
+    """
+    return rx.vstack(
+        rx.hstack(
+            rx.text(label, size="2", color="gray"),
+            rx.spacer(),
+            rx.input(
+                value=var,
+                on_change=handler,
+                width="90px",
+                size="1",
+                type="number",
+                min=str(min_val),
+                max=str(max_val),
+                step=str(step),
+            ),
+            width="100%",
+        ),
+        rx.slider(
+            min=min_val,
+            max=max_val,
+            step=step,
+            value=[var],
+            on_change=handler,
+            width="100%",
+        ),
+        spacing="1",
+        width="100%",
+    )
+
+
 def neuron_panel() -> rx.Component:
     """Sidebar panel for configuring Hodgkin-Huxley neuron parameters."""
     return rx.vstack(
@@ -26,149 +77,21 @@ def neuron_panel() -> rx.Component:
         rx.separator(),
         rx.text("Conductances (mS/cm²)", size="2", weight="bold"),
         rx.vstack(
-            rx.hstack(
-                rx.text("g_Na", size="2", color="gray"),
-                rx.spacer(),
-                rx.input(
-                    value=AppState.g_Na,
-                    on_change=AppState.set_g_Na,
-                    width="90px",
-                    size="1",
-                    type="number",
-                    min="0",
-                    max="300",
-                    step="1",
-                ),
-                width="100%",
-            ),
-            rx.slider(
-                min=0,
-                max=300,
-                step=1,
-                value=[AppState.g_Na],
-                on_change=AppState.set_g_Na,
-                width="100%",
-            ),
-            rx.hstack(
-                rx.text("g_K", size="2", color="gray"),
-                rx.spacer(),
-                rx.input(
-                    value=AppState.g_K,
-                    on_change=AppState.set_g_K,
-                    width="90px",
-                    size="1",
-                    type="number",
-                    min="0",
-                    max="100",
-                    step="0.5",
-                ),
-                width="100%",
-            ),
-            rx.slider(
-                min=0,
-                max=100,
-                step=0.5,
-                value=[AppState.g_K],
-                on_change=AppState.set_g_K,
-                width="100%",
-            ),
-            rx.hstack(
-                rx.text("g_L", size="2", color="gray"),
-                rx.spacer(),
-                rx.input(
-                    value=AppState.g_L,
-                    on_change=AppState.set_g_L,
-                    width="90px",
-                    size="1",
-                    type="number",
-                    min="0",
-                    max="2",
-                    step="0.01",
-                ),
-                width="100%",
-            ),
-            rx.slider(
-                min=0,
-                max=2,
-                step=0.01,
-                value=[AppState.g_L],
-                on_change=AppState.set_g_L,
-                width="100%",
-            ),
+            _param_row("g_Na", AppState.g_Na, AppState.set_g_Na, *PARAM_RANGES["g_Na"]),
+            _param_row("g_K", AppState.g_K, AppState.set_g_K, *PARAM_RANGES["g_K"]),
+            _param_row("g_L", AppState.g_L, AppState.set_g_L, *PARAM_RANGES["g_L"]),
             spacing="1",
             width="100%",
         ),
         rx.separator(),
         rx.text("Membrane Properties", size="2", weight="bold"),
-        rx.hstack(
-            rx.text("C_m (µF/cm²)", size="2", color="gray"),
-            rx.spacer(),
-            rx.input(
-                value=AppState.C_m,
-                on_change=AppState.set_C_m,
-                width="90px",
-                size="1",
-                type="number",
-                min="0.1",
-                max="5",
-                step="0.1",
-            ),
-            width="100%",
+        _param_row(
+            "C_m (µF/cm²)", AppState.C_m, AppState.set_C_m, *PARAM_RANGES["C_m"]
         ),
-        rx.slider(
-            min=0.1,
-            max=5,
-            step=0.1,
-            value=[AppState.C_m],
-            on_change=AppState.set_C_m,
-            width="100%",
+        _param_row(
+            "v_rest (mV)", AppState.v_rest, AppState.set_v_rest, *PARAM_RANGES["v_rest"]
         ),
-        rx.hstack(
-            rx.text("v_rest (mV)", size="2", color="gray"),
-            rx.spacer(),
-            rx.input(
-                value=AppState.v_rest,
-                on_change=AppState.set_v_rest,
-                width="90px",
-                size="1",
-                type="number",
-                min="-90",
-                max="-40",
-                step="1",
-            ),
-            width="100%",
-        ),
-        rx.slider(
-            min=-90,
-            max=-40,
-            step=1,
-            value=[AppState.v_rest],
-            on_change=AppState.set_v_rest,
-            width="100%",
-        ),
-        rx.hstack(
-            rx.text("T (K)", size="2", color="gray"),
-            rx.spacer(),
-            rx.input(
-                value=AppState.T,
-                on_change=AppState.set_T,
-                width="90px",
-                size="1",
-                type="number",
-                min="273.15",
-                max="323.15",
-                step="0.5",
-            ),
-            width="100%",
-        ),
-        rx.slider(
-            min=273.15,
-            max=323.15,
-            step=0.5,
-            value=[AppState.T],
-            on_change=AppState.set_T,
-            width="100%",
-        ),
+        _param_row("T (K)", AppState.T, AppState.set_T, *PARAM_RANGES["T"]),
         rx.separator(),
         rx.accordion.root(
             rx.accordion.item(
@@ -197,36 +120,9 @@ def neuron_panel() -> rx.Component:
         rx.separator(),
         rx.text("Reversal Potentials", size="2", weight="bold"),
         rx.vstack(
-            rx.hstack(
-                rx.text("E_Na", size="2", color="gray"),
-                rx.spacer(),
-                rx.badge(
-                    rx.text(AppState.E_Na.to(str), size="2"),
-                    rx.text(" mV", size="1", color="gray"),
-                    variant="soft",
-                ),
-                width="100%",
-            ),
-            rx.hstack(
-                rx.text("E_K", size="2", color="gray"),
-                rx.spacer(),
-                rx.badge(
-                    rx.text(AppState.E_K.to(str), size="2"),
-                    rx.text(" mV", size="1", color="gray"),
-                    variant="soft",
-                ),
-                width="100%",
-            ),
-            rx.hstack(
-                rx.text("E_L", size="2", color="gray"),
-                rx.spacer(),
-                rx.badge(
-                    rx.text(AppState.E_L.to(str), size="2"),
-                    rx.text(" mV", size="1", color="gray"),
-                    variant="soft",
-                ),
-                width="100%",
-            ),
+            _reversal_row("E_Na", AppState.E_Na),
+            _reversal_row("E_K", AppState.E_K),
+            _reversal_row("E_L", AppState.E_L),
             spacing="1",
             width="100%",
         ),

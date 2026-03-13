@@ -49,8 +49,3 @@ SWEEP_COLORS: list[str] = [
     "#bcbd22",
     "#17becf",
 ]
-
-# Plotly subplot row labels
-RESPONSE_ROW: int = 1
-GATING_ROW: int = 2
-STIMULUS_ROW: int = 3
