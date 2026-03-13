@@ -75,7 +75,7 @@ def _sidebar() -> rx.Component:
                 spacing="0",
                 width="100%",
             ),
-            height="calc(100vh - 60px)",
+            height="calc(100vh - 60px - 2 * var(--space-3))",
         ),
         width="280px",
         min_width="280px",
@@ -102,7 +102,7 @@ def _main_content() -> rx.Component:
         ),
         spacing="0",
         width="100%",
-        height="calc(100vh - 60px)",
+        height="calc(100vh - 60px - 2 * var(--space-3))",
     )
 
 
@@ -119,7 +119,8 @@ def index() -> rx.Component:
         ),
         spacing="0",
         width="100%",
-        height="100vh",
+        min_height="100vh",
+        padding="3",
         overflow="hidden",
     )
 
