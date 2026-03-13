@@ -97,6 +97,30 @@ _FLOAT_FIELDS: list[str] = [
 ]
 
 
+_BOOL_FIELDS: list[str] = [
+    "show_voltage",
+    "show_total_current",
+    "show_sodium_current",
+    "show_potassium_current",
+    "show_leak_current",
+    "show_potassium_activation",
+    "show_sodium_activation",
+    "show_sodium_inactivation",
+]
+
+
+def _make_bool_setter(field_name: str):
+    """Factory returning a bool event handler for ``field_name``."""
+
+    def setter(self, value: bool) -> None:
+        setattr(self, field_name, value)
+
+    setter.__name__ = f"set_{field_name}"
+    setter.__qualname__ = f"AppState.set_{field_name}"
+    setter.__doc__ = f"Set {field_name} from a checkbox event."
+    return setter
+
+
 def _make_float_setter(field_name: str):
     """Factory returning a float-coercing event handler for ``field_name``.
 
@@ -308,40 +332,9 @@ class AppState(rx.State):
     for _f in _FLOAT_FIELDS:
         vars()[f"set_{_f}"] = _make_float_setter(_f)
 
-    # ------------------------------------------------------------------ #
-    # Trace visibility setters                                           #
-    # ------------------------------------------------------------------ #
-    def set_show_voltage(self, value: bool) -> None:
-        """Set show_voltage from a checkbox event."""
-        self.show_voltage = value
-
-    def set_show_total_current(self, value: bool) -> None:
-        """Set show_total_current from a checkbox event."""
-        self.show_total_current = value
-
-    def set_show_sodium_current(self, value: bool) -> None:
-        """Set show_sodium_current from a checkbox event."""
-        self.show_sodium_current = value
-
-    def set_show_potassium_current(self, value: bool) -> None:
-        """Set show_potassium_current from a checkbox event."""
-        self.show_potassium_current = value
-
-    def set_show_leak_current(self, value: bool) -> None:
-        """Set show_leak_current from a checkbox event."""
-        self.show_leak_current = value
-
-    def set_show_potassium_activation(self, value: bool) -> None:
-        """Set show_potassium_activation from a checkbox event."""
-        self.show_potassium_activation = value
-
-    def set_show_sodium_activation(self, value: bool) -> None:
-        """Set show_sodium_activation from a checkbox event."""
-        self.show_sodium_activation = value
-
-    def set_show_sodium_inactivation(self, value: bool) -> None:
-        """Set show_sodium_inactivation from a checkbox event."""
-        self.show_sodium_inactivation = value
+    # One setter per bool field — same rationale as float setters above.
+    for _f in _BOOL_FIELDS:
+        vars()[f"set_{_f}"] = _make_bool_setter(_f)
 
     # ------------------------------------------------------------------ #
     # Sweep management                                                   #
