@@ -216,7 +216,12 @@ def neuron_panel() -> rx.Component:
         rx.separator(),
         rx.accordion.root(
             rx.accordion.item(
-                header=rx.text("Ion Concentrations (mM)", size="2", weight="bold"),
+                header=rx.text(
+                    "Ion Concentrations (mM)",
+                    size="2",
+                    weight="bold",
+                    color="var(--gray-12)",
+                ),
                 content=rx.vstack(
                     _ion_row("Na⁺ out", AppState.Na_out, AppState.set_Na_out, 1, 500),
                     _ion_row("Na⁺ in", AppState.Na_in, AppState.set_Na_in, 1, 100),
@@ -230,6 +235,7 @@ def neuron_panel() -> rx.Component:
                 value="ion-concentrations",
             ),
             collapsible=True,
+            variant="ghost",
             width="100%",
         ),
         rx.separator(),
