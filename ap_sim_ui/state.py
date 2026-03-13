@@ -282,6 +282,10 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     # Event handlers                                                     #
     # ------------------------------------------------------------------ #
+    def set_protocol_type(self, value: str) -> None:
+        """Set protocol_type from a select event."""
+        self.protocol_type = value
+
     def set_clamp_mode(self, mode: str) -> None:
         """Switch between Current Clamp and Voltage Clamp modes."""
         self.clamp_mode = mode
@@ -534,6 +538,41 @@ class AppState(rx.State):
     def set_vc_interpulse_duration(self, value: "str | list[float]") -> None:
         """Set vc_interpulse_duration from an input or slider event."""
         self._set_float("vc_interpulse_duration", value)
+
+    # ------------------------------------------------------------------ #
+    # Trace visibility setters                                           #
+    # ------------------------------------------------------------------ #
+    def set_show_voltage(self, value: bool) -> None:
+        """Set show_voltage from a checkbox event."""
+        self.show_voltage = value
+
+    def set_show_total_current(self, value: bool) -> None:
+        """Set show_total_current from a checkbox event."""
+        self.show_total_current = value
+
+    def set_show_sodium_current(self, value: bool) -> None:
+        """Set show_sodium_current from a checkbox event."""
+        self.show_sodium_current = value
+
+    def set_show_potassium_current(self, value: bool) -> None:
+        """Set show_potassium_current from a checkbox event."""
+        self.show_potassium_current = value
+
+    def set_show_leak_current(self, value: bool) -> None:
+        """Set show_leak_current from a checkbox event."""
+        self.show_leak_current = value
+
+    def set_show_potassium_activation(self, value: bool) -> None:
+        """Set show_potassium_activation from a checkbox event."""
+        self.show_potassium_activation = value
+
+    def set_show_sodium_activation(self, value: bool) -> None:
+        """Set show_sodium_activation from a checkbox event."""
+        self.show_sodium_activation = value
+
+    def set_show_sodium_inactivation(self, value: bool) -> None:
+        """Set show_sodium_inactivation from a checkbox event."""
+        self.show_sodium_inactivation = value
 
     def add_sweep(self) -> None:
         """Save the current simulation result as a named sweep."""
