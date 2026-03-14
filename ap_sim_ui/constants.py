@@ -15,6 +15,8 @@ PARAM_RANGES: dict[str, tuple[float, float, float]] = {
     "Cl_out": (1.0, 300.0, 1.0),
     "Cl_in": (1.0, 100.0, 1.0),
     "T": (273.15, 323.15, 0.5),  # 0°C to 50°C
+    # Optional channel conductances
+    "ih_g_max": (0.0, 1.0, 0.01),
 }
 
 # Current clamp protocol types

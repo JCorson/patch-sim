@@ -12,6 +12,9 @@ import ap_sim
 import ap_sim.clamp_simulations
 from ap_sim.constants import (
     DEFAULT_C_M,
+    DEFAULT_CL_IN,
+    DEFAULT_CL_OUT,
+    DEFAULT_G_IH,
     DEFAULT_G_K,
     DEFAULT_G_L,
     DEFAULT_G_NA,
@@ -21,9 +24,8 @@ from ap_sim.constants import (
     DEFAULT_NA_OUT,
     DEFAULT_T,
     DEFAULT_V_REST,
-    DEFAULT_CL_IN,
-    DEFAULT_CL_OUT,
 )
+from ap_sim.optional_channels import make_ih_channel
 from ap_sim_ui import constants, presets
 from ap_sim_ui.plotting import Sweep, build_figure
 from ap_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
@@ -94,6 +96,8 @@ _FLOAT_FIELDS: list[str] = [
     "vc_test_voltage_min",
     "vc_test_voltage_max",
     "vc_interpulse_duration",
+    # Optional channel params
+    "ih_g_max",
 ]
 
 
@@ -106,6 +110,10 @@ _BOOL_FIELDS: list[str] = [
     "show_potassium_activation",
     "show_sodium_activation",
     "show_sodium_inactivation",
+    # Optional channel visibility
+    "ih_enabled",
+    "show_ih_current",
+    "show_ih_gating",
 ]
 
 
@@ -160,6 +168,12 @@ class AppState(rx.State):
     Cl_out: float = DEFAULT_CL_OUT
     Cl_in: float = DEFAULT_CL_IN
     T: float = DEFAULT_T
+
+    # ------------------------------------------------------------------ #
+    # Optional channels                                                   #
+    # ------------------------------------------------------------------ #
+    ih_enabled: bool = False
+    ih_g_max: float = DEFAULT_G_IH
 
     # ------------------------------------------------------------------ #
     # Experiment mode                                                     #
@@ -233,6 +247,8 @@ class AppState(rx.State):
     show_potassium_activation: bool = False
     show_sodium_activation: bool = False
     show_sodium_inactivation: bool = False
+    show_ih_current: bool = True
+    show_ih_gating: bool = True
 
     # ------------------------------------------------------------------ #
     # UI state                                                           #
@@ -285,6 +301,8 @@ class AppState(rx.State):
             show_sodium_activation=self.show_sodium_activation,
             show_sodium_inactivation=self.show_sodium_inactivation,
             clamp_mode=self.clamp_mode,
+            show_optional_currents={"Ih": self.show_ih_current},
+            show_optional_gating={"r": self.show_ih_gating},
         )
 
     # ------------------------------------------------------------------ #
@@ -365,6 +383,9 @@ class AppState(rx.State):
             self.error_message = ""
 
         try:
+            opt_channels = []
+            if self.ih_enabled:
+                opt_channels.append(make_ih_channel(g_max=self.ih_g_max))
             neuron = ap_sim.HodgkinHuxley(
                 g_Na=self.g_Na,
                 g_K=self.g_K,
@@ -378,6 +399,7 @@ class AppState(rx.State):
                 Cl_out=self.Cl_out,
                 Cl_in=self.Cl_in,
                 T=self.T,
+                optional_channels=tuple(opt_channels),
             )
 
             fs = ap_sim.clamp_simulations.SIM_SAMPLING_FREQ
