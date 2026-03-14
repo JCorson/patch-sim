@@ -3,9 +3,10 @@
 The model includes equations for ion channel dynamics and membrane voltage.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 
+from .channels import GatingVariable, IonChannel
 from .constants import (
     DEFAULT_C_M,
     DEFAULT_CL_IN,
@@ -50,6 +51,9 @@ class HodgkinHuxley:
         Cl_out (float): Extracellular chloride concentration in mM.
         Cl_in (float): Intracellular chloride concentration in mM.
         T (float): Temperature in Kelvin.
+        optional_channels: Tuple of additional ion channels added on top of
+            the classic Na/K/leak triad.  Defaults to an empty tuple so that
+            all existing code is unaffected.
 
     Cached properties (derived from ion concentrations on first access):
         E_Na (float): Sodium reversal potential in mV.
@@ -75,6 +79,9 @@ class HodgkinHuxley:
     # Temperature in Kelvin (37°C for mammalian cells)
     T: float = DEFAULT_T
 
+    # Optional extra channels — empty by default so existing code is unaffected
+    optional_channels: tuple[IonChannel, ...] = field(default_factory=tuple)
+
     def __post_init__(self) -> None:
         """Validate parameter values on construction."""
         if self.g_Na < 0:
@@ -97,6 +104,28 @@ class HodgkinHuxley:
         ]:
             if value <= 0:
                 raise ValueError(f"Ion concentration ({name}) must be positive.")
+        _BUILTIN_NAMES = {"Na", "K", "leak"}
+        ch_names = [ch.name for ch in self.optional_channels]
+        if len(ch_names) != len(set(ch_names)):
+            raise ValueError(f"Optional channel names must be unique, got {ch_names}.")
+        for ch_name in ch_names:
+            if ch_name in _BUILTIN_NAMES:
+                raise ValueError(
+                    f"Optional channel name '{ch_name}' collides with a built-in "
+                    "channel name (Na, K, leak)."
+                )
+
+    def all_optional_gating_variables(self) -> list[GatingVariable]:
+        """Return a flat list of all gating variables across optional channels.
+
+        Returns:
+            List of GatingVariable objects from all optional channels, in the
+            order the channels and their gating variables are declared.
+        """
+        result: list[GatingVariable] = []
+        for ch in self.optional_channels:
+            result.extend(ch.gating_variables)
+        return result
 
     # Reversal potentials — derived from ion concentrations via the Nernst
     # equation.  Using @cached_property avoids the object.__setattr__ hack
