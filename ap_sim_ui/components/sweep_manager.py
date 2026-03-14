@@ -37,6 +37,22 @@ def _cc_trace_checkboxes() -> rx.Component:
             AppState.show_sodium_inactivation,
             AppState.set_show_sodium_inactivation,
         ),
+        rx.cond(
+            AppState.ih_enabled,
+            rx.vstack(
+                _trace_checkbox(
+                    "I_Ih",
+                    AppState.show_ih_current,
+                    AppState.set_show_ih_current,
+                ),
+                _trace_checkbox(
+                    "Ih gating (r)",
+                    AppState.show_ih_gating,
+                    AppState.set_show_ih_gating,
+                ),
+                spacing="1",
+            ),
+        ),
         spacing="1",
         wrap="wrap",
         direction="row",
@@ -80,6 +96,22 @@ def _vc_trace_checkboxes() -> rx.Component:
             "Na inactivation (h)",
             AppState.show_sodium_inactivation,
             AppState.set_show_sodium_inactivation,
+        ),
+        rx.cond(
+            AppState.ih_enabled,
+            rx.vstack(
+                _trace_checkbox(
+                    "I_Ih",
+                    AppState.show_ih_current,
+                    AppState.set_show_ih_current,
+                ),
+                _trace_checkbox(
+                    "Ih gating (r)",
+                    AppState.show_ih_gating,
+                    AppState.set_show_ih_gating,
+                ),
+                spacing="1",
+            ),
         ),
         spacing="1",
         wrap="wrap",

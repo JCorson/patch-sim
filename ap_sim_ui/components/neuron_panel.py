@@ -6,6 +6,54 @@ from ap_sim_ui.constants import PARAM_RANGES
 from ap_sim_ui.state import AppState
 
 
+def _optional_channel_row(
+    label: str,
+    enabled_var: rx.Var,
+    enabled_setter,
+    g_var: rx.Var,
+    g_setter,
+    param_key: str,
+) -> rx.Component:
+    """Render a checkbox + conditional conductance slider for an optional channel.
+
+    Args:
+        label: Display name for the channel (e.g. 'Ih (HCN)').
+        enabled_var: Reactive bool var bound to the enable checkbox.
+        enabled_setter: Event handler called when the checkbox changes.
+        g_var: Reactive float var bound to the conductance slider.
+        g_setter: Event handler called when the conductance changes.
+        param_key: Key into PARAM_RANGES for the conductance slider bounds.
+
+    Returns:
+        A vstack containing an enable checkbox and a conditional g_max row.
+    """
+    min_val, max_val, step = PARAM_RANGES[param_key]
+    return rx.vstack(
+        rx.hstack(
+            rx.checkbox(
+                checked=enabled_var,
+                on_change=enabled_setter,
+            ),
+            rx.text(label, size="2"),
+            spacing="2",
+            align="center",
+        ),
+        rx.cond(
+            enabled_var,
+            _param_row(
+                "g_max (mS/cm²)",
+                g_var,
+                g_setter,
+                min_val,
+                max_val,
+                step,
+            ),
+        ),
+        spacing="2",
+        width="100%",
+    )
+
+
 def _reversal_row(label: str, value: rx.Var, unit: str = "mV") -> rx.Component:
     """Render a read-only reversal potential display row."""
     return rx.hstack(
@@ -112,6 +160,33 @@ def neuron_panel() -> rx.Component:
                     width="100%",
                 ),
                 value="ion-concentrations",
+            ),
+            collapsible=True,
+            variant="ghost",
+            width="100%",
+        ),
+        rx.separator(),
+        rx.accordion.root(
+            rx.accordion.item(
+                header=rx.text(
+                    "Optional Channels",
+                    size="2",
+                    weight="bold",
+                    color="var(--gray-12)",
+                ),
+                content=rx.vstack(
+                    _optional_channel_row(
+                        "Ih (HCN)",
+                        AppState.ih_enabled,
+                        AppState.set_ih_enabled,
+                        AppState.ih_g_max,
+                        AppState.set_ih_g_max,
+                        "ih_g_max",
+                    ),
+                    spacing="2",
+                    width="100%",
+                ),
+                value="optional-channels",
             ),
             collapsible=True,
             variant="ghost",
