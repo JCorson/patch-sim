@@ -21,7 +21,7 @@ def _header() -> rx.Component:
             size="2",
         ),
         rx.spacer(),
-        rx.heading("AP Simulator", size="4"),
+        rx.heading("Action Potential Simulator", size="4"),
         rx.spacer(),
         rx.cond(
             AppState.is_running,
