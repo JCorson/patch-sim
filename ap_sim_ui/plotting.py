@@ -231,9 +231,6 @@ def build_figure(
         if sweep_mode == "Current Clamp":
             if show_voltage:
                 _scatter(t, sweep.voltage, f"{pfx}Voltage (mV)", 1, c)
-            for ch_name, i_vals in sweep.optional_currents.items():
-                if show_optional_currents.get(ch_name, True):
-                    _scatter(t, i_vals, f"{pfx}I_{ch_name}", 1, c)
         else:
             if show_total_current:
                 _scatter(t, sweep.total_current, f"{pfx}Total I", 1, c)
