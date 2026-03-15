@@ -21,6 +21,12 @@ DEFAULT_E_IH: float = -30.0  # Ih reversal potential in mV (mixed Na/K cation)
 DEFAULT_G_IKA: float = 5.0  # A-type K+ maximum conductance in mS/cm²
 DEFAULT_E_IKA: float = -77.0  # A-type K+ reversal potential in mV
 
+DEFAULT_G_NAP: float = 0.5  # Persistent Na+ maximum conductance in mS/cm²
+DEFAULT_E_NAP: float = 60.0  # Persistent Na+ reversal potential in mV
+
+DEFAULT_G_NAR: float = 0.3  # Resurgent Na+ maximum conductance in mS/cm²
+DEFAULT_E_NAR: float = 60.0  # Resurgent Na+ reversal potential in mV
+
 # Calcium dynamics defaults
 DEFAULT_ALPHA_CA: float = 1e-4  # mM / (µA/cm² · ms)
 DEFAULT_TAU_CA: float = 200.0  # ms
