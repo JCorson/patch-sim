@@ -11,7 +11,16 @@ import ap_sim
 from ap_sim.channels import BaseIonChannel, GatingVariable, IonChannel
 from ap_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from ap_sim.hodgkin_huxley import HodgkinHuxley
-from ap_sim.optional_channels import _alpha_r, _beta_r, make_ih_channel
+from ap_sim.optional_channels import (
+    _alpha_a,
+    _alpha_b,
+    _alpha_r,
+    _beta_a,
+    _beta_b,
+    _beta_r,
+    make_ih_channel,
+    make_ika_channel,
+)
 from ap_sim.protocols import step_current, step_voltage
 
 
@@ -322,3 +331,147 @@ def test_public_api_exports():
     assert hasattr(ap_sim, "BaseIonChannel")
     assert hasattr(ap_sim, "IonChannel")
     assert hasattr(ap_sim, "make_ih_channel")
+
+
+# ---------------------------------------------------------------------------
+# IKa rate functions
+# ---------------------------------------------------------------------------
+
+
+def test_ika_gating_variable_steady_state_in_bounds():
+    """IKa gating variables a_inf and b_inf are in [0, 1] for physiological voltages."""
+    for V in np.linspace(-120.0, 0.0, 50):
+        for alpha_fn, beta_fn in ((_alpha_a, _beta_a), (_alpha_b, _beta_b)):
+            a = alpha_fn(V)
+            b = beta_fn(V)
+            assert a >= 0, f"alpha negative at V={V}"
+            assert b >= 0, f"beta negative at V={V}"
+            ss = a / (a + b)
+            assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}"
+
+
+def test_ika_kinetics_activation_increases_with_depolarisation():
+    """IKa a_inf (activation) is higher at depolarised voltages."""
+
+    def a_inf(V: float) -> float:
+        """Activation steady-state at voltage V."""
+        a, b = _alpha_a(V), _beta_a(V)
+        return a / (a + b)
+
+    assert a_inf(-20.0) > a_inf(-65.0) > a_inf(-100.0)
+
+
+def test_ika_kinetics_inactivation_decreases_with_depolarisation():
+    """IKa b_inf (inactivation) is lower at depolarised voltages."""
+
+    def b_inf(V: float) -> float:
+        """Inactivation steady-state at voltage V."""
+        a, b = _alpha_b(V), _beta_b(V)
+        return a / (a + b)
+
+    assert b_inf(-100.0) > b_inf(-65.0) > b_inf(-20.0)
+
+
+# ---------------------------------------------------------------------------
+# make_ika_channel
+# ---------------------------------------------------------------------------
+
+
+def test_make_ika_channel_defaults():
+    """make_ika_channel() produces a channel with the expected defaults."""
+    from ap_sim.constants import DEFAULT_E_IKA, DEFAULT_G_IKA
+
+    ch = make_ika_channel()
+    assert ch.name == "IKa"
+    assert ch.g_max == pytest.approx(DEFAULT_G_IKA)
+    assert ch.e_rev == pytest.approx(DEFAULT_E_IKA)
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "a"
+    assert ch.gating_variables[0].power == 1
+    assert ch.gating_variables[1].name == "b"
+    assert ch.gating_variables[1].power == 1
+
+
+def test_make_ika_channel_custom_params():
+    """make_ika_channel accepts custom g_max and e_rev."""
+    ch = make_ika_channel(g_max=10.0, e_rev=-80.0)
+    assert ch.g_max == pytest.approx(10.0)
+    assert ch.e_rev == pytest.approx(-80.0)
+
+
+# ---------------------------------------------------------------------------
+# IKa integration tests
+# ---------------------------------------------------------------------------
+
+
+def test_current_clamp_with_ika_extra_columns():
+    """Current clamp with IKa channel adds IKa_current, a, and b columns."""
+    neuron = HodgkinHuxley(optional_channels=(make_ika_channel(),))
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert "IKa_current" in df.columns
+    assert "a" in df.columns
+    assert "b" in df.columns
+
+
+def test_current_clamp_ika_gating_in_bounds():
+    """IKa gating variables a and b stay in [0, 1] during current clamp."""
+    neuron = HodgkinHuxley(optional_channels=(make_ika_channel(),))
+    stim = step_current(
+        duration=30.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=20.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert df["a"].min() >= 0.0
+    assert df["a"].max() <= 1.0
+    assert df["b"].min() >= 0.0
+    assert df["b"].max() <= 1.0
+
+
+def test_voltage_clamp_with_ika_extra_columns():
+    """Voltage clamp with IKa channel adds IKa_current, a, and b columns."""
+    neuron = HodgkinHuxley(optional_channels=(make_ika_channel(),))
+    prot = step_voltage(
+        duration=20.0,
+        voltage_amplitude=0.0,
+        step_start=5.0,
+        step_duration=10.0,
+        holding_voltage=-70.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_voltage_clamp(neuron, prot)
+    assert "IKa_current" in df.columns
+    assert "a" in df.columns
+    assert "b" in df.columns
+
+
+def test_ika_and_ih_coexist():
+    """IKa and Ih channels can coexist and each contributes its columns."""
+    neuron = HodgkinHuxley(optional_channels=(make_ika_channel(), make_ih_channel()))
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert "IKa_current" in df.columns
+    assert "Ih_current" in df.columns
+    assert "a" in df.columns
+    assert "b" in df.columns
+    assert "r" in df.columns
+
+
+def test_public_api_exports_ika():
+    """make_ika_channel is exported from the ap_sim public API."""
+    assert hasattr(ap_sim, "make_ika_channel")

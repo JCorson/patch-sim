@@ -6,7 +6,7 @@ A package for simulating action potentials using the Hodgkin-Huxley model.
 from . import constants
 from .channels import GatingVariable, BaseIonChannel, IonChannel
 from .hodgkin_huxley import HodgkinHuxley
-from .optional_channels import make_ih_channel
+from .optional_channels import make_ih_channel, make_ika_channel
 from .clamp_simulations import simulate_voltage_clamp, simulate_current_clamp
 from .nernst import nernst_potential
 from .protocols import (
@@ -31,6 +31,7 @@ __all__ = [
     "IonChannel",
     "HodgkinHuxley",
     "make_ih_channel",
+    "make_ika_channel",
     "simulate_voltage_clamp",
     "simulate_current_clamp",
     "nernst_potential",
