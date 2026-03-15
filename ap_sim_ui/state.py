@@ -15,6 +15,7 @@ from ap_sim.constants import (
     DEFAULT_CL_IN,
     DEFAULT_CL_OUT,
     DEFAULT_G_IH,
+    DEFAULT_G_IKA,
     DEFAULT_G_K,
     DEFAULT_G_L,
     DEFAULT_G_NA,
@@ -25,7 +26,7 @@ from ap_sim.constants import (
     DEFAULT_T,
     DEFAULT_V_REST,
 )
-from ap_sim.optional_channels import make_ih_channel
+from ap_sim.optional_channels import make_ih_channel, make_ika_channel
 from ap_sim_ui import constants, presets
 from ap_sim_ui.plotting import Sweep, build_figure
 from ap_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
@@ -98,6 +99,7 @@ _FLOAT_FIELDS: list[str] = [
     "vc_interpulse_duration",
     # Optional channel params
     "ih_g_max",
+    "ika_g_max",
 ]
 
 
@@ -114,6 +116,9 @@ _BOOL_FIELDS: list[str] = [
     "ih_enabled",
     "show_ih_current",
     "show_ih_gating",
+    "ika_enabled",
+    "show_ika_current",
+    "show_ika_gating",
 ]
 
 
@@ -174,6 +179,8 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     ih_enabled: bool = False
     ih_g_max: float = DEFAULT_G_IH
+    ika_enabled: bool = False
+    ika_g_max: float = DEFAULT_G_IKA
 
     # ------------------------------------------------------------------ #
     # Experiment mode                                                     #
@@ -249,6 +256,8 @@ class AppState(rx.State):
     show_sodium_inactivation: bool = False
     show_ih_current: bool = True
     show_ih_gating: bool = True
+    show_ika_current: bool = True
+    show_ika_gating: bool = True
 
     # ------------------------------------------------------------------ #
     # UI state                                                           #
@@ -301,8 +310,15 @@ class AppState(rx.State):
             show_sodium_activation=self.show_sodium_activation,
             show_sodium_inactivation=self.show_sodium_inactivation,
             clamp_mode=self.clamp_mode,
-            show_optional_currents={"Ih": self.show_ih_current},
-            show_optional_gating={"r": self.show_ih_gating},
+            show_optional_currents={
+                "Ih": self.show_ih_current,
+                "IKa": self.show_ika_current,
+            },
+            show_optional_gating={
+                "r": self.show_ih_gating,
+                "a": self.show_ika_gating,
+                "b": self.show_ika_gating,
+            },
         )
 
     # ------------------------------------------------------------------ #
@@ -386,6 +402,8 @@ class AppState(rx.State):
             opt_channels = []
             if self.ih_enabled:
                 opt_channels.append(make_ih_channel(g_max=self.ih_g_max))
+            if self.ika_enabled:
+                opt_channels.append(make_ika_channel(g_max=self.ika_g_max))
             neuron = ap_sim.HodgkinHuxley(
                 g_Na=self.g_Na,
                 g_K=self.g_K,
