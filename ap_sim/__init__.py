@@ -4,6 +4,7 @@ A package for simulating action potentials using the Hodgkin-Huxley model.
 """
 
 from . import constants
+from .calcium import CalciumDynamics
 from .channels import GatingVariable, BaseIonChannel, IonChannel
 from .hodgkin_huxley import HodgkinHuxley
 from .optional_channels import make_ih_channel, make_ika_channel
@@ -26,6 +27,7 @@ from .protocols import (
 
 __all__ = [
     "constants",
+    "CalciumDynamics",
     "GatingVariable",
     "BaseIonChannel",
     "IonChannel",

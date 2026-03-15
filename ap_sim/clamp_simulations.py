@@ -130,11 +130,13 @@ def _hh_derivatives(
     h: float,
     opt_state: dict[str, float],
     I_ext: float,
-) -> tuple[float, float, float, float, dict[str, float]]:
+    ca_i: float,
+) -> tuple[float, float, float, float, dict[str, float], float]:
     """Compute HH ODE derivatives for the current-clamp system.
 
     Includes contributions from optional channels in the voltage derivative
-    and returns their gating derivatives as a separate dict.
+    and returns their gating derivatives as a separate dict.  Also computes
+    the Ca2+ concentration derivative when calcium dynamics are active.
 
     Args:
         neuron: The Hodgkin-Huxley neuron model.
@@ -144,10 +146,12 @@ def _hh_derivatives(
         h: Sodium inactivation gating variable.
         opt_state: Optional channel gating state (name → value).
         I_ext: External current in uA/cm^2.
+        ca_i: Current intracellular Ca2+ concentration in mM.
 
     Returns:
-        Tuple of (dV/dt, dn/dt, dm/dt, dh/dt, opt_derivs) where opt_derivs
-        maps each optional gating variable name to its derivative.
+        Tuple of (dV/dt, dn/dt, dm/dt, dh/dt, opt_derivs, dca_i/dt) where
+        opt_derivs maps each optional gating variable name to its derivative
+        and dca_i/dt is 0.0 when no calcium_dynamics are configured.
     """
     I_Na = neuron.g_Na * (m**3) * h * (V - neuron.E_Na)
     I_K = neuron.g_K * (n**4) * (V - neuron.E_K)
@@ -158,7 +162,12 @@ def _hh_derivatives(
     dm = neuron.alpha_m(V) * (1 - m) - neuron.beta_m(V) * m
     dh = neuron.alpha_h(V) * (1 - h) - neuron.beta_h(V) * h
     opt_derivs = _optional_gating_derivatives(neuron, V, opt_state)
-    return dV, dn, dm, dh, opt_derivs
+    if neuron.calcium_dynamics is not None:
+        I_Ca = neuron.calcium_current(V, opt_state)
+        dca_i = neuron.calcium_dynamics.derivative(I_Ca, ca_i)
+    else:
+        dca_i = 0.0
+    return dV, dn, dm, dh, opt_derivs, dca_i
 
 
 def _gating_derivatives(
@@ -168,8 +177,12 @@ def _gating_derivatives(
     m: float,
     h: float,
     opt_state: dict[str, float],
-) -> tuple[float, float, float, dict[str, float]]:
+    ca_i: float,
+) -> tuple[float, float, float, dict[str, float], float]:
     """Compute gating variable derivatives for a prescribed voltage.
+
+    Also computes the Ca2+ concentration derivative when calcium dynamics
+    are active.
 
     Args:
         neuron: The Hodgkin-Huxley neuron model.
@@ -178,16 +191,23 @@ def _gating_derivatives(
         m: Sodium activation gating variable.
         h: Sodium inactivation gating variable.
         opt_state: Optional channel gating state (name → value).
+        ca_i: Current intracellular Ca2+ concentration in mM.
 
     Returns:
-        Tuple of (dn/dt, dm/dt, dh/dt, opt_derivs) where opt_derivs maps each
-        optional gating variable name to its derivative.
+        Tuple of (dn/dt, dm/dt, dh/dt, opt_derivs, dca_i/dt) where
+        opt_derivs maps each optional gating variable name to its derivative
+        and dca_i/dt is 0.0 when no calcium_dynamics are configured.
     """
     dn = neuron.alpha_n(V) * (1 - n) - neuron.beta_n(V) * n
     dm = neuron.alpha_m(V) * (1 - m) - neuron.beta_m(V) * m
     dh = neuron.alpha_h(V) * (1 - h) - neuron.beta_h(V) * h
     opt_derivs = _optional_gating_derivatives(neuron, V, opt_state)
-    return dn, dm, dh, opt_derivs
+    if neuron.calcium_dynamics is not None:
+        I_Ca = neuron.calcium_current(V, opt_state)
+        dca_i = neuron.calcium_dynamics.derivative(I_Ca, ca_i)
+    else:
+        dca_i = 0.0
+    return dn, dm, dh, opt_derivs, dca_i
 
 
 def _rk4_step_current_clamp(
@@ -199,7 +219,8 @@ def _rk4_step_current_clamp(
     opt_state: dict[str, float],
     I_ext: float,
     dt: float,
-) -> tuple[float, float, float, float, dict[str, float]]:
+    ca_i: float,
+) -> tuple[float, float, float, float, dict[str, float], float]:
     """Advance the current-clamp state by one RK4 step.
 
     Args:
@@ -211,14 +232,17 @@ def _rk4_step_current_clamp(
         opt_state: Optional channel gating state (name → value).
         I_ext: External current in uA/cm^2, held constant over the step.
         dt: Time step in milliseconds.
+        ca_i: Current intracellular Ca2+ concentration in mM.
 
     Returns:
-        Tuple of updated (V, n, m, h, opt_state) with gating variables clipped
-        to [0, 1].
+        Tuple of updated (V, n, m, h, opt_state, ca_i) with gating variables
+        clipped to [0, 1] and ca_i floored at 0.0.
     """
-    dV1, dn1, dm1, dh1, dopt1 = _hh_derivatives(neuron, V, n, m, h, opt_state, I_ext)
+    dV1, dn1, dm1, dh1, dopt1, dca1 = _hh_derivatives(
+        neuron, V, n, m, h, opt_state, I_ext, ca_i
+    )
     opt2 = _advance_opt_state(opt_state, dopt1, 0.5 * dt)
-    dV2, dn2, dm2, dh2, dopt2 = _hh_derivatives(
+    dV2, dn2, dm2, dh2, dopt2, dca2 = _hh_derivatives(
         neuron,
         V + 0.5 * dt * dV1,
         n + 0.5 * dt * dn1,
@@ -226,9 +250,10 @@ def _rk4_step_current_clamp(
         h + 0.5 * dt * dh1,
         opt2,
         I_ext,
+        ca_i + 0.5 * dt * dca1,
     )
     opt3 = _advance_opt_state(opt_state, dopt2, 0.5 * dt)
-    dV3, dn3, dm3, dh3, dopt3 = _hh_derivatives(
+    dV3, dn3, dm3, dh3, dopt3, dca3 = _hh_derivatives(
         neuron,
         V + 0.5 * dt * dV2,
         n + 0.5 * dt * dn2,
@@ -236,9 +261,10 @@ def _rk4_step_current_clamp(
         h + 0.5 * dt * dh2,
         opt3,
         I_ext,
+        ca_i + 0.5 * dt * dca2,
     )
     opt4 = _advance_opt_state(opt_state, dopt3, dt)
-    dV4, dn4, dm4, dh4, dopt4 = _hh_derivatives(
+    dV4, dn4, dm4, dh4, dopt4, dca4 = _hh_derivatives(
         neuron,
         V + dt * dV3,
         n + dt * dn3,
@@ -246,6 +272,7 @@ def _rk4_step_current_clamp(
         h + dt * dh3,
         opt4,
         I_ext,
+        ca_i + dt * dca3,
     )
     V_new = V + (dt / 6.0) * (dV1 + 2 * dV2 + 2 * dV3 + dV4)
     n_new = float(np.clip(n + (dt / 6.0) * (dn1 + 2 * dn2 + 2 * dn3 + dn4), 0, 1))
@@ -258,7 +285,8 @@ def _rk4_step_current_clamp(
             for k in opt_state
         }
     )
-    return V_new, n_new, m_new, h_new, opt_new
+    ca_new = max(0.0, ca_i + (dt / 6.0) * (dca1 + 2 * dca2 + 2 * dca3 + dca4))
+    return V_new, n_new, m_new, h_new, opt_new, ca_new
 
 
 def _rk4_step_voltage_clamp(
@@ -269,7 +297,8 @@ def _rk4_step_voltage_clamp(
     h: float,
     opt_state: dict[str, float],
     dt: float,
-) -> tuple[float, float, float, dict[str, float]]:
+    ca_i: float,
+) -> tuple[float, float, float, dict[str, float], float]:
     """Advance voltage-clamp gating variables by one RK4 step.
 
     Args:
@@ -280,38 +309,44 @@ def _rk4_step_voltage_clamp(
         h: Sodium inactivation gating variable.
         opt_state: Optional channel gating state (name → value).
         dt: Time step in milliseconds.
+        ca_i: Current intracellular Ca2+ concentration in mM.
 
     Returns:
-        Tuple of updated (n, m, h, opt_state) gating variables clipped to
-        [0, 1].
+        Tuple of updated (n, m, h, opt_state, ca_i) with gating variables
+        clipped to [0, 1] and ca_i floored at 0.0.
     """
-    dn1, dm1, dh1, dopt1 = _gating_derivatives(neuron, V, n, m, h, opt_state)
+    dn1, dm1, dh1, dopt1, dca1 = _gating_derivatives(
+        neuron, V, n, m, h, opt_state, ca_i
+    )
     opt2 = _advance_opt_state(opt_state, dopt1, 0.5 * dt)
-    dn2, dm2, dh2, dopt2 = _gating_derivatives(
+    dn2, dm2, dh2, dopt2, dca2 = _gating_derivatives(
         neuron,
         V,
         n + 0.5 * dt * dn1,
         m + 0.5 * dt * dm1,
         h + 0.5 * dt * dh1,
         opt2,
+        ca_i + 0.5 * dt * dca1,
     )
     opt3 = _advance_opt_state(opt_state, dopt2, 0.5 * dt)
-    dn3, dm3, dh3, dopt3 = _gating_derivatives(
+    dn3, dm3, dh3, dopt3, dca3 = _gating_derivatives(
         neuron,
         V,
         n + 0.5 * dt * dn2,
         m + 0.5 * dt * dm2,
         h + 0.5 * dt * dh2,
         opt3,
+        ca_i + 0.5 * dt * dca2,
     )
     opt4 = _advance_opt_state(opt_state, dopt3, dt)
-    dn4, dm4, dh4, dopt4 = _gating_derivatives(
+    dn4, dm4, dh4, dopt4, dca4 = _gating_derivatives(
         neuron,
         V,
         n + dt * dn3,
         m + dt * dm3,
         h + dt * dh3,
         opt4,
+        ca_i + dt * dca3,
     )
     n_new = float(np.clip(n + (dt / 6.0) * (dn1 + 2 * dn2 + 2 * dn3 + dn4), 0, 1))
     m_new = float(np.clip(m + (dt / 6.0) * (dm1 + 2 * dm2 + 2 * dm3 + dm4), 0, 1))
@@ -323,7 +358,8 @@ def _rk4_step_voltage_clamp(
             for k in opt_state
         }
     )
-    return n_new, m_new, h_new, opt_new
+    ca_new = max(0.0, ca_i + (dt / 6.0) * (dca1 + 2 * dca2 + 2 * dca3 + dca4))
+    return n_new, m_new, h_new, opt_new, ca_new
 
 
 def simulate_voltage_clamp(
@@ -344,6 +380,9 @@ def simulate_voltage_clamp(
     columns ``{channel_name}_current`` for each channel and
     ``{gating_var_name}`` for each optional gating variable.
 
+    When the neuron has ``calcium_dynamics`` configured, a ``ca_i`` column
+    containing intracellular Ca2+ concentration in mM is included.
+
     Args:
         neuron: The Hodgkin-Huxley neuron object to simulate.
         voltage_protocol: Voltage values in mV to clamp the membrane at for each
@@ -354,6 +393,7 @@ def simulate_voltage_clamp(
         voltage, total_current, sodium_current, potassium_current, leak_current,
         potassium_activation, sodium_activation, sodium_inactivation.
         Optional channel columns are appended when present.
+        A ca_i column is appended when calcium_dynamics is configured.
     """
     num_time_steps = len(voltage_protocol)
 
@@ -381,6 +421,14 @@ def simulate_voltage_clamp(
         for gv in neuron.all_optional_gating_variables()
     }
 
+    # Pre-allocate calcium array if dynamics are active
+    ca_arr: np.ndarray | None = (
+        np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
+    )
+    ca_i: float = (
+        neuron.calcium_dynamics.ca_rest if neuron.calcium_dynamics is not None else 0.0
+    )
+
     # Initialise gating variables at steady state for the first voltage
     n_arr[0], m_arr[0], h_arr[0], opt_state = _initialize_gating_variables(
         neuron, voltage_protocol[0]
@@ -389,6 +437,9 @@ def simulate_voltage_clamp(
     # Record initial optional gating state
     for gv_name, val in opt_state.items():
         opt_gating_arrs[gv_name][0] = val
+
+    if ca_arr is not None:
+        ca_arr[0] = ca_i
 
     # Compute initial currents
     V0 = voltage_protocol[0]
@@ -411,13 +462,16 @@ def simulate_voltage_clamp(
         V = voltage_protocol[i]
         n_prev, m_prev, h_prev = n_arr[i - 1], m_arr[i - 1], h_arr[i - 1]
 
-        n, m, h, opt_state = _rk4_step_voltage_clamp(
-            neuron, V, n_prev, m_prev, h_prev, opt_state, time_step
+        n, m, h, opt_state, ca_i = _rk4_step_voltage_clamp(
+            neuron, V, n_prev, m_prev, h_prev, opt_state, time_step, ca_i
         )
         n_arr[i], m_arr[i], h_arr[i] = n, m, h
 
         for gv_name, val in opt_state.items():
             opt_gating_arrs[gv_name][i] = val
+
+        if ca_arr is not None:
+            ca_arr[i] = ca_i
 
         g_Na = neuron.g_Na * (m**3) * h
         g_K = neuron.g_K * (n**4)
@@ -447,6 +501,8 @@ def simulate_voltage_clamp(
         data[f"{ch.name}_current"] = opt_ch_currents[ch.name]
     for gv_name, arr in opt_gating_arrs.items():
         data[gv_name] = arr
+    if ca_arr is not None:
+        data["ca_i"] = ca_arr
 
     results = pd.DataFrame(data, index=time_array)
     results.index.name = "time"
@@ -471,6 +527,9 @@ def simulate_current_clamp(
     columns ``{channel_name}_current`` for each channel and
     ``{gating_var_name}`` for each optional gating variable.
 
+    When the neuron has ``calcium_dynamics`` configured, a ``ca_i`` column
+    containing intracellular Ca2+ concentration in mM is included.
+
     Args:
         neuron: The Hodgkin-Huxley neuron object to simulate.
         current_external: External current in uA/cm^2 for a time-varying current
@@ -480,6 +539,7 @@ def simulate_current_clamp(
         DataFrame indexed by time in milliseconds (named 'time'), with columns:
         voltage, potassium_activation, sodium_activation, sodium_inactivation.
         Optional channel columns are appended when present.
+        A ca_i column is appended when calcium_dynamics is configured.
     """
     num_time_steps = len(current_external)
 
@@ -503,6 +563,14 @@ def simulate_current_clamp(
         for gv in neuron.all_optional_gating_variables()
     }
 
+    # Pre-allocate calcium array if dynamics are active
+    ca_arr: np.ndarray | None = (
+        np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
+    )
+    ca_i: float = (
+        neuron.calcium_dynamics.ca_rest if neuron.calcium_dynamics is not None else 0.0
+    )
+
     # Initialise gating variables at steady state for resting potential
     V_arr[0] = neuron.v_rest
     n_arr[0], m_arr[0], h_arr[0], opt_state = _initialize_gating_variables(
@@ -513,19 +581,24 @@ def simulate_current_clamp(
     for gv_name, val in opt_state.items():
         opt_gating_arrs[gv_name][0] = val
 
+    if ca_arr is not None:
+        ca_arr[0] = ca_i
+
     # Main simulation loop — all state in plain numpy scalars
     for i in range(1, num_time_steps):
         V = V_arr[i - 1]
         n, m, h = n_arr[i - 1], m_arr[i - 1], h_arr[i - 1]
 
-        V_new, n_new, m_new, h_new, opt_state = _rk4_step_current_clamp(
-            neuron, V, n, m, h, opt_state, current_external[i - 1], time_step
+        V_new, n_new, m_new, h_new, opt_state, ca_i = _rk4_step_current_clamp(
+            neuron, V, n, m, h, opt_state, current_external[i - 1], time_step, ca_i
         )
 
         V_arr[i] = V_new
         n_arr[i], m_arr[i], h_arr[i] = n_new, m_new, h_new
         for gv_name, val in opt_state.items():
             opt_gating_arrs[gv_name][i] = val
+        if ca_arr is not None:
+            ca_arr[i] = ca_i
 
     # Compute optional channel currents over the recorded voltage trace
     for i in range(num_time_steps):
@@ -546,6 +619,8 @@ def simulate_current_clamp(
         data[f"{ch.name}_current"] = opt_ch_currents[ch.name]
     for gv_name, arr in opt_gating_arrs.items():
         data[gv_name] = arr
+    if ca_arr is not None:
+        data["ca_i"] = ca_arr
 
     results = pd.DataFrame(data, index=time_array)
     results.index.name = "time"
