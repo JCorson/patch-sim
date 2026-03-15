@@ -6,6 +6,7 @@ The model includes equations for ion channel dynamics and membrane voltage.
 from dataclasses import dataclass, field
 from functools import cached_property
 
+from .calcium import CalciumDynamics
 from .channels import GatingVariable, IonChannel
 from .constants import (
     DEFAULT_C_M,
@@ -82,6 +83,9 @@ class HodgkinHuxley:
     # Optional extra channels — empty by default so existing code is unaffected
     optional_channels: tuple[IonChannel, ...] = field(default_factory=tuple)
 
+    # Calcium dynamics — None by default for backward compatibility
+    calcium_dynamics: CalciumDynamics | None = None
+
     def __post_init__(self) -> None:
         """Validate parameter values on construction."""
         if self.g_Na < 0:
@@ -126,6 +130,26 @@ class HodgkinHuxley:
         for ch in self.optional_channels:
             result.extend(ch.gating_variables)
         return result
+
+    def calcium_current(self, V: float, opt_state: dict[str, float]) -> float:
+        """Return the total current from all calcium-carrying optional channels.
+
+        Sums the current from every optional channel that has
+        ``carries_calcium=True``.  Used by the Ca2+ ODE to determine how
+        much intracellular Ca2+ is entering the cell each time step.
+
+        Args:
+            V: Membrane voltage in mV.
+            opt_state: Optional channel gating state (name → value).
+
+        Returns:
+            Total calcium current in µA/cm² (positive = outward).
+        """
+        return sum(
+            ch.compute_current(V, opt_state)
+            for ch in self.optional_channels
+            if ch.carries_calcium
+        )
 
     # Reversal potentials — derived from ion concentrations via the Nernst
     # equation.  Using @cached_property avoids the object.__setattr__ hack
