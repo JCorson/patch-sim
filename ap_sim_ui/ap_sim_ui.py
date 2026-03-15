@@ -93,6 +93,8 @@ def _main_content() -> rx.Component:
             padding="4",
             width="100%",
             flex="1",
+            min_height="0",
+            overflow="hidden",
         ),
         rx.box(
             sweep_manager(),
