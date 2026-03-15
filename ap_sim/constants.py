@@ -21,6 +21,11 @@ DEFAULT_E_IH: float = -30.0  # Ih reversal potential in mV (mixed Na/K cation)
 DEFAULT_G_IKA: float = 5.0  # A-type K+ maximum conductance in mS/cm²
 DEFAULT_E_IKA: float = -77.0  # A-type K+ reversal potential in mV
 
+# Calcium dynamics defaults
+DEFAULT_ALPHA_CA: float = 1e-4  # mM / (µA/cm² · ms)
+DEFAULT_TAU_CA: float = 200.0  # ms
+DEFAULT_CA_REST: float = 1e-4  # mM
+
 DEFAULT_NEURON_PARAMS: dict[str, float] = {
     "g_Na": DEFAULT_G_NA,
     "g_K": DEFAULT_G_K,
