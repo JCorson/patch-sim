@@ -1,9 +1,10 @@
 """Tests for intracellular Ca2+ dynamics (issue #44).
 
 Covers CalciumDynamics ODE correctness, validation, backward compatibility,
-simulation integration, and the carries_calcium channel flag.
+simulation integration, and the CalciumIonChannel marker class.
 """
 
+from dataclasses import dataclass
 from typing import cast
 
 import numpy as np
@@ -11,10 +12,36 @@ import pytest
 
 import ap_sim
 from ap_sim.calcium import CalciumDynamics
-from ap_sim.channels import BaseIonChannel, GatingVariable, IonChannel
+from ap_sim.channels import (
+    BaseIonChannel,
+    CalciumIonChannel,
+    GatingVariable,
+    IonChannel,
+)
 from ap_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from ap_sim.hodgkin_huxley import HodgkinHuxley
 from ap_sim.protocols import step_current, step_voltage
+
+
+# ---------------------------------------------------------------------------
+# Minimal calcium channel for use in tests.
+# Inherits BaseIonChannel for the channel mechanics and CalciumIonChannel
+# as a marker so that isinstance(ch, CalciumIonChannel) returns True.
+# ---------------------------------------------------------------------------
+
+_CA_GATE = GatingVariable(
+    name="ca_gate",
+    power=1,
+    alpha=lambda V: 0.1,
+    beta=lambda V: 0.1,
+)
+
+
+@dataclass(frozen=True)
+class _MockCalciumChannel(BaseIonChannel, CalciumIonChannel):
+    """Minimal Ca2+-carrying channel for testing."""
+
+    ...
 
 
 # ---------------------------------------------------------------------------
@@ -97,24 +124,23 @@ def test_validation_ca_rest_zero_is_valid() -> None:
 
 
 # ---------------------------------------------------------------------------
-# carries_calcium default
+# CalciumIonChannel marker
 # ---------------------------------------------------------------------------
 
 
-def test_carries_calcium_defaults_false() -> None:
-    """BaseIonChannel.carries_calcium defaults to False."""
-
-    def _alpha(V: float) -> float:
-        """Constant alpha."""
-        return 0.01
-
-    def _beta(V: float) -> float:
-        """Constant beta."""
-        return 0.01
-
-    gv = GatingVariable(name="x", power=1, alpha=_alpha, beta=_beta)
+def test_base_ion_channel_is_not_calcium_ion_channel() -> None:
+    """A plain BaseIonChannel is not an instance of CalciumIonChannel."""
+    gv = GatingVariable(name="x", power=1, alpha=lambda V: 0.01, beta=lambda V: 0.01)
     ch = BaseIonChannel(name="test_ch", g_max=1.0, gating_variables=(gv,), e_rev=-70.0)
-    assert ch.carries_calcium is False
+    assert not isinstance(ch, CalciumIonChannel)
+
+
+def test_mock_calcium_channel_is_calcium_ion_channel() -> None:
+    """A channel inheriting CalciumIonChannel is identified correctly."""
+    ch = _MockCalciumChannel(
+        name="mock_ca", g_max=1.0, gating_variables=(_CA_GATE,), e_rev=120.0
+    )
+    assert isinstance(ch, CalciumIonChannel)
 
 
 # ---------------------------------------------------------------------------
@@ -184,35 +210,16 @@ def test_voltage_clamp_ca_stays_at_rest_no_calcium_channels() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Mock calcium channel: ca_i column exists and varies
+# CalciumIonChannel in simulations: ca_i column exists and varies
 # ---------------------------------------------------------------------------
-
-
-def _make_mock_calcium_channel() -> BaseIonChannel:
-    """Create a minimal calcium-carrying channel for testing."""
-
-    def _alpha(V: float) -> float:
-        """Constant opening rate."""
-        return 0.1
-
-    def _beta(V: float) -> float:
-        """Constant closing rate."""
-        return 0.1
-
-    gv = GatingVariable(name="ca_gate", power=1, alpha=_alpha, beta=_beta)
-    return BaseIonChannel(
-        name="mock_ca",
-        g_max=1.0,
-        gating_variables=(gv,),
-        e_rev=120.0,  # strong inward drive at resting potential
-        carries_calcium=True,
-    )
 
 
 def test_current_clamp_ca_varies_with_calcium_channel() -> None:
     """ca_i column is present and changes from ca_rest when a Ca2+ channel exists."""
     cd = CalciumDynamics(alpha_ca=1e-3, tau_ca=500.0, ca_rest=1e-4)
-    ch = _make_mock_calcium_channel()
+    ch = _MockCalciumChannel(
+        name="mock_ca", g_max=1.0, gating_variables=(_CA_GATE,), e_rev=120.0
+    )
     neuron = HodgkinHuxley(
         calcium_dynamics=cd,
         optional_channels=cast(tuple[IonChannel, ...], (ch,)),
@@ -232,7 +239,9 @@ def test_current_clamp_ca_varies_with_calcium_channel() -> None:
 def test_voltage_clamp_ca_varies_with_calcium_channel() -> None:
     """ca_i column is present and changes from ca_rest in voltage clamp."""
     cd = CalciumDynamics(alpha_ca=1e-3, tau_ca=500.0, ca_rest=1e-4)
-    ch = _make_mock_calcium_channel()
+    ch = _MockCalciumChannel(
+        name="mock_ca", g_max=1.0, gating_variables=(_CA_GATE,), e_rev=120.0
+    )
     neuron = HodgkinHuxley(
         calcium_dynamics=cd,
         optional_channels=cast(tuple[IonChannel, ...], (ch,)),
@@ -257,7 +266,9 @@ def test_voltage_clamp_ca_varies_with_calcium_channel() -> None:
 def test_ca_i_stays_non_negative_current_clamp() -> None:
     """ca_i is never negative throughout a current-clamp simulation."""
     cd = CalciumDynamics(alpha_ca=1.0, tau_ca=1.0, ca_rest=0.0)
-    ch = _make_mock_calcium_channel()
+    ch = _MockCalciumChannel(
+        name="mock_ca", g_max=1.0, gating_variables=(_CA_GATE,), e_rev=120.0
+    )
     neuron = HodgkinHuxley(
         calcium_dynamics=cd,
         optional_channels=cast(tuple[IonChannel, ...], (ch,)),
@@ -275,7 +286,9 @@ def test_ca_i_stays_non_negative_current_clamp() -> None:
 def test_ca_i_stays_non_negative_voltage_clamp() -> None:
     """ca_i is never negative throughout a voltage-clamp simulation."""
     cd = CalciumDynamics(alpha_ca=1.0, tau_ca=1.0, ca_rest=0.0)
-    ch = _make_mock_calcium_channel()
+    ch = _MockCalciumChannel(
+        name="mock_ca", g_max=1.0, gating_variables=(_CA_GATE,), e_rev=120.0
+    )
     neuron = HodgkinHuxley(
         calcium_dynamics=cd,
         optional_channels=cast(tuple[IonChannel, ...], (ch,)),

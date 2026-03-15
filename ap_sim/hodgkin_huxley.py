@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 
 from .calcium import CalciumDynamics
-from .channels import GatingVariable, IonChannel
+from .channels import CalciumIonChannel, GatingVariable, IonChannel
 from .constants import (
     DEFAULT_C_M,
     DEFAULT_CL_IN,
@@ -148,7 +148,7 @@ class HodgkinHuxley:
         return sum(
             ch.compute_current(V, opt_state)
             for ch in self.optional_channels
-            if ch.carries_calcium
+            if isinstance(ch, CalciumIonChannel)
         )
 
     # Reversal potentials — derived from ion concentrations via the Nernst

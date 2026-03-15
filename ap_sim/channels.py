@@ -4,6 +4,7 @@ Provides the building blocks for defining optional ion channels that can be
 added on top of the classic Na, K, and leak channels.
 """
 
+from abc import ABC
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol, runtime_checkable
 
@@ -36,14 +37,11 @@ class IonChannel(Protocol):
         name: Human-readable channel identifier (e.g. 'Ih').
         g_max: Maximum conductance in mS/cm².
         gating_variables: Tuple of GatingVariable descriptors.
-        carries_calcium: True if this channel carries Ca2+ ions, so its
-            current contributes to intracellular Ca2+ dynamics.
     """
 
     name: str
     g_max: float
     gating_variables: tuple[GatingVariable, ...]
-    carries_calcium: bool
 
     def reversal_potential(self, neuron: Any) -> float:
         """Return the reversal potential for this channel in mV.
@@ -70,6 +68,18 @@ class IonChannel(Protocol):
         ...
 
 
+class CalciumIonChannel(ABC):
+    """Marker base class for ion channels that carry Ca2+ ions.
+
+    A calcium channel declares itself by inheriting from this class alongside
+    its channel base (e.g. ``class ICaL(BaseIonChannel, CalciumIonChannel)``).
+    ``isinstance(ch, CalciumIonChannel)`` then correctly identifies only those
+    channels, without requiring a flag field on every non-calcium channel.
+    """
+
+    ...
+
+
 @dataclass(frozen=True)
 class BaseIonChannel:
     """Generic ion channel with a fixed reversal potential.
@@ -84,8 +94,6 @@ class BaseIonChannel:
         g_max: Maximum conductance in mS/cm².
         gating_variables: Tuple of GatingVariable descriptors.
         e_rev: Fixed reversal potential in mV.
-        carries_calcium: True if this channel carries Ca2+ ions, so its
-            current contributes to intracellular Ca2+ dynamics.
 
     Raises:
         ValueError: If ``g_max`` is negative or if gating variable names are
@@ -96,7 +104,6 @@ class BaseIonChannel:
     g_max: float
     gating_variables: tuple[GatingVariable, ...]
     e_rev: float
-    carries_calcium: bool = False
 
     def __post_init__(self) -> None:
         """Validate channel parameters on construction."""
