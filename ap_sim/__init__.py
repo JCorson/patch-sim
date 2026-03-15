@@ -7,7 +7,12 @@ from . import constants
 from .calcium import CalciumDynamics
 from .channels import GatingVariable, BaseIonChannel, CalciumIonChannel, IonChannel
 from .hodgkin_huxley import HodgkinHuxley
-from .optional_channels import make_ih_channel, make_ika_channel
+from .optional_channels import (
+    make_ih_channel,
+    make_ika_channel,
+    make_inap_channel,
+    make_inar_channel,
+)
 from .clamp_simulations import simulate_voltage_clamp, simulate_current_clamp
 from .nernst import nernst_potential
 from .protocols import (
@@ -35,6 +40,8 @@ __all__ = [
     "HodgkinHuxley",
     "make_ih_channel",
     "make_ika_channel",
+    "make_inap_channel",
+    "make_inar_channel",
     "simulate_voltage_clamp",
     "simulate_current_clamp",
     "nernst_potential",

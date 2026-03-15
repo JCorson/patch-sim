@@ -14,12 +14,20 @@ from ap_sim.hodgkin_huxley import HodgkinHuxley
 from ap_sim.optional_channels import (
     _alpha_a,
     _alpha_b,
+    _alpha_hr,
+    _alpha_p,
     _alpha_r,
+    _alpha_s,
     _beta_a,
     _beta_b,
+    _beta_hr,
+    _beta_p,
     _beta_r,
+    _beta_s,
     make_ih_channel,
     make_ika_channel,
+    make_inar_channel,
+    make_inap_channel,
 )
 from ap_sim.protocols import step_current, step_voltage
 
@@ -475,3 +483,313 @@ def test_ika_and_ih_coexist():
 def test_public_api_exports_ika():
     """make_ika_channel is exported from the ap_sim public API."""
     assert hasattr(ap_sim, "make_ika_channel")
+
+
+# ---------------------------------------------------------------------------
+# INaP rate functions
+# ---------------------------------------------------------------------------
+
+
+def test_inap_gating_variable_steady_state_in_bounds():
+    """INaP gating variable p_inf is in [0, 1] for physiological voltages."""
+    for V in np.linspace(-120.0, 0.0, 50):
+        a = _alpha_p(V)
+        b = _beta_p(V)
+        assert a >= 0, f"alpha_p negative at V={V}"
+        assert b >= 0, f"beta_p negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}"
+
+
+def test_inap_activation_increases_with_depolarisation():
+    """INaP p_inf (activation) is higher at depolarised voltages."""
+
+    def p_inf(V: float) -> float:
+        """Activation steady-state at voltage V."""
+        a, b = _alpha_p(V), _beta_p(V)
+        return a / (a + b)
+
+    assert p_inf(-20.0) > p_inf(-53.0) > p_inf(-100.0)
+
+
+def test_inap_subthreshold_activation():
+    """INaP p_inf is substantially activated below spike threshold (-52.6 mV half)."""
+
+    def p_inf(V: float) -> float:
+        """Activation steady-state at voltage V."""
+        a, b = _alpha_p(V), _beta_p(V)
+        return a / (a + b)
+
+    # At half-activation voltage p_inf should be ~0.5
+    assert p_inf(-52.6) == pytest.approx(0.5, abs=0.01)
+    # Subthreshold range (-55 to -40 mV) should have partial activation
+    assert 0.0 < p_inf(-55.0) < 0.5
+    assert 0.5 < p_inf(-40.0) < 1.0
+
+
+# ---------------------------------------------------------------------------
+# make_inap_channel
+# ---------------------------------------------------------------------------
+
+
+def test_make_inap_channel_defaults():
+    """make_inap_channel() produces a channel with the expected defaults."""
+    from ap_sim.constants import DEFAULT_E_NAP, DEFAULT_G_NAP
+
+    ch = make_inap_channel()
+    assert ch.name == "INaP"
+    assert ch.g_max == pytest.approx(DEFAULT_G_NAP)
+    assert ch.e_rev == pytest.approx(DEFAULT_E_NAP)
+    assert len(ch.gating_variables) == 1
+    assert ch.gating_variables[0].name == "p"
+    assert ch.gating_variables[0].power == 1
+
+
+def test_make_inap_channel_custom_params():
+    """make_inap_channel accepts custom g_max and e_rev."""
+    ch = make_inap_channel(g_max=1.0, e_rev=55.0)
+    assert ch.g_max == pytest.approx(1.0)
+    assert ch.e_rev == pytest.approx(55.0)
+
+
+# ---------------------------------------------------------------------------
+# INaP integration tests
+# ---------------------------------------------------------------------------
+
+
+def test_current_clamp_with_inap_extra_columns():
+    """Current clamp with INaP channel adds INaP_current and p columns."""
+    neuron = HodgkinHuxley(optional_channels=(make_inap_channel(),))
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert "INaP_current" in df.columns
+    assert "p" in df.columns
+
+
+def test_voltage_clamp_with_inap_extra_columns():
+    """Voltage clamp with INaP channel adds INaP_current and p columns."""
+    neuron = HodgkinHuxley(optional_channels=(make_inap_channel(),))
+    prot = step_voltage(
+        duration=20.0,
+        voltage_amplitude=0.0,
+        step_start=5.0,
+        step_duration=10.0,
+        holding_voltage=-70.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_voltage_clamp(neuron, prot)
+    assert "INaP_current" in df.columns
+    assert "p" in df.columns
+
+
+def test_current_clamp_inap_gating_in_bounds():
+    """INaP gating variable p stays in [0, 1] during current clamp."""
+    neuron = HodgkinHuxley(optional_channels=(make_inap_channel(),))
+    stim = step_current(
+        duration=30.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=20.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert df["p"].min() >= 0.0
+    assert df["p"].max() <= 1.0
+
+
+def test_public_api_exports_inap():
+    """make_inap_channel is exported from the ap_sim public API."""
+    assert hasattr(ap_sim, "make_inap_channel")
+
+
+# ---------------------------------------------------------------------------
+# INaR rate functions
+# ---------------------------------------------------------------------------
+
+
+def test_inar_s_gating_steady_state_in_bounds():
+    """INaR activation variable s_inf is in [0, 1] for physiological voltages."""
+    for V in np.linspace(-120.0, 0.0, 50):
+        a = _alpha_s(V)
+        b = _beta_s(V)
+        assert a >= 0, f"alpha_s negative at V={V}"
+        assert b >= 0, f"beta_s negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"s steady state {ss} out of [0,1] at V={V}"
+
+
+def test_inar_hr_gating_steady_state_in_bounds():
+    """INaR unblocking variable hr_inf is in [0, 1] for physiological voltages."""
+    for V in np.linspace(-120.0, 0.0, 50):
+        a = _alpha_hr(V)
+        b = _beta_hr(V)
+        assert a >= 0, f"alpha_hr negative at V={V}"
+        assert b >= 0, f"beta_hr negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"hr steady state {ss} out of [0,1] at V={V}"
+
+
+def test_inar_activation_increases_with_depolarisation():
+    """INaR s_inf (activation) is higher at depolarised voltages."""
+
+    def s_inf(V: float) -> float:
+        """Activation steady-state at voltage V."""
+        a, b = _alpha_s(V), _beta_s(V)
+        return a / (a + b)
+
+    assert s_inf(-20.0) > s_inf(-42.0) > s_inf(-100.0)
+
+
+def test_inar_unblocking_decreases_with_depolarisation():
+    """INaR hr_inf (unblocking) is lower at depolarised voltages (more blocked)."""
+
+    def hr_inf(V: float) -> float:
+        """Unblocking steady-state at voltage V."""
+        a, b = _alpha_hr(V), _beta_hr(V)
+        return a / (a + b)
+
+    assert hr_inf(-100.0) > hr_inf(-55.0) > hr_inf(-20.0)
+
+
+def test_inar_rates_non_negative():
+    """All four INaR rate functions are non-negative across physiological voltages."""
+    for V in np.linspace(-120.0, 60.0, 100):
+        assert _alpha_s(V) >= 0, f"alpha_s negative at V={V}"
+        assert _beta_s(V) >= 0, f"beta_s negative at V={V}"
+        assert _alpha_hr(V) >= 0, f"alpha_hr negative at V={V}"
+        assert _beta_hr(V) >= 0, f"beta_hr negative at V={V}"
+
+
+# ---------------------------------------------------------------------------
+# make_inar_channel
+# ---------------------------------------------------------------------------
+
+
+def test_make_inar_channel_defaults():
+    """make_inar_channel() produces a channel with the expected defaults."""
+    from ap_sim.constants import DEFAULT_E_NAR, DEFAULT_G_NAR
+
+    ch = make_inar_channel()
+    assert ch.name == "INaR"
+    assert ch.g_max == pytest.approx(DEFAULT_G_NAR)
+    assert ch.e_rev == pytest.approx(DEFAULT_E_NAR)
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "s"
+    assert ch.gating_variables[0].power == 1
+    assert ch.gating_variables[1].name == "hr"
+    assert ch.gating_variables[1].power == 1
+
+
+def test_make_inar_channel_custom_params():
+    """make_inar_channel accepts custom g_max and e_rev."""
+    ch = make_inar_channel(g_max=0.5, e_rev=55.0)
+    assert ch.g_max == pytest.approx(0.5)
+    assert ch.e_rev == pytest.approx(55.0)
+
+
+# ---------------------------------------------------------------------------
+# INaR integration tests
+# ---------------------------------------------------------------------------
+
+
+def test_current_clamp_with_inar_extra_columns():
+    """Current clamp with INaR channel adds INaR_current, s, and hr columns."""
+    neuron = HodgkinHuxley(optional_channels=(make_inar_channel(),))
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert "INaR_current" in df.columns
+    assert "s" in df.columns
+    assert "hr" in df.columns
+
+
+def test_voltage_clamp_with_inar_extra_columns():
+    """Voltage clamp with INaR channel adds INaR_current, s, and hr columns."""
+    neuron = HodgkinHuxley(optional_channels=(make_inar_channel(),))
+    prot = step_voltage(
+        duration=20.0,
+        voltage_amplitude=0.0,
+        step_start=5.0,
+        step_duration=10.0,
+        holding_voltage=-70.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_voltage_clamp(neuron, prot)
+    assert "INaR_current" in df.columns
+    assert "s" in df.columns
+    assert "hr" in df.columns
+
+
+def test_current_clamp_inar_gating_in_bounds():
+    """INaR gating variables s and hr stay in [0, 1] during current clamp."""
+    neuron = HodgkinHuxley(optional_channels=(make_inar_channel(),))
+    stim = step_current(
+        duration=30.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=20.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert df["s"].min() >= 0.0
+    assert df["s"].max() <= 1.0
+    assert df["hr"].min() >= 0.0
+    assert df["hr"].max() <= 1.0
+
+
+def test_inap_and_inar_coexist():
+    """INaP and INaR channels can coexist and each contributes columns."""
+    neuron = HodgkinHuxley(optional_channels=(make_inap_channel(), make_inar_channel()))
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert "INaP_current" in df.columns
+    assert "INaR_current" in df.columns
+    assert "p" in df.columns
+    assert "s" in df.columns
+    assert "hr" in df.columns
+
+
+def test_all_four_optional_channels_coexist():
+    """All four optional channels (Ih, IKa, INaP, INaR) can coexist."""
+    neuron = HodgkinHuxley(
+        optional_channels=(
+            make_ih_channel(),
+            make_ika_channel(),
+            make_inap_channel(),
+            make_inar_channel(),
+        )
+    )
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    for col in ("Ih_current", "IKa_current", "INaP_current", "INaR_current"):
+        assert col in df.columns
+    for gate in ("r", "a", "b", "p", "s", "hr"):
+        assert gate in df.columns
+
+
+def test_public_api_exports_inar():
+    """make_inar_channel is exported from the ap_sim public API."""
+    assert hasattr(ap_sim, "make_inar_channel")
