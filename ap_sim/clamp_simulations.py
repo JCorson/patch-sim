@@ -594,12 +594,15 @@ def simulate_current_clamp(
         neuron, neuron.v_rest, ca_i
     )
 
-    # Record initial additional gating state
+    # Record initial additional gating state and compute initial currents
     for gv_name, val in add_state.items():
         add_gating_arrs[gv_name][0] = val
 
     if ca_arr is not None:
         ca_arr[0] = ca_i
+
+    for ch in neuron.additional_channels:
+        add_ch_currents[ch.name][0] = ch.compute_current(neuron.v_rest, add_state)
 
     # Main simulation loop — all state in plain numpy scalars
     for i in range(1, num_time_steps):
@@ -616,15 +619,8 @@ def simulate_current_clamp(
             add_gating_arrs[gv_name][i] = val
         if ca_arr is not None:
             ca_arr[i] = ca_i
-
-    # Compute additional channel currents over the recorded voltage trace
-    for i in range(num_time_steps):
-        # Rebuild add_state at each step from the recorded arrays
-        step_add: dict[str, float] = {
-            gv_name: float(add_gating_arrs[gv_name][i]) for gv_name in add_gating_arrs
-        }
         for ch in neuron.additional_channels:
-            add_ch_currents[ch.name][i] = ch.compute_current(float(V_arr[i]), step_add)
+            add_ch_currents[ch.name][i] = ch.compute_current(V_new, add_state)
 
     data: dict[str, np.ndarray] = {
         "voltage": V_arr,
