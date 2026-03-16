@@ -854,9 +854,8 @@ def test_im_activation_increases_with_depolarisation():
 
 def test_im_slow_kinetics():
     """IM tau_w is greater than 50 ms near the half-activation voltage (-35 mV)."""
-    from ap_sim.additional_channels import _im_tau
-
-    assert _im_tau(-35.0) > 50.0
+    tau = 1.0 / (_alpha_w(-35.0) + _beta_w(-35.0))
+    assert tau > 50.0
 
 
 # ---------------------------------------------------------------------------
@@ -969,10 +968,9 @@ def test_ikir_activation_increases_with_hyperpolarisation():
 
 def test_ikir_fast_kinetics():
     """IKir tau_kir is at most 10 ms across physiological voltages."""
-    from ap_sim.additional_channels import _ikir_tau
-
     for V in np.linspace(-120.0, 0.0, 50):
-        assert _ikir_tau(V) <= 10.0, f"tau_kir too slow at V={V}"
+        tau = 1.0 / (_alpha_kir(V) + _beta_kir(V))
+        assert tau <= 10.0, f"tau_kir too slow at V={V}"
 
 
 # ---------------------------------------------------------------------------
