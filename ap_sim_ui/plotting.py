@@ -81,9 +81,9 @@ class Sweep(BaseModel):
     ) -> "Sweep":
         """Create a Sweep from a simulation result DataFrame.
 
-        Columns not in the classic set are classified as optional: columns
-        whose name ends with ``_current`` become ``optional_currents``; all
-        other extra columns become ``optional_gating``.
+        Columns not in the classic set are classified as additional: columns
+        whose name ends with ``_current`` become ``additional_currents``; all
+        other extra columns become ``additional_gating``.
 
         Args:
             df: Simulation result DataFrame with time as the index.
@@ -179,7 +179,7 @@ def build_figure(
             visibility flag.  ``None`` means show all.
 
     Returns:
-        A Plotly Figure with response, optional gating, and stimulus subplots.
+        A Plotly Figure with response, additional gating, and stimulus subplots.
     """
     if show_additional_currents is None:
         show_additional_currents = {}
@@ -187,25 +187,25 @@ def build_figure(
         show_additional_gating = {}
 
     # Collect additional keys present in current sweeps.
-    opt_gating_keys: list[str] = []
-    opt_current_keys: list[str] = []
+    add_gating_keys: list[str] = []
+    add_current_keys: list[str] = []
     for sweep in current_sweeps:
         for key in sweep.additional_gating:
-            if key not in opt_gating_keys:
-                opt_gating_keys.append(key)
+            if key not in add_gating_keys:
+                add_gating_keys.append(key)
         for key in sweep.additional_currents:
-            if key not in opt_current_keys:
-                opt_current_keys.append(key)
+            if key not in add_current_keys:
+                add_current_keys.append(key)
 
-    show_any_opt_gating = any(
-        show_additional_gating.get(k, True) for k in opt_gating_keys
+    show_any_add_gating = any(
+        show_additional_gating.get(k, True) for k in add_gating_keys
     )
 
     show_gating = (
         show_potassium_activation
         or show_sodium_activation
         or show_sodium_inactivation
-        or show_any_opt_gating
+        or show_any_add_gating
     )
 
     is_vc = clamp_mode == "Voltage Clamp"
@@ -222,7 +222,7 @@ def build_figure(
             active_currents.append(("potassium_current", "I_K (µA/cm²)"))
         if show_leak_current:
             active_currents.append(("leak_current", "I_L (µA/cm²)"))
-        for ch_name in opt_current_keys:
+        for ch_name in add_current_keys:
             if show_additional_currents.get(ch_name, True):
                 active_currents.append((f"opt:{ch_name}", f"I_{ch_name} (µA/cm²)"))
 

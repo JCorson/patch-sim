@@ -97,7 +97,7 @@ _FLOAT_FIELDS: list[str] = [
     "vc_test_voltage_min",
     "vc_test_voltage_max",
     "vc_interpulse_duration",
-    # Optional channel params
+    # Additional channel params
     "ih_g_max",
     "ika_g_max",
 ]
@@ -112,7 +112,7 @@ _BOOL_FIELDS: list[str] = [
     "show_potassium_activation",
     "show_sodium_activation",
     "show_sodium_inactivation",
-    # Optional channel visibility
+    # Additional channel visibility
     "ih_enabled",
     "show_ih_current",
     "show_ih_gating",
@@ -175,7 +175,7 @@ class AppState(rx.State):
     T: float = DEFAULT_T
 
     # ------------------------------------------------------------------ #
-    # Optional channels                                                   #
+    # Additional channels                                                 #
     # ------------------------------------------------------------------ #
     ih_enabled: bool = False
     ih_g_max: float = DEFAULT_G_IH
@@ -399,11 +399,11 @@ class AppState(rx.State):
             self.error_message = ""
 
         try:
-            opt_channels = []
+            additional_channels = []
             if self.ih_enabled:
-                opt_channels.append(make_ih_channel(g_max=self.ih_g_max))
+                additional_channels.append(make_ih_channel(g_max=self.ih_g_max))
             if self.ika_enabled:
-                opt_channels.append(make_ika_channel(g_max=self.ika_g_max))
+                additional_channels.append(make_ika_channel(g_max=self.ika_g_max))
             neuron = ap_sim.HodgkinHuxley(
                 g_Na=self.g_Na,
                 g_K=self.g_K,
@@ -417,7 +417,7 @@ class AppState(rx.State):
                 Cl_out=self.Cl_out,
                 Cl_in=self.Cl_in,
                 T=self.T,
-                additional_channels=tuple(opt_channels),
+                additional_channels=tuple(additional_channels),
             )
 
             fs = ap_sim.clamp_simulations.SIM_SAMPLING_FREQ
