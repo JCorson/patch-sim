@@ -86,12 +86,23 @@ def boltzmann_cosh_rates(
         tau = tau_scale / (tau_rate * math.cosh((V - half) / cosh_scale))
         return max(tau, tau_floor)
 
+    # Single-slot cache: stores (V, inf_val, tau_val) so that alpha and beta
+    # called with the same V in the same RK4 sub-step share one evaluation.
+    _last: list[tuple[float, float, float]] = [(float("nan"), 0.0, 0.0)]
+
+    def _ensure(V: float) -> None:
+        """Populate _last if V differs from the cached voltage."""
+        if V != _last[0][0]:
+            _last[0] = (V, _inf(V), _tau(V))
+
     def alpha(V: float) -> float:
         """Forward rate alpha = inf(V) / tau(V) in 1/ms."""
-        return _inf(V) / _tau(V)
+        _ensure(V)
+        return _last[0][1] / _last[0][2]
 
     def beta(V: float) -> float:
         """Backward rate beta = (1 - inf(V)) / tau(V) in 1/ms."""
-        return (1.0 - _inf(V)) / _tau(V)
+        _ensure(V)
+        return (1.0 - _last[0][1]) / _last[0][2]
 
     return alpha, beta
