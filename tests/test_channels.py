@@ -1060,7 +1060,7 @@ def test_public_api_exports_ikir():
 
 
 def test_calcium_gating_variable_in_integrator():
-    """A channel with CalciumGatingVariable initialises and runs without error."""
+    """A channel with CalciumGatingVariable initializes and runs without error."""
     cg = CalciumGatingVariable(
         name="q_test",
         power=1,

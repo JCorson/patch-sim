@@ -47,7 +47,7 @@ def _initialize_gating_variables(
 ) -> tuple[float, float, float, dict[str, float]]:
     """Compute steady-state gating variables at a given initial voltage.
 
-    Initialises both the classic HH gating variables (n, m, h) and the
+    Initializes both the classic HH gating variables (n, m, h) and the
     steady-state values for all additional channel gating variables.
     CalciumGatingVariable instances receive both voltage and ca_i.
 
@@ -446,7 +446,7 @@ def simulate_voltage_clamp(
         neuron.calcium_dynamics.ca_rest if neuron.calcium_dynamics is not None else 0.0
     )
 
-    # Initialise gating variables at steady state for the first voltage
+    # Initialize gating variables at steady state for the first voltage
     n_arr[0], m_arr[0], h_arr[0], add_state = _initialize_gating_variables(
         neuron, voltage_protocol[0], ca_i
     )
@@ -588,7 +588,7 @@ def simulate_current_clamp(
         neuron.calcium_dynamics.ca_rest if neuron.calcium_dynamics is not None else 0.0
     )
 
-    # Initialise gating variables at steady state for resting potential
+    # Initialize gating variables at steady state for resting potential
     V_arr[0] = neuron.v_rest
     n_arr[0], m_arr[0], h_arr[0], add_state = _initialize_gating_variables(
         neuron, neuron.v_rest, ca_i
