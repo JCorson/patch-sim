@@ -136,7 +136,7 @@ def _clip_additional_state(add_state: dict[str, float]) -> dict[str, float]:
     Returns:
         New dict with all values clipped to [0, 1].
     """
-    return {k: float(np.clip(v, 0.0, 1.0)) for k, v in add_state.items()}
+    return {k: max(0.0, min(1.0, v)) for k, v in add_state.items()}
 
 
 def _hh_derivatives(
@@ -292,9 +292,9 @@ def _rk4_step_current_clamp(
         ca_i + dt * dca3,
     )
     V_new = V + (dt / 6.0) * (dV1 + 2 * dV2 + 2 * dV3 + dV4)
-    n_new = float(np.clip(n + (dt / 6.0) * (dn1 + 2 * dn2 + 2 * dn3 + dn4), 0, 1))
-    m_new = float(np.clip(m + (dt / 6.0) * (dm1 + 2 * dm2 + 2 * dm3 + dm4), 0, 1))
-    h_new = float(np.clip(h + (dt / 6.0) * (dh1 + 2 * dh2 + 2 * dh3 + dh4), 0, 1))
+    n_new = max(0.0, min(1.0, n + (dt / 6.0) * (dn1 + 2 * dn2 + 2 * dn3 + dn4)))
+    m_new = max(0.0, min(1.0, m + (dt / 6.0) * (dm1 + 2 * dm2 + 2 * dm3 + dm4)))
+    h_new = max(0.0, min(1.0, h + (dt / 6.0) * (dh1 + 2 * dh2 + 2 * dh3 + dh4)))
     add_new = _clip_additional_state(
         {
             k: add_state[k]
@@ -365,9 +365,9 @@ def _rk4_step_voltage_clamp(
         add4,
         ca_i + dt * dca3,
     )
-    n_new = float(np.clip(n + (dt / 6.0) * (dn1 + 2 * dn2 + 2 * dn3 + dn4), 0, 1))
-    m_new = float(np.clip(m + (dt / 6.0) * (dm1 + 2 * dm2 + 2 * dm3 + dm4), 0, 1))
-    h_new = float(np.clip(h + (dt / 6.0) * (dh1 + 2 * dh2 + 2 * dh3 + dh4), 0, 1))
+    n_new = max(0.0, min(1.0, n + (dt / 6.0) * (dn1 + 2 * dn2 + 2 * dn3 + dn4)))
+    m_new = max(0.0, min(1.0, m + (dt / 6.0) * (dm1 + 2 * dm2 + 2 * dm3 + dm4)))
+    h_new = max(0.0, min(1.0, h + (dt / 6.0) * (dh1 + 2 * dh2 + 2 * dh3 + dh4)))
     add_new = _clip_additional_state(
         {
             k: add_state[k]
