@@ -14,11 +14,19 @@ from ap_sim.constants import (
     DEFAULT_C_M,
     DEFAULT_CL_IN,
     DEFAULT_CL_OUT,
+    DEFAULT_G_ICAN,
+    DEFAULT_G_ICAL,
+    DEFAULT_G_ICAT,
     DEFAULT_G_IH,
     DEFAULT_G_IKA,
+    DEFAULT_G_IKCA,
+    DEFAULT_G_IKIR,
+    DEFAULT_G_IM,
     DEFAULT_G_K,
     DEFAULT_G_L,
     DEFAULT_G_NA,
+    DEFAULT_G_NAP,
+    DEFAULT_G_NAR,
     DEFAULT_K_IN,
     DEFAULT_K_OUT,
     DEFAULT_NA_IN,
@@ -26,7 +34,18 @@ from ap_sim.constants import (
     DEFAULT_T,
     DEFAULT_V_REST,
 )
-from ap_sim.additional_channels import make_ih_channel, make_ika_channel
+from ap_sim.additional_channels import (
+    make_ican_channel,
+    make_ical_channel,
+    make_icat_channel,
+    make_ih_channel,
+    make_ika_channel,
+    make_ikca_channel,
+    make_ikir_channel,
+    make_im_channel,
+    make_inap_channel,
+    make_inar_channel,
+)
 from ap_sim_ui import constants, presets
 from ap_sim_ui.plotting import Sweep, build_figure
 from ap_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
@@ -100,6 +119,14 @@ _FLOAT_FIELDS: list[str] = [
     # Additional channel params
     "ih_g_max",
     "ika_g_max",
+    "inap_g_max",
+    "inar_g_max",
+    "im_g_max",
+    "ikir_g_max",
+    "ikca_g_max",
+    "ical_g_max",
+    "icat_g_max",
+    "ican_g_max",
 ]
 
 
@@ -119,6 +146,30 @@ _BOOL_FIELDS: list[str] = [
     "ika_enabled",
     "show_ika_current",
     "show_ika_gating",
+    "inap_enabled",
+    "show_inap_current",
+    "show_inap_gating",
+    "inar_enabled",
+    "show_inar_current",
+    "show_inar_gating",
+    "im_enabled",
+    "show_im_current",
+    "show_im_gating",
+    "ikir_enabled",
+    "show_ikir_current",
+    "show_ikir_gating",
+    "ikca_enabled",
+    "show_ikca_current",
+    "show_ikca_gating",
+    "ical_enabled",
+    "show_ical_current",
+    "show_ical_gating",
+    "icat_enabled",
+    "show_icat_current",
+    "show_icat_gating",
+    "ican_enabled",
+    "show_ican_current",
+    "show_ican_gating",
 ]
 
 
@@ -181,6 +232,22 @@ class AppState(rx.State):
     ih_g_max: float = DEFAULT_G_IH
     ika_enabled: bool = False
     ika_g_max: float = DEFAULT_G_IKA
+    inap_enabled: bool = False
+    inap_g_max: float = DEFAULT_G_NAP
+    inar_enabled: bool = False
+    inar_g_max: float = DEFAULT_G_NAR
+    im_enabled: bool = False
+    im_g_max: float = DEFAULT_G_IM
+    ikir_enabled: bool = False
+    ikir_g_max: float = DEFAULT_G_IKIR
+    ikca_enabled: bool = False
+    ikca_g_max: float = DEFAULT_G_IKCA
+    ical_enabled: bool = False
+    ical_g_max: float = DEFAULT_G_ICAL
+    icat_enabled: bool = False
+    icat_g_max: float = DEFAULT_G_ICAT
+    ican_enabled: bool = False
+    ican_g_max: float = DEFAULT_G_ICAN
 
     # ------------------------------------------------------------------ #
     # Experiment mode                                                     #
@@ -258,6 +325,22 @@ class AppState(rx.State):
     show_ih_gating: bool = True
     show_ika_current: bool = True
     show_ika_gating: bool = True
+    show_inap_current: bool = True
+    show_inap_gating: bool = True
+    show_inar_current: bool = True
+    show_inar_gating: bool = True
+    show_im_current: bool = True
+    show_im_gating: bool = True
+    show_ikir_current: bool = True
+    show_ikir_gating: bool = True
+    show_ikca_current: bool = True
+    show_ikca_gating: bool = True
+    show_ical_current: bool = True
+    show_ical_gating: bool = True
+    show_icat_current: bool = True
+    show_icat_gating: bool = True
+    show_ican_current: bool = True
+    show_ican_gating: bool = True
 
     # ------------------------------------------------------------------ #
     # UI state                                                           #
@@ -313,11 +396,31 @@ class AppState(rx.State):
             show_additional_currents={
                 "Ih": self.show_ih_current,
                 "IKa": self.show_ika_current,
+                "INaP": self.show_inap_current,
+                "INaR": self.show_inar_current,
+                "IM": self.show_im_current,
+                "IKir": self.show_ikir_current,
+                "IKCa": self.show_ikca_current,
+                "ICaL": self.show_ical_current,
+                "ICaT": self.show_icat_current,
+                "ICaN": self.show_ican_current,
             },
             show_additional_gating={
                 "r": self.show_ih_gating,
                 "a": self.show_ika_gating,
                 "b": self.show_ika_gating,
+                "p": self.show_inap_gating,
+                "s": self.show_inar_gating,
+                "hr": self.show_inar_gating,
+                "w": self.show_im_gating,
+                "kir": self.show_ikir_gating,
+                "q": self.show_ikca_gating,
+                "d": self.show_ical_gating,
+                "f": self.show_ical_gating,
+                "dt": self.show_icat_gating,
+                "ft": self.show_icat_gating,
+                "dn": self.show_ican_gating,
+                "fn": self.show_ican_gating,
             },
         )
 
@@ -404,6 +507,29 @@ class AppState(rx.State):
                 additional_channels.append(make_ih_channel(g_max=self.ih_g_max))
             if self.ika_enabled:
                 additional_channels.append(make_ika_channel(g_max=self.ika_g_max))
+            if self.inap_enabled:
+                additional_channels.append(make_inap_channel(g_max=self.inap_g_max))
+            if self.inar_enabled:
+                additional_channels.append(make_inar_channel(g_max=self.inar_g_max))
+            if self.im_enabled:
+                additional_channels.append(make_im_channel(g_max=self.im_g_max))
+            if self.ikir_enabled:
+                additional_channels.append(make_ikir_channel(g_max=self.ikir_g_max))
+            if self.ikca_enabled:
+                additional_channels.append(make_ikca_channel(g_max=self.ikca_g_max))
+            if self.ical_enabled:
+                additional_channels.append(make_ical_channel(g_max=self.ical_g_max))
+            if self.icat_enabled:
+                additional_channels.append(make_icat_channel(g_max=self.icat_g_max))
+            if self.ican_enabled:
+                additional_channels.append(make_ican_channel(g_max=self.ican_g_max))
+            needs_calcium = (
+                self.ikca_enabled
+                or self.ical_enabled
+                or self.icat_enabled
+                or self.ican_enabled
+            )
+            calcium_dynamics = ap_sim.CalciumDynamics() if needs_calcium else None
             neuron = ap_sim.HodgkinHuxley(
                 g_Na=self.g_Na,
                 g_K=self.g_K,
@@ -418,6 +544,7 @@ class AppState(rx.State):
                 Cl_in=self.Cl_in,
                 T=self.T,
                 additional_channels=tuple(additional_channels),
+                calcium_dynamics=calcium_dynamics,
             )
 
             fs = ap_sim.clamp_simulations.SIM_SAMPLING_FREQ
