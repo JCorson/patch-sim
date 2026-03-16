@@ -157,12 +157,12 @@ def make_ih_channel(
     """Create an Ih (HCN/funny current) ion channel.
 
     The Ih channel is hyperpolarization-activated and carries a mixed Na⁺/K⁺
-    cation current. It is responsible for the depolarising sag potential seen
-    during sustained hyperpolarisation in many neuron types.
+    cation current. It is responsible for the depolarizing sag potential seen
+    during sustained hyperpolarization in many neuron types.
 
     Kinetics follow Destexhe et al. (1993) with a single gating variable ``r``
     (power 1).  At resting potential (~-65 mV) the channel is largely closed;
-    deep hyperpolarisation (~-100 mV) activates it strongly.
+    deep hyperpolarization (~-100 mV) activates it strongly.
 
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
@@ -198,7 +198,7 @@ def make_inap_channel(
     """Create an INaP (persistent Na⁺) ion channel.
 
     INaP is a non-inactivating Na⁺ current active near the resting potential.
-    It amplifies subthreshold depolarisations and can lower the threshold for
+    It amplifies subthreshold depolarizations and can lower the threshold for
     action potential generation.  It uses a single gating variable ``p``
     (power 1).
 
@@ -242,7 +242,7 @@ _alpha_s, _beta_s = boltzmann_cosh_rates(
 def _nar_hr_inf(V: float) -> float:
     """Steady-state unblocking variable hr of INaR at voltage V.
 
-    High at hyperpolarised potentials (channel unblocked), low at depolarised
+    High at hyperpolarized potentials (channel unblocked), low at depolarized
     potentials (channel blocked).  Half-point at -55.0 mV.
 
     Args:
@@ -257,8 +257,8 @@ def _nar_hr_inf(V: float) -> float:
 def _nar_tau_hr(V: float) -> float:
     """Asymmetric voltage-dependent time constant for INaR unblocking variable hr.
 
-    Slow at depolarised potentials (slow blocking), intermediate at
-    hyperpolarised potentials (faster unblocking).
+    Slow at depolarized potentials (slow blocking), intermediate at
+    hyperpolarized potentials (faster unblocking).
 
     Args:
         V: Membrane voltage in mV.
@@ -306,13 +306,13 @@ def make_inar_channel(
 ) -> BaseIonChannel:
     """Create an INaR (resurgent Na⁺) ion channel.
 
-    INaR produces a transient inward Na⁺ current on membrane repolarisation,
+    INaR produces a transient inward Na⁺ current on membrane repolarization,
     known as the resurgent current.  The mechanism relies on two gating
     variables: ``s`` (activation, power 1) and ``hr`` (unblocking, power 1).
 
     At rest ``s`` is low and ``hr`` is high (channel closed but unblocked).
     During an action potential ``s`` opens quickly while ``hr`` slowly blocks
-    the channel.  On repolarisation ``hr`` recovers before ``s`` deactivates,
+    the channel.  On repolarization ``hr`` recovers before ``s`` deactivates,
     producing a transient resurgent current.
 
     Kinetics follow a simplified Raman & Bean (2001) two-variable alpha/beta
@@ -354,7 +354,7 @@ def make_im_channel(
 
     IM is a slow, non-inactivating K⁺ current that is suppressed by
     muscarinic receptor activation.  It contributes to spike-frequency
-    adaptation and the medium afterhyperpolarisation.  It uses a single
+    adaptation and the medium afterhyperpolarization.  It uses a single
     gating variable ``w`` (power 1).
 
     Kinetics follow Adams et al. (1982) / Traub & Miles (1991) with a
@@ -394,8 +394,8 @@ def make_ikir_channel(
 ) -> BaseIonChannel:
     """Create an IKir (inward rectifier K⁺) ion channel.
 
-    IKir is a K⁺ channel that is most active at hyperpolarised potentials
-    (inward rectification).  It helps stabilise the resting potential and
+    IKir is a K⁺ channel that is most active at hyperpolarized potentials
+    (inward rectification).  It helps stabilize the resting potential and
     contributes a large conductance near the K⁺ equilibrium potential.
     It uses a single gating variable ``kir`` (power 1).
 
@@ -502,9 +502,9 @@ def make_ikca_channel(
 ) -> BaseIonChannel:
     """Create an IKCa (calcium-activated K⁺) ion channel.
 
-    IKCa is a BK-like K⁺ channel activated by both membrane depolarisation
-    and elevated intracellular Ca²⁺.  It contributes to spike repolarisation
-    and the afterhyperpolarisation following Ca²⁺ entry.  It uses a single
+    IKCa is a BK-like K⁺ channel activated by both membrane depolarization
+    and elevated intracellular Ca²⁺.  It contributes to spike repolarization
+    and the afterhyperpolarization following Ca²⁺ entry.  It uses a single
     CalciumGatingVariable ``q`` (power 1) whose kinetics depend on both
     voltage and [Ca²⁺]ᵢ.
 
