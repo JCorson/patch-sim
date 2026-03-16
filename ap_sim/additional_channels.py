@@ -11,10 +11,14 @@ from .channels import BaseIonChannel, GatingVariable
 from .constants import (
     DEFAULT_E_IH,
     DEFAULT_E_IKA,
+    DEFAULT_E_IM,
+    DEFAULT_E_IKIR,
     DEFAULT_E_NAP,
     DEFAULT_E_NAR,
     DEFAULT_G_IH,
     DEFAULT_G_IKA,
+    DEFAULT_G_IM,
+    DEFAULT_G_IKIR,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
 )
@@ -443,5 +447,212 @@ def make_inar_channel(
         name="INaR",
         g_max=g_max,
         gating_variables=(s_var, hr_var),
+        e_rev=e_rev,
+    )
+
+
+# ---------------------------------------------------------------------------
+# I_M — Muscarinic K⁺ channel (Adams et al. 1982 / Traub & Miles 1991)
+# ---------------------------------------------------------------------------
+
+_IM_HALF: float = -35.0  # Half-activation voltage in mV
+_IM_SLOPE: float = 10.0  # Activation slope in mV
+_IM_TAU_SCALE: float = 1000.0  # Time-constant numerator in ms
+_IM_TAU_RATE: float = 3.3  # Rate multiplier for tau
+_IM_TAU_COSH_SCALE: float = 20.0  # Voltage scale in cosh denominator in mV
+_IM_TAU_FLOOR: float = 10.0  # Minimum time constant in ms
+
+
+def _im_w_inf(V: float) -> float:
+    """Steady-state activation of IM at voltage V.
+
+    Uses a Boltzmann function with half-activation at -35 mV.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Steady-state open probability in [0, 1].
+    """
+    return 1.0 / (1.0 + safe_exp(-(V - _IM_HALF) / _IM_SLOPE))
+
+
+def _im_tau(V: float) -> float:
+    """Voltage-dependent time constant for IM activation variable w.
+
+    Uses a cosh-based expression with a floor to prevent near-zero values.
+    Peaks at approximately 150 ms near -35 mV.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Time constant in ms (floored at 10 ms).
+    """
+    tau = _IM_TAU_SCALE / (
+        _IM_TAU_RATE * 2.0 * math.cosh((V - _IM_HALF) / _IM_TAU_COSH_SCALE)
+    )
+    return max(tau, _IM_TAU_FLOOR)
+
+
+def _alpha_w(V: float) -> float:
+    """Forward rate for IM gating variable w (Adams et al. 1982).
+
+    Derived as alpha_w = w_inf / tau_w.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Forward rate alpha_w in 1/ms.
+    """
+    return _im_w_inf(V) / _im_tau(V)
+
+
+def _beta_w(V: float) -> float:
+    """Backward rate for IM gating variable w (Adams et al. 1982).
+
+    Derived as beta_w = (1 - w_inf) / tau_w.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Backward rate beta_w in 1/ms.
+    """
+    return (1.0 - _im_w_inf(V)) / _im_tau(V)
+
+
+def make_im_channel(
+    g_max: float = DEFAULT_G_IM,
+    e_rev: float = DEFAULT_E_IM,
+) -> BaseIonChannel:
+    """Create an IM (muscarinic K⁺) ion channel.
+
+    IM is a slow, non-inactivating K⁺ current that is suppressed by
+    muscarinic receptor activation.  It contributes to spike-frequency
+    adaptation and the medium afterhyperpolarisation.  It uses a single
+    gating variable ``w`` (power 1).
+
+    Kinetics follow Adams et al. (1982) / Traub & Miles (1991) with a
+    Boltzmann activation centred at -35 mV and a slow cosh-based time
+    constant (~150 ms near -35 mV).
+
+    Args:
+        g_max: Maximum conductance in mS/cm². Must be non-negative.
+            Defaults to :data:`~ap_sim.constants.DEFAULT_G_IM`.
+        e_rev: Reversal potential in mV. Defaults to
+            :data:`~ap_sim.constants.DEFAULT_E_IM`.
+
+    Returns:
+        A :class:`~ap_sim.channels.BaseIonChannel` representing the IM current.
+    """
+    w_var = GatingVariable(name="w", power=1, alpha=_alpha_w, beta=_beta_w)
+    return BaseIonChannel(
+        name="IM",
+        g_max=g_max,
+        gating_variables=(w_var,),
+        e_rev=e_rev,
+    )
+
+
+# ---------------------------------------------------------------------------
+# I_Kir — Inward rectifier K⁺ channel (Hagiwara & Takahashi 1974)
+# ---------------------------------------------------------------------------
+
+_IKIR_HALF: float = -80.0  # Half-activation voltage in mV (inverted)
+_IKIR_SLOPE: float = 12.0  # Slope factor in mV
+_IKIR_TAU_SCALE: float = 10.0  # Time-constant numerator in ms
+_IKIR_TAU_COSH_SCALE: float = 24.0  # Voltage scale in cosh denominator in mV
+_IKIR_TAU_FLOOR: float = 0.5  # Minimum time constant in ms
+
+
+def _ikir_kir_inf(V: float) -> float:
+    """Steady-state activation of IKir at voltage V.
+
+    Uses an inverted Boltzmann function — higher at hyperpolarised potentials.
+    Half-activation at -80 mV.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Steady-state open probability in [0, 1].
+    """
+    return 1.0 / (1.0 + safe_exp((V - _IKIR_HALF) / _IKIR_SLOPE))
+
+
+def _ikir_tau(V: float) -> float:
+    """Voltage-dependent time constant for IKir gating variable kir.
+
+    Uses a cosh-based expression with a floor to prevent near-zero values.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Time constant in ms (floored at 0.5 ms).
+    """
+    tau = _IKIR_TAU_SCALE / math.cosh((V - _IKIR_HALF) / _IKIR_TAU_COSH_SCALE)
+    return max(tau, _IKIR_TAU_FLOOR)
+
+
+def _alpha_kir(V: float) -> float:
+    """Forward rate for IKir gating variable kir.
+
+    Derived as alpha_kir = kir_inf / tau_kir.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Forward rate alpha_kir in 1/ms.
+    """
+    return _ikir_kir_inf(V) / _ikir_tau(V)
+
+
+def _beta_kir(V: float) -> float:
+    """Backward rate for IKir gating variable kir.
+
+    Derived as beta_kir = (1 - kir_inf) / tau_kir.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Backward rate beta_kir in 1/ms.
+    """
+    return (1.0 - _ikir_kir_inf(V)) / _ikir_tau(V)
+
+
+def make_ikir_channel(
+    g_max: float = DEFAULT_G_IKIR,
+    e_rev: float = DEFAULT_E_IKIR,
+) -> BaseIonChannel:
+    """Create an IKir (inward rectifier K⁺) ion channel.
+
+    IKir is a K⁺ channel that is most active at hyperpolarised potentials
+    (inward rectification).  It helps stabilise the resting potential and
+    contributes a large conductance near the K⁺ equilibrium potential.
+    It uses a single gating variable ``kir`` (power 1).
+
+    Kinetics follow Hagiwara & Takahashi (1974) / Steephen & Bhalla (2009),
+    with an inverted Boltzmann activation centred at -80 mV and a fast
+    cosh-based time constant.
+
+    Args:
+        g_max: Maximum conductance in mS/cm². Must be non-negative.
+            Defaults to :data:`~ap_sim.constants.DEFAULT_G_IKIR`.
+        e_rev: Reversal potential in mV. Defaults to
+            :data:`~ap_sim.constants.DEFAULT_E_IKIR`.
+
+    Returns:
+        A :class:`~ap_sim.channels.BaseIonChannel` representing the IKir current.
+    """
+    kir_var = GatingVariable(name="kir", power=1, alpha=_alpha_kir, beta=_beta_kir)
+    return BaseIonChannel(
+        name="IKir",
+        g_max=g_max,
+        gating_variables=(kir_var,),
         e_rev=e_rev,
     )

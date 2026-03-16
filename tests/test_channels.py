@@ -15,17 +15,23 @@ from ap_sim.additional_channels import (
     _alpha_a,
     _alpha_b,
     _alpha_hr,
+    _alpha_kir,
     _alpha_p,
     _alpha_r,
     _alpha_s,
+    _alpha_w,
     _beta_a,
     _beta_b,
     _beta_hr,
+    _beta_kir,
     _beta_p,
     _beta_r,
     _beta_s,
+    _beta_w,
     make_ih_channel,
     make_ika_channel,
+    make_ikir_channel,
+    make_im_channel,
     make_inar_channel,
     make_inap_channel,
 )
@@ -769,13 +775,15 @@ def test_inap_and_inar_coexist():
 
 
 def test_all_additional_channels_coexist():
-    """All four additional channels (Ih, IKa, INaP, INaR) can coexist."""
+    """All six additional channels (Ih, IKa, INaP, INaR, IM, IKir) can coexist."""
     neuron = HodgkinHuxley(
         additional_channels=(
             make_ih_channel(),
             make_ika_channel(),
             make_inap_channel(),
             make_inar_channel(),
+            make_im_channel(),
+            make_ikir_channel(),
         )
     )
     stim = step_current(
@@ -786,12 +794,250 @@ def test_all_additional_channels_coexist():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    for col in ("Ih_current", "IKa_current", "INaP_current", "INaR_current"):
+    for col in (
+        "Ih_current",
+        "IKa_current",
+        "INaP_current",
+        "INaR_current",
+        "IM_current",
+        "IKir_current",
+    ):
         assert col in df.columns
-    for gate in ("r", "a", "b", "p", "s", "hr"):
+    for gate in ("r", "a", "b", "p", "s", "hr", "w", "kir"):
         assert gate in df.columns
 
 
 def test_public_api_exports_inar():
     """make_inar_channel is exported from the ap_sim public API."""
     assert hasattr(ap_sim, "make_inar_channel")
+
+
+# ---------------------------------------------------------------------------
+# I_M rate functions
+# ---------------------------------------------------------------------------
+
+
+def test_im_gating_variable_steady_state_in_bounds():
+    """IM gating variable w_inf is in [0, 1] for physiological voltages."""
+    for V in np.linspace(-120.0, 0.0, 50):
+        a = _alpha_w(V)
+        b = _beta_w(V)
+        assert a >= 0, f"alpha_w negative at V={V}"
+        assert b >= 0, f"beta_w negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}"
+
+
+def test_im_activation_increases_with_depolarisation():
+    """IM w_inf (activation) is higher at depolarised voltages."""
+
+    def w_inf(V: float) -> float:
+        """Activation steady-state at voltage V."""
+        a, b = _alpha_w(V), _beta_w(V)
+        return a / (a + b)
+
+    assert w_inf(-20.0) > w_inf(-35.0) > w_inf(-100.0)
+
+
+def test_im_slow_kinetics():
+    """IM tau_w is greater than 50 ms near the half-activation voltage (-35 mV)."""
+    from ap_sim.additional_channels import _im_tau
+
+    assert _im_tau(-35.0) > 50.0
+
+
+# ---------------------------------------------------------------------------
+# make_im_channel
+# ---------------------------------------------------------------------------
+
+
+def test_make_im_channel_defaults():
+    """make_im_channel() produces a channel with the expected defaults."""
+    from ap_sim.constants import DEFAULT_E_IM, DEFAULT_G_IM
+
+    ch = make_im_channel()
+    assert ch.name == "IM"
+    assert ch.g_max == pytest.approx(DEFAULT_G_IM)
+    assert ch.e_rev == pytest.approx(DEFAULT_E_IM)
+    assert len(ch.gating_variables) == 1
+    assert ch.gating_variables[0].name == "w"
+    assert ch.gating_variables[0].power == 1
+
+
+def test_make_im_channel_custom_params():
+    """make_im_channel accepts custom g_max and e_rev."""
+    ch = make_im_channel(g_max=1.0, e_rev=-80.0)
+    assert ch.g_max == pytest.approx(1.0)
+    assert ch.e_rev == pytest.approx(-80.0)
+
+
+# ---------------------------------------------------------------------------
+# I_M integration tests
+# ---------------------------------------------------------------------------
+
+
+def test_current_clamp_with_im_extra_columns():
+    """Current clamp with IM channel adds IM_current and w columns."""
+    neuron = HodgkinHuxley(additional_channels=(make_im_channel(),))
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert "IM_current" in df.columns
+    assert "w" in df.columns
+
+
+def test_voltage_clamp_with_im_extra_columns():
+    """Voltage clamp with IM channel adds IM_current and w columns."""
+    neuron = HodgkinHuxley(additional_channels=(make_im_channel(),))
+    prot = step_voltage(
+        duration=20.0,
+        voltage_amplitude=0.0,
+        step_start=5.0,
+        step_duration=10.0,
+        holding_voltage=-70.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_voltage_clamp(neuron, prot)
+    assert "IM_current" in df.columns
+    assert "w" in df.columns
+
+
+def test_current_clamp_im_gating_in_bounds():
+    """IM gating variable w stays in [0, 1] during current clamp."""
+    neuron = HodgkinHuxley(additional_channels=(make_im_channel(),))
+    stim = step_current(
+        duration=30.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=20.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert df["w"].min() >= 0.0
+    assert df["w"].max() <= 1.0
+
+
+def test_public_api_exports_im():
+    """make_im_channel is exported from the ap_sim public API."""
+    assert hasattr(ap_sim, "make_im_channel")
+
+
+# ---------------------------------------------------------------------------
+# I_Kir rate functions
+# ---------------------------------------------------------------------------
+
+
+def test_ikir_gating_variable_steady_state_in_bounds():
+    """IKir gating variable kir_inf is in [0, 1] for physiological voltages."""
+    for V in np.linspace(-120.0, 0.0, 50):
+        a = _alpha_kir(V)
+        b = _beta_kir(V)
+        assert a >= 0, f"alpha_kir negative at V={V}"
+        assert b >= 0, f"beta_kir negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}"
+
+
+def test_ikir_activation_increases_with_hyperpolarisation():
+    """IKir kir_inf is higher at hyperpolarised voltages (inverted rectifier)."""
+
+    def kir_inf(V: float) -> float:
+        """Activation steady-state at voltage V."""
+        a, b = _alpha_kir(V), _beta_kir(V)
+        return a / (a + b)
+
+    assert kir_inf(-100.0) > kir_inf(-80.0) > kir_inf(-40.0)
+
+
+def test_ikir_fast_kinetics():
+    """IKir tau_kir is at most 10 ms across physiological voltages."""
+    from ap_sim.additional_channels import _ikir_tau
+
+    for V in np.linspace(-120.0, 0.0, 50):
+        assert _ikir_tau(V) <= 10.0, f"tau_kir too slow at V={V}"
+
+
+# ---------------------------------------------------------------------------
+# make_ikir_channel
+# ---------------------------------------------------------------------------
+
+
+def test_make_ikir_channel_defaults():
+    """make_ikir_channel() produces a channel with the expected defaults."""
+    from ap_sim.constants import DEFAULT_E_IKIR, DEFAULT_G_IKIR
+
+    ch = make_ikir_channel()
+    assert ch.name == "IKir"
+    assert ch.g_max == pytest.approx(DEFAULT_G_IKIR)
+    assert ch.e_rev == pytest.approx(DEFAULT_E_IKIR)
+    assert len(ch.gating_variables) == 1
+    assert ch.gating_variables[0].name == "kir"
+    assert ch.gating_variables[0].power == 1
+
+
+def test_make_ikir_channel_custom_params():
+    """make_ikir_channel accepts custom g_max and e_rev."""
+    ch = make_ikir_channel(g_max=0.5, e_rev=-80.0)
+    assert ch.g_max == pytest.approx(0.5)
+    assert ch.e_rev == pytest.approx(-80.0)
+
+
+# ---------------------------------------------------------------------------
+# I_Kir integration tests
+# ---------------------------------------------------------------------------
+
+
+def test_current_clamp_with_ikir_extra_columns():
+    """Current clamp with IKir channel adds IKir_current and kir columns."""
+    neuron = HodgkinHuxley(additional_channels=(make_ikir_channel(),))
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert "IKir_current" in df.columns
+    assert "kir" in df.columns
+
+
+def test_voltage_clamp_with_ikir_extra_columns():
+    """Voltage clamp with IKir channel adds IKir_current and kir columns."""
+    neuron = HodgkinHuxley(additional_channels=(make_ikir_channel(),))
+    prot = step_voltage(
+        duration=20.0,
+        voltage_amplitude=0.0,
+        step_start=5.0,
+        step_duration=10.0,
+        holding_voltage=-70.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_voltage_clamp(neuron, prot)
+    assert "IKir_current" in df.columns
+    assert "kir" in df.columns
+
+
+def test_current_clamp_ikir_gating_in_bounds():
+    """IKir gating variable kir stays in [0, 1] during current clamp."""
+    neuron = HodgkinHuxley(additional_channels=(make_ikir_channel(),))
+    stim = step_current(
+        duration=30.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=20.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert df["kir"].min() >= 0.0
+    assert df["kir"].max() <= 1.0
+
+
+def test_public_api_exports_ikir():
+    """make_ikir_channel is exported from the ap_sim public API."""
+    assert hasattr(ap_sim, "make_ikir_channel")
