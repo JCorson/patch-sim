@@ -6,7 +6,7 @@ added on top of the classic Na, K, and leak channels.
 
 from abc import ABC
 from dataclasses import dataclass
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, Union, runtime_checkable
 
 
 @dataclass(frozen=True)
@@ -26,6 +26,32 @@ class GatingVariable:
     beta: Callable[[float], float]
 
 
+@dataclass(frozen=True)
+class CalciumGatingVariable:
+    """A gating variable whose kinetics depend on both voltage and [Ca²⁺]ᵢ.
+
+    Used for channels like I_KCa whose activation depends on intracellular
+    calcium concentration in addition to membrane voltage.  The alpha/beta
+    signatures take two arguments: ``(V, ca_i)`` where ``V`` is the membrane
+    voltage in mV and ``ca_i`` is the intracellular Ca²⁺ concentration in mM.
+
+    Attributes:
+        name: Unique name used as a key in gating-state dicts (e.g. 'q').
+        power: Exponent applied to this gate's value when computing conductance.
+        alpha: Forward rate function alpha(V, ca_i) in units 1/ms.
+        beta: Backward rate function beta(V, ca_i) in units 1/ms.
+    """
+
+    name: str
+    power: int
+    alpha: Callable[[float, float], float]
+    beta: Callable[[float, float], float]
+
+
+#: Type alias for any gating variable (voltage-only or calcium-dependent).
+AnyGatingVariable = Union[GatingVariable, CalciumGatingVariable]
+
+
 @runtime_checkable
 class IonChannel(Protocol):
     """Structural protocol satisfied by any ion channel implementation.
@@ -36,12 +62,12 @@ class IonChannel(Protocol):
     Attributes:
         name: Human-readable channel identifier (e.g. 'Ih').
         g_max: Maximum conductance in mS/cm².
-        gating_variables: Tuple of GatingVariable descriptors.
+        gating_variables: Tuple of gating variable descriptors.
     """
 
     name: str
     g_max: float
-    gating_variables: tuple[GatingVariable, ...]
+    gating_variables: tuple[AnyGatingVariable, ...]
 
     def reversal_potential(self, neuron: Any) -> float:
         """Return the reversal potential for this channel in mV.
@@ -92,7 +118,7 @@ class BaseIonChannel:
     Attributes:
         name: Human-readable channel identifier.
         g_max: Maximum conductance in mS/cm².
-        gating_variables: Tuple of GatingVariable descriptors.
+        gating_variables: Tuple of gating variable descriptors.
         e_rev: Fixed reversal potential in mV.
 
     Raises:
@@ -102,7 +128,7 @@ class BaseIonChannel:
 
     name: str
     g_max: float
-    gating_variables: tuple[GatingVariable, ...]
+    gating_variables: tuple[AnyGatingVariable, ...]
     e_rev: float
 
     def __post_init__(self) -> None:

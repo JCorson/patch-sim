@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 
 from .calcium import CalciumDynamics
-from .channels import CalciumIonChannel, GatingVariable, IonChannel
+from .channels import AnyGatingVariable, CalciumIonChannel, IonChannel
 from .constants import (
     DEFAULT_C_M,
     DEFAULT_CL_IN,
@@ -121,14 +121,15 @@ class HodgkinHuxley:
                     "channel name (Na, K, leak)."
                 )
 
-    def all_additional_gating_variables(self) -> list[GatingVariable]:
+    def all_additional_gating_variables(self) -> list[AnyGatingVariable]:
         """Return a flat list of all gating variables across additional channels.
 
         Returns:
-            List of GatingVariable objects from all additional channels, in the
-            order the channels and their gating variables are declared.
+            List of gating variable objects from all additional channels, in
+            the order the channels and their gating variables are declared.
+            May contain both GatingVariable and CalciumGatingVariable instances.
         """
-        result: list[GatingVariable] = []
+        result: list[AnyGatingVariable] = []
         for ch in self.additional_channels:
             result.extend(ch.gating_variables)
         return result

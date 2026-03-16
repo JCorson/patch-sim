@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from typing import TYPE_CHECKING
 
+from .channels import CalciumGatingVariable
+
 if TYPE_CHECKING:
     from .hodgkin_huxley import HodgkinHuxley
 
@@ -39,16 +41,20 @@ def _setup_simulation(
 
 
 def _initialize_gating_variables(
-    neuron: "HodgkinHuxley", initial_voltage: float
+    neuron: "HodgkinHuxley",
+    initial_voltage: float,
+    ca_i: float = 0.0,
 ) -> tuple[float, float, float, dict[str, float]]:
     """Compute steady-state gating variables at a given initial voltage.
 
     Initialises both the classic HH gating variables (n, m, h) and the
     steady-state values for all additional channel gating variables.
+    CalciumGatingVariable instances receive both voltage and ca_i.
 
     Args:
         neuron: The Hodgkin-Huxley neuron model.
         initial_voltage: Initial membrane voltage in mV.
+        ca_i: Initial intracellular Ca²⁺ concentration in mM.
 
     Returns:
         Tuple of (n0, m0, h0, opt_state) where opt_state maps each additional
@@ -64,7 +70,10 @@ def _initialize_gating_variables(
 
     opt_state: dict[str, float] = {}
     for gv in neuron.all_additional_gating_variables():
-        a, b = gv.alpha(V0), gv.beta(V0)
+        if isinstance(gv, CalciumGatingVariable):
+            a, b = gv.alpha(V0, ca_i), gv.beta(V0, ca_i)
+        else:
+            a, b = gv.alpha(V0), gv.beta(V0)
         opt_state[gv.name] = a / (a + b)
 
     return n0, m0, h0, opt_state
@@ -74,13 +83,18 @@ def _additional_gating_derivatives(
     neuron: "HodgkinHuxley",
     V: float,
     opt_state: dict[str, float],
+    ca_i: float = 0.0,
 ) -> dict[str, float]:
     """Compute derivatives for all additional channel gating variables.
+
+    CalciumGatingVariable instances receive both voltage and ca_i for their
+    rate functions; standard GatingVariable instances receive only voltage.
 
     Args:
         neuron: The Hodgkin-Huxley neuron model.
         V: Membrane voltage in mV.
         opt_state: Current gating state mapping name → value.
+        ca_i: Current intracellular Ca²⁺ concentration in mM.
 
     Returns:
         Dict mapping each gating variable name to its dx/dt value.
@@ -88,7 +102,10 @@ def _additional_gating_derivatives(
     derivs: dict[str, float] = {}
     for gv in neuron.all_additional_gating_variables():
         x = opt_state[gv.name]
-        derivs[gv.name] = gv.alpha(V) * (1 - x) - gv.beta(V) * x
+        if isinstance(gv, CalciumGatingVariable):
+            derivs[gv.name] = gv.alpha(V, ca_i) * (1 - x) - gv.beta(V, ca_i) * x
+        else:
+            derivs[gv.name] = gv.alpha(V) * (1 - x) - gv.beta(V) * x
     return derivs
 
 
@@ -161,7 +178,7 @@ def _hh_derivatives(
     dn = neuron.alpha_n(V) * (1 - n) - neuron.beta_n(V) * n
     dm = neuron.alpha_m(V) * (1 - m) - neuron.beta_m(V) * m
     dh = neuron.alpha_h(V) * (1 - h) - neuron.beta_h(V) * h
-    opt_derivs = _additional_gating_derivatives(neuron, V, opt_state)
+    opt_derivs = _additional_gating_derivatives(neuron, V, opt_state, ca_i)
     if neuron.calcium_dynamics is not None:
         I_Ca = neuron.calcium_current(V, opt_state)
         dca_i = neuron.calcium_dynamics.derivative(I_Ca, ca_i)
@@ -201,7 +218,7 @@ def _gating_derivatives(
     dn = neuron.alpha_n(V) * (1 - n) - neuron.beta_n(V) * n
     dm = neuron.alpha_m(V) * (1 - m) - neuron.beta_m(V) * m
     dh = neuron.alpha_h(V) * (1 - h) - neuron.beta_h(V) * h
-    opt_derivs = _additional_gating_derivatives(neuron, V, opt_state)
+    opt_derivs = _additional_gating_derivatives(neuron, V, opt_state, ca_i)
     if neuron.calcium_dynamics is not None:
         I_Ca = neuron.calcium_current(V, opt_state)
         dca_i = neuron.calcium_dynamics.derivative(I_Ca, ca_i)
@@ -431,7 +448,7 @@ def simulate_voltage_clamp(
 
     # Initialise gating variables at steady state for the first voltage
     n_arr[0], m_arr[0], h_arr[0], opt_state = _initialize_gating_variables(
-        neuron, voltage_protocol[0]
+        neuron, voltage_protocol[0], ca_i
     )
 
     # Record initial optional gating state
@@ -574,7 +591,7 @@ def simulate_current_clamp(
     # Initialise gating variables at steady state for resting potential
     V_arr[0] = neuron.v_rest
     n_arr[0], m_arr[0], h_arr[0], opt_state = _initialize_gating_variables(
-        neuron, neuron.v_rest
+        neuron, neuron.v_rest, ca_i
     )
 
     # Record initial optional gating state

@@ -8,7 +8,12 @@ import numpy as np
 import pytest
 
 import ap_sim
-from ap_sim.channels import BaseIonChannel, GatingVariable, IonChannel
+from ap_sim.channels import (
+    BaseIonChannel,
+    CalciumGatingVariable,
+    GatingVariable,
+    IonChannel,
+)
 from ap_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from ap_sim.hodgkin_huxley import HodgkinHuxley
 from ap_sim.additional_channels import (
@@ -1041,3 +1046,81 @@ def test_current_clamp_ikir_gating_in_bounds():
 def test_public_api_exports_ikir():
     """make_ikir_channel is exported from the ap_sim public API."""
     assert hasattr(ap_sim, "make_ikir_channel")
+
+
+# ---------------------------------------------------------------------------
+# CalciumGatingVariable infrastructure (Step 4)
+# ---------------------------------------------------------------------------
+
+
+def test_calcium_gating_variable_in_integrator():
+    """A channel with CalciumGatingVariable initialises and runs without error."""
+    cg = CalciumGatingVariable(
+        name="q_test",
+        power=1,
+        alpha=lambda V, ca: 0.1 * ca if ca > 0 else 0.0,
+        beta=lambda V, ca: 0.1,
+    )
+    ch = BaseIonChannel(
+        name="ITest",
+        g_max=0.5,
+        gating_variables=(cg,),
+        e_rev=-77.0,
+    )
+    from ap_sim.calcium import CalciumDynamics
+
+    neuron = HodgkinHuxley(
+        additional_channels=(ch,),
+        calcium_dynamics=CalciumDynamics(),
+    )
+    stim = step_current(
+        duration=10.0,
+        current_amplitude=0.0,
+        step_start=2.0,
+        step_duration=5.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert "ITest_current" in df.columns
+    assert "q_test" in df.columns
+
+
+def test_calcium_gating_variable_steady_state_depends_on_ca():
+    """CalciumGatingVariable steady state differs for different ca_i values."""
+    cg = CalciumGatingVariable(
+        name="q_test2",
+        power=1,
+        alpha=lambda V, ca: ca / (ca + 0.001),
+        beta=lambda V, ca: 1.0 - ca / (ca + 0.001),
+    )
+    V = -65.0
+    ca_low = 1e-4
+    ca_high = 1e-2
+    a_low, b_low = cg.alpha(V, ca_low), cg.beta(V, ca_low)
+    a_high, b_high = cg.alpha(V, ca_high), cg.beta(V, ca_high)
+    ss_low = a_low / (a_low + b_low)
+    ss_high = a_high / (a_high + b_high)
+    assert ss_high > ss_low
+
+
+def test_existing_channels_unaffected_by_calcium_gating_infra():
+    """Voltage-only channels still work after CalciumGatingVariable addition."""
+    neuron = HodgkinHuxley(additional_channels=(make_ih_channel(), make_ika_channel()))
+    stim = step_current(
+        duration=10.0,
+        current_amplitude=10.0,
+        step_start=2.0,
+        step_duration=5.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert "Ih_current" in df.columns
+    assert "IKa_current" in df.columns
+    assert df["r"].min() >= 0.0
+    assert df["r"].max() <= 1.0
+
+
+def test_calcium_gating_variable_exported():
+    """CalciumGatingVariable and AnyGatingVariable are in the ap_sim public API."""
+    assert hasattr(ap_sim, "CalciumGatingVariable")
+    assert hasattr(ap_sim, "AnyGatingVariable")
