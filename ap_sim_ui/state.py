@@ -26,7 +26,7 @@ from ap_sim.constants import (
     DEFAULT_T,
     DEFAULT_V_REST,
 )
-from ap_sim.optional_channels import make_ih_channel, make_ika_channel
+from ap_sim.additional_channels import make_ih_channel, make_ika_channel
 from ap_sim_ui import constants, presets
 from ap_sim_ui.plotting import Sweep, build_figure
 from ap_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
@@ -310,11 +310,11 @@ class AppState(rx.State):
             show_sodium_activation=self.show_sodium_activation,
             show_sodium_inactivation=self.show_sodium_inactivation,
             clamp_mode=self.clamp_mode,
-            show_optional_currents={
+            show_additional_currents={
                 "Ih": self.show_ih_current,
                 "IKa": self.show_ika_current,
             },
-            show_optional_gating={
+            show_additional_gating={
                 "r": self.show_ih_gating,
                 "a": self.show_ika_gating,
                 "b": self.show_ika_gating,
@@ -417,7 +417,7 @@ class AppState(rx.State):
                 Cl_out=self.Cl_out,
                 Cl_in=self.Cl_in,
                 T=self.T,
-                optional_channels=tuple(opt_channels),
+                additional_channels=tuple(opt_channels),
             )
 
             fs = ap_sim.clamp_simulations.SIM_SAMPLING_FREQ

@@ -50,8 +50,8 @@ class Sweep(BaseModel):
         sodium_inactivation: Gating variable h (dimensionless, 0–1).
         stimulus: Stimulus waveform (current µA/cm² or voltage command mV).
         clamp_mode: "Current Clamp" or "Voltage Clamp".
-        optional_currents: Extra channel currents keyed by channel name.
-        optional_gating: Extra gating variable traces keyed by variable name.
+        additional_currents: Extra channel currents keyed by channel name.
+        additional_gating: Extra gating variable traces keyed by variable name.
     """
 
     label: str
@@ -67,8 +67,8 @@ class Sweep(BaseModel):
     sodium_inactivation: list[float]
     stimulus: list[float]
     clamp_mode: str
-    optional_currents: dict[str, list[float]] = {}
-    optional_gating: dict[str, list[float]] = {}
+    additional_currents: dict[str, list[float]] = {}
+    additional_gating: dict[str, list[float]] = {}
 
     @classmethod
     def from_dataframe(
@@ -101,17 +101,17 @@ class Sweep(BaseModel):
             """Return column as list, or empty list if column absent."""
             return df[name].tolist() if name in columns else []
 
-        optional_currents: dict[str, list[float]] = {}
-        optional_gating: dict[str, list[float]] = {}
+        additional_currents: dict[str, list[float]] = {}
+        additional_gating: dict[str, list[float]] = {}
         for col in columns:
             if col in _CLASSIC_COLUMNS:
                 continue
             if col.endswith("_current"):
                 # Strip trailing _current to get the channel name key
                 ch_name = col[: -len("_current")]
-                optional_currents[ch_name] = df[col].tolist()
+                additional_currents[ch_name] = df[col].tolist()
             else:
-                optional_gating[col] = df[col].tolist()
+                additional_gating[col] = df[col].tolist()
 
         return cls(
             label=label,
@@ -127,8 +127,8 @@ class Sweep(BaseModel):
             potassium_activation=_col("potassium_activation"),
             sodium_activation=_col("sodium_activation"),
             sodium_inactivation=_col("sodium_inactivation"),
-            optional_currents=optional_currents,
-            optional_gating=optional_gating,
+            additional_currents=additional_currents,
+            additional_gating=additional_gating,
         )
 
 
@@ -144,8 +144,8 @@ def build_figure(
     show_sodium_activation: bool,
     show_sodium_inactivation: bool,
     clamp_mode: str,
-    show_optional_currents: dict[str, bool] | None = None,
-    show_optional_gating: dict[str, bool] | None = None,
+    show_additional_currents: dict[str, bool] | None = None,
+    show_additional_gating: dict[str, bool] | None = None,
 ) -> go.Figure:
     """Build a Plotly figure from current and saved sweeps.
 
@@ -173,32 +173,32 @@ def build_figure(
         show_sodium_activation: Whether to render gating variable m.
         show_sodium_inactivation: Whether to render gating variable h.
         clamp_mode: Active UI clamp mode, used for layout and axis labels.
-        show_optional_currents: Mapping from optional channel name to
+        show_additional_currents: Mapping from additional channel name to
             visibility flag.  ``None`` means show all.
-        show_optional_gating: Mapping from optional gating variable name to
+        show_additional_gating: Mapping from additional gating variable name to
             visibility flag.  ``None`` means show all.
 
     Returns:
         A Plotly Figure with response, optional gating, and stimulus subplots.
     """
-    if show_optional_currents is None:
-        show_optional_currents = {}
-    if show_optional_gating is None:
-        show_optional_gating = {}
+    if show_additional_currents is None:
+        show_additional_currents = {}
+    if show_additional_gating is None:
+        show_additional_gating = {}
 
-    # Collect optional keys present in current sweeps.
+    # Collect additional keys present in current sweeps.
     opt_gating_keys: list[str] = []
     opt_current_keys: list[str] = []
     for sweep in current_sweeps:
-        for key in sweep.optional_gating:
+        for key in sweep.additional_gating:
             if key not in opt_gating_keys:
                 opt_gating_keys.append(key)
-        for key in sweep.optional_currents:
+        for key in sweep.additional_currents:
             if key not in opt_current_keys:
                 opt_current_keys.append(key)
 
     show_any_opt_gating = any(
-        show_optional_gating.get(k, True) for k in opt_gating_keys
+        show_additional_gating.get(k, True) for k in opt_gating_keys
     )
 
     show_gating = (
@@ -223,7 +223,7 @@ def build_figure(
         if show_leak_current:
             active_currents.append(("leak_current", "I_L (µA/cm²)"))
         for ch_name in opt_current_keys:
-            if show_optional_currents.get(ch_name, True):
+            if show_additional_currents.get(ch_name, True):
                 active_currents.append((f"opt:{ch_name}", f"I_{ch_name} (µA/cm²)"))
 
         # Map each attr_key to its 1-based row index.
@@ -303,7 +303,7 @@ def build_figure(
                     _scatter(t, sweep.leak_current, f"{pfx}I_L", row, c)
                 elif attr_key.startswith("opt:"):
                     ch_name = attr_key[4:]
-                    vals = sweep.optional_currents.get(ch_name, [])
+                    vals = sweep.additional_currents.get(ch_name, [])
                     _scatter(t, vals, f"{pfx}I_{ch_name}", row, c)
 
         if show_gating and gating_row is not None:
@@ -313,8 +313,8 @@ def build_figure(
                 _scatter(t, sweep.sodium_activation, f"{pfx}m", gating_row, c)
             if show_sodium_inactivation:
                 _scatter(t, sweep.sodium_inactivation, f"{pfx}h", gating_row, c)
-            for gv_name, gv_vals in sweep.optional_gating.items():
-                if show_optional_gating.get(gv_name, True):
+            for gv_name, gv_vals in sweep.additional_gating.items():
+                if show_additional_gating.get(gv_name, True):
                     _scatter(t, gv_vals, f"{pfx}{gv_name}", gating_row, c)
 
         _scatter(t, sweep.stimulus, stim_label, stimulus_row, c)
@@ -361,7 +361,7 @@ def build_figure(
                     )
                 elif attr_key.startswith("opt:"):
                     ch_name = attr_key[4:]
-                    vals = sweep.optional_currents.get(ch_name, [])
+                    vals = sweep.additional_currents.get(ch_name, [])
                     _scatter(sweep.time, vals, f"{sweep.label} I_{ch_name}", row, c)
         else:
             _scatter(sweep.time, sweep.total_current, f"{sweep.label} I_total", 1, c)

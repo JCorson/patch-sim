@@ -1,7 +1,7 @@
-"""Tests for the optional ion channel framework.
+"""Tests for the additional ion channel framework.
 
 Covers BaseIonChannel math, GatingVariable steady states, Ih kinetics,
-backward compatibility with no optional channels, and validation errors.
+backward compatibility with no additional channels, and validation errors.
 """
 
 import numpy as np
@@ -11,7 +11,7 @@ import ap_sim
 from ap_sim.channels import BaseIonChannel, GatingVariable, IonChannel
 from ap_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from ap_sim.hodgkin_huxley import HodgkinHuxley
-from ap_sim.optional_channels import (
+from ap_sim.additional_channels import (
     _alpha_a,
     _alpha_b,
     _alpha_hr,
@@ -137,19 +137,19 @@ def test_base_ion_channel_duplicate_gating_names_raises():
         BaseIonChannel(name="dup", g_max=1.0, gating_variables=(gv1, gv2), e_rev=0.0)
 
 
-def test_hh_duplicate_optional_channel_names_raises():
-    """Duplicate optional channel names on HodgkinHuxley raise ValueError."""
+def test_hh_duplicate_additional_channel_names_raises():
+    """Duplicate additional channel names on HodgkinHuxley raise ValueError."""
     ch = make_ih_channel()
     with pytest.raises(ValueError, match="names must be unique"):
-        HodgkinHuxley(optional_channels=(ch, ch))
+        HodgkinHuxley(additional_channels=(ch, ch))
 
 
 def test_hh_builtin_channel_name_collision_raises():
-    """Optional channel named 'Na' collides with built-in and raises ValueError."""
+    """Additional channel named 'Na' collides with built-in and raises ValueError."""
     gv = GatingVariable(name="r", power=1, alpha=lambda V: 0.1, beta=lambda V: 0.1)
     ch = BaseIonChannel(name="Na", g_max=0.1, gating_variables=(gv,), e_rev=-30.0)
     with pytest.raises(ValueError, match="collides with a built-in"):
-        HodgkinHuxley(optional_channels=(ch,))
+        HodgkinHuxley(additional_channels=(ch,))
 
 
 # ---------------------------------------------------------------------------
@@ -182,8 +182,8 @@ def test_make_ih_channel_custom_params():
 # ---------------------------------------------------------------------------
 
 
-def test_current_clamp_no_optional_channels_identical_columns(hh_model):
-    """simulate_current_clamp with no optional channels has exact classic columns."""
+def test_current_clamp_no_additional_channels_identical_columns(hh_model):
+    """simulate_current_clamp with no additional channels has exact classic columns."""
     stim = step_current(
         duration=10.0,
         current_amplitude=10.0,
@@ -201,8 +201,8 @@ def test_current_clamp_no_optional_channels_identical_columns(hh_model):
     assert set(df.columns) == expected
 
 
-def test_voltage_clamp_no_optional_channels_identical_columns(hh_model):
-    """simulate_voltage_clamp with no optional channels has exact classic columns."""
+def test_voltage_clamp_no_additional_channels_identical_columns(hh_model):
+    """simulate_voltage_clamp with no additional channels has exact classic columns."""
     prot = step_voltage(
         duration=10.0,
         voltage_amplitude=0.0,
@@ -225,8 +225,8 @@ def test_voltage_clamp_no_optional_channels_identical_columns(hh_model):
     assert set(df.columns) == expected
 
 
-def test_current_clamp_no_optional_channels_values_unchanged():
-    """Voltage trace is unchanged when optional_channels is empty vs. default."""
+def test_current_clamp_no_additional_channels_values_unchanged():
+    """Voltage trace is unchanged when additional_channels is empty vs. default."""
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -235,7 +235,7 @@ def test_current_clamp_no_optional_channels_values_unchanged():
         sampling_frequency=40000.0,
     )
     df_default = simulate_current_clamp(HodgkinHuxley(), stim)
-    df_empty = simulate_current_clamp(HodgkinHuxley(optional_channels=()), stim)
+    df_empty = simulate_current_clamp(HodgkinHuxley(additional_channels=()), stim)
     np.testing.assert_array_equal(
         df_default["voltage"].values, df_empty["voltage"].values
     )
@@ -248,7 +248,7 @@ def test_current_clamp_no_optional_channels_values_unchanged():
 
 def test_current_clamp_with_ih_extra_columns():
     """Current clamp with Ih channel adds Ih_current and r columns."""
-    neuron = HodgkinHuxley(optional_channels=(make_ih_channel(),))
+    neuron = HodgkinHuxley(additional_channels=(make_ih_channel(),))
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -263,7 +263,7 @@ def test_current_clamp_with_ih_extra_columns():
 
 def test_current_clamp_ih_gating_variable_in_bounds():
     """Ih gating variable r stays in [0, 1] during current clamp."""
-    neuron = HodgkinHuxley(optional_channels=(make_ih_channel(),))
+    neuron = HodgkinHuxley(additional_channels=(make_ih_channel(),))
     stim = step_current(
         duration=30.0,
         current_amplitude=10.0,
@@ -278,7 +278,7 @@ def test_current_clamp_ih_gating_variable_in_bounds():
 
 def test_voltage_clamp_with_ih_extra_columns():
     """Voltage clamp with Ih channel adds Ih_current and r columns."""
-    neuron = HodgkinHuxley(optional_channels=(make_ih_channel(),))
+    neuron = HodgkinHuxley(additional_channels=(make_ih_channel(),))
     prot = step_voltage(
         duration=20.0,
         voltage_amplitude=-40.0,
@@ -294,7 +294,7 @@ def test_voltage_clamp_with_ih_extra_columns():
 
 def test_voltage_clamp_total_current_includes_ih():
     """total_current includes Ih contribution: I_total == I_Na + I_K + I_L + I_Ih."""
-    neuron = HodgkinHuxley(optional_channels=(make_ih_channel(),))
+    neuron = HodgkinHuxley(additional_channels=(make_ih_channel(),))
     prot = step_voltage(
         duration=10.0,
         voltage_amplitude=-40.0,
@@ -318,7 +318,7 @@ def test_multiple_optional_channels_coexist():
     ch1 = make_ih_channel(g_max=0.1)
     gv2 = GatingVariable(name="q", power=1, alpha=lambda V: 0.05, beta=lambda V: 0.05)
     ch2 = BaseIonChannel(name="Iq", g_max=0.05, gating_variables=(gv2,), e_rev=-80.0)
-    neuron = HodgkinHuxley(optional_channels=(ch1, ch2))
+    neuron = HodgkinHuxley(additional_channels=(ch1, ch2))
     stim = step_current(
         duration=10.0,
         current_amplitude=5.0,
@@ -414,7 +414,7 @@ def test_make_ika_channel_custom_params():
 
 def test_current_clamp_with_ika_extra_columns():
     """Current clamp with IKa channel adds IKa_current, a, and b columns."""
-    neuron = HodgkinHuxley(optional_channels=(make_ika_channel(),))
+    neuron = HodgkinHuxley(additional_channels=(make_ika_channel(),))
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -430,7 +430,7 @@ def test_current_clamp_with_ika_extra_columns():
 
 def test_current_clamp_ika_gating_in_bounds():
     """IKa gating variables a and b stay in [0, 1] during current clamp."""
-    neuron = HodgkinHuxley(optional_channels=(make_ika_channel(),))
+    neuron = HodgkinHuxley(additional_channels=(make_ika_channel(),))
     stim = step_current(
         duration=30.0,
         current_amplitude=10.0,
@@ -447,7 +447,7 @@ def test_current_clamp_ika_gating_in_bounds():
 
 def test_voltage_clamp_with_ika_extra_columns():
     """Voltage clamp with IKa channel adds IKa_current, a, and b columns."""
-    neuron = HodgkinHuxley(optional_channels=(make_ika_channel(),))
+    neuron = HodgkinHuxley(additional_channels=(make_ika_channel(),))
     prot = step_voltage(
         duration=20.0,
         voltage_amplitude=0.0,
@@ -464,7 +464,7 @@ def test_voltage_clamp_with_ika_extra_columns():
 
 def test_ika_and_ih_coexist():
     """IKa and Ih channels can coexist and each contributes its columns."""
-    neuron = HodgkinHuxley(optional_channels=(make_ika_channel(), make_ih_channel()))
+    neuron = HodgkinHuxley(additional_channels=(make_ika_channel(), make_ih_channel()))
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -559,7 +559,7 @@ def test_make_inap_channel_custom_params():
 
 def test_current_clamp_with_inap_extra_columns():
     """Current clamp with INaP channel adds INaP_current and p columns."""
-    neuron = HodgkinHuxley(optional_channels=(make_inap_channel(),))
+    neuron = HodgkinHuxley(additional_channels=(make_inap_channel(),))
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -574,7 +574,7 @@ def test_current_clamp_with_inap_extra_columns():
 
 def test_voltage_clamp_with_inap_extra_columns():
     """Voltage clamp with INaP channel adds INaP_current and p columns."""
-    neuron = HodgkinHuxley(optional_channels=(make_inap_channel(),))
+    neuron = HodgkinHuxley(additional_channels=(make_inap_channel(),))
     prot = step_voltage(
         duration=20.0,
         voltage_amplitude=0.0,
@@ -590,7 +590,7 @@ def test_voltage_clamp_with_inap_extra_columns():
 
 def test_current_clamp_inap_gating_in_bounds():
     """INaP gating variable p stays in [0, 1] during current clamp."""
-    neuron = HodgkinHuxley(optional_channels=(make_inap_channel(),))
+    neuron = HodgkinHuxley(additional_channels=(make_inap_channel(),))
     stim = step_current(
         duration=30.0,
         current_amplitude=10.0,
@@ -700,7 +700,7 @@ def test_make_inar_channel_custom_params():
 
 def test_current_clamp_with_inar_extra_columns():
     """Current clamp with INaR channel adds INaR_current, s, and hr columns."""
-    neuron = HodgkinHuxley(optional_channels=(make_inar_channel(),))
+    neuron = HodgkinHuxley(additional_channels=(make_inar_channel(),))
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -716,7 +716,7 @@ def test_current_clamp_with_inar_extra_columns():
 
 def test_voltage_clamp_with_inar_extra_columns():
     """Voltage clamp with INaR channel adds INaR_current, s, and hr columns."""
-    neuron = HodgkinHuxley(optional_channels=(make_inar_channel(),))
+    neuron = HodgkinHuxley(additional_channels=(make_inar_channel(),))
     prot = step_voltage(
         duration=20.0,
         voltage_amplitude=0.0,
@@ -733,7 +733,7 @@ def test_voltage_clamp_with_inar_extra_columns():
 
 def test_current_clamp_inar_gating_in_bounds():
     """INaR gating variables s and hr stay in [0, 1] during current clamp."""
-    neuron = HodgkinHuxley(optional_channels=(make_inar_channel(),))
+    neuron = HodgkinHuxley(additional_channels=(make_inar_channel(),))
     stim = step_current(
         duration=30.0,
         current_amplitude=10.0,
@@ -750,7 +750,9 @@ def test_current_clamp_inar_gating_in_bounds():
 
 def test_inap_and_inar_coexist():
     """INaP and INaR channels can coexist and each contributes columns."""
-    neuron = HodgkinHuxley(optional_channels=(make_inap_channel(), make_inar_channel()))
+    neuron = HodgkinHuxley(
+        additional_channels=(make_inap_channel(), make_inar_channel())
+    )
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -766,10 +768,10 @@ def test_inap_and_inar_coexist():
     assert "hr" in df.columns
 
 
-def test_all_four_optional_channels_coexist():
-    """All four optional channels (Ih, IKa, INaP, INaR) can coexist."""
+def test_all_additional_channels_coexist():
+    """All four additional channels (Ih, IKa, INaP, INaR) can coexist."""
     neuron = HodgkinHuxley(
-        optional_channels=(
+        additional_channels=(
             make_ih_channel(),
             make_ika_channel(),
             make_inap_channel(),

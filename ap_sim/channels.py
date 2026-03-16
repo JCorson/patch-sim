@@ -1,6 +1,6 @@
 """Ion channel abstractions for the Hodgkin-Huxley simulator.
 
-Provides the building blocks for defining optional ion channels that can be
+Provides the building blocks for defining additional ion channels that can be
 added on top of the classic Na, K, and leak channels.
 """
 

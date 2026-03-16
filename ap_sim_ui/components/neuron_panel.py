@@ -6,7 +6,7 @@ from ap_sim_ui.constants import PARAM_RANGES
 from ap_sim_ui.state import AppState
 
 
-def _optional_channel_row(
+def _additional_channel_row(
     label: str,
     enabled_var: rx.Var,
     enabled_setter,
@@ -14,7 +14,7 @@ def _optional_channel_row(
     g_setter,
     param_key: str,
 ) -> rx.Component:
-    """Render a checkbox + conditional conductance slider for an optional channel.
+    """Render a checkbox + conditional conductance slider for an additional channel.
 
     Args:
         label: Display name for the channel (e.g. 'Ih (HCN)').
@@ -169,13 +169,13 @@ def neuron_panel() -> rx.Component:
         rx.accordion.root(
             rx.accordion.item(
                 header=rx.text(
-                    "Optional Channels",
+                    "Additional Channels",
                     size="2",
                     weight="bold",
                     color="var(--gray-12)",
                 ),
                 content=rx.vstack(
-                    _optional_channel_row(
+                    _additional_channel_row(
                         "Ih (HCN)",
                         AppState.ih_enabled,
                         AppState.set_ih_enabled,
@@ -183,7 +183,7 @@ def neuron_panel() -> rx.Component:
                         AppState.set_ih_g_max,
                         "ih_g_max",
                     ),
-                    _optional_channel_row(
+                    _additional_channel_row(
                         "IKa (A-type K⁺)",
                         AppState.ika_enabled,
                         AppState.set_ika_enabled,
@@ -194,7 +194,7 @@ def neuron_panel() -> rx.Component:
                     spacing="2",
                     width="100%",
                 ),
-                value="optional-channels",
+                value="additional-channels",
             ),
             collapsible=True,
             variant="ghost",

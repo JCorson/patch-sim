@@ -1,7 +1,7 @@
-"""Concrete optional ion channel implementations.
+"""Concrete additional ion channel implementations.
 
 These channels can be added to a HodgkinHuxley model via the
-``optional_channels`` argument to extend the classic three-channel HH model
+``additional_channels`` argument to extend the classic three-channel HH model
 with additional biophysical mechanisms.
 """
 

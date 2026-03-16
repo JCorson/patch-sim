@@ -222,7 +222,7 @@ def test_current_clamp_ca_varies_with_calcium_channel() -> None:
     )
     neuron = HodgkinHuxley(
         calcium_dynamics=cd,
-        optional_channels=cast(tuple[IonChannel, ...], (ch,)),
+        additional_channels=cast(tuple[IonChannel, ...], (ch,)),
     )
     protocol = step_current(
         duration=20.0,
@@ -244,7 +244,7 @@ def test_voltage_clamp_ca_varies_with_calcium_channel() -> None:
     )
     neuron = HodgkinHuxley(
         calcium_dynamics=cd,
-        optional_channels=cast(tuple[IonChannel, ...], (ch,)),
+        additional_channels=cast(tuple[IonChannel, ...], (ch,)),
     )
     protocol = step_voltage(
         duration=20.0,
@@ -271,7 +271,7 @@ def test_ca_i_stays_non_negative_current_clamp() -> None:
     )
     neuron = HodgkinHuxley(
         calcium_dynamics=cd,
-        optional_channels=cast(tuple[IonChannel, ...], (ch,)),
+        additional_channels=cast(tuple[IonChannel, ...], (ch,)),
     )
     protocol = step_current(
         duration=5.0,
@@ -291,7 +291,7 @@ def test_ca_i_stays_non_negative_voltage_clamp() -> None:
     )
     neuron = HodgkinHuxley(
         calcium_dynamics=cd,
-        optional_channels=cast(tuple[IonChannel, ...], (ch,)),
+        additional_channels=cast(tuple[IonChannel, ...], (ch,)),
     )
     protocol = step_voltage(
         duration=5.0,

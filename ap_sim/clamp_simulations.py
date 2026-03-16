@@ -44,14 +44,14 @@ def _initialize_gating_variables(
     """Compute steady-state gating variables at a given initial voltage.
 
     Initialises both the classic HH gating variables (n, m, h) and the
-    steady-state values for all optional channel gating variables.
+    steady-state values for all additional channel gating variables.
 
     Args:
         neuron: The Hodgkin-Huxley neuron model.
         initial_voltage: Initial membrane voltage in mV.
 
     Returns:
-        Tuple of (n0, m0, h0, opt_state) where opt_state maps each optional
+        Tuple of (n0, m0, h0, opt_state) where opt_state maps each additional
         gating variable name to its steady-state value at initial_voltage.
     """
     V0 = initial_voltage
@@ -63,19 +63,19 @@ def _initialize_gating_variables(
     h0 = ah0 / (ah0 + bh0)
 
     opt_state: dict[str, float] = {}
-    for gv in neuron.all_optional_gating_variables():
+    for gv in neuron.all_additional_gating_variables():
         a, b = gv.alpha(V0), gv.beta(V0)
         opt_state[gv.name] = a / (a + b)
 
     return n0, m0, h0, opt_state
 
 
-def _optional_gating_derivatives(
+def _additional_gating_derivatives(
     neuron: "HodgkinHuxley",
     V: float,
     opt_state: dict[str, float],
 ) -> dict[str, float]:
-    """Compute derivatives for all optional channel gating variables.
+    """Compute derivatives for all additional channel gating variables.
 
     Args:
         neuron: The Hodgkin-Huxley neuron model.
@@ -86,7 +86,7 @@ def _optional_gating_derivatives(
         Dict mapping each gating variable name to its dx/dt value.
     """
     derivs: dict[str, float] = {}
-    for gv in neuron.all_optional_gating_variables():
+    for gv in neuron.all_additional_gating_variables():
         x = opt_state[gv.name]
         derivs[gv.name] = gv.alpha(V) * (1 - x) - gv.beta(V) * x
     return derivs
@@ -156,12 +156,12 @@ def _hh_derivatives(
     I_Na = neuron.g_Na * (m**3) * h * (V - neuron.E_Na)
     I_K = neuron.g_K * (n**4) * (V - neuron.E_K)
     I_L = neuron.g_L * (V - neuron.E_L)
-    I_opt = sum(ch.compute_current(V, opt_state) for ch in neuron.optional_channels)
+    I_opt = sum(ch.compute_current(V, opt_state) for ch in neuron.additional_channels)
     dV = (I_ext - I_Na - I_K - I_L - I_opt) / neuron.C_m
     dn = neuron.alpha_n(V) * (1 - n) - neuron.beta_n(V) * n
     dm = neuron.alpha_m(V) * (1 - m) - neuron.beta_m(V) * m
     dh = neuron.alpha_h(V) * (1 - h) - neuron.beta_h(V) * h
-    opt_derivs = _optional_gating_derivatives(neuron, V, opt_state)
+    opt_derivs = _additional_gating_derivatives(neuron, V, opt_state)
     if neuron.calcium_dynamics is not None:
         I_Ca = neuron.calcium_current(V, opt_state)
         dca_i = neuron.calcium_dynamics.derivative(I_Ca, ca_i)
@@ -201,7 +201,7 @@ def _gating_derivatives(
     dn = neuron.alpha_n(V) * (1 - n) - neuron.beta_n(V) * n
     dm = neuron.alpha_m(V) * (1 - m) - neuron.beta_m(V) * m
     dh = neuron.alpha_h(V) * (1 - h) - neuron.beta_h(V) * h
-    opt_derivs = _optional_gating_derivatives(neuron, V, opt_state)
+    opt_derivs = _additional_gating_derivatives(neuron, V, opt_state)
     if neuron.calcium_dynamics is not None:
         I_Ca = neuron.calcium_current(V, opt_state)
         dca_i = neuron.calcium_dynamics.derivative(I_Ca, ca_i)
@@ -376,9 +376,9 @@ def simulate_voltage_clamp(
     The simulation always uses :data:`SIM_SAMPLING_FREQ` (40 kHz, dt = 0.025 ms)
     as the integration time step.
 
-    When the neuron has optional channels, the DataFrame includes additional
+    When the neuron has additional channels, the DataFrame includes extra
     columns ``{channel_name}_current`` for each channel and
-    ``{gating_var_name}`` for each optional gating variable.
+    ``{gating_var_name}`` for each additional gating variable.
 
     When the neuron has ``calcium_dynamics`` configured, a ``ca_i`` column
     containing intracellular Ca2+ concentration in mM is included.
@@ -414,11 +414,11 @@ def simulate_voltage_clamp(
 
     # Pre-allocate optional channel arrays
     opt_ch_currents: dict[str, np.ndarray] = {
-        ch.name: np.empty(num_time_steps) for ch in neuron.optional_channels
+        ch.name: np.empty(num_time_steps) for ch in neuron.additional_channels
     }
     opt_gating_arrs: dict[str, np.ndarray] = {
         gv.name: np.empty(num_time_steps)
-        for gv in neuron.all_optional_gating_variables()
+        for gv in neuron.all_additional_gating_variables()
     }
 
     # Pre-allocate calcium array if dynamics are active
@@ -448,13 +448,13 @@ def simulate_voltage_clamp(
     I_Na[0] = g_Na0 * (V0 - neuron.E_Na)
     I_K[0] = g_K0 * (V0 - neuron.E_K)
     I_L[0] = neuron.g_L * (V0 - neuron.E_L)
-    for ch in neuron.optional_channels:
+    for ch in neuron.additional_channels:
         opt_ch_currents[ch.name][0] = ch.compute_current(V0, opt_state)
     I_total[0] = (
         I_Na[0]
         + I_K[0]
         + I_L[0]
-        + sum(opt_ch_currents[ch.name][0] for ch in neuron.optional_channels)
+        + sum(opt_ch_currents[ch.name][0] for ch in neuron.additional_channels)
     )
 
     # Main simulation loop — all state in plain numpy scalars
@@ -478,13 +478,13 @@ def simulate_voltage_clamp(
         I_Na[i] = g_Na * (V - neuron.E_Na)
         I_K[i] = g_K * (V - neuron.E_K)
         I_L[i] = neuron.g_L * (V - neuron.E_L)
-        for ch in neuron.optional_channels:
+        for ch in neuron.additional_channels:
             opt_ch_currents[ch.name][i] = ch.compute_current(V, opt_state)
         I_total[i] = (
             I_Na[i]
             + I_K[i]
             + I_L[i]
-            + sum(opt_ch_currents[ch.name][i] for ch in neuron.optional_channels)
+            + sum(opt_ch_currents[ch.name][i] for ch in neuron.additional_channels)
         )
 
     data: dict[str, np.ndarray] = {
@@ -497,7 +497,7 @@ def simulate_voltage_clamp(
         "sodium_activation": m_arr,
         "sodium_inactivation": h_arr,
     }
-    for ch in neuron.optional_channels:
+    for ch in neuron.additional_channels:
         data[f"{ch.name}_current"] = opt_ch_currents[ch.name]
     for gv_name, arr in opt_gating_arrs.items():
         data[gv_name] = arr
@@ -523,9 +523,9 @@ def simulate_current_clamp(
     The simulation always uses :data:`SIM_SAMPLING_FREQ` (40 kHz, dt = 0.025 ms)
     as the integration time step.
 
-    When the neuron has optional channels, the DataFrame includes additional
+    When the neuron has additional channels, the DataFrame includes extra
     columns ``{channel_name}_current`` for each channel and
-    ``{gating_var_name}`` for each optional gating variable.
+    ``{gating_var_name}`` for each additional gating variable.
 
     When the neuron has ``calcium_dynamics`` configured, a ``ca_i`` column
     containing intracellular Ca2+ concentration in mM is included.
@@ -556,11 +556,11 @@ def simulate_current_clamp(
 
     # Pre-allocate optional channel arrays
     opt_ch_currents: dict[str, np.ndarray] = {
-        ch.name: np.empty(num_time_steps) for ch in neuron.optional_channels
+        ch.name: np.empty(num_time_steps) for ch in neuron.additional_channels
     }
     opt_gating_arrs: dict[str, np.ndarray] = {
         gv.name: np.empty(num_time_steps)
-        for gv in neuron.all_optional_gating_variables()
+        for gv in neuron.all_additional_gating_variables()
     }
 
     # Pre-allocate calcium array if dynamics are active
@@ -606,7 +606,7 @@ def simulate_current_clamp(
         step_opt: dict[str, float] = {
             gv_name: float(opt_gating_arrs[gv_name][i]) for gv_name in opt_gating_arrs
         }
-        for ch in neuron.optional_channels:
+        for ch in neuron.additional_channels:
             opt_ch_currents[ch.name][i] = ch.compute_current(float(V_arr[i]), step_opt)
 
     data: dict[str, np.ndarray] = {
@@ -615,7 +615,7 @@ def simulate_current_clamp(
         "sodium_activation": m_arr,
         "sodium_inactivation": h_arr,
     }
-    for ch in neuron.optional_channels:
+    for ch in neuron.additional_channels:
         data[f"{ch.name}_current"] = opt_ch_currents[ch.name]
     for gv_name, arr in opt_gating_arrs.items():
         data[gv_name] = arr

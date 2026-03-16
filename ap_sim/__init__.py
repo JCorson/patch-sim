@@ -7,7 +7,7 @@ from . import constants
 from .calcium import CalciumDynamics
 from .channels import GatingVariable, BaseIonChannel, CalciumIonChannel, IonChannel
 from .hodgkin_huxley import HodgkinHuxley
-from .optional_channels import (
+from .additional_channels import (
     make_ih_channel,
     make_ika_channel,
     make_inap_channel,

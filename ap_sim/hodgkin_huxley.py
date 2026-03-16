@@ -52,7 +52,7 @@ class HodgkinHuxley:
         Cl_out (float): Extracellular chloride concentration in mM.
         Cl_in (float): Intracellular chloride concentration in mM.
         T (float): Temperature in Kelvin.
-        optional_channels: Tuple of additional ion channels added on top of
+        additional_channels: Tuple of additional ion channels added on top of
             the classic Na/K/leak triad.  Defaults to an empty tuple so that
             all existing code is unaffected.
 
@@ -80,8 +80,8 @@ class HodgkinHuxley:
     # Temperature in Kelvin (37°C for mammalian cells)
     T: float = DEFAULT_T
 
-    # Optional extra channels — empty by default so existing code is unaffected
-    optional_channels: tuple[IonChannel, ...] = field(default_factory=tuple)
+    # Additional extra channels — empty by default so existing code is unaffected
+    additional_channels: tuple[IonChannel, ...] = field(default_factory=tuple)
 
     # Calcium dynamics — None by default for backward compatibility
     calcium_dynamics: CalciumDynamics | None = None
@@ -109,45 +109,47 @@ class HodgkinHuxley:
             if value <= 0:
                 raise ValueError(f"Ion concentration ({name}) must be positive.")
         _BUILTIN_NAMES = {"Na", "K", "leak"}
-        ch_names = [ch.name for ch in self.optional_channels]
+        ch_names = [ch.name for ch in self.additional_channels]
         if len(ch_names) != len(set(ch_names)):
-            raise ValueError(f"Optional channel names must be unique, got {ch_names}.")
+            raise ValueError(
+                f"Additional channel names must be unique, got {ch_names}."
+            )
         for ch_name in ch_names:
             if ch_name in _BUILTIN_NAMES:
                 raise ValueError(
-                    f"Optional channel name '{ch_name}' collides with a built-in "
+                    f"Additional channel name '{ch_name}' collides with a built-in "
                     "channel name (Na, K, leak)."
                 )
 
-    def all_optional_gating_variables(self) -> list[GatingVariable]:
-        """Return a flat list of all gating variables across optional channels.
+    def all_additional_gating_variables(self) -> list[GatingVariable]:
+        """Return a flat list of all gating variables across additional channels.
 
         Returns:
-            List of GatingVariable objects from all optional channels, in the
+            List of GatingVariable objects from all additional channels, in the
             order the channels and their gating variables are declared.
         """
         result: list[GatingVariable] = []
-        for ch in self.optional_channels:
+        for ch in self.additional_channels:
             result.extend(ch.gating_variables)
         return result
 
     def calcium_current(self, V: float, opt_state: dict[str, float]) -> float:
-        """Return the total current from all calcium-carrying optional channels.
+        """Return the total current from all calcium-carrying additional channels.
 
-        Sums the current from every optional channel that has
-        ``carries_calcium=True``.  Used by the Ca2+ ODE to determine how
-        much intracellular Ca2+ is entering the cell each time step.
+        Sums the current from every additional channel that is an instance of
+        CalciumIonChannel.  Used by the Ca2+ ODE to determine how much
+        intracellular Ca2+ is entering the cell each time step.
 
         Args:
             V: Membrane voltage in mV.
-            opt_state: Optional channel gating state (name → value).
+            opt_state: Additional channel gating state (name → value).
 
         Returns:
             Total calcium current in µA/cm² (positive = outward).
         """
         return sum(
             ch.compute_current(V, opt_state)
-            for ch in self.optional_channels
+            for ch in self.additional_channels
             if isinstance(ch, CalciumIonChannel)
         )
 
