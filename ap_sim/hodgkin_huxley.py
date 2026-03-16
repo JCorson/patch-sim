@@ -121,18 +121,19 @@ class HodgkinHuxley:
                     "channel name (Na, K, leak)."
                 )
 
-    def all_additional_gating_variables(self) -> list[AnyGatingVariable]:
-        """Return a flat list of all gating variables across additional channels.
+    @cached_property
+    def all_additional_gating_variables(self) -> tuple[AnyGatingVariable, ...]:
+        """Return a flat tuple of all gating variables across additional channels.
 
         Returns:
-            List of gating variable objects from all additional channels, in
+            Tuple of gating variable objects from all additional channels, in
             the order the channels and their gating variables are declared.
             May contain both GatingVariable and CalciumGatingVariable instances.
         """
         result: list[AnyGatingVariable] = []
         for ch in self.additional_channels:
             result.extend(ch.gating_variables)
-        return result
+        return tuple(result)
 
     def calcium_current(self, V: float, opt_state: dict[str, float]) -> float:
         """Return the total current from all calcium-carrying additional channels.

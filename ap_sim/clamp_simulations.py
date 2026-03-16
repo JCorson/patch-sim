@@ -69,7 +69,7 @@ def _initialize_gating_variables(
     h0 = ah0 / (ah0 + bh0)
 
     add_state: dict[str, float] = {}
-    for gv in neuron.all_additional_gating_variables():
+    for gv in neuron.all_additional_gating_variables:
         if isinstance(gv, CalciumGatingVariable):
             a, b = gv.alpha(V0, ca_i), gv.beta(V0, ca_i)
         else:
@@ -100,7 +100,7 @@ def _additional_gating_derivatives(
         Dict mapping each gating variable name to its dx/dt value.
     """
     derivs: dict[str, float] = {}
-    for gv in neuron.all_additional_gating_variables():
+    for gv in neuron.all_additional_gating_variables:
         x = add_state[gv.name]
         if isinstance(gv, CalciumGatingVariable):
             derivs[gv.name] = gv.alpha(V, ca_i) * (1 - x) - gv.beta(V, ca_i) * x
@@ -435,7 +435,7 @@ def simulate_voltage_clamp(
     }
     add_gating_arrs: dict[str, np.ndarray] = {
         gv.name: np.empty(num_time_steps)
-        for gv in neuron.all_additional_gating_variables()
+        for gv in neuron.all_additional_gating_variables
     }
 
     # Pre-allocate calcium array if dynamics are active
@@ -577,7 +577,7 @@ def simulate_current_clamp(
     }
     add_gating_arrs: dict[str, np.ndarray] = {
         gv.name: np.empty(num_time_steps)
-        for gv in neuron.all_additional_gating_variables()
+        for gv in neuron.all_additional_gating_variables
     }
 
     # Pre-allocate calcium array if dynamics are active
