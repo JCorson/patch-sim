@@ -19,6 +19,12 @@ from ap_sim.hodgkin_huxley import HodgkinHuxley
 from ap_sim.additional_channels import (
     _alpha_a,
     _alpha_b,
+    _alpha_d,
+    _alpha_dn,
+    _alpha_dt,
+    _alpha_f,
+    _alpha_fn,
+    _alpha_ft,
     _alpha_hr,
     _alpha_kir,
     _alpha_p,
@@ -28,6 +34,12 @@ from ap_sim.additional_channels import (
     _alpha_w,
     _beta_a,
     _beta_b,
+    _beta_d,
+    _beta_dn,
+    _beta_dt,
+    _beta_f,
+    _beta_fn,
+    _beta_ft,
     _beta_hr,
     _beta_kir,
     _beta_p,
@@ -35,6 +47,9 @@ from ap_sim.additional_channels import (
     _beta_r,
     _beta_s,
     _beta_w,
+    make_ican_channel,
+    make_ical_channel,
+    make_icat_channel,
     make_ih_channel,
     make_ika_channel,
     make_ikca_channel,
@@ -1262,3 +1277,349 @@ def test_current_clamp_ikca_gating_in_bounds():
 def test_public_api_exports_ikca():
     """make_ikca_channel is exported from the ap_sim public API."""
     assert hasattr(ap_sim, "make_ikca_channel")
+
+
+# ---------------------------------------------------------------------------
+# ICaL — L-type Ca²⁺ channel
+# ---------------------------------------------------------------------------
+
+
+def test_ical_gating_steady_state_in_bounds():
+    """ICaL gating variable steady states are in [0, 1] for physiological voltages."""
+    for V in np.linspace(-120.0, 60.0, 60):
+        for alpha_fn, beta_fn in ((_alpha_d, _beta_d), (_alpha_f, _beta_f)):
+            a = alpha_fn(V)
+            b = beta_fn(V)
+            assert a >= 0, f"alpha negative at V={V}"
+            assert b >= 0, f"beta negative at V={V}"
+            ss = a / (a + b)
+            assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}"
+
+
+def test_ical_activation_increases_with_depolarisation():
+    """ICaL d_inf (activation) is higher at depolarised voltages."""
+
+    def d_inf(V: float) -> float:
+        """Activation steady-state at voltage V."""
+        a, b = _alpha_d(V), _beta_d(V)
+        return a / (a + b)
+
+    assert d_inf(20.0) > d_inf(-30.0) > d_inf(-80.0)
+
+
+def test_make_ical_channel_defaults():
+    """make_ical_channel() produces a channel with the expected defaults."""
+    from ap_sim.channels import CalciumIonChannel
+    from ap_sim.constants import DEFAULT_E_ICAL, DEFAULT_G_ICAL
+
+    ch = make_ical_channel()
+    assert ch.name == "ICaL"
+    assert ch.g_max == pytest.approx(DEFAULT_G_ICAL)
+    assert ch.e_rev == pytest.approx(DEFAULT_E_ICAL)
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "d"
+    assert ch.gating_variables[0].power == 2
+    assert ch.gating_variables[1].name == "f"
+    assert ch.gating_variables[1].power == 1
+    assert isinstance(ch, CalciumIonChannel)
+
+
+def test_current_clamp_with_ical_extra_columns():
+    """Current clamp with ICaL channel adds ICaL_current, d, and f columns."""
+    from ap_sim.calcium import CalciumDynamics
+
+    neuron = HodgkinHuxley(
+        additional_channels=(make_ical_channel(),),
+        calcium_dynamics=CalciumDynamics(),
+    )
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert "ICaL_current" in df.columns
+    assert "d" in df.columns
+    assert "f" in df.columns
+
+
+def test_current_clamp_ical_gating_in_bounds():
+    """ICaL gating variables d and f stay in [0, 1] during current clamp."""
+    from ap_sim.calcium import CalciumDynamics
+
+    neuron = HodgkinHuxley(
+        additional_channels=(make_ical_channel(),),
+        calcium_dynamics=CalciumDynamics(),
+    )
+    stim = step_current(
+        duration=30.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=20.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert df["d"].min() >= 0.0
+    assert df["d"].max() <= 1.0
+    assert df["f"].min() >= 0.0
+    assert df["f"].max() <= 1.0
+
+
+def test_voltage_clamp_with_ical_extra_columns():
+    """Voltage clamp with ICaL channel adds ICaL_current, d, and f columns."""
+    from ap_sim.calcium import CalciumDynamics
+
+    neuron = HodgkinHuxley(
+        additional_channels=(make_ical_channel(),),
+        calcium_dynamics=CalciumDynamics(),
+    )
+    prot = step_voltage(
+        duration=20.0,
+        voltage_amplitude=0.0,
+        step_start=5.0,
+        step_duration=10.0,
+        holding_voltage=-70.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_voltage_clamp(neuron, prot)
+    assert "ICaL_current" in df.columns
+    assert "d" in df.columns
+    assert "f" in df.columns
+
+
+def test_public_api_exports_ical():
+    """make_ical_channel and CalciumBaseIonChannel are exported from ap_sim."""
+    assert hasattr(ap_sim, "make_ical_channel")
+    assert hasattr(ap_sim, "CalciumBaseIonChannel")
+
+
+# ---------------------------------------------------------------------------
+# ICaT — T-type Ca²⁺ channel
+# ---------------------------------------------------------------------------
+
+
+def test_icat_gating_steady_state_in_bounds():
+    """ICaT gating variable steady states are in [0, 1] for physiological voltages."""
+    for V in np.linspace(-120.0, 60.0, 60):
+        for alpha_fn, beta_fn in ((_alpha_dt, _beta_dt), (_alpha_ft, _beta_ft)):
+            a = alpha_fn(V)
+            b = beta_fn(V)
+            assert a >= 0, f"alpha negative at V={V}"
+            assert b >= 0, f"beta negative at V={V}"
+            ss = a / (a + b)
+            assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}"
+
+
+def test_icat_activation_increases_with_depolarisation():
+    """ICaT dt_inf (activation) is higher at less-negative voltages."""
+
+    def dt_inf(V: float) -> float:
+        """Activation steady-state at voltage V."""
+        a, b = _alpha_dt(V), _beta_dt(V)
+        return a / (a + b)
+
+    assert dt_inf(-20.0) > dt_inf(-60.0) > dt_inf(-100.0)
+
+
+def test_make_icat_channel_defaults():
+    """make_icat_channel() produces a channel with the expected defaults."""
+    from ap_sim.channels import CalciumIonChannel
+    from ap_sim.constants import DEFAULT_E_ICAT, DEFAULT_G_ICAT
+
+    ch = make_icat_channel()
+    assert ch.name == "ICaT"
+    assert ch.g_max == pytest.approx(DEFAULT_G_ICAT)
+    assert ch.e_rev == pytest.approx(DEFAULT_E_ICAT)
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "dt"
+    assert ch.gating_variables[0].power == 2
+    assert ch.gating_variables[1].name == "ft"
+    assert ch.gating_variables[1].power == 1
+    assert isinstance(ch, CalciumIonChannel)
+
+
+def test_current_clamp_with_icat_extra_columns():
+    """Current clamp with ICaT channel adds ICaT_current, dt, and ft columns."""
+    from ap_sim.calcium import CalciumDynamics
+
+    neuron = HodgkinHuxley(
+        additional_channels=(make_icat_channel(),),
+        calcium_dynamics=CalciumDynamics(),
+    )
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert "ICaT_current" in df.columns
+    assert "dt" in df.columns
+    assert "ft" in df.columns
+
+
+def test_current_clamp_icat_gating_in_bounds():
+    """ICaT gating variables dt and ft stay in [0, 1] during current clamp."""
+    from ap_sim.calcium import CalciumDynamics
+
+    neuron = HodgkinHuxley(
+        additional_channels=(make_icat_channel(),),
+        calcium_dynamics=CalciumDynamics(),
+    )
+    stim = step_current(
+        duration=30.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=20.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert df["dt"].min() >= 0.0
+    assert df["dt"].max() <= 1.0
+    assert df["ft"].min() >= 0.0
+    assert df["ft"].max() <= 1.0
+
+
+def test_voltage_clamp_with_icat_extra_columns():
+    """Voltage clamp with ICaT channel adds ICaT_current, dt, and ft columns."""
+    from ap_sim.calcium import CalciumDynamics
+
+    neuron = HodgkinHuxley(
+        additional_channels=(make_icat_channel(),),
+        calcium_dynamics=CalciumDynamics(),
+    )
+    prot = step_voltage(
+        duration=20.0,
+        voltage_amplitude=0.0,
+        step_start=5.0,
+        step_duration=10.0,
+        holding_voltage=-70.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_voltage_clamp(neuron, prot)
+    assert "ICaT_current" in df.columns
+    assert "dt" in df.columns
+    assert "ft" in df.columns
+
+
+def test_public_api_exports_icat():
+    """make_icat_channel is exported from the ap_sim public API."""
+    assert hasattr(ap_sim, "make_icat_channel")
+
+
+# ---------------------------------------------------------------------------
+# ICaN — N-type Ca²⁺ channel
+# ---------------------------------------------------------------------------
+
+
+def test_ican_gating_steady_state_in_bounds():
+    """ICaN gating variable steady states are in [0, 1] for physiological voltages."""
+    for V in np.linspace(-120.0, 60.0, 60):
+        for alpha_fn, beta_fn in ((_alpha_dn, _beta_dn), (_alpha_fn, _beta_fn)):
+            a = alpha_fn(V)
+            b = beta_fn(V)
+            assert a >= 0, f"alpha negative at V={V}"
+            assert b >= 0, f"beta negative at V={V}"
+            ss = a / (a + b)
+            assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}"
+
+
+def test_ican_activation_increases_with_depolarisation():
+    """ICaN dn_inf (activation) is higher at depolarised voltages."""
+
+    def dn_inf(V: float) -> float:
+        """Activation steady-state at voltage V."""
+        a, b = _alpha_dn(V), _beta_dn(V)
+        return a / (a + b)
+
+    assert dn_inf(20.0) > dn_inf(-30.0) > dn_inf(-80.0)
+
+
+def test_make_ican_channel_defaults():
+    """make_ican_channel() produces a channel with the expected defaults."""
+    from ap_sim.channels import CalciumIonChannel
+    from ap_sim.constants import DEFAULT_E_ICAN, DEFAULT_G_ICAN
+
+    ch = make_ican_channel()
+    assert ch.name == "ICaN"
+    assert ch.g_max == pytest.approx(DEFAULT_G_ICAN)
+    assert ch.e_rev == pytest.approx(DEFAULT_E_ICAN)
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "dn"
+    assert ch.gating_variables[0].power == 2
+    assert ch.gating_variables[1].name == "fn"
+    assert ch.gating_variables[1].power == 1
+    assert isinstance(ch, CalciumIonChannel)
+
+
+def test_current_clamp_with_ican_extra_columns():
+    """Current clamp with ICaN channel adds ICaN_current, dn, and fn columns."""
+    from ap_sim.calcium import CalciumDynamics
+
+    neuron = HodgkinHuxley(
+        additional_channels=(make_ican_channel(),),
+        calcium_dynamics=CalciumDynamics(),
+    )
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert "ICaN_current" in df.columns
+    assert "dn" in df.columns
+    assert "fn" in df.columns
+
+
+def test_current_clamp_ican_gating_in_bounds():
+    """ICaN gating variables dn and fn stay in [0, 1] during current clamp."""
+    from ap_sim.calcium import CalciumDynamics
+
+    neuron = HodgkinHuxley(
+        additional_channels=(make_ican_channel(),),
+        calcium_dynamics=CalciumDynamics(),
+    )
+    stim = step_current(
+        duration=30.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=20.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert df["dn"].min() >= 0.0
+    assert df["dn"].max() <= 1.0
+    assert df["fn"].min() >= 0.0
+    assert df["fn"].max() <= 1.0
+
+
+def test_voltage_clamp_with_ican_extra_columns():
+    """Voltage clamp with ICaN channel adds ICaN_current, dn, and fn columns."""
+    from ap_sim.calcium import CalciumDynamics
+
+    neuron = HodgkinHuxley(
+        additional_channels=(make_ican_channel(),),
+        calcium_dynamics=CalciumDynamics(),
+    )
+    prot = step_voltage(
+        duration=20.0,
+        voltage_amplitude=0.0,
+        step_start=5.0,
+        step_duration=10.0,
+        holding_voltage=-70.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_voltage_clamp(neuron, prot)
+    assert "ICaN_current" in df.columns
+    assert "dn" in df.columns
+    assert "fn" in df.columns
+
+
+def test_public_api_exports_ican():
+    """make_ican_channel is exported from the ap_sim public API."""
+    assert hasattr(ap_sim, "make_ican_channel")

@@ -6,9 +6,18 @@ with additional biophysical mechanisms.
 """
 
 import math
+from dataclasses import dataclass
 
-from .channels import BaseIonChannel, CalciumGatingVariable, GatingVariable
+from .channels import (
+    BaseIonChannel,
+    CalciumGatingVariable,
+    CalciumIonChannel,
+    GatingVariable,
+)
 from .constants import (
+    DEFAULT_E_ICAN,
+    DEFAULT_E_ICAL,
+    DEFAULT_E_ICAT,
     DEFAULT_E_IH,
     DEFAULT_E_IKA,
     DEFAULT_E_IKCA,
@@ -16,6 +25,9 @@ from .constants import (
     DEFAULT_E_IM,
     DEFAULT_E_NAP,
     DEFAULT_E_NAR,
+    DEFAULT_G_ICAN,
+    DEFAULT_G_ICAL,
+    DEFAULT_G_ICAT,
     DEFAULT_G_IH,
     DEFAULT_G_IKA,
     DEFAULT_G_IKCA,
@@ -25,6 +37,20 @@ from .constants import (
     DEFAULT_G_NAR,
 )
 from .utils import boltzmann_cosh_rates, safe_exp
+
+
+@dataclass(frozen=True)
+class CalciumBaseIonChannel(BaseIonChannel, CalciumIonChannel):
+    """A BaseIonChannel that also carries Ca²⁺ ions.
+
+    Inherits both :class:`~ap_sim.channels.BaseIonChannel` (for conductance
+    and gating mechanics) and :class:`~ap_sim.channels.CalciumIonChannel`
+    (marker so ``isinstance(ch, CalciumIonChannel)`` returns ``True``).
+
+    Use this as the return type for Ca²⁺-carrying channels (ICaL, ICaT,
+    ICaN) so that :func:`~ap_sim.hodgkin_huxley.HodgkinHuxley.calcium_current`
+    picks them up automatically.
+    """
 
 
 def _alpha_r(V: float) -> float:
@@ -529,5 +555,147 @@ def make_ikca_channel(
         name="IKCa",
         g_max=g_max,
         gating_variables=(q_var,),
+        e_rev=e_rev,
+    )
+
+
+# ---------------------------------------------------------------------------
+# ICaL — L-type Ca²⁺ channel (high-voltage activated, slow inactivating)
+# ---------------------------------------------------------------------------
+
+_alpha_d, _beta_d = boltzmann_cosh_rates(
+    half=-10.0, slope=6.2, tau_scale=1.0, tau_floor=0.1
+)
+_alpha_f, _beta_f = boltzmann_cosh_rates(
+    half=-35.0, slope=-9.0, tau_scale=50.0, tau_floor=5.0
+)
+
+
+def make_ical_channel(
+    g_max: float = DEFAULT_G_ICAL,
+    e_rev: float = DEFAULT_E_ICAL,
+) -> CalciumBaseIonChannel:
+    """Create an ICaL (L-type Ca²⁺) ion channel.
+
+    ICaL is a high-voltage-activated Ca²⁺ channel with slow voltage-dependent
+    inactivation.  It is the dominant source of Ca²⁺ influx during action
+    potentials in many neuron types.  It uses two gating variables: ``d``
+    (activation, power 2) and ``f`` (inactivation, power 1).
+
+    Because ICaL carries Ca²⁺, the returned object inherits
+    :class:`~ap_sim.channels.CalciumIonChannel` so that
+    :func:`~ap_sim.hodgkin_huxley.HodgkinHuxley.calcium_current` sums its
+    contribution automatically.
+
+    Kinetics use Boltzmann-cosh rate functions with activation centred at
+    -10 mV (slope 6.2 mV) and inactivation centred at -35 mV (slope -9 mV,
+    inverted).
+
+    Args:
+        g_max: Maximum conductance in mS/cm². Must be non-negative.
+            Defaults to :data:`~ap_sim.constants.DEFAULT_G_ICAL`.
+        e_rev: Reversal potential in mV. Defaults to
+            :data:`~ap_sim.constants.DEFAULT_E_ICAL`.
+
+    Returns:
+        A :class:`CalciumBaseIonChannel` representing the ICaL current.
+    """
+    d_var = GatingVariable(name="d", power=2, alpha=_alpha_d, beta=_beta_d)
+    f_var = GatingVariable(name="f", power=1, alpha=_alpha_f, beta=_beta_f)
+    return CalciumBaseIonChannel(
+        name="ICaL",
+        g_max=g_max,
+        gating_variables=(d_var, f_var),
+        e_rev=e_rev,
+    )
+
+
+# ---------------------------------------------------------------------------
+# ICaT — T-type Ca²⁺ channel (low-voltage activated, transient)
+# ---------------------------------------------------------------------------
+
+_alpha_dt, _beta_dt = boltzmann_cosh_rates(
+    half=-56.0, slope=6.2, tau_scale=1.0, tau_floor=0.1
+)
+_alpha_ft, _beta_ft = boltzmann_cosh_rates(
+    half=-80.0, slope=-9.0, tau_scale=20.0, tau_floor=2.0
+)
+
+
+def make_icat_channel(
+    g_max: float = DEFAULT_G_ICAT,
+    e_rev: float = DEFAULT_E_ICAT,
+) -> CalciumBaseIonChannel:
+    """Create an ICaT (T-type Ca²⁺) ion channel.
+
+    ICaT is a low-voltage-activated, transient Ca²⁺ channel.  It activates
+    near the resting potential and contributes to burst firing and
+    oscillatory behaviour (e.g. in thalamic neurons).  It uses two gating
+    variables: ``dt`` (activation, power 2) and ``ft`` (inactivation, power 1).
+
+    Kinetics follow Destexhe et al. (1994) with activation half-point at
+    -56 mV and inactivation half-point at -80 mV.
+
+    Args:
+        g_max: Maximum conductance in mS/cm². Must be non-negative.
+            Defaults to :data:`~ap_sim.constants.DEFAULT_G_ICAT`.
+        e_rev: Reversal potential in mV. Defaults to
+            :data:`~ap_sim.constants.DEFAULT_E_ICAT`.
+
+    Returns:
+        A :class:`CalciumBaseIonChannel` representing the ICaT current.
+    """
+    dt_var = GatingVariable(name="dt", power=2, alpha=_alpha_dt, beta=_beta_dt)
+    ft_var = GatingVariable(name="ft", power=1, alpha=_alpha_ft, beta=_beta_ft)
+    return CalciumBaseIonChannel(
+        name="ICaT",
+        g_max=g_max,
+        gating_variables=(dt_var, ft_var),
+        e_rev=e_rev,
+    )
+
+
+# ---------------------------------------------------------------------------
+# ICaN — N-type Ca²⁺ channel (high-voltage activated)
+# ---------------------------------------------------------------------------
+
+_alpha_dn, _beta_dn = boltzmann_cosh_rates(
+    half=-20.0, slope=6.2, tau_scale=1.0, tau_floor=0.1
+)
+_alpha_fn, _beta_fn = boltzmann_cosh_rates(
+    half=-40.0, slope=-9.0, tau_scale=30.0, tau_floor=3.0
+)
+
+
+def make_ican_channel(
+    g_max: float = DEFAULT_G_ICAN,
+    e_rev: float = DEFAULT_E_ICAN,
+) -> CalciumBaseIonChannel:
+    """Create an ICaN (N-type Ca²⁺) ion channel.
+
+    ICaN is a high-voltage-activated Ca²⁺ channel that inactivates more
+    rapidly than ICaL.  It is widely expressed in neuronal dendrites and
+    presynaptic terminals and contributes to neurotransmitter release.
+    It uses two gating variables: ``dn`` (activation, power 2) and
+    ``fn`` (inactivation, power 1).
+
+    Kinetics use Boltzmann-cosh rate functions with activation centred at
+    -20 mV and inactivation centred at -40 mV.
+
+    Args:
+        g_max: Maximum conductance in mS/cm². Must be non-negative.
+            Defaults to :data:`~ap_sim.constants.DEFAULT_G_ICAN`.
+        e_rev: Reversal potential in mV. Defaults to
+            :data:`~ap_sim.constants.DEFAULT_E_ICAN`.
+
+    Returns:
+        A :class:`CalciumBaseIonChannel` representing the ICaN current.
+    """
+    dn_var = GatingVariable(name="dn", power=2, alpha=_alpha_dn, beta=_beta_dn)
+    fn_var = GatingVariable(name="fn", power=1, alpha=_alpha_fn, beta=_beta_fn)
+    return CalciumBaseIonChannel(
+        name="ICaN",
+        g_max=g_max,
+        gating_variables=(dn_var, fn_var),
         e_rev=e_rev,
     )

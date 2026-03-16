@@ -36,6 +36,15 @@ DEFAULT_E_IKIR: float = -77.0  # Inward rectifier K+ reversal potential in mV
 DEFAULT_G_IKCA: float = 1.0  # Calcium-activated K+ maximum conductance in mS/cm²
 DEFAULT_E_IKCA: float = -77.0  # Calcium-activated K+ reversal potential in mV
 
+DEFAULT_G_ICAL: float = 0.5  # L-type Ca2+ maximum conductance in mS/cm²
+DEFAULT_E_ICAL: float = 120.0  # L-type Ca2+ reversal potential in mV
+
+DEFAULT_G_ICAT: float = 0.3  # T-type Ca2+ maximum conductance in mS/cm²
+DEFAULT_E_ICAT: float = 120.0  # T-type Ca2+ reversal potential in mV
+
+DEFAULT_G_ICAN: float = 0.3  # N-type Ca2+ maximum conductance in mS/cm²
+DEFAULT_E_ICAN: float = 120.0  # N-type Ca2+ reversal potential in mV
+
 # Calcium dynamics defaults
 DEFAULT_ALPHA_CA: float = 1e-4  # mM / (µA/cm² · ms)
 DEFAULT_TAU_CA: float = 200.0  # ms

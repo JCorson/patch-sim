@@ -15,6 +15,10 @@ from .channels import (
 )
 from .hodgkin_huxley import HodgkinHuxley
 from .additional_channels import (
+    CalciumBaseIonChannel,
+    make_ican_channel,
+    make_ical_channel,
+    make_icat_channel,
     make_ih_channel,
     make_ika_channel,
     make_ikca_channel,
@@ -43,6 +47,7 @@ from .protocols import (
 __all__ = [
     "constants",
     "AnyGatingVariable",
+    "CalciumBaseIonChannel",
     "CalciumDynamics",
     "CalciumGatingVariable",
     "GatingVariable",
@@ -50,6 +55,9 @@ __all__ = [
     "CalciumIonChannel",
     "IonChannel",
     "HodgkinHuxley",
+    "make_ican_channel",
+    "make_ical_channel",
+    "make_icat_channel",
     "make_ih_channel",
     "make_ika_channel",
     "make_ikca_channel",
