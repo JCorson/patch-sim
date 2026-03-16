@@ -17,6 +17,7 @@ from .hodgkin_huxley import HodgkinHuxley
 from .additional_channels import (
     make_ih_channel,
     make_ika_channel,
+    make_ikca_channel,
     make_ikir_channel,
     make_im_channel,
     make_inap_channel,
@@ -51,6 +52,7 @@ __all__ = [
     "HodgkinHuxley",
     "make_ih_channel",
     "make_ika_channel",
+    "make_ikca_channel",
     "make_ikir_channel",
     "make_im_channel",
     "make_inap_channel",

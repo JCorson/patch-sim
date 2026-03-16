@@ -7,18 +7,20 @@ with additional biophysical mechanisms.
 
 import math
 
-from .channels import BaseIonChannel, GatingVariable
+from .channels import BaseIonChannel, CalciumGatingVariable, GatingVariable
 from .constants import (
     DEFAULT_E_IH,
     DEFAULT_E_IKA,
-    DEFAULT_E_IM,
+    DEFAULT_E_IKCA,
     DEFAULT_E_IKIR,
+    DEFAULT_E_IM,
     DEFAULT_E_NAP,
     DEFAULT_E_NAR,
     DEFAULT_G_IH,
     DEFAULT_G_IKA,
-    DEFAULT_G_IM,
+    DEFAULT_G_IKCA,
     DEFAULT_G_IKIR,
+    DEFAULT_G_IM,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
 )
@@ -654,5 +656,117 @@ def make_ikir_channel(
         name="IKir",
         g_max=g_max,
         gating_variables=(kir_var,),
+        e_rev=e_rev,
+    )
+
+
+# ---------------------------------------------------------------------------
+# I_KCa — Calcium-activated K⁺ channel (simplified BK-like)
+# ---------------------------------------------------------------------------
+
+_IKCA_HILL_KD: float = 0.001  # Half-saturation Ca²⁺ concentration in mM (K_d)
+_IKCA_V_HALF: float = -20.0  # Half-activation voltage in mV
+_IKCA_V_SLOPE: float = 10.0  # Voltage activation slope in mV
+_IKCA_TAU_SCALE: float = 10.0  # Time-constant numerator in ms
+_IKCA_TAU_COSH_SCALE: float = 20.0  # Voltage scale in cosh denominator in mV
+_IKCA_TAU_FLOOR: float = 1.0  # Minimum time constant in ms
+
+
+def _ikca_q_inf(V: float, ca_i: float) -> float:
+    """Steady-state activation of IKCa at voltage V and [Ca²⁺]ᵢ.
+
+    Combines a linear Hill function (n=1, K_d=0.001 mM) with a Boltzmann
+    voltage factor.  Zero calcium gives zero activation regardless of voltage.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM.
+
+    Returns:
+        Steady-state open probability in [0, 1].
+    """
+    hill = ca_i / (ca_i + _IKCA_HILL_KD)
+    boltzmann = 1.0 / (1.0 + safe_exp(-(V - _IKCA_V_HALF) / _IKCA_V_SLOPE))
+    return hill * boltzmann
+
+
+def _ikca_tau(V: float) -> float:
+    """Voltage-dependent time constant for IKCa gating variable q.
+
+    Uses a cosh-based expression with a floor to prevent near-zero values.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Time constant in ms (floored at 1 ms).
+    """
+    tau = _IKCA_TAU_SCALE / math.cosh((V - _IKCA_V_HALF) / _IKCA_TAU_COSH_SCALE)
+    return max(tau, _IKCA_TAU_FLOOR)
+
+
+def _alpha_q(V: float, ca_i: float) -> float:
+    """Forward rate for IKCa gating variable q.
+
+    Derived as alpha_q = q_inf(V, ca_i) / tau(V).
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM.
+
+    Returns:
+        Forward rate alpha_q in 1/ms.
+    """
+    return _ikca_q_inf(V, ca_i) / _ikca_tau(V)
+
+
+def _beta_q(V: float, ca_i: float) -> float:
+    """Backward rate for IKCa gating variable q.
+
+    Derived as beta_q = (1 - q_inf(V, ca_i)) / tau(V).
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM.
+
+    Returns:
+        Backward rate beta_q in 1/ms.
+    """
+    return (1.0 - _ikca_q_inf(V, ca_i)) / _ikca_tau(V)
+
+
+def make_ikca_channel(
+    g_max: float = DEFAULT_G_IKCA,
+    e_rev: float = DEFAULT_E_IKCA,
+) -> BaseIonChannel:
+    """Create an IKCa (calcium-activated K⁺) ion channel.
+
+    IKCa is a BK-like K⁺ channel activated by both membrane depolarisation
+    and elevated intracellular Ca²⁺.  It contributes to spike repolarisation
+    and the afterhyperpolarisation following Ca²⁺ entry.  It uses a single
+    CalciumGatingVariable ``q`` (power 1) whose kinetics depend on both
+    voltage and [Ca²⁺]ᵢ.
+
+    Note: IKCa is calcium-*activated* but carries K⁺, not Ca²⁺.  It does NOT
+    inherit CalciumIonChannel.
+
+    Kinetics use a Hill function (K_d = 0.001 mM, n = 1) multiplied by a
+    Boltzmann voltage factor (half-activation at -20 mV) for the steady state,
+    and a cosh-based voltage-dependent time constant.
+
+    Args:
+        g_max: Maximum conductance in mS/cm². Must be non-negative.
+            Defaults to :data:`~ap_sim.constants.DEFAULT_G_IKCA`.
+        e_rev: Reversal potential in mV. Defaults to
+            :data:`~ap_sim.constants.DEFAULT_E_IKCA`.
+
+    Returns:
+        A :class:`~ap_sim.channels.BaseIonChannel` representing the IKCa current.
+    """
+    q_var = CalciumGatingVariable(name="q", power=1, alpha=_alpha_q, beta=_beta_q)
+    return BaseIonChannel(
+        name="IKCa",
+        g_max=g_max,
+        gating_variables=(q_var,),
         e_rev=e_rev,
     )

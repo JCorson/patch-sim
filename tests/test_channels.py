@@ -22,6 +22,7 @@ from ap_sim.additional_channels import (
     _alpha_hr,
     _alpha_kir,
     _alpha_p,
+    _alpha_q,
     _alpha_r,
     _alpha_s,
     _alpha_w,
@@ -30,11 +31,13 @@ from ap_sim.additional_channels import (
     _beta_hr,
     _beta_kir,
     _beta_p,
+    _beta_q,
     _beta_r,
     _beta_s,
     _beta_w,
     make_ih_channel,
     make_ika_channel,
+    make_ikca_channel,
     make_ikir_channel,
     make_im_channel,
     make_inar_channel,
@@ -780,7 +783,9 @@ def test_inap_and_inar_coexist():
 
 
 def test_all_additional_channels_coexist():
-    """All six additional channels (Ih, IKa, INaP, INaR, IM, IKir) can coexist."""
+    """All seven additional channels (Ih, IKa, INaP, INaR, IM, IKir, IKCa) coexist."""
+    from ap_sim.calcium import CalciumDynamics
+
     neuron = HodgkinHuxley(
         additional_channels=(
             make_ih_channel(),
@@ -789,7 +794,9 @@ def test_all_additional_channels_coexist():
             make_inar_channel(),
             make_im_channel(),
             make_ikir_channel(),
-        )
+            make_ikca_channel(),
+        ),
+        calcium_dynamics=CalciumDynamics(),
     )
     stim = step_current(
         duration=20.0,
@@ -806,9 +813,10 @@ def test_all_additional_channels_coexist():
         "INaR_current",
         "IM_current",
         "IKir_current",
+        "IKCa_current",
     ):
         assert col in df.columns
-    for gate in ("r", "a", "b", "p", "s", "hr", "w", "kir"):
+    for gate in ("r", "a", "b", "p", "s", "hr", "w", "kir", "q"):
         assert gate in df.columns
 
 
@@ -1124,3 +1132,135 @@ def test_calcium_gating_variable_exported():
     """CalciumGatingVariable and AnyGatingVariable are in the ap_sim public API."""
     assert hasattr(ap_sim, "CalciumGatingVariable")
     assert hasattr(ap_sim, "AnyGatingVariable")
+
+
+# ---------------------------------------------------------------------------
+# I_KCa rate functions
+# ---------------------------------------------------------------------------
+
+
+def test_ikca_gating_steady_state_in_bounds():
+    """IKCa gating variable q_inf is in [0, 1] for physiological V and ca_i."""
+    for V in np.linspace(-120.0, 60.0, 20):
+        for ca in (1e-4, 1e-3, 1e-2):
+            a = _alpha_q(V, ca)
+            b = _beta_q(V, ca)
+            assert a >= 0, f"alpha_q negative at V={V}, ca={ca}"
+            assert b >= 0, f"beta_q negative at V={V}, ca={ca}"
+            ss = a / (a + b)
+            assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}, ca={ca}"
+
+
+def test_ikca_activation_increases_with_calcium():
+    """IKCa q_inf is higher at higher [Ca²⁺]ᵢ at a fixed voltage."""
+    from ap_sim.additional_channels import _ikca_q_inf
+
+    V = -20.0
+    assert _ikca_q_inf(V, 1e-2) > _ikca_q_inf(V, 1e-3) > _ikca_q_inf(V, 1e-4)
+
+
+def test_ikca_activation_increases_with_depolarisation():
+    """IKCa q_inf is higher at depolarised voltages at fixed [Ca²⁺]ᵢ."""
+    from ap_sim.additional_channels import _ikca_q_inf
+
+    ca = 1e-3
+    assert _ikca_q_inf(20.0, ca) > _ikca_q_inf(-20.0, ca) > _ikca_q_inf(-80.0, ca)
+
+
+def test_ikca_zero_calcium_gives_zero_activation():
+    """IKCa q_inf is zero when [Ca²⁺]ᵢ is zero, regardless of voltage."""
+    from ap_sim.additional_channels import _ikca_q_inf
+
+    for V in np.linspace(-120.0, 60.0, 10):
+        assert _ikca_q_inf(V, 0.0) == 0.0, f"q_inf non-zero at V={V} with ca=0"
+
+
+def test_ikca_rates_non_negative():
+    """IKCa alpha_q and beta_q are non-negative across physiological range."""
+    for V in np.linspace(-120.0, 60.0, 30):
+        for ca in (0.0, 1e-4, 1e-3):
+            assert _alpha_q(V, ca) >= 0, f"alpha_q negative at V={V}, ca={ca}"
+            assert _beta_q(V, ca) >= 0, f"beta_q negative at V={V}, ca={ca}"
+
+
+# ---------------------------------------------------------------------------
+# make_ikca_channel
+# ---------------------------------------------------------------------------
+
+
+def test_make_ikca_channel_defaults():
+    """make_ikca_channel() produces a channel with the expected defaults."""
+    from ap_sim.constants import DEFAULT_E_IKCA, DEFAULT_G_IKCA
+
+    ch = make_ikca_channel()
+    assert ch.name == "IKCa"
+    assert ch.g_max == pytest.approx(DEFAULT_G_IKCA)
+    assert ch.e_rev == pytest.approx(DEFAULT_E_IKCA)
+    assert len(ch.gating_variables) == 1
+    assert ch.gating_variables[0].name == "q"
+    assert ch.gating_variables[0].power == 1
+
+
+def test_make_ikca_channel_custom_params():
+    """make_ikca_channel accepts custom g_max and e_rev."""
+    ch = make_ikca_channel(g_max=2.0, e_rev=-80.0)
+    assert ch.g_max == pytest.approx(2.0)
+    assert ch.e_rev == pytest.approx(-80.0)
+
+
+def test_ikca_is_not_calcium_ion_channel():
+    """IKCa does not inherit CalciumIonChannel — it carries K⁺, not Ca²⁺."""
+    from ap_sim.channels import CalciumIonChannel
+
+    ch = make_ikca_channel()
+    assert not isinstance(ch, CalciumIonChannel)
+
+
+# ---------------------------------------------------------------------------
+# I_KCa integration tests
+# ---------------------------------------------------------------------------
+
+
+def test_current_clamp_with_ikca():
+    """Current clamp with IKCa channel adds IKCa_current and q columns."""
+    from ap_sim.calcium import CalciumDynamics
+
+    neuron = HodgkinHuxley(
+        additional_channels=(make_ikca_channel(),),
+        calcium_dynamics=CalciumDynamics(),
+    )
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert "IKCa_current" in df.columns
+    assert "q" in df.columns
+
+
+def test_current_clamp_ikca_gating_in_bounds():
+    """IKCa gating variable q stays in [0, 1] during current clamp."""
+    from ap_sim.calcium import CalciumDynamics
+
+    neuron = HodgkinHuxley(
+        additional_channels=(make_ikca_channel(),),
+        calcium_dynamics=CalciumDynamics(),
+    )
+    stim = step_current(
+        duration=30.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=20.0,
+        sampling_frequency=40000.0,
+    )
+    df = simulate_current_clamp(neuron, stim)
+    assert df["q"].min() >= 0.0
+    assert df["q"].max() <= 1.0
+
+
+def test_public_api_exports_ikca():
+    """make_ikca_channel is exported from the ap_sim public API."""
+    assert hasattr(ap_sim, "make_ikca_channel")
