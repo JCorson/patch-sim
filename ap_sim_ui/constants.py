@@ -18,6 +18,14 @@ PARAM_RANGES: dict[str, tuple[float, float, float]] = {
     # Additional channel conductances
     "ih_g_max": (0.0, 1.0, 0.01),
     "ika_g_max": (0.0, 100.0, 0.1),
+    "inap_g_max": (0.0, 5.0, 0.01),
+    "inar_g_max": (0.0, 5.0, 0.01),
+    "im_g_max": (0.0, 5.0, 0.01),
+    "ikir_g_max": (0.0, 2.0, 0.01),
+    "ikca_g_max": (0.0, 10.0, 0.1),
+    "ical_g_max": (0.0, 5.0, 0.01),
+    "icat_g_max": (0.0, 5.0, 0.01),
+    "ican_g_max": (0.0, 5.0, 0.01),
 }
 
 # Current clamp protocol types
