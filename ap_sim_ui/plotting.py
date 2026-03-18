@@ -406,10 +406,10 @@ def build_figure(
             hoverinfo: Plotly hoverinfo value (e.g. ``"skip"``); ``None``
                 uses the default.
         """
-        line: dict = {"color": color} if color else {}
-        if dash:
+        line: dict = {"color": color} if color is not None else {}
+        if dash is not None:
             line["dash"] = dash
-        if width:
+        if width is not None:
             line["width"] = width
         kwargs: dict = {}
         if hoverinfo is not None:
