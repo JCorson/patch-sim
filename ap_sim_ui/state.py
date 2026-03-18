@@ -53,6 +53,26 @@ from ap_sim_ui.plotting import Sweep, build_figure
 from ap_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
 
 # ------------------------------------------------------------------ #
+# Channel registry                                                   #
+# ------------------------------------------------------------------ #
+# Each entry is (enabled_attr, g_max_attr, factory, extra_kwargs).   #
+# extra_kwargs maps kwarg name → state attribute name; the value     #
+# "e_ca" is resolved at runtime from the computed Nernst potential.  #
+
+_CHANNEL_REGISTRY: list[tuple[str, str, object, dict[str, str]]] = [
+    ("ih_enabled", "ih_g_max", make_ih_channel, {}),
+    ("ika_enabled", "ika_g_max", make_ika_channel, {}),
+    ("inap_enabled", "inap_g_max", make_inap_channel, {}),
+    ("inar_enabled", "inar_g_max", make_inar_channel, {}),
+    ("im_enabled", "im_g_max", make_im_channel, {}),
+    ("ikir_enabled", "ikir_g_max", make_ikir_channel, {}),
+    ("ikca_enabled", "ikca_g_max", make_ikca_channel, {}),
+    ("ical_enabled", "ical_g_max", make_ical_channel, {"e_rev": "e_ca"}),
+    ("icat_enabled", "icat_g_max", make_icat_channel, {"e_rev": "e_ca"}),
+    ("ican_enabled", "ican_g_max", make_ican_channel, {"e_rev": "e_ca"}),
+]
+
+# ------------------------------------------------------------------ #
 # Float setter generation                                            #
 # ------------------------------------------------------------------ #
 # Reflex's auto-generated set_X handlers are typed `value: float`,   #
@@ -517,34 +537,15 @@ class AppState(rx.State):
             self.error_message = ""
 
         try:
-            additional_channels = []
-            if self.ih_enabled:
-                additional_channels.append(make_ih_channel(g_max=self.ih_g_max))
-            if self.ika_enabled:
-                additional_channels.append(make_ika_channel(g_max=self.ika_g_max))
-            if self.inap_enabled:
-                additional_channels.append(make_inap_channel(g_max=self.inap_g_max))
-            if self.inar_enabled:
-                additional_channels.append(make_inar_channel(g_max=self.inar_g_max))
-            if self.im_enabled:
-                additional_channels.append(make_im_channel(g_max=self.im_g_max))
-            if self.ikir_enabled:
-                additional_channels.append(make_ikir_channel(g_max=self.ikir_g_max))
-            if self.ikca_enabled:
-                additional_channels.append(make_ikca_channel(g_max=self.ikca_g_max))
             e_ca = float(ap_sim.nernst_potential(2, self.T, self.Ca_out, self.Ca_in))
-            if self.ical_enabled:
-                additional_channels.append(
-                    make_ical_channel(g_max=self.ical_g_max, e_rev=e_ca)
-                )
-            if self.icat_enabled:
-                additional_channels.append(
-                    make_icat_channel(g_max=self.icat_g_max, e_rev=e_ca)
-                )
-            if self.ican_enabled:
-                additional_channels.append(
-                    make_ican_channel(g_max=self.ican_g_max, e_rev=e_ca)
-                )
+            _extra_values = {"e_ca": e_ca}
+            additional_channels = []
+            for enabled_attr, g_max_attr, factory, extra_kwargs in _CHANNEL_REGISTRY:
+                if getattr(self, enabled_attr):
+                    kwargs = {k: _extra_values[v] for k, v in extra_kwargs.items()}
+                    additional_channels.append(
+                        factory(g_max=getattr(self, g_max_attr), **kwargs)  # type: ignore[operator]
+                    )
             needs_calcium = (
                 self.ikca_enabled
                 or self.ical_enabled
