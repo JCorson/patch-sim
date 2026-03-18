@@ -101,7 +101,7 @@ def _minmax_downsample(
 
     idx_sorted = sorted(keep)
     time_ds = [time[i] for i in idx_sorted]
-    arrays_ds = [[arr[i] for i in idx_sorted] for arr in arrays]
+    arrays_ds = [([arr[i] for i in idx_sorted] if arr else []) for arr in arrays]
     return time_ds, arrays_ds
 
 
