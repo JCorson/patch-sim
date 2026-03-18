@@ -33,6 +33,13 @@ ap_sim = {path = "./ap_sim", editable = true}
 module = ["ap_sim_ui.*", "reflex.*", "plotly.*", "rxconfig"]
 ignore_errors = true
 
+[[tool.mypy.overrides]]
+# test_state.py uses Reflex internals (_reflex_internal_init) and accesses
+# dynamically-generated AppState attributes (set_duration, set_show_voltage,
+# etc.) that mypy cannot resolve from the class definition alone.
+module = ["tests.test_state"]
+ignore_errors = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 filterwarnings = [
