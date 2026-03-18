@@ -12,6 +12,8 @@ import ap_sim
 import ap_sim.clamp_simulations
 from ap_sim.constants import (
     DEFAULT_C_M,
+    DEFAULT_CA_IN,
+    DEFAULT_CA_OUT,
     DEFAULT_CL_IN,
     DEFAULT_CL_OUT,
     DEFAULT_G_ICAN,
@@ -71,6 +73,8 @@ _FLOAT_FIELDS: list[str] = [
     "K_in",
     "Cl_out",
     "Cl_in",
+    "Ca_out",
+    "Ca_in",
     "T",
     # Shared protocol params
     "duration",
@@ -223,6 +227,8 @@ class AppState(rx.State):
     K_in: float = DEFAULT_K_IN
     Cl_out: float = DEFAULT_CL_OUT
     Cl_in: float = DEFAULT_CL_IN
+    Ca_out: float = DEFAULT_CA_OUT
+    Ca_in: float = DEFAULT_CA_IN
     T: float = DEFAULT_T
 
     # ------------------------------------------------------------------ #
@@ -365,6 +371,11 @@ class AppState(rx.State):
     def E_L(self) -> float:
         """Leak reversal potential in mV."""
         return float(ap_sim.nernst_potential(-1, self.T, self.Cl_out, self.Cl_in))
+
+    @rx.var
+    def E_Ca(self) -> float:
+        """Calcium reversal potential in mV (z=+2)."""
+        return float(ap_sim.nernst_potential(2, self.T, self.Ca_out, self.Ca_in))
 
     @rx.var
     def protocol_options(self) -> list[str]:
@@ -521,12 +532,19 @@ class AppState(rx.State):
                 additional_channels.append(make_ikir_channel(g_max=self.ikir_g_max))
             if self.ikca_enabled:
                 additional_channels.append(make_ikca_channel(g_max=self.ikca_g_max))
+            e_ca = float(ap_sim.nernst_potential(2, self.T, self.Ca_out, self.Ca_in))
             if self.ical_enabled:
-                additional_channels.append(make_ical_channel(g_max=self.ical_g_max))
+                additional_channels.append(
+                    make_ical_channel(g_max=self.ical_g_max, e_rev=e_ca)
+                )
             if self.icat_enabled:
-                additional_channels.append(make_icat_channel(g_max=self.icat_g_max))
+                additional_channels.append(
+                    make_icat_channel(g_max=self.icat_g_max, e_rev=e_ca)
+                )
             if self.ican_enabled:
-                additional_channels.append(make_ican_channel(g_max=self.ican_g_max))
+                additional_channels.append(
+                    make_ican_channel(g_max=self.ican_g_max, e_rev=e_ca)
+                )
             needs_calcium = (
                 self.ikca_enabled
                 or self.ical_enabled
@@ -546,6 +564,8 @@ class AppState(rx.State):
                 K_in=self.K_in,
                 Cl_out=self.Cl_out,
                 Cl_in=self.Cl_in,
+                Ca_out=self.Ca_out,
+                Ca_in=self.Ca_in,
                 T=self.T,
                 additional_channels=tuple(additional_channels),
                 calcium_dynamics=calcium_dynamics,

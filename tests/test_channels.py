@@ -1310,12 +1310,12 @@ def test_ical_activation_increases_with_depolarisation():
 def test_make_ical_channel_defaults():
     """make_ical_channel() produces a channel with the expected defaults."""
     from ap_sim.channels import CalciumIonChannel
-    from ap_sim.constants import DEFAULT_E_ICAL, DEFAULT_G_ICAL
+    from ap_sim.constants import DEFAULT_E_CA, DEFAULT_G_ICAL
 
     ch = make_ical_channel()
     assert ch.name == "ICaL"
     assert ch.g_max == pytest.approx(DEFAULT_G_ICAL)
-    assert ch.e_rev == pytest.approx(DEFAULT_E_ICAL)
+    assert ch.e_rev == pytest.approx(DEFAULT_E_CA)
     assert len(ch.gating_variables) == 2
     assert ch.gating_variables[0].name == "d"
     assert ch.gating_variables[0].power == 2
@@ -1426,12 +1426,12 @@ def test_icat_activation_increases_with_depolarisation():
 def test_make_icat_channel_defaults():
     """make_icat_channel() produces a channel with the expected defaults."""
     from ap_sim.channels import CalciumIonChannel
-    from ap_sim.constants import DEFAULT_E_ICAT, DEFAULT_G_ICAT
+    from ap_sim.constants import DEFAULT_E_CA, DEFAULT_G_ICAT
 
     ch = make_icat_channel()
     assert ch.name == "ICaT"
     assert ch.g_max == pytest.approx(DEFAULT_G_ICAT)
-    assert ch.e_rev == pytest.approx(DEFAULT_E_ICAT)
+    assert ch.e_rev == pytest.approx(DEFAULT_E_CA)
     assert len(ch.gating_variables) == 2
     assert ch.gating_variables[0].name == "dt"
     assert ch.gating_variables[0].power == 2
@@ -1541,12 +1541,12 @@ def test_ican_activation_increases_with_depolarisation():
 def test_make_ican_channel_defaults():
     """make_ican_channel() produces a channel with the expected defaults."""
     from ap_sim.channels import CalciumIonChannel
-    from ap_sim.constants import DEFAULT_E_ICAN, DEFAULT_G_ICAN
+    from ap_sim.constants import DEFAULT_E_CA, DEFAULT_G_ICAN
 
     ch = make_ican_channel()
     assert ch.name == "ICaN"
     assert ch.g_max == pytest.approx(DEFAULT_G_ICAN)
-    assert ch.e_rev == pytest.approx(DEFAULT_E_ICAN)
+    assert ch.e_rev == pytest.approx(DEFAULT_E_CA)
     assert len(ch.gating_variables) == 2
     assert ch.gating_variables[0].name == "dn"
     assert ch.gating_variables[0].power == 2

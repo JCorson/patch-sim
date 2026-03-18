@@ -15,9 +15,7 @@ from .channels import (
     GatingVariable,
 )
 from .constants import (
-    DEFAULT_E_ICAN,
-    DEFAULT_E_ICAL,
-    DEFAULT_E_ICAT,
+    DEFAULT_E_CA,
     DEFAULT_E_IH,
     DEFAULT_E_IKA,
     DEFAULT_E_IKCA,
@@ -573,7 +571,7 @@ _alpha_f, _beta_f = boltzmann_cosh_rates(
 
 def make_ical_channel(
     g_max: float = DEFAULT_G_ICAL,
-    e_rev: float = DEFAULT_E_ICAL,
+    e_rev: float = DEFAULT_E_CA,
 ) -> CalciumBaseIonChannel:
     """Create an ICaL (L-type Ca²⁺) ion channel.
 
@@ -595,7 +593,7 @@ def make_ical_channel(
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~ap_sim.constants.DEFAULT_G_ICAL`.
         e_rev: Reversal potential in mV. Defaults to
-            :data:`~ap_sim.constants.DEFAULT_E_ICAL`.
+            :data:`~ap_sim.constants.DEFAULT_E_CA`.
 
     Returns:
         A :class:`CalciumBaseIonChannel` representing the ICaL current.
@@ -624,7 +622,7 @@ _alpha_ft, _beta_ft = boltzmann_cosh_rates(
 
 def make_icat_channel(
     g_max: float = DEFAULT_G_ICAT,
-    e_rev: float = DEFAULT_E_ICAT,
+    e_rev: float = DEFAULT_E_CA,
 ) -> CalciumBaseIonChannel:
     """Create an ICaT (T-type Ca²⁺) ion channel.
 
@@ -640,7 +638,7 @@ def make_icat_channel(
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~ap_sim.constants.DEFAULT_G_ICAT`.
         e_rev: Reversal potential in mV. Defaults to
-            :data:`~ap_sim.constants.DEFAULT_E_ICAT`.
+            :data:`~ap_sim.constants.DEFAULT_E_CA`.
 
     Returns:
         A :class:`CalciumBaseIonChannel` representing the ICaT current.
@@ -669,7 +667,7 @@ _alpha_fn, _beta_fn = boltzmann_cosh_rates(
 
 def make_ican_channel(
     g_max: float = DEFAULT_G_ICAN,
-    e_rev: float = DEFAULT_E_ICAN,
+    e_rev: float = DEFAULT_E_CA,
 ) -> CalciumBaseIonChannel:
     """Create an ICaN (N-type Ca²⁺) ion channel.
 
@@ -686,7 +684,7 @@ def make_ican_channel(
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~ap_sim.constants.DEFAULT_G_ICAN`.
         e_rev: Reversal potential in mV. Defaults to
-            :data:`~ap_sim.constants.DEFAULT_E_ICAN`.
+            :data:`~ap_sim.constants.DEFAULT_E_CA`.
 
     Returns:
         A :class:`CalciumBaseIonChannel` representing the ICaN current.

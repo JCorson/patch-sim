@@ -150,6 +150,8 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
                 "K_in",
                 "Cl_out",
                 "Cl_in",
+                "Ca_out",
+                "Ca_in",
                 "T",
             }
             and isinstance(v, (int, float))
@@ -181,6 +183,8 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
                 "K_in",
                 "Cl_out",
                 "Cl_in",
+                "Ca_out",
+                "Ca_in",
                 "T",
             }
             and isinstance(v, (int, float))

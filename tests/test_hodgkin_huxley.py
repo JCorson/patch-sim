@@ -230,9 +230,36 @@ def test_non_positive_temperature_raises(T: float):
         {"Cl_out": -1.0},
         {"Cl_in": 0.0},
         {"Cl_in": -1.0},
+        {"Ca_out": 0.0},
+        {"Ca_out": -1.0},
+        {"Ca_in": 0.0},
+        {"Ca_in": -1.0},
     ],
 )
 def test_non_positive_ion_concentration_raises(kwargs: dict):
     """Non-positive ion concentration must raise ValueError."""
     with pytest.raises(ValueError, match="concentration"):
         HodgkinHuxley(**kwargs)
+
+
+def test_e_ca_matches_nernst(hh_model):
+    """E_Ca must match Nernst equation with z=2 for default Ca concentrations."""
+    expected = nernst_potential(2, hh_model.T, hh_model.Ca_out, hh_model.Ca_in)
+    assert hh_model.E_Ca == pytest.approx(expected)
+
+
+def test_e_ca_default_is_positive():
+    """Default E_Ca should be large and positive (~131 mV)."""
+    model = HodgkinHuxley()
+    assert model.E_Ca > 100.0
+
+
+def test_custom_ca_concentrations_shift_e_ca():
+    """Changing Ca concentrations must produce a shifted E_Ca."""
+    default_model = HodgkinHuxley()
+    # Higher Ca_out → more positive E_Ca
+    higher_out = HodgkinHuxley(Ca_out=10.0)
+    assert higher_out.E_Ca > default_model.E_Ca
+    # Lower Ca_out → less positive E_Ca
+    lower_out = HodgkinHuxley(Ca_out=0.5)
+    assert lower_out.E_Ca < default_model.E_Ca

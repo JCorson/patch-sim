@@ -10,6 +10,8 @@ from .calcium import CalciumDynamics
 from .channels import AnyGatingVariable, CalciumIonChannel, IonChannel
 from .constants import (
     DEFAULT_C_M,
+    DEFAULT_CA_IN,
+    DEFAULT_CA_OUT,
     DEFAULT_CL_IN,
     DEFAULT_CL_OUT,
     DEFAULT_G_K,
@@ -76,6 +78,8 @@ class HodgkinHuxley:
     K_in: float = DEFAULT_K_IN
     Cl_out: float = DEFAULT_CL_OUT
     Cl_in: float = DEFAULT_CL_IN
+    Ca_out: float = DEFAULT_CA_OUT
+    Ca_in: float = DEFAULT_CA_IN
 
     # Temperature in Kelvin (37°C for mammalian cells)
     T: float = DEFAULT_T
@@ -105,6 +109,8 @@ class HodgkinHuxley:
             ("K_in", self.K_in),
             ("Cl_out", self.Cl_out),
             ("Cl_in", self.Cl_in),
+            ("Ca_out", self.Ca_out),
+            ("Ca_in", self.Ca_in),
         ]:
             if value <= 0:
                 raise ValueError(f"Ion concentration ({name}) must be positive.")
@@ -172,6 +178,11 @@ class HodgkinHuxley:
     def E_L(self) -> float:
         """Leak reversal potential in mV."""
         return nernst_potential(-1, self.T, self.Cl_out, self.Cl_in)
+
+    @cached_property
+    def E_Ca(self) -> float:
+        """Calcium reversal potential in mV (z=+2)."""
+        return nernst_potential(2, self.T, self.Ca_out, self.Ca_in)
 
     def alpha_n(self, V: float) -> float:
         """Calculate the rate constant alpha_n for potassium channel activation.

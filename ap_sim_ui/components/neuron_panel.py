@@ -156,6 +156,22 @@ def neuron_panel() -> rx.Component:
                     _ion_row("K⁺ in", AppState.K_in, AppState.set_K_in, 1, 300),
                     _ion_row("Cl⁻ out", AppState.Cl_out, AppState.set_Cl_out, 1, 300),
                     _ion_row("Cl⁻ in", AppState.Cl_in, AppState.set_Cl_in, 1, 100),
+                    _ion_row(
+                        "Ca²⁺ out",
+                        AppState.Ca_out,
+                        AppState.set_Ca_out,
+                        0.1,
+                        20,
+                        0.1,
+                    ),
+                    _ion_row(
+                        "Ca²⁺ in",
+                        AppState.Ca_in,
+                        AppState.set_Ca_in,
+                        0.00001,
+                        0.01,
+                        0.00001,
+                    ),
                     spacing="2",
                     width="100%",
                 ),
@@ -270,6 +286,7 @@ def neuron_panel() -> rx.Component:
             _reversal_row("E_Na", AppState.E_Na),
             _reversal_row("E_K", AppState.E_K),
             _reversal_row("E_L", AppState.E_L),
+            _reversal_row("E_Ca", AppState.E_Ca),
             spacing="1",
             width="100%",
         ),
@@ -285,6 +302,7 @@ def _ion_row(
     handler,
     min_val: float,
     max_val: float,
+    step: float = 1,
 ) -> rx.Component:
     """Render a single ion concentration row with input."""
     return rx.hstack(
@@ -292,7 +310,7 @@ def _ion_row(
         rx.slider(
             min=min_val,
             max=max_val,
-            step=1,
+            step=step,
             value=[var],
             on_change=handler,
             width="100%",
@@ -305,6 +323,7 @@ def _ion_row(
             type="number",
             min=str(min_val),
             max=str(max_val),
+            step=str(step),
         ),
         width="100%",
         spacing="2",
