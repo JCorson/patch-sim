@@ -98,16 +98,17 @@ GATING_VAR_COLORS: dict[str, str] = {
     "fn": "#dbdb8d",  # light olive
 }
 
-# Colour palette for sweep overlays (10 distinct colours)
+# Neutral grey palette for sweep overlays so saved "reference" traces are
+# visually distinct from the coloured channel / gating-variable traces.
 SWEEP_COLORS: list[str] = [
-    "#1f77b4",
-    "#ff7f0e",
-    "#2ca02c",
-    "#d62728",
-    "#9467bd",
-    "#8c564b",
-    "#e377c2",
-    "#7f7f7f",
-    "#bcbd22",
-    "#17becf",
+    "#888888",
+    "#666666",
+    "#aaaaaa",
+    "#555555",
+    "#999999",
+    "#777777",
+    "#bbbbbb",
+    "#444444",
+    "#9e9e9e",
+    "#707070",
 ]
