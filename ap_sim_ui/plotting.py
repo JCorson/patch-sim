@@ -37,73 +37,6 @@ _CLASSIC_CURRENT_COLUMNS = frozenset(
 # Maximum number of hover carrier points; keeps tooltip HTML build time short.
 _MAX_HOVER_POINTS = 2000
 
-# Default maximum display points per sweep after downsampling.
-_DEFAULT_MAX_DISPLAY_POINTS = 500
-
-
-def _minmax_downsample(
-    time: list[float],
-    arrays: list[list[float]],
-    reference: list[float],
-    n_target: int,
-) -> tuple[list[float], list[list[float]]]:
-    """Downsample a set of co-indexed arrays using min-max bucket selection.
-
-    Divides the trace into ``n_target // 2`` equal buckets and, for each
-    bucket, retains the indices of the minimum and maximum values of the
-    *reference* signal.  All other arrays use the same index set so every
-    array remains aligned.  The first and last points are always kept.
-
-    This preserves sharp peaks and troughs (e.g. action potential spikes or
-    fast inward currents) that uniform striding would miss.
-
-    Args:
-        time: Time axis values.  Must have the same length as every element
-            of ``arrays`` and ``reference``.
-        arrays: Signal arrays to downsample together.
-        reference: The signal used to determine which points to keep within
-            each bucket.  Typically voltage (Current Clamp) or total current
-            (Voltage Clamp).
-        n_target: Approximate maximum number of output points.  The actual
-            count may differ slightly because duplicate min/max indices are
-            de-duplicated.
-
-    Returns:
-        A 2-tuple ``(time_ds, arrays_ds)`` where ``time_ds`` is the
-        downsampled time axis and ``arrays_ds`` is the downsampled version
-        of each array in ``arrays``, in the same order.
-    """
-    n = len(time)
-    if n <= n_target:
-        return time, arrays
-
-    n_buckets = max(1, n_target // 2)
-    keep: set[int] = {0, n - 1}
-
-    for b in range(n_buckets):
-        start = (b * n) // n_buckets
-        end = ((b + 1) * n) // n_buckets
-        if start >= end:
-            continue
-        min_idx = start
-        max_idx = start
-        min_val = reference[start]
-        max_val = reference[start]
-        for i in range(start + 1, end):
-            if reference[i] < min_val:
-                min_val = reference[i]
-                min_idx = i
-            if reference[i] > max_val:
-                max_val = reference[i]
-                max_idx = i
-        keep.add(min_idx)
-        keep.add(max_idx)
-
-    idx_sorted = sorted(keep)
-    time_ds = [time[i] for i in idx_sorted]
-    arrays_ds = [[arr[i] for i in idx_sorted] for arr in arrays]
-    return time_ds, arrays_ds
-
 
 class Sweep(BaseModel):
     """A simulation result snapshot used for overlay display.
@@ -150,7 +83,6 @@ class Sweep(BaseModel):
         label: str,
         color: str,
         mode: str,
-        max_display_points: int = _DEFAULT_MAX_DISPLAY_POINTS,
     ) -> "Sweep":
         """Create a Sweep from a simulation result DataFrame.
 
@@ -158,23 +90,15 @@ class Sweep(BaseModel):
         whose name ends with ``_current`` become ``additional_currents``; all
         other extra columns become ``additional_gating``.
 
-        All signal arrays are downsampled together using min-max bucket
-        selection so that peaks and troughs are preserved while the display
-        payload is kept small.  Full-resolution data remains in the
-        ``ap_sim`` core library; only this display copy is reduced.
-
         Args:
             df: Simulation result DataFrame with time as the index.
             stimulus: Stimulus array (current or voltage command).
             label: Display name for this sweep in the legend.
             color: Hex colour string; pass empty string to use Plotly default.
             mode: Clamp mode — "Current Clamp" or "Voltage Clamp".
-            max_display_points: Approximate maximum number of time points to
-                retain after downsampling.  Defaults to
-                ``_DEFAULT_MAX_DISPLAY_POINTS``.
 
         Returns:
-            A fully populated Sweep instance with downsampled arrays.
+            A fully populated Sweep instance.
         """
         columns = df.columns.tolist()
 
@@ -194,64 +118,22 @@ class Sweep(BaseModel):
             else:
                 additional_gating[col] = df[col].tolist()
 
-        # Pack all signal arrays in a fixed order for uniform downsampling so
-        # every array uses the same index selection and remains aligned.
-        classic_keys = [
-            "voltage",
-            "sodium_current",
-            "potassium_current",
-            "leak_current",
-            "total_current",
-            "potassium_activation",
-            "sodium_activation",
-            "sodium_inactivation",
-        ]
-        classic_arrays = [_col(k) for k in classic_keys]
-        stim_array = stimulus.tolist()
-        add_curr_key_list = list(additional_currents.keys())
-        add_curr_arrays = [additional_currents[k] for k in add_curr_key_list]
-        add_gating_key_list = list(additional_gating.keys())
-        add_gating_arrays = [additional_gating[k] for k in add_gating_key_list]
-
-        all_arrays = classic_arrays + [stim_array] + add_curr_arrays + add_gating_arrays
-        time_raw = df.index.tolist()
-
-        # Use total_current (VC) or voltage (CC) as the reference signal for
-        # bucket min/max selection; fall back to time if the column is absent.
-        ref: list[float] = (
-            classic_arrays[4] if mode == "Voltage Clamp" else classic_arrays[0]
-        )
-        if not ref:
-            ref = time_raw
-
-        time_ds, all_ds = _minmax_downsample(
-            time_raw, all_arrays, ref, max_display_points
-        )
-
-        # Unpack in the same order they were packed.
-        n_classic = len(classic_keys)
-        classic_ds = all_ds[:n_classic]
-        stim_ds = all_ds[n_classic]
-        offset = n_classic + 1
-        add_curr_ds = all_ds[offset : offset + len(add_curr_arrays)]
-        add_gating_ds = all_ds[offset + len(add_curr_arrays) :]
-
         return cls(
             label=label,
             color=color,
             clamp_mode=mode,
-            time=time_ds,
-            stimulus=stim_ds,
-            voltage=classic_ds[0],
-            sodium_current=classic_ds[1],
-            potassium_current=classic_ds[2],
-            leak_current=classic_ds[3],
-            total_current=classic_ds[4],
-            potassium_activation=classic_ds[5],
-            sodium_activation=classic_ds[6],
-            sodium_inactivation=classic_ds[7],
-            additional_currents=dict(zip(add_curr_key_list, add_curr_ds)),
-            additional_gating=dict(zip(add_gating_key_list, add_gating_ds)),
+            time=df.index.tolist(),
+            stimulus=stimulus.tolist(),
+            voltage=_col("voltage"),
+            sodium_current=_col("sodium_current"),
+            potassium_current=_col("potassium_current"),
+            leak_current=_col("leak_current"),
+            total_current=_col("total_current"),
+            potassium_activation=_col("potassium_activation"),
+            sodium_activation=_col("sodium_activation"),
+            sodium_inactivation=_col("sodium_inactivation"),
+            additional_currents=additional_currents,
+            additional_gating=additional_gating,
         )
 
 
