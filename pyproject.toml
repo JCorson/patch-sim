@@ -37,7 +37,8 @@ ignore_errors = true
 # test_state.py uses Reflex internals (_reflex_internal_init) and accesses
 # dynamically-generated AppState attributes (set_duration, set_show_voltage,
 # etc.) that mypy cannot resolve from the class definition alone.
-module = ["tests.test_state"]
+# test_plotting.py imports plotly directly; plotly has no type stubs.
+module = ["tests.test_state", "tests.test_plotting"]
 ignore_errors = true
 
 [tool.pytest.ini_options]
