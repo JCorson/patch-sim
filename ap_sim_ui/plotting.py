@@ -4,6 +4,8 @@ Pure functions and data containers — no Reflex dependency.
 Follows the same separation as protocol_builders.py.
 """
 
+from dataclasses import dataclass, field
+
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pydantic import BaseModel
@@ -54,6 +56,42 @@ _TOTAL_CURRENT_LINE_WIDTH = 4
 
 # Plot margin in pixels: left, right, top, bottom.
 _PLOT_MARGIN = {"l": 60, "r": 20, "t": 30, "b": 40}
+
+
+@dataclass(frozen=True)
+class TraceVisibility:
+    """Visibility flags for every plotted trace.
+
+    All classic flags default to ``True`` so callers only need to supply
+    the flags they want to override.  Additional-channel dicts are empty
+    by default, which ``build_figure`` and ``_build_hover_tables`` treat as
+    "show all".
+
+    Attributes:
+        voltage: Show the membrane voltage trace (Current Clamp).
+        total_current: Show the summed ion current trace (Voltage Clamp).
+        sodium_current: Show I_Na.
+        potassium_current: Show I_K.
+        leak_current: Show I_L.
+        potassium_activation: Show gating variable n.
+        sodium_activation: Show gating variable m.
+        sodium_inactivation: Show gating variable h.
+        additional_currents: Visibility flags for extra channel currents,
+            keyed by channel name.
+        additional_gating: Visibility flags for extra gating variables,
+            keyed by variable name.
+    """
+
+    voltage: bool = True
+    total_current: bool = True
+    sodium_current: bool = True
+    potassium_current: bool = True
+    leak_current: bool = True
+    potassium_activation: bool = True
+    sodium_activation: bool = True
+    sodium_inactivation: bool = True
+    additional_currents: dict[str, bool] = field(default_factory=dict)
+    additional_gating: dict[str, bool] = field(default_factory=dict)
 
 
 class Sweep(BaseModel):
@@ -157,15 +195,7 @@ class Sweep(BaseModel):
 
 def _build_hover_tables(
     current_sweeps: list[Sweep],
-    show_total_current: bool,
-    show_sodium_current: bool,
-    show_potassium_current: bool,
-    show_leak_current: bool,
-    show_potassium_activation: bool,
-    show_sodium_activation: bool,
-    show_sodium_inactivation: bool,
-    show_additional_currents: dict[str, bool],
-    show_additional_gating: dict[str, bool],
+    visibility: TraceVisibility,
     add_current_keys: list[str],
     add_gating_keys: list[str],
     is_vc: bool,
@@ -179,15 +209,7 @@ def _build_hover_tables(
 
     Args:
         current_sweeps: The N sweeps from the I-V Curve run.
-        show_total_current: Whether the total current trace is visible.
-        show_sodium_current: Whether I_Na is visible.
-        show_potassium_current: Whether I_K is visible.
-        show_leak_current: Whether I_L is visible.
-        show_potassium_activation: Whether gating variable n is visible.
-        show_sodium_activation: Whether gating variable m is visible.
-        show_sodium_inactivation: Whether gating variable h is visible.
-        show_additional_currents: Visibility flags for additional current channels.
-        show_additional_gating: Visibility flags for additional gating variables.
+        visibility: Consolidated trace visibility flags.
         add_current_keys: Ordered list of additional current channel names.
         add_gating_keys: Ordered list of additional gating variable names.
         is_vc: True when in Voltage Clamp mode.
@@ -224,16 +246,16 @@ def _build_hover_tables(
     # Col spec: (header_label, source, data_key)
     if is_vc:
         resp_cols: list[tuple[str, str, str]] = []
-        if show_total_current:
+        if visibility.total_current:
             resp_cols.append(("I_total", "classic", "total_current"))
-        if show_sodium_current:
+        if visibility.sodium_current:
             resp_cols.append(("I_Na", "classic", "sodium_current"))
-        if show_potassium_current:
+        if visibility.potassium_current:
             resp_cols.append(("I_K", "classic", "potassium_current"))
-        if show_leak_current:
+        if visibility.leak_current:
             resp_cols.append(("I_L", "classic", "leak_current"))
         for ch_name in add_current_keys:
-            if show_additional_currents.get(ch_name, True):
+            if visibility.additional_currents.get(ch_name, True):
                 resp_cols.append((f"I_{ch_name}", "additional", ch_name))
     else:
         resp_cols = [("V (mV)", "classic", "voltage")]
@@ -260,14 +282,14 @@ def _build_hover_tables(
 
     # --- Gating subplot (row 2) ---
     gating_cols: list[tuple[str, str, str]] = []
-    if show_potassium_activation:
+    if visibility.potassium_activation:
         gating_cols.append(("n", "classic", "potassium_activation"))
-    if show_sodium_activation:
+    if visibility.sodium_activation:
         gating_cols.append(("m", "classic", "sodium_activation"))
-    if show_sodium_inactivation:
+    if visibility.sodium_inactivation:
         gating_cols.append(("h", "classic", "sodium_inactivation"))
     for gv_name in add_gating_keys:
-        if show_additional_gating.get(gv_name, True):
+        if visibility.additional_gating.get(gv_name, True):
             gating_cols.append((gv_name, "additional", gv_name))
 
     if gating_cols:
@@ -309,17 +331,8 @@ def _build_hover_tables(
 def build_figure(
     current_sweeps: list[Sweep],
     saved_sweeps: list[Sweep],
-    show_voltage: bool,
-    show_total_current: bool,
-    show_sodium_current: bool,
-    show_potassium_current: bool,
-    show_leak_current: bool,
-    show_potassium_activation: bool,
-    show_sodium_activation: bool,
-    show_sodium_inactivation: bool,
+    visibility: TraceVisibility,
     clamp_mode: str,
-    show_additional_currents: dict[str, bool] | None = None,
-    show_additional_gating: dict[str, bool] | None = None,
 ) -> go.Figure:
     """Build a Plotly figure from current and saved sweeps.
 
@@ -348,28 +361,12 @@ def build_figure(
         current_sweeps: Latest simulation result (1 sweep for standard runs,
             N sweeps for I-V Curve).
         saved_sweeps: User-saved sweeps for comparison overlay.
-        show_voltage: Whether to render the voltage trace.
-        show_total_current: Whether to render total current.
-        show_sodium_current: Whether to render I_Na.
-        show_potassium_current: Whether to render I_K.
-        show_leak_current: Whether to render I_L.
-        show_potassium_activation: Whether to render gating variable n.
-        show_sodium_activation: Whether to render gating variable m.
-        show_sodium_inactivation: Whether to render gating variable h.
+        visibility: Consolidated trace visibility flags.
         clamp_mode: Active UI clamp mode, used for layout and axis labels.
-        show_additional_currents: Mapping from additional channel name to
-            visibility flag.  ``None`` means show all.
-        show_additional_gating: Mapping from additional gating variable name to
-            visibility flag.  ``None`` means show all.
 
     Returns:
         A Plotly Figure with response, gating, and stimulus subplots.
     """
-    if show_additional_currents is None:
-        show_additional_currents = {}
-    if show_additional_gating is None:
-        show_additional_gating = {}
-
     # Collect additional keys present in current sweeps.
     add_gating_keys: list[str] = []
     add_current_keys: list[str] = []
@@ -460,7 +457,7 @@ def build_figure(
                 f"{pfx}Voltage (mV)",
                 1,
                 c,
-                visible=show_voltage,
+                visible=visibility.voltage,
                 hoverinfo=hi,
             )
         else:
@@ -471,7 +468,7 @@ def build_figure(
                 f"{pfx}I_total",
                 1,
                 CHANNEL_COLORS.get("total_current"),
-                visible=show_total_current,
+                visible=visibility.total_current,
                 width=_TOTAL_CURRENT_LINE_WIDTH,
                 hoverinfo=hi,
             )
@@ -481,7 +478,7 @@ def build_figure(
                 f"{pfx}I_Na",
                 1,
                 CHANNEL_COLORS.get("sodium_current"),
-                visible=show_sodium_current,
+                visible=visibility.sodium_current,
                 hoverinfo=hi,
             )
             _scatter(
@@ -490,7 +487,7 @@ def build_figure(
                 f"{pfx}I_K",
                 1,
                 CHANNEL_COLORS.get("potassium_current"),
-                visible=show_potassium_current,
+                visible=visibility.potassium_current,
                 hoverinfo=hi,
             )
             _scatter(
@@ -499,11 +496,11 @@ def build_figure(
                 f"{pfx}I_L",
                 1,
                 CHANNEL_COLORS.get("leak_current"),
-                visible=show_leak_current,
+                visible=visibility.leak_current,
                 hoverinfo=hi,
             )
             for ch_name, vals in sweep.additional_currents.items():
-                vis = show_additional_currents.get(ch_name, True)
+                vis = visibility.additional_currents.get(ch_name, True)
                 _scatter(
                     t,
                     vals,
@@ -522,7 +519,7 @@ def build_figure(
             f"{pfx}n",
             gating_row,
             GATING_VAR_COLORS.get("n"),
-            visible=show_potassium_activation,
+            visible=visibility.potassium_activation,
             hoverinfo=hi,
         )
         _scatter(
@@ -531,7 +528,7 @@ def build_figure(
             f"{pfx}m",
             gating_row,
             GATING_VAR_COLORS.get("m"),
-            visible=show_sodium_activation,
+            visible=visibility.sodium_activation,
             hoverinfo=hi,
         )
         _scatter(
@@ -540,11 +537,11 @@ def build_figure(
             f"{pfx}h",
             gating_row,
             GATING_VAR_COLORS.get("h"),
-            visible=show_sodium_inactivation,
+            visible=visibility.sodium_inactivation,
             hoverinfo=hi,
         )
         for gv_name, gv_vals in sweep.additional_gating.items():
-            vis = show_additional_gating.get(gv_name, True)
+            vis = visibility.additional_gating.get(gv_name, True)
             _scatter(
                 t,
                 gv_vals,
@@ -634,15 +631,7 @@ def build_figure(
 
         resp_html, gating_html, stim_html = _build_hover_tables(
             current_sweeps=current_sweeps,
-            show_total_current=show_total_current,
-            show_sodium_current=show_sodium_current,
-            show_potassium_current=show_potassium_current,
-            show_leak_current=show_leak_current,
-            show_potassium_activation=show_potassium_activation,
-            show_sodium_activation=show_sodium_activation,
-            show_sodium_inactivation=show_sodium_inactivation,
-            show_additional_currents=show_additional_currents,
-            show_additional_gating=show_additional_gating,
+            visibility=visibility,
             add_current_keys=add_current_keys,
             add_gating_keys=add_gating_keys,
             is_vc=is_vc,

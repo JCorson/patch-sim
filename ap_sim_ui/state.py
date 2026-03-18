@@ -49,7 +49,7 @@ from ap_sim.additional_channels import (
     make_inar_channel,
 )
 from ap_sim_ui import constants, presets
-from ap_sim_ui.plotting import Sweep, build_figure
+from ap_sim_ui.plotting import Sweep, TraceVisibility, build_figure
 from ap_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
 
 # ------------------------------------------------------------------ #
@@ -415,44 +415,46 @@ class AppState(rx.State):
         return build_figure(
             current_sweeps=self.current_sweeps,
             saved_sweeps=self.saved_sweeps,
-            show_voltage=self.show_voltage,
-            show_total_current=self.show_total_current,
-            show_sodium_current=self.show_sodium_current,
-            show_potassium_current=self.show_potassium_current,
-            show_leak_current=self.show_leak_current,
-            show_potassium_activation=self.show_potassium_activation,
-            show_sodium_activation=self.show_sodium_activation,
-            show_sodium_inactivation=self.show_sodium_inactivation,
+            visibility=TraceVisibility(
+                voltage=self.show_voltage,
+                total_current=self.show_total_current,
+                sodium_current=self.show_sodium_current,
+                potassium_current=self.show_potassium_current,
+                leak_current=self.show_leak_current,
+                potassium_activation=self.show_potassium_activation,
+                sodium_activation=self.show_sodium_activation,
+                sodium_inactivation=self.show_sodium_inactivation,
+                additional_currents={
+                    "Ih": self.show_ih_current,
+                    "IKa": self.show_ika_current,
+                    "INaP": self.show_inap_current,
+                    "INaR": self.show_inar_current,
+                    "IM": self.show_im_current,
+                    "IKir": self.show_ikir_current,
+                    "IKCa": self.show_ikca_current,
+                    "ICaL": self.show_ical_current,
+                    "ICaT": self.show_icat_current,
+                    "ICaN": self.show_ican_current,
+                },
+                additional_gating={
+                    "r": self.show_ih_gating,
+                    "a": self.show_ika_gating,
+                    "b": self.show_ika_gating,
+                    "p": self.show_inap_gating,
+                    "s": self.show_inar_gating,
+                    "hr": self.show_inar_gating,
+                    "w": self.show_im_gating,
+                    "kir": self.show_ikir_gating,
+                    "q": self.show_ikca_gating,
+                    "d": self.show_ical_gating,
+                    "f": self.show_ical_gating,
+                    "dt": self.show_icat_gating,
+                    "ft": self.show_icat_gating,
+                    "dn": self.show_ican_gating,
+                    "fn": self.show_ican_gating,
+                },
+            ),
             clamp_mode=self.clamp_mode,
-            show_additional_currents={
-                "Ih": self.show_ih_current,
-                "IKa": self.show_ika_current,
-                "INaP": self.show_inap_current,
-                "INaR": self.show_inar_current,
-                "IM": self.show_im_current,
-                "IKir": self.show_ikir_current,
-                "IKCa": self.show_ikca_current,
-                "ICaL": self.show_ical_current,
-                "ICaT": self.show_icat_current,
-                "ICaN": self.show_ican_current,
-            },
-            show_additional_gating={
-                "r": self.show_ih_gating,
-                "a": self.show_ika_gating,
-                "b": self.show_ika_gating,
-                "p": self.show_inap_gating,
-                "s": self.show_inar_gating,
-                "hr": self.show_inar_gating,
-                "w": self.show_im_gating,
-                "kir": self.show_ikir_gating,
-                "q": self.show_ikca_gating,
-                "d": self.show_ical_gating,
-                "f": self.show_ical_gating,
-                "dt": self.show_icat_gating,
-                "ft": self.show_icat_gating,
-                "dn": self.show_ican_gating,
-                "fn": self.show_ican_gating,
-            },
         )
 
     # ------------------------------------------------------------------ #

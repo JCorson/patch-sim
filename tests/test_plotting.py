@@ -11,7 +11,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
-from ap_sim_ui.plotting import Sweep, _build_hover_tables, build_figure
+from ap_sim_ui.plotting import Sweep, TraceVisibility, _build_hover_tables, build_figure
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -197,34 +197,36 @@ def test_from_dataframe_label_and_color_stored() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _all_flags_true() -> dict:
-    """Return keyword arguments for build_figure with all visibility flags True.
+def _all_flags_true() -> TraceVisibility:
+    """Return a TraceVisibility with all classic flags set to True.
 
     Returns:
-        Dict of flag arguments suitable for unpacking into build_figure.
+        A TraceVisibility instance with every flag enabled.
     """
-    return dict(
-        show_voltage=True,
-        show_total_current=True,
-        show_sodium_current=True,
-        show_potassium_current=True,
-        show_leak_current=True,
-        show_potassium_activation=True,
-        show_sodium_activation=True,
-        show_sodium_inactivation=True,
+    return TraceVisibility(
+        voltage=True,
+        total_current=True,
+        sodium_current=True,
+        potassium_current=True,
+        leak_current=True,
+        potassium_activation=True,
+        sodium_activation=True,
+        sodium_inactivation=True,
     )
 
 
 def test_build_figure_returns_go_figure() -> None:
     """build_figure returns a plotly go.Figure."""
-    fig = build_figure([], [], clamp_mode="Current Clamp", **_all_flags_true())
+    fig = build_figure([], [], visibility=_all_flags_true(), clamp_mode="Current Clamp")
     assert isinstance(fig, go.Figure)
 
 
 def test_build_figure_cc_has_three_subplots() -> None:
     """Current Clamp figure has exactly 3 subplots (rows)."""
     sweep = _make_sweep(mode="Current Clamp")
-    fig = build_figure([sweep], [], clamp_mode="Current Clamp", **_all_flags_true())
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+    )
     # Each subplot contributes a distinct y-axis entry (yaxis, yaxis2, yaxis3).
     yaxes = [k for k in fig.layout.to_plotly_json() if k.startswith("yaxis")]
     assert len(yaxes) == 3
@@ -233,14 +235,16 @@ def test_build_figure_cc_has_three_subplots() -> None:
 def test_build_figure_vc_has_three_subplots() -> None:
     """Voltage Clamp figure has exactly 3 subplots."""
     sweep = _make_sweep(mode="Voltage Clamp")
-    fig = build_figure([sweep], [], clamp_mode="Voltage Clamp", **_all_flags_true())
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
     yaxes = [k for k in fig.layout.to_plotly_json() if k.startswith("yaxis")]
     assert len(yaxes) == 3
 
 
 def test_build_figure_empty_sweeps_no_error() -> None:
     """build_figure with no sweeps returns a valid empty figure."""
-    fig = build_figure([], [], clamp_mode="Current Clamp", **_all_flags_true())
+    fig = build_figure([], [], visibility=_all_flags_true(), clamp_mode="Current Clamp")
     assert isinstance(fig, go.Figure)
 
 
@@ -252,7 +256,9 @@ def test_build_figure_empty_sweeps_no_error() -> None:
 def test_build_figure_cc_single_sweep_trace_count() -> None:
     """Current Clamp single sweep: voltage + 3 gating + stimulus = 5 traces."""
     sweep = _make_sweep(mode="Current Clamp")
-    fig = build_figure([sweep], [], clamp_mode="Current Clamp", **_all_flags_true())
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+    )
     # voltage(1) + n, m, h(3) + stimulus(1) = 5
     assert len(fig.data) == 5
 
@@ -260,7 +266,9 @@ def test_build_figure_cc_single_sweep_trace_count() -> None:
 def test_build_figure_vc_single_sweep_trace_count() -> None:
     """Voltage Clamp single sweep: 4 current traces + 3 gating + stimulus = 8."""
     sweep = _make_sweep(mode="Voltage Clamp")
-    fig = build_figure([sweep], [], clamp_mode="Voltage Clamp", **_all_flags_true())
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
     # total, Na, K, leak(4) + n, m, h(3) + stimulus(1) = 8
     assert len(fig.data) == 8
 
@@ -273,14 +281,18 @@ def test_build_figure_vc_single_sweep_trace_count() -> None:
 def test_build_figure_single_sweep_hovermode_x_unified() -> None:
     """Single-sweep mode uses hovermode='x unified'."""
     sweep = _make_sweep()
-    fig = build_figure([sweep], [], clamp_mode="Current Clamp", **_all_flags_true())
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+    )
     assert fig.layout.hovermode == "x unified"
 
 
 def test_build_figure_multi_sweep_hovermode_x() -> None:
     """Multi-sweep (I-V Curve) mode uses hovermode='x'."""
     sweeps = [_make_sweep(label=f"{v} mV") for v in [-60, -40, -20]]
-    fig = build_figure(sweeps, [], clamp_mode="Voltage Clamp", **_all_flags_true())
+    fig = build_figure(
+        sweeps, [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
     assert fig.layout.hovermode == "x"
 
 
@@ -312,21 +324,27 @@ def _count_carrier_traces(fig: go.Figure) -> int:
 def test_build_figure_multi_sweep_adds_three_carrier_traces() -> None:
     """Multi-sweep mode adds exactly 3 carrier traces (one per subplot)."""
     sweeps = [_make_sweep(label=f"{v} mV") for v in [-60, -40, -20]]
-    fig = build_figure(sweeps, [], clamp_mode="Voltage Clamp", **_all_flags_true())
+    fig = build_figure(
+        sweeps, [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
     assert _count_carrier_traces(fig) == 3
 
 
 def test_build_figure_single_sweep_has_no_carrier_traces() -> None:
     """Single-sweep mode adds no carrier traces."""
     sweep = _make_sweep()
-    fig = build_figure([sweep], [], clamp_mode="Current Clamp", **_all_flags_true())
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+    )
     assert _count_carrier_traces(fig) == 0
 
 
 def test_build_figure_multi_sweep_data_traces_hoverinfo_skip() -> None:
     """In multi-sweep mode, non-carrier traces have hoverinfo='skip'."""
     sweeps = [_make_sweep(label=f"{v} mV") for v in [-60, -40]]
-    fig = build_figure(sweeps, [], clamp_mode="Current Clamp", **_all_flags_true())
+    fig = build_figure(
+        sweeps, [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+    )
     carrier_count = _count_carrier_traces(fig)
     for trace in fig.data:
         is_carrier = (
@@ -349,9 +367,8 @@ def test_build_figure_multi_sweep_data_traces_hoverinfo_skip() -> None:
 def test_build_figure_hidden_voltage_trace_is_present_but_not_visible() -> None:
     """Voltage trace is in fig.data but has visible=False when toggled off."""
     sweep = _make_sweep(mode="Current Clamp")
-    flags = _all_flags_true()
-    flags["show_voltage"] = False
-    fig = build_figure([sweep], [], clamp_mode="Current Clamp", **flags)
+    vis = TraceVisibility(voltage=False)
+    fig = build_figure([sweep], [], visibility=vis, clamp_mode="Current Clamp")
     voltage_traces = [t for t in fig.data if "Voltage" in (t.name or "")]
     assert len(voltage_traces) == 1
     assert voltage_traces[0].visible is False
@@ -360,10 +377,10 @@ def test_build_figure_hidden_voltage_trace_is_present_but_not_visible() -> None:
 def test_build_figure_hidden_trace_does_not_remove_it() -> None:
     """Disabling a flag sets visible=False; it never removes the trace."""
     sweep = _make_sweep(mode="Current Clamp")
-    flags_on = _all_flags_true()
-    flags_off = {**flags_on, "show_voltage": False}
-    fig_on = build_figure([sweep], [], clamp_mode="Current Clamp", **flags_on)
-    fig_off = build_figure([sweep], [], clamp_mode="Current Clamp", **flags_off)
+    vis_on = TraceVisibility()
+    vis_off = TraceVisibility(voltage=False)
+    fig_on = build_figure([sweep], [], visibility=vis_on, clamp_mode="Current Clamp")
+    fig_off = build_figure([sweep], [], visibility=vis_off, clamp_mode="Current Clamp")
     assert len(fig_on.data) == len(fig_off.data)
 
 
@@ -371,11 +388,12 @@ def test_build_figure_gating_traces_hidden_when_flags_off() -> None:
     """All gating traces are present but hidden when their flags are False."""
     # Use an empty label so trace names are plain "n", "m", "h".
     sweep = _make_sweep(label="", mode="Current Clamp")
-    flags = _all_flags_true()
-    flags["show_potassium_activation"] = False
-    flags["show_sodium_activation"] = False
-    flags["show_sodium_inactivation"] = False
-    fig = build_figure([sweep], [], clamp_mode="Current Clamp", **flags)
+    vis = TraceVisibility(
+        potassium_activation=False,
+        sodium_activation=False,
+        sodium_inactivation=False,
+    )
+    fig = build_figure([sweep], [], visibility=vis, clamp_mode="Current Clamp")
     gating_traces = [t for t in fig.data if t.name in ("n", "m", "h")]
     assert len(gating_traces) == 3
     assert all(tr.visible is False for tr in gating_traces)
@@ -391,10 +409,10 @@ def test_build_figure_saved_sweep_adds_traces() -> None:
     current = _make_sweep(label="current", color="#ff0000")
     saved = _make_sweep(label="saved", color="#888888")
     fig_no_saved = build_figure(
-        [current], [], clamp_mode="Current Clamp", **_all_flags_true()
+        [current], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
     )
     fig_with_saved = build_figure(
-        [current], [saved], clamp_mode="Current Clamp", **_all_flags_true()
+        [current], [saved], visibility=_all_flags_true(), clamp_mode="Current Clamp"
     )
     assert len(fig_with_saved.data) > len(fig_no_saved.data)
 
@@ -404,7 +422,7 @@ def test_build_figure_saved_sweep_stimulus_trace_present() -> None:
     current = _make_sweep(label="current")
     saved = _make_sweep(label="saved_ref", color="#666666")
     fig = build_figure(
-        [current], [saved], clamp_mode="Current Clamp", **_all_flags_true()
+        [current], [saved], visibility=_all_flags_true(), clamp_mode="Current Clamp"
     )
     saved_stimulus_traces = [t for t in fig.data if t.name == "saved_ref"]
     assert len(saved_stimulus_traces) == 1
@@ -427,15 +445,7 @@ def _default_hover_args(sweeps: list[Sweep], *, is_vc: bool = False) -> dict:
     """
     return dict(
         current_sweeps=sweeps,
-        show_total_current=True,
-        show_sodium_current=True,
-        show_potassium_current=True,
-        show_leak_current=True,
-        show_potassium_activation=True,
-        show_sodium_activation=True,
-        show_sodium_inactivation=True,
-        show_additional_currents={},
-        show_additional_gating={},
+        visibility=TraceVisibility(),
         add_current_keys=[],
         add_gating_keys=[],
         is_vc=is_vc,
@@ -508,12 +518,12 @@ def test_build_hover_tables_stim_html_contains_time_data() -> None:
 def test_build_hover_tables_all_flags_off_gating_returns_empty_strings() -> None:
     """When all gating visibility flags are False, gating HTML entries are empty."""
     sweeps = [_make_sweep(label="A"), _make_sweep(label="B")]
-    args = {
-        **_default_hover_args(sweeps),
-        "show_potassium_activation": False,
-        "show_sodium_activation": False,
-        "show_sodium_inactivation": False,
-    }
+    vis = TraceVisibility(
+        potassium_activation=False,
+        sodium_activation=False,
+        sodium_inactivation=False,
+    )
+    args = {**_default_hover_args(sweeps), "visibility": vis}
     _, gating, _ = _build_hover_tables(**args)
     assert all(html == "" for html in gating)
 
@@ -523,13 +533,13 @@ def test_build_hover_tables_vc_all_current_flags_off_resp_returns_empty_strings(
 ):
     """In VC mode with all current flags off, response HTML entries are empty."""
     sweeps = [_make_sweep(label="A"), _make_sweep(label="B")]
-    args = {
-        **_default_hover_args(sweeps, is_vc=True),
-        "show_total_current": False,
-        "show_sodium_current": False,
-        "show_potassium_current": False,
-        "show_leak_current": False,
-    }
+    vis = TraceVisibility(
+        total_current=False,
+        sodium_current=False,
+        potassium_current=False,
+        leak_current=False,
+    )
+    args = {**_default_hover_args(sweeps, is_vc=True), "visibility": vis}
     resp, _, _ = _build_hover_tables(**args)
     assert all(html == "" for html in resp)
 
