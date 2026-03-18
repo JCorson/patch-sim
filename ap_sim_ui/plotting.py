@@ -253,7 +253,7 @@ def build_figure(
                 1,
                 CHANNEL_COLORS.get("total_current"),
                 visible=show_total_current,
-                width=2.5,
+                width=4,
             )
             _scatter(
                 t,
@@ -342,7 +342,7 @@ def build_figure(
                 1,
                 CHANNEL_COLORS.get("total_current"),
                 dash="dash",
-                width=2.5,
+                width=4,
             )
             _scatter(
                 sweep.time,
