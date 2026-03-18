@@ -47,6 +47,57 @@ VOLTAGE_PROTOCOLS: list[str] = [
     "Activation",
 ]
 
+# Fixed colours per ion current channel (used in Voltage Clamp overlay plot).
+CHANNEL_COLORS: dict[str, str] = {
+    "total_current": "#1f77b4",  # blue
+    "sodium_current": "#ff7f0e",  # orange
+    "potassium_current": "#2ca02c",  # green
+    "leak_current": "#7f7f7f",  # grey
+    "Ih": "#d62728",  # red
+    "IKa": "#9467bd",  # purple
+    "INaP": "#e377c2",  # pink
+    "INaR": "#bcbd22",  # olive
+    "IM": "#17becf",  # cyan
+    "IKir": "#8c564b",  # brown
+    "IKCa": "#ff9896",  # light red
+    "ICaL": "#aec7e8",  # light blue
+    "ICaT": "#98df8a",  # light green
+    "ICaN": "#c5b0d5",  # light purple
+}
+
+# Gating variable name → channel colour (matches CHANNEL_COLORS for the owning channel).
+GATING_VAR_COLORS: dict[str, str] = {
+    # Classic HH gating variables
+    "n": "#2ca02c",  # potassium
+    "m": "#ff7f0e",  # sodium
+    "h": "#ff7f0e",  # sodium
+    # Ih
+    "s": "#d62728",
+    "hr": "#d62728",
+    # IKa
+    "a": "#9467bd",
+    "b": "#9467bd",
+    # INaP
+    "p": "#e377c2",
+    # INaR
+    "r": "#bcbd22",
+    # IM
+    "w": "#17becf",
+    # IKir
+    "kir": "#8c564b",
+    # IKCa
+    "q": "#ff9896",
+    # ICaL
+    "d": "#aec7e8",
+    "f": "#aec7e8",
+    # ICaT
+    "dt": "#98df8a",
+    "ft": "#98df8a",
+    # ICaN
+    "dn": "#c5b0d5",
+    "fn": "#c5b0d5",
+}
+
 # Colour palette for sweep overlays (10 distinct colours)
 SWEEP_COLORS: list[str] = [
     "#1f77b4",

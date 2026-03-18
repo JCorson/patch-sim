@@ -8,6 +8,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pydantic import BaseModel
 
+from ap_sim_ui.constants import CHANNEL_COLORS, GATING_VAR_COLORS
+
 # Classic column names that are always present in simulation DataFrames.
 _CLASSIC_COLUMNS = frozenset(
     {
@@ -158,14 +160,11 @@ def build_figure(
     Saved sweeps are rendered as overlays showing the primary trace and
     stimulus only, always visible.
 
-    **Current Clamp** always uses a fixed 3-row layout (voltage, gating,
-    stimulus).  **Voltage Clamp** always creates rows for all 4 classic
-    currents plus any additional currents present in the sweep data, then
-    gating and stimulus rows.  The row count only changes when a new
-    simulation is run with a different channel configuration.
-
-    In Voltage Clamp mode the y-axis labels identify each panel so the
-    legend is hidden.
+    Both **Current Clamp** and **Voltage Clamp** use a fixed 3-row layout.
+    In Voltage Clamp mode all ion current channels are overlaid on a single
+    subplot (row 1) with each channel identified by a fixed colour from
+    ``CHANNEL_COLORS`` and a legend entry.  Saved VC sweeps are drawn with
+    dashed lines in the same channel colours.
 
     Args:
         current_sweeps: Latest simulation result (1 sweep for standard runs,
@@ -205,42 +204,12 @@ def build_figure(
                 add_current_keys.append(key)
 
     is_vc = clamp_mode == "Voltage Clamp"
-    all_vc_currents: list[tuple[str, str]] = []
 
-    if is_vc:
-        # Fixed layout: all 4 classic currents + all additional from sweep
-        # data + gating + stimulus.  Layout depends only on which channels
-        # were enabled at simulation time, not on the show_* visibility flags.
-        all_vc_currents = [
-            ("total_current", "I_total (µA/cm²)"),
-            ("sodium_current", "I_Na (µA/cm²)"),
-            ("potassium_current", "I_K (µA/cm²)"),
-            ("leak_current", "I_L (µA/cm²)"),
-        ]
-        for ch_name in add_current_keys:
-            all_vc_currents.append((f"opt:{ch_name}", f"I_{ch_name} (µA/cm²)"))
-
-        channel_row: dict[str, int] = {
-            attr_key: i + 1 for i, (attr_key, _) in enumerate(all_vc_currents)
-        }
-        n_current_rows = len(all_vc_currents)
-        gating_row = n_current_rows + 1
-        stimulus_row = n_current_rows + 2
-        rows = stimulus_row
-
-        stim_fraction = 0.15
-        gating_fraction = 0.15
-        current_fraction = (1.0 - stim_fraction - gating_fraction) / n_current_rows
-        row_heights = [current_fraction] * n_current_rows + [
-            gating_fraction,
-            stim_fraction,
-        ]
-    else:
-        # Current Clamp: always 3 rows (voltage, gating, stimulus).
-        rows = 3
-        row_heights = [0.5, 0.25, 0.25]
-        gating_row = 2
-        stimulus_row = 3
+    # Both modes use a fixed 3-row layout.
+    rows = 3
+    row_heights = [0.5, 0.25, 0.25]
+    gating_row = 2
+    stimulus_row = 3
 
     vert_spacing = 0.08 if rows > 1 else 0.0
     fig = make_subplots(
@@ -251,9 +220,11 @@ def build_figure(
         vertical_spacing=vert_spacing,
     )
 
-    def _scatter(x, y, name, row, color=None, visible=True):
+    def _scatter(x, y, name, row, color=None, visible=True, dash=None):
         """Add a Scattergl trace to the figure."""
-        line = {"color": color} if color else {}
+        line: dict = {"color": color} if color else {}
+        if dash:
+            line["dash"] = dash
         fig.add_trace(
             go.Scattergl(x=x, y=y, name=name, mode="lines", line=line, visible=visible),
             row=row,
@@ -272,51 +243,49 @@ def build_figure(
         if sweep_mode == "Current Clamp":
             _scatter(t, sweep.voltage, f"{pfx}Voltage (mV)", 1, c, visible=show_voltage)
         else:
-            # Voltage Clamp: one trace per channel row, always added with
-            # the appropriate visible flag.
-            for attr_key, _ in all_vc_currents:
-                row = channel_row[attr_key]
-                if attr_key == "total_current":
-                    _scatter(
-                        t,
-                        sweep.total_current,
-                        f"{pfx}Total I",
-                        row,
-                        c,
-                        visible=show_total_current,
-                    )
-                elif attr_key == "sodium_current":
-                    _scatter(
-                        t,
-                        sweep.sodium_current,
-                        f"{pfx}I_Na",
-                        row,
-                        c,
-                        visible=show_sodium_current,
-                    )
-                elif attr_key == "potassium_current":
-                    _scatter(
-                        t,
-                        sweep.potassium_current,
-                        f"{pfx}I_K",
-                        row,
-                        c,
-                        visible=show_potassium_current,
-                    )
-                elif attr_key == "leak_current":
-                    _scatter(
-                        t,
-                        sweep.leak_current,
-                        f"{pfx}I_L",
-                        row,
-                        c,
-                        visible=show_leak_current,
-                    )
-                elif attr_key.startswith("opt:"):
-                    ch_name = attr_key[4:]
-                    vals = sweep.additional_currents.get(ch_name, [])
-                    vis = show_additional_currents.get(ch_name, True)
-                    _scatter(t, vals, f"{pfx}I_{ch_name}", row, c, visible=vis)
+            # Voltage Clamp: all currents overlaid on row 1 with channel colours.
+            _scatter(
+                t,
+                sweep.total_current,
+                f"{pfx}I_total",
+                1,
+                CHANNEL_COLORS.get("total_current"),
+                visible=show_total_current,
+            )
+            _scatter(
+                t,
+                sweep.sodium_current,
+                f"{pfx}I_Na",
+                1,
+                CHANNEL_COLORS.get("sodium_current"),
+                visible=show_sodium_current,
+            )
+            _scatter(
+                t,
+                sweep.potassium_current,
+                f"{pfx}I_K",
+                1,
+                CHANNEL_COLORS.get("potassium_current"),
+                visible=show_potassium_current,
+            )
+            _scatter(
+                t,
+                sweep.leak_current,
+                f"{pfx}I_L",
+                1,
+                CHANNEL_COLORS.get("leak_current"),
+                visible=show_leak_current,
+            )
+            for ch_name, vals in sweep.additional_currents.items():
+                vis = show_additional_currents.get(ch_name, True)
+                _scatter(
+                    t,
+                    vals,
+                    f"{pfx}I_{ch_name}",
+                    1,
+                    CHANNEL_COLORS.get(ch_name),
+                    visible=vis,
+                )
 
         # Gating row is always present; traces are always added with their
         # visibility flags so the layout never changes on toggle.
@@ -325,7 +294,7 @@ def build_figure(
             sweep.potassium_activation,
             f"{pfx}n",
             gating_row,
-            c,
+            GATING_VAR_COLORS.get("n"),
             visible=show_potassium_activation,
         )
         _scatter(
@@ -333,7 +302,7 @@ def build_figure(
             sweep.sodium_activation,
             f"{pfx}m",
             gating_row,
-            c,
+            GATING_VAR_COLORS.get("m"),
             visible=show_sodium_activation,
         )
         _scatter(
@@ -341,12 +310,19 @@ def build_figure(
             sweep.sodium_inactivation,
             f"{pfx}h",
             gating_row,
-            c,
+            GATING_VAR_COLORS.get("h"),
             visible=show_sodium_inactivation,
         )
         for gv_name, gv_vals in sweep.additional_gating.items():
             vis = show_additional_gating.get(gv_name, True)
-            _scatter(t, gv_vals, f"{pfx}{gv_name}", gating_row, c, visible=vis)
+            _scatter(
+                t,
+                gv_vals,
+                f"{pfx}{gv_name}",
+                gating_row,
+                GATING_VAR_COLORS.get(gv_name),
+                visible=vis,
+            )
 
         _scatter(t, sweep.stimulus, stim_label, stimulus_row, c)
 
@@ -355,53 +331,55 @@ def build_figure(
         if sweep.clamp_mode == "Current Clamp":
             _scatter(sweep.time, sweep.voltage, f"{sweep.label} V", 1, c)
         elif is_vc:
-            # Show each current channel row for saved VC sweeps.
-            for attr_key, _ in all_vc_currents:
-                row = channel_row[attr_key]
-                if attr_key == "total_current":
-                    _scatter(
-                        sweep.time,
-                        sweep.total_current,
-                        f"{sweep.label} I_total",
-                        row,
-                        c,
-                    )
-                elif attr_key == "sodium_current":
-                    _scatter(
-                        sweep.time,
-                        sweep.sodium_current,
-                        f"{sweep.label} I_Na",
-                        row,
-                        c,
-                    )
-                elif attr_key == "potassium_current":
-                    _scatter(
-                        sweep.time,
-                        sweep.potassium_current,
-                        f"{sweep.label} I_K",
-                        row,
-                        c,
-                    )
-                elif attr_key == "leak_current":
-                    _scatter(
-                        sweep.time,
-                        sweep.leak_current,
-                        f"{sweep.label} I_L",
-                        row,
-                        c,
-                    )
-                elif attr_key.startswith("opt:"):
-                    ch_name = attr_key[4:]
-                    vals = sweep.additional_currents.get(ch_name, [])
-                    _scatter(sweep.time, vals, f"{sweep.label} I_{ch_name}", row, c)
+            # Saved VC sweeps: all currents overlaid on row 1, dashed lines.
+            _scatter(
+                sweep.time,
+                sweep.total_current,
+                f"{sweep.label} I_total",
+                1,
+                CHANNEL_COLORS.get("total_current"),
+                dash="dash",
+            )
+            _scatter(
+                sweep.time,
+                sweep.sodium_current,
+                f"{sweep.label} I_Na",
+                1,
+                CHANNEL_COLORS.get("sodium_current"),
+                dash="dash",
+            )
+            _scatter(
+                sweep.time,
+                sweep.potassium_current,
+                f"{sweep.label} I_K",
+                1,
+                CHANNEL_COLORS.get("potassium_current"),
+                dash="dash",
+            )
+            _scatter(
+                sweep.time,
+                sweep.leak_current,
+                f"{sweep.label} I_L",
+                1,
+                CHANNEL_COLORS.get("leak_current"),
+                dash="dash",
+            )
+            for ch_name, vals in sweep.additional_currents.items():
+                _scatter(
+                    sweep.time,
+                    vals,
+                    f"{sweep.label} I_{ch_name}",
+                    1,
+                    CHANNEL_COLORS.get(ch_name),
+                    dash="dash",
+                )
         else:
             _scatter(sweep.time, sweep.total_current, f"{sweep.label} I_total", 1, c)
         _scatter(sweep.time, sweep.stimulus, sweep.label, stimulus_row, c)
 
     # Y-axis labels.
     if is_vc:
-        for attr_key, y_label in all_vc_currents:
-            fig.update_yaxes(title_text=y_label, row=channel_row[attr_key], col=1)
+        fig.update_yaxes(title_text="Current (µA/cm²)", row=1, col=1)
         fig.update_yaxes(title_text="Voltage (mV)", row=stimulus_row, col=1)
     else:
         fig.update_yaxes(title_text="Voltage (mV)", row=1, col=1)
@@ -412,20 +390,11 @@ def build_figure(
 
     fig.update_xaxes(title_text="Time (ms)", row=stimulus_row, col=1)
 
-    if is_vc:
-        fig.update_layout(
-            autosize=True,
-            margin={"l": 60, "r": 20, "t": 30, "b": 40},
-            template="plotly_white",
-            hovermode="x unified",
-            showlegend=False,
-        )
-    else:
-        fig.update_layout(
-            autosize=True,
-            margin={"l": 60, "r": 20, "t": 30, "b": 40},
-            legend={"orientation": "h", "y": 1.08},
-            template="plotly_white",
-            hovermode="x unified",
-        )
+    fig.update_layout(
+        autosize=True,
+        margin={"l": 60, "r": 20, "t": 30, "b": 40},
+        template="plotly_white",
+        hovermode="x unified",
+        showlegend=False,
+    )
     return fig
