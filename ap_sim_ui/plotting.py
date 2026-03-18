@@ -37,6 +37,24 @@ _CLASSIC_CURRENT_COLUMNS = frozenset(
 # Maximum number of hover carrier points; keeps tooltip HTML build time short.
 _MAX_HOVER_POINTS = 2000
 
+# Hover tooltip column width in characters.
+_HOVER_COL_WIDTH = 8
+
+# Inline CSS applied to hover tooltip ``<span>`` elements.
+_HOVER_MONO_STYLE = "font-family: monospace; font-size: 11px;"
+
+# Relative row heights for the 3-row subplot layout (response, gating, stimulus).
+_SUBPLOT_ROW_HEIGHTS = [0.5, 0.25, 0.25]
+
+# Vertical gap between subplot rows (fraction of total figure height).
+_SUBPLOT_VERT_SPACING = 0.08
+
+# Line width used for the total-current trace in Voltage Clamp mode.
+_TOTAL_CURRENT_LINE_WIDTH = 4
+
+# Plot margin in pixels: left, right, top, bottom.
+_PLOT_MARGIN = {"l": 60, "r": 20, "t": 30, "b": 40}
+
 
 class Sweep(BaseModel):
     """A simulation result snapshot used for overlay display.
@@ -182,9 +200,9 @@ def _build_hover_tables(
     time_vals = current_sweeps[0].time
     indices = list(range(0, len(time_vals), stride))
     n_pts = len(indices)
-    col_w = 8
+    col_w = _HOVER_COL_WIDTH
     label_w = max((len(s.label) for s in current_sweeps), default=6)
-    mono_style = "font-family: monospace; font-size: 11px;"
+    mono_style = _HOVER_MONO_STYLE
 
     def _fmt_table(header: str, row_groups: list[list[str]]) -> list[str]:
         """Format a list of HTML table strings from per-time-point row groups.
@@ -368,11 +386,11 @@ def build_figure(
 
     # Both modes use a fixed 3-row layout.
     rows = 3
-    row_heights = [0.5, 0.25, 0.25]
+    row_heights = _SUBPLOT_ROW_HEIGHTS
     gating_row = 2
     stimulus_row = 3
 
-    vert_spacing = 0.08 if rows > 1 else 0.0
+    vert_spacing = _SUBPLOT_VERT_SPACING if rows > 1 else 0.0
     fig = make_subplots(
         rows=rows,
         cols=1,
@@ -454,7 +472,7 @@ def build_figure(
                 1,
                 CHANNEL_COLORS.get("total_current"),
                 visible=show_total_current,
-                width=4,
+                width=_TOTAL_CURRENT_LINE_WIDTH,
                 hoverinfo=hi,
             )
             _scatter(
@@ -552,7 +570,7 @@ def build_figure(
                 1,
                 CHANNEL_COLORS.get("total_current"),
                 dash="dash",
-                width=4,
+                width=_TOTAL_CURRENT_LINE_WIDTH,
                 hoverinfo=hi,
             )
             _scatter(
@@ -676,7 +694,7 @@ def build_figure(
     hovermode = "x" if is_multi_sweep else "x unified"
     fig.update_layout(
         autosize=True,
-        margin={"l": 60, "r": 20, "t": 30, "b": 40},
+        margin=_PLOT_MARGIN,
         template="plotly_white",
         hovermode=hovermode,
         showlegend=False,
