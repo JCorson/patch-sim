@@ -439,6 +439,8 @@ class AppState(rx.State):
             self.protocol_type = constants.CURRENT_PROTOCOLS[0]
         else:
             self.protocol_type = constants.VOLTAGE_PROTOCOLS[0]
+        self.current_sweeps = []
+        self.saved_sweeps = []
 
     def load_preset(self, name: str) -> None:
         """Load a named preset configuration."""
@@ -447,6 +449,8 @@ class AppState(rx.State):
         config = presets.PRESETS[name]
         for key, value in config.items():
             setattr(self, key, value)
+        self.current_sweeps = []
+        self.saved_sweeps = []
 
     # ------------------------------------------------------------------ #
     # Numeric field setters                                              #

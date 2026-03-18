@@ -205,12 +205,13 @@ def build_figure(
                 add_current_keys.append(key)
 
     is_vc = clamp_mode == "Voltage Clamp"
+    all_vc_currents: list[tuple[str, str]] = []
 
     if is_vc:
         # Fixed layout: all 4 classic currents + all additional from sweep
         # data + gating + stimulus.  Layout depends only on which channels
         # were enabled at simulation time, not on the show_* visibility flags.
-        all_vc_currents: list[tuple[str, str]] = [
+        all_vc_currents = [
             ("total_current", "I_total (µA/cm²)"),
             ("sodium_current", "I_Na (µA/cm²)"),
             ("potassium_current", "I_K (µA/cm²)"),
