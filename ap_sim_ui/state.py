@@ -318,9 +318,9 @@ class AppState(rx.State):
     show_sodium_current: bool = True
     show_potassium_current: bool = True
     show_leak_current: bool = False
-    show_potassium_activation: bool = False
-    show_sodium_activation: bool = False
-    show_sodium_inactivation: bool = False
+    show_potassium_activation: bool = True
+    show_sodium_activation: bool = True
+    show_sodium_inactivation: bool = True
     show_ih_current: bool = True
     show_ih_gating: bool = True
     show_ika_current: bool = True
