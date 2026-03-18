@@ -65,37 +65,37 @@ CHANNEL_COLORS: dict[str, str] = {
     "ICaN": "#c5b0d5",  # light purple
 }
 
-# Gating variable name → channel colour (matches CHANNEL_COLORS for the owning channel).
+# Gating variable name → unique colour (each variable gets its own distinct colour).
 GATING_VAR_COLORS: dict[str, str] = {
     # Classic HH gating variables
-    "n": "#2ca02c",  # potassium
-    "m": "#ff7f0e",  # sodium
-    "h": "#ff7f0e",  # sodium
+    "n": "#1f77b4",  # blue
+    "m": "#ff7f0e",  # orange
+    "h": "#2ca02c",  # green
     # Ih
-    "s": "#d62728",
-    "hr": "#d62728",
+    "s": "#d62728",  # red
+    "hr": "#9467bd",  # purple
     # IKa
-    "a": "#9467bd",
-    "b": "#9467bd",
+    "a": "#8c564b",  # brown
+    "b": "#e377c2",  # pink
     # INaP
-    "p": "#e377c2",
+    "p": "#7f7f7f",  # grey
     # INaR
-    "r": "#bcbd22",
+    "r": "#bcbd22",  # olive
     # IM
-    "w": "#17becf",
+    "w": "#17becf",  # cyan
     # IKir
-    "kir": "#8c564b",
+    "kir": "#aec7e8",  # light blue
     # IKCa
-    "q": "#ff9896",
+    "q": "#ffbb78",  # light orange
     # ICaL
-    "d": "#aec7e8",
-    "f": "#aec7e8",
+    "d": "#98df8a",  # light green
+    "f": "#ff9896",  # light red
     # ICaT
-    "dt": "#98df8a",
-    "ft": "#98df8a",
+    "dt": "#c5b0d5",  # light purple
+    "ft": "#c49c94",  # light brown
     # ICaN
-    "dn": "#c5b0d5",
-    "fn": "#c5b0d5",
+    "dn": "#f7b6d2",  # light pink
+    "fn": "#dbdb8d",  # light olive
 }
 
 # Colour palette for sweep overlays (10 distinct colours)
