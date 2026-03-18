@@ -58,7 +58,7 @@ _TOTAL_CURRENT_LINE_WIDTH = 4
 _PLOT_MARGIN = {"l": 60, "r": 20, "t": 30, "b": 40}
 
 
-@dataclass(frozen=True)
+@dataclass
 class TraceVisibility:
     """Visibility flags for every plotted trace.
 
