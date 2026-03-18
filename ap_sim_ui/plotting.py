@@ -220,11 +220,13 @@ def build_figure(
         vertical_spacing=vert_spacing,
     )
 
-    def _scatter(x, y, name, row, color=None, visible=True, dash=None):
+    def _scatter(x, y, name, row, color=None, visible=True, dash=None, width=None):
         """Add a Scattergl trace to the figure."""
         line: dict = {"color": color} if color else {}
         if dash:
             line["dash"] = dash
+        if width:
+            line["width"] = width
         fig.add_trace(
             go.Scattergl(x=x, y=y, name=name, mode="lines", line=line, visible=visible),
             row=row,
@@ -251,6 +253,7 @@ def build_figure(
                 1,
                 CHANNEL_COLORS.get("total_current"),
                 visible=show_total_current,
+                width=2.5,
             )
             _scatter(
                 t,
@@ -339,6 +342,7 @@ def build_figure(
                 1,
                 CHANNEL_COLORS.get("total_current"),
                 dash="dash",
+                width=2.5,
             )
             _scatter(
                 sweep.time,
