@@ -9,17 +9,12 @@ import math
 
 from .channels import (
     GatingVariable,
+    GoldmanSpec,
     IonChannel,
+    IonSpecies,
+    NernstSpec,
 )
 from .constants import (
-    DEFAULT_E_CA,
-    DEFAULT_E_IH,
-    DEFAULT_E_IKA,
-    DEFAULT_E_IKCA,
-    DEFAULT_E_IKIR,
-    DEFAULT_E_IM,
-    DEFAULT_E_NAP,
-    DEFAULT_E_NAR,
     DEFAULT_G_ICAN,
     DEFAULT_G_ICAL,
     DEFAULT_G_ICAT,
@@ -30,6 +25,7 @@ from .constants import (
     DEFAULT_G_IM,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
+    DEFAULT_IH_P_NA,
 )
 from .utils import boltzmann_cosh_rates, safe_exp
 
@@ -133,7 +129,6 @@ def _beta_b(V: float, ca_i: float) -> float:
 
 def make_ika_channel(
     g_max: float = DEFAULT_G_IKA,
-    e_rev: float = DEFAULT_E_IKA,
 ) -> IonChannel:
     """Create an IKa (A-type K⁺) ion channel.
 
@@ -144,11 +139,12 @@ def make_ika_channel(
     Kinetics follow Traub & Miles (1991) hippocampal neuron models, shifted by
     -65 mV to match this codebase's absolute voltage convention.
 
+    The reversal potential is computed dynamically from the neuron's K⁺
+    concentrations using the Nernst equation.
+
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~ap_sim.constants.DEFAULT_G_IKA`.
-        e_rev: Reversal potential in mV. Defaults to
-            :data:`~ap_sim.constants.DEFAULT_E_IKA`.
 
     Returns:
         An :class:`~ap_sim.channels.IonChannel` representing the IKa current.
@@ -159,13 +155,13 @@ def make_ika_channel(
         name="IKa",
         g_max=g_max,
         gating_variables=(a_var, b_var),
-        e_rev=e_rev,
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )
 
 
 def make_ih_channel(
     g_max: float = DEFAULT_G_IH,
-    e_rev: float = DEFAULT_E_IH,
+    p_na: float = DEFAULT_IH_P_NA,
 ) -> IonChannel:
     """Create an Ih (HCN/funny current) ion channel.
 
@@ -177,11 +173,17 @@ def make_ih_channel(
     (power 1).  At resting potential (~-65 mV) the channel is largely closed;
     deep hyperpolarization (~-100 mV) activates it strongly.
 
+    The reversal potential is computed dynamically from the neuron's Na⁺ and
+    K⁺ concentrations using the Goldman-Hodgkin-Katz equation, parameterised by
+    the Na⁺ permeability relative to K⁺ (``p_na``).
+
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~ap_sim.constants.DEFAULT_G_IH`.
-        e_rev: Reversal potential in mV. Defaults to
-            :data:`~ap_sim.constants.DEFAULT_E_IH`.
+        p_na: Na⁺ permeability relative to K⁺ (dimensionless). A value of
+            ~0.289 yields a reversal potential near -30 mV at default HH ion
+            concentrations.  Defaults to
+            :data:`~ap_sim.constants.DEFAULT_IH_P_NA`.
 
     Returns:
         An :class:`~ap_sim.channels.IonChannel` representing the Ih current.
@@ -191,7 +193,12 @@ def make_ih_channel(
         name="Ih",
         g_max=g_max,
         gating_variables=(r_var,),
-        e_rev=e_rev,
+        reversal_spec=GoldmanSpec(
+            permeabilities=(
+                (IonSpecies.SODIUM, p_na),
+                (IonSpecies.POTASSIUM, 1.0),
+            )
+        ),
     )
 
 
@@ -206,7 +213,6 @@ _alpha_p, _beta_p = boltzmann_cosh_rates(
 
 def make_inap_channel(
     g_max: float = DEFAULT_G_NAP,
-    e_rev: float = DEFAULT_E_NAP,
 ) -> IonChannel:
     """Create an INaP (persistent Na⁺) ion channel.
 
@@ -218,11 +224,12 @@ def make_inap_channel(
     Kinetics follow Magistretti & Alonso (1999), with a Boltzmann activation
     centred at -52.6 mV and a cosh-based time constant.
 
+    The reversal potential is computed dynamically from the neuron's Na⁺
+    concentrations using the Nernst equation.
+
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~ap_sim.constants.DEFAULT_G_NAP`.
-        e_rev: Reversal potential in mV. Defaults to
-            :data:`~ap_sim.constants.DEFAULT_E_NAP`.
 
     Returns:
         An :class:`~ap_sim.channels.IonChannel` representing the INaP current.
@@ -232,7 +239,7 @@ def make_inap_channel(
         name="INaP",
         g_max=g_max,
         gating_variables=(p_var,),
-        e_rev=e_rev,
+        reversal_spec=NernstSpec(IonSpecies.SODIUM),
     )
 
 
@@ -317,7 +324,6 @@ def _beta_hr(V: float, ca_i: float) -> float:
 
 def make_inar_channel(
     g_max: float = DEFAULT_G_NAR,
-    e_rev: float = DEFAULT_E_NAR,
 ) -> IonChannel:
     """Create an INaR (resurgent Na⁺) ion channel.
 
@@ -333,11 +339,12 @@ def make_inar_channel(
     Kinetics follow a simplified Raman & Bean (2001) two-variable alpha/beta
     model.
 
+    The reversal potential is computed dynamically from the neuron's Na⁺
+    concentrations using the Nernst equation.
+
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~ap_sim.constants.DEFAULT_G_NAR`.
-        e_rev: Reversal potential in mV. Defaults to
-            :data:`~ap_sim.constants.DEFAULT_E_NAR`.
 
     Returns:
         An :class:`~ap_sim.channels.IonChannel` representing the INaR current.
@@ -348,7 +355,7 @@ def make_inar_channel(
         name="INaR",
         g_max=g_max,
         gating_variables=(s_var, hr_var),
-        e_rev=e_rev,
+        reversal_spec=NernstSpec(IonSpecies.SODIUM),
     )
 
 
@@ -363,7 +370,6 @@ _alpha_w, _beta_w = boltzmann_cosh_rates(
 
 def make_im_channel(
     g_max: float = DEFAULT_G_IM,
-    e_rev: float = DEFAULT_E_IM,
 ) -> IonChannel:
     """Create an IM (muscarinic K⁺) ion channel.
 
@@ -376,11 +382,12 @@ def make_im_channel(
     Boltzmann activation centred at -35 mV and a slow cosh-based time
     constant (~150 ms near -35 mV).
 
+    The reversal potential is computed dynamically from the neuron's K⁺
+    concentrations using the Nernst equation.
+
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~ap_sim.constants.DEFAULT_G_IM`.
-        e_rev: Reversal potential in mV. Defaults to
-            :data:`~ap_sim.constants.DEFAULT_E_IM`.
 
     Returns:
         An :class:`~ap_sim.channels.IonChannel` representing the IM current.
@@ -390,7 +397,7 @@ def make_im_channel(
         name="IM",
         g_max=g_max,
         gating_variables=(w_var,),
-        e_rev=e_rev,
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )
 
 
@@ -405,7 +412,6 @@ _alpha_kir, _beta_kir = boltzmann_cosh_rates(
 
 def make_ikir_channel(
     g_max: float = DEFAULT_G_IKIR,
-    e_rev: float = DEFAULT_E_IKIR,
 ) -> IonChannel:
     """Create an IKir (inward rectifier K⁺) ion channel.
 
@@ -418,11 +424,12 @@ def make_ikir_channel(
     with an inverted Boltzmann activation centred at -80 mV and a fast
     cosh-based time constant.
 
+    The reversal potential is computed dynamically from the neuron's K⁺
+    concentrations using the Nernst equation.
+
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~ap_sim.constants.DEFAULT_G_IKIR`.
-        e_rev: Reversal potential in mV. Defaults to
-            :data:`~ap_sim.constants.DEFAULT_E_IKIR`.
 
     Returns:
         An :class:`~ap_sim.channels.IonChannel` representing the IKir current.
@@ -432,7 +439,7 @@ def make_ikir_channel(
         name="IKir",
         g_max=g_max,
         gating_variables=(kir_var,),
-        e_rev=e_rev,
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )
 
 
@@ -513,7 +520,6 @@ def _beta_q(V: float, ca_i: float) -> float:
 
 def make_ikca_channel(
     g_max: float = DEFAULT_G_IKCA,
-    e_rev: float = DEFAULT_E_IKCA,
 ) -> IonChannel:
     """Create an IKCa (calcium-activated K⁺) ion channel.
 
@@ -530,11 +536,12 @@ def make_ikca_channel(
     Boltzmann voltage factor (half-activation at -20 mV) for the steady state,
     and a cosh-based voltage-dependent time constant.
 
+    The reversal potential is computed dynamically from the neuron's K⁺
+    concentrations using the Nernst equation.
+
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~ap_sim.constants.DEFAULT_G_IKCA`.
-        e_rev: Reversal potential in mV. Defaults to
-            :data:`~ap_sim.constants.DEFAULT_E_IKCA`.
 
     Returns:
         An :class:`~ap_sim.channels.IonChannel` representing the IKCa current.
@@ -544,7 +551,7 @@ def make_ikca_channel(
         name="IKCa",
         g_max=g_max,
         gating_variables=(q_var,),
-        e_rev=e_rev,
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )
 
 
@@ -562,7 +569,6 @@ _alpha_f, _beta_f = boltzmann_cosh_rates(
 
 def make_ical_channel(
     g_max: float = DEFAULT_G_ICAL,
-    e_rev: float = DEFAULT_E_CA,
 ) -> IonChannel:
     """Create an ICaL (L-type Ca²⁺) ion channel.
 
@@ -579,11 +585,12 @@ def make_ical_channel(
     -10 mV (slope 6.2 mV) and inactivation centred at -35 mV (slope -9 mV,
     inverted).
 
+    The reversal potential is computed dynamically from the neuron's Ca²⁺
+    concentrations using the Nernst equation.
+
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~ap_sim.constants.DEFAULT_G_ICAL`.
-        e_rev: Reversal potential in mV. Defaults to
-            :data:`~ap_sim.constants.DEFAULT_E_CA`.
 
     Returns:
         An :class:`~ap_sim.channels.IonChannel` representing the ICaL current.
@@ -594,7 +601,7 @@ def make_ical_channel(
         name="ICaL",
         g_max=g_max,
         gating_variables=(d_var, f_var),
-        e_rev=e_rev,
+        reversal_spec=NernstSpec(IonSpecies.CALCIUM),
         carries_calcium=True,
     )
 
@@ -613,7 +620,6 @@ _alpha_ft, _beta_ft = boltzmann_cosh_rates(
 
 def make_icat_channel(
     g_max: float = DEFAULT_G_ICAT,
-    e_rev: float = DEFAULT_E_CA,
 ) -> IonChannel:
     """Create an ICaT (T-type Ca²⁺) ion channel.
 
@@ -625,11 +631,12 @@ def make_icat_channel(
     Kinetics follow Destexhe et al. (1994) with activation half-point at
     -56 mV and inactivation half-point at -80 mV.
 
+    The reversal potential is computed dynamically from the neuron's Ca²⁺
+    concentrations using the Nernst equation.
+
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~ap_sim.constants.DEFAULT_G_ICAT`.
-        e_rev: Reversal potential in mV. Defaults to
-            :data:`~ap_sim.constants.DEFAULT_E_CA`.
 
     Returns:
         An :class:`~ap_sim.channels.IonChannel` representing the ICaT current.
@@ -640,7 +647,7 @@ def make_icat_channel(
         name="ICaT",
         g_max=g_max,
         gating_variables=(dt_var, ft_var),
-        e_rev=e_rev,
+        reversal_spec=NernstSpec(IonSpecies.CALCIUM),
         carries_calcium=True,
     )
 
@@ -659,7 +666,6 @@ _alpha_fn, _beta_fn = boltzmann_cosh_rates(
 
 def make_ican_channel(
     g_max: float = DEFAULT_G_ICAN,
-    e_rev: float = DEFAULT_E_CA,
 ) -> IonChannel:
     """Create an ICaN (N-type Ca²⁺) ion channel.
 
@@ -672,11 +678,12 @@ def make_ican_channel(
     Kinetics use Boltzmann-cosh rate functions with activation centred at
     -20 mV and inactivation centred at -40 mV.
 
+    The reversal potential is computed dynamically from the neuron's Ca²⁺
+    concentrations using the Nernst equation.
+
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~ap_sim.constants.DEFAULT_G_ICAN`.
-        e_rev: Reversal potential in mV. Defaults to
-            :data:`~ap_sim.constants.DEFAULT_E_CA`.
 
     Returns:
         An :class:`~ap_sim.channels.IonChannel` representing the ICaN current.
@@ -687,6 +694,6 @@ def make_ican_channel(
         name="ICaN",
         g_max=g_max,
         gating_variables=(dn_var, fn_var),
-        e_rev=e_rev,
+        reversal_spec=NernstSpec(IonSpecies.CALCIUM),
         carries_calcium=True,
     )

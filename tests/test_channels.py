@@ -100,47 +100,66 @@ def test_ih_kinetics_steady_state_higher_at_hyperpolarised():
 # ---------------------------------------------------------------------------
 
 
-def _make_simple_channel(g_max: float = 1.0, e_rev: float = 0.0) -> IonChannel:
-    """Helper: create a channel with a single linear gating variable (power=1)."""
+def _make_simple_channel(g_max: float = 1.0) -> IonChannel:
+    """Helper: create a K⁺ channel with a single linear gating variable (power=1)."""
     gv = GatingVariable(
         name="x",
         power=1,
         alpha=lambda V, ca_i: 0.1,
         beta=lambda V, ca_i: 0.1,
     )
-    return IonChannel(name="test", g_max=g_max, gating_variables=(gv,), e_rev=e_rev)
+    return IonChannel(
+        name="test",
+        g_max=g_max,
+        gating_variables=(gv,),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
 
 
 def test_base_ion_channel_compute_current_math():
-    """compute_current returns g_max * gate^power * (V - e_rev)."""
-    ch = _make_simple_channel(g_max=2.0, e_rev=-10.0)
+    """compute_current returns g_max * gate^power * (V - E_rev)."""
+    neuron = HodgkinHuxley()
+    ch = _make_simple_channel(g_max=2.0)
+    e_rev = ch.reversal_potential(neuron)
     # gate value = 0.5, power = 1 → g = 2.0 * 0.5^1 = 1.0
-    # current = 1.0 * (V - (-10)) = 1.0 * 10 = 10.0
-    result = ch.compute_current(V=0.0, gating_state={"x": 0.5})
-    assert result == pytest.approx(2.0 * 0.5 * (0.0 - (-10.0)))
+    result = ch.compute_current(V=0.0, gating_state={"x": 0.5}, neuron=neuron)
+    assert result == pytest.approx(2.0 * 0.5 * (0.0 - e_rev))
 
 
 def test_base_ion_channel_power_two():
     """compute_current correctly raises the gate to its power."""
+    neuron = HodgkinHuxley()
     gv = GatingVariable(
         name="y", power=2, alpha=lambda V, ca_i: 0.1, beta=lambda V, ca_i: 0.1
     )
-    ch = IonChannel(name="pow2", g_max=1.0, gating_variables=(gv,), e_rev=0.0)
+    ch = IonChannel(
+        name="pow2",
+        g_max=1.0,
+        gating_variables=(gv,),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
+    e_rev = ch.reversal_potential(neuron)
     # gate=0.5, power=2 → g = 1.0 * 0.5^2 = 0.25
-    result = ch.compute_current(V=10.0, gating_state={"y": 0.5})
-    assert result == pytest.approx(1.0 * (0.5**2) * (10.0 - 0.0))
+    result = ch.compute_current(V=10.0, gating_state={"y": 0.5}, neuron=neuron)
+    assert result == pytest.approx(1.0 * (0.5**2) * (10.0 - e_rev))
 
 
-def test_base_ion_channel_reversal_potential_returns_e_rev():
-    """reversal_potential() returns the fixed e_rev value."""
-    ch = _make_simple_channel(e_rev=-30.0)
-    assert ch.reversal_potential(neuron=None) == pytest.approx(-30.0)
+def test_base_ion_channel_reversal_potential_uses_nernst():
+    """reversal_potential() computes K⁺ Nernst potential from neuron concentrations."""
+    from ap_sim.nernst import nernst_potential
+
+    neuron = HodgkinHuxley()
+    ch = _make_simple_channel()
+    expected = nernst_potential(1, neuron.T, neuron.K_out, neuron.K_in)
+    assert ch.reversal_potential(neuron) == pytest.approx(expected)
 
 
 def test_base_ion_channel_zero_current_at_reversal():
-    """Current is zero when V equals e_rev."""
-    ch = _make_simple_channel(g_max=1.0, e_rev=-40.0)
-    result = ch.compute_current(V=-40.0, gating_state={"x": 0.8})
+    """Current is zero when V equals E_rev (the Nernst potential)."""
+    neuron = HodgkinHuxley()
+    ch = _make_simple_channel(g_max=1.0)
+    e_rev = ch.reversal_potential(neuron)
+    result = ch.compute_current(V=e_rev, gating_state={"x": 0.8}, neuron=neuron)
     assert result == pytest.approx(0.0)
 
 
@@ -220,7 +239,12 @@ def test_base_ion_channel_duplicate_gating_names_raises():
         name="x", power=2, alpha=lambda V, ca_i: 0.2, beta=lambda V, ca_i: 0.2
     )
     with pytest.raises(ValueError, match="names must be unique"):
-        IonChannel(name="dup", g_max=1.0, gating_variables=(gv1, gv2), e_rev=0.0)
+        IonChannel(
+            name="dup",
+            g_max=1.0,
+            gating_variables=(gv1, gv2),
+            reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+        )
 
 
 def test_hh_duplicate_additional_channel_names_raises():
@@ -235,7 +259,12 @@ def test_hh_builtin_channel_name_collision_raises():
     gv = GatingVariable(
         name="r", power=1, alpha=lambda V, ca_i: 0.1, beta=lambda V, ca_i: 0.1
     )
-    ch = IonChannel(name="Na", g_max=0.1, gating_variables=(gv,), e_rev=-30.0)
+    ch = IonChannel(
+        name="Na",
+        g_max=0.1,
+        gating_variables=(gv,),
+        reversal_spec=NernstSpec(IonSpecies.SODIUM),
+    )
     with pytest.raises(ValueError, match="collides with a built-in"):
         HodgkinHuxley(additional_channels=(ch,))
 
@@ -247,22 +276,25 @@ def test_hh_builtin_channel_name_collision_raises():
 
 def test_make_ih_channel_defaults():
     """make_ih_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_E_IH, DEFAULT_G_IH
+    from ap_sim.constants import DEFAULT_G_IH, DEFAULT_IH_P_NA
 
     ch = make_ih_channel()
     assert ch.name == "Ih"
     assert ch.g_max == pytest.approx(DEFAULT_G_IH)
-    assert ch.e_rev == pytest.approx(DEFAULT_E_IH)
+    assert isinstance(ch.reversal_spec, GoldmanSpec)
+    assert ch.reversal_spec.permeabilities[0] == (IonSpecies.SODIUM, DEFAULT_IH_P_NA)
+    assert ch.reversal_spec.permeabilities[1] == (IonSpecies.POTASSIUM, 1.0)
     assert len(ch.gating_variables) == 1
     assert ch.gating_variables[0].name == "r"
     assert ch.gating_variables[0].power == 1
 
 
 def test_make_ih_channel_custom_params():
-    """make_ih_channel accepts custom g_max and e_rev."""
-    ch = make_ih_channel(g_max=0.5, e_rev=-25.0)
+    """make_ih_channel accepts custom g_max and p_na."""
+    ch = make_ih_channel(g_max=0.5, p_na=0.33)
     assert ch.g_max == pytest.approx(0.5)
-    assert ch.e_rev == pytest.approx(-25.0)
+    assert isinstance(ch.reversal_spec, GoldmanSpec)
+    assert ch.reversal_spec.permeabilities[0][1] == pytest.approx(0.33)
 
 
 # ---------------------------------------------------------------------------
@@ -407,7 +439,12 @@ def test_multiple_optional_channels_coexist():
     gv2 = GatingVariable(
         name="q", power=1, alpha=lambda V, ca_i: 0.05, beta=lambda V, ca_i: 0.05
     )
-    ch2 = IonChannel(name="Iq", g_max=0.05, gating_variables=(gv2,), e_rev=-80.0)
+    ch2 = IonChannel(
+        name="Iq",
+        g_max=0.05,
+        gating_variables=(gv2,),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
     neuron = HodgkinHuxley(additional_channels=(ch1, ch2))
     stim = step_current(
         duration=10.0,
@@ -476,12 +513,13 @@ def test_ika_kinetics_inactivation_decreases_with_depolarisation():
 
 def test_make_ika_channel_defaults():
     """make_ika_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_E_IKA, DEFAULT_G_IKA
+    from ap_sim.constants import DEFAULT_G_IKA
 
     ch = make_ika_channel()
     assert ch.name == "IKa"
     assert ch.g_max == pytest.approx(DEFAULT_G_IKA)
-    assert ch.e_rev == pytest.approx(DEFAULT_E_IKA)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
     assert len(ch.gating_variables) == 2
     assert ch.gating_variables[0].name == "a"
     assert ch.gating_variables[0].power == 1
@@ -490,10 +528,11 @@ def test_make_ika_channel_defaults():
 
 
 def test_make_ika_channel_custom_params():
-    """make_ika_channel accepts custom g_max and e_rev."""
-    ch = make_ika_channel(g_max=10.0, e_rev=-80.0)
+    """make_ika_channel accepts custom g_max."""
+    ch = make_ika_channel(g_max=10.0)
     assert ch.g_max == pytest.approx(10.0)
-    assert ch.e_rev == pytest.approx(-80.0)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
 
 
 # ---------------------------------------------------------------------------
@@ -623,22 +662,24 @@ def test_inap_subthreshold_activation():
 
 def test_make_inap_channel_defaults():
     """make_inap_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_E_NAP, DEFAULT_G_NAP
+    from ap_sim.constants import DEFAULT_G_NAP
 
     ch = make_inap_channel()
     assert ch.name == "INaP"
     assert ch.g_max == pytest.approx(DEFAULT_G_NAP)
-    assert ch.e_rev == pytest.approx(DEFAULT_E_NAP)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.SODIUM
     assert len(ch.gating_variables) == 1
     assert ch.gating_variables[0].name == "p"
     assert ch.gating_variables[0].power == 1
 
 
 def test_make_inap_channel_custom_params():
-    """make_inap_channel accepts custom g_max and e_rev."""
-    ch = make_inap_channel(g_max=1.0, e_rev=55.0)
+    """make_inap_channel accepts custom g_max."""
+    ch = make_inap_channel(g_max=1.0)
     assert ch.g_max == pytest.approx(1.0)
-    assert ch.e_rev == pytest.approx(55.0)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.SODIUM
 
 
 # ---------------------------------------------------------------------------
@@ -762,12 +803,13 @@ def test_inar_rates_non_negative():
 
 def test_make_inar_channel_defaults():
     """make_inar_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_E_NAR, DEFAULT_G_NAR
+    from ap_sim.constants import DEFAULT_G_NAR
 
     ch = make_inar_channel()
     assert ch.name == "INaR"
     assert ch.g_max == pytest.approx(DEFAULT_G_NAR)
-    assert ch.e_rev == pytest.approx(DEFAULT_E_NAR)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.SODIUM
     assert len(ch.gating_variables) == 2
     assert ch.gating_variables[0].name == "s"
     assert ch.gating_variables[0].power == 1
@@ -776,10 +818,11 @@ def test_make_inar_channel_defaults():
 
 
 def test_make_inar_channel_custom_params():
-    """make_inar_channel accepts custom g_max and e_rev."""
-    ch = make_inar_channel(g_max=0.5, e_rev=55.0)
+    """make_inar_channel accepts custom g_max."""
+    ch = make_inar_channel(g_max=0.5)
     assert ch.g_max == pytest.approx(0.5)
-    assert ch.e_rev == pytest.approx(55.0)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.SODIUM
 
 
 # ---------------------------------------------------------------------------
@@ -940,22 +983,24 @@ def test_im_slow_kinetics():
 
 def test_make_im_channel_defaults():
     """make_im_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_E_IM, DEFAULT_G_IM
+    from ap_sim.constants import DEFAULT_G_IM
 
     ch = make_im_channel()
     assert ch.name == "IM"
     assert ch.g_max == pytest.approx(DEFAULT_G_IM)
-    assert ch.e_rev == pytest.approx(DEFAULT_E_IM)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
     assert len(ch.gating_variables) == 1
     assert ch.gating_variables[0].name == "w"
     assert ch.gating_variables[0].power == 1
 
 
 def test_make_im_channel_custom_params():
-    """make_im_channel accepts custom g_max and e_rev."""
-    ch = make_im_channel(g_max=1.0, e_rev=-80.0)
+    """make_im_channel accepts custom g_max."""
+    ch = make_im_channel(g_max=1.0)
     assert ch.g_max == pytest.approx(1.0)
-    assert ch.e_rev == pytest.approx(-80.0)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
 
 
 # ---------------------------------------------------------------------------
@@ -1055,22 +1100,24 @@ def test_ikir_fast_kinetics():
 
 def test_make_ikir_channel_defaults():
     """make_ikir_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_E_IKIR, DEFAULT_G_IKIR
+    from ap_sim.constants import DEFAULT_G_IKIR
 
     ch = make_ikir_channel()
     assert ch.name == "IKir"
     assert ch.g_max == pytest.approx(DEFAULT_G_IKIR)
-    assert ch.e_rev == pytest.approx(DEFAULT_E_IKIR)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
     assert len(ch.gating_variables) == 1
     assert ch.gating_variables[0].name == "kir"
     assert ch.gating_variables[0].power == 1
 
 
 def test_make_ikir_channel_custom_params():
-    """make_ikir_channel accepts custom g_max and e_rev."""
-    ch = make_ikir_channel(g_max=0.5, e_rev=-80.0)
+    """make_ikir_channel accepts custom g_max."""
+    ch = make_ikir_channel(g_max=0.5)
     assert ch.g_max == pytest.approx(0.5)
-    assert ch.e_rev == pytest.approx(-80.0)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
 
 
 # ---------------------------------------------------------------------------
@@ -1146,7 +1193,7 @@ def test_calcium_gating_variable_in_integrator():
         name="ITest",
         g_max=0.5,
         gating_variables=(cg,),
-        e_rev=-77.0,
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )
     from ap_sim.calcium import CalciumDynamics
 
@@ -1262,22 +1309,24 @@ def test_ikca_rates_non_negative():
 
 def test_make_ikca_channel_defaults():
     """make_ikca_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_E_IKCA, DEFAULT_G_IKCA
+    from ap_sim.constants import DEFAULT_G_IKCA
 
     ch = make_ikca_channel()
     assert ch.name == "IKCa"
     assert ch.g_max == pytest.approx(DEFAULT_G_IKCA)
-    assert ch.e_rev == pytest.approx(DEFAULT_E_IKCA)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
     assert len(ch.gating_variables) == 1
     assert ch.gating_variables[0].name == "q"
     assert ch.gating_variables[0].power == 1
 
 
 def test_make_ikca_channel_custom_params():
-    """make_ikca_channel accepts custom g_max and e_rev."""
-    ch = make_ikca_channel(g_max=2.0, e_rev=-80.0)
+    """make_ikca_channel accepts a custom g_max."""
+    ch = make_ikca_channel(g_max=2.0)
     assert ch.g_max == pytest.approx(2.0)
-    assert ch.e_rev == pytest.approx(-80.0)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
 
 
 def test_ikca_is_not_calcium_ion_channel():
@@ -1366,12 +1415,13 @@ def test_ical_activation_increases_with_depolarisation():
 
 def test_make_ical_channel_defaults():
     """make_ical_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_E_CA, DEFAULT_G_ICAL
+    from ap_sim.constants import DEFAULT_G_ICAL
 
     ch = make_ical_channel()
     assert ch.name == "ICaL"
     assert ch.g_max == pytest.approx(DEFAULT_G_ICAL)
-    assert ch.e_rev == pytest.approx(DEFAULT_E_CA)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.CALCIUM
     assert len(ch.gating_variables) == 2
     assert ch.gating_variables[0].name == "d"
     assert ch.gating_variables[0].power == 2
@@ -1480,12 +1530,13 @@ def test_icat_activation_increases_with_depolarisation():
 
 def test_make_icat_channel_defaults():
     """make_icat_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_E_CA, DEFAULT_G_ICAT
+    from ap_sim.constants import DEFAULT_G_ICAT
 
     ch = make_icat_channel()
     assert ch.name == "ICaT"
     assert ch.g_max == pytest.approx(DEFAULT_G_ICAT)
-    assert ch.e_rev == pytest.approx(DEFAULT_E_CA)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.CALCIUM
     assert len(ch.gating_variables) == 2
     assert ch.gating_variables[0].name == "dt"
     assert ch.gating_variables[0].power == 2
@@ -1594,12 +1645,13 @@ def test_ican_activation_increases_with_depolarisation():
 
 def test_make_ican_channel_defaults():
     """make_ican_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_E_CA, DEFAULT_G_ICAN
+    from ap_sim.constants import DEFAULT_G_ICAN
 
     ch = make_ican_channel()
     assert ch.name == "ICaN"
     assert ch.g_max == pytest.approx(DEFAULT_G_ICAN)
-    assert ch.e_rev == pytest.approx(DEFAULT_E_CA)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.CALCIUM
     assert len(ch.gating_variables) == 2
     assert ch.gating_variables[0].name == "dn"
     assert ch.gating_variables[0].power == 2

@@ -130,15 +130,19 @@ class GatingVariable:
 
 @dataclass(frozen=True)
 class IonChannel:
-    """An ion channel with a fixed reversal potential and gating mechanics.
+    """An ion channel whose reversal potential is derived from ion concentrations.
 
-    Computes current as ``g_max * prod(gate^power) * (V - e_rev)``.
+    Computes current as ``g_max * prod(gate^power) * (V - E_rev)`` where
+    ``E_rev`` is computed at runtime from the neuron's ion concentrations using
+    either the Nernst equation (:class:`NernstSpec`) or the Goldman-Hodgkin-Katz
+    equation (:class:`GoldmanSpec`).
 
     Attributes:
         name: Human-readable channel identifier (e.g. ``'Ih'``).
         g_max: Maximum conductance in mS/cm².
         gating_variables: Tuple of gating variable descriptors.
-        e_rev: Fixed reversal potential in mV.
+        reversal_spec: Specification for how the reversal potential is computed
+            from the neuron's ion concentrations.
         carries_calcium: ``True`` for channels that carry Ca²⁺ ions (e.g.
             ICaL, ICaT, ICaN).  Used by
             :meth:`~ap_sim.hodgkin_huxley.HodgkinHuxley.calcium_current` to
@@ -153,7 +157,7 @@ class IonChannel:
     name: str
     g_max: float
     gating_variables: tuple["GatingVariable", ...]
-    e_rev: float
+    reversal_spec: ReversalSpec
     carries_calcium: bool = field(default=False)
 
     def __post_init__(self) -> None:
@@ -170,26 +174,51 @@ class IonChannel:
             )
 
     def reversal_potential(self, neuron: Any) -> float:
-        """Return the fixed reversal potential for this channel.
+        """Compute the reversal potential from the neuron's ion concentrations.
+
+        Dispatches to :func:`~ap_sim.nernst.nernst_potential` for a
+        :class:`NernstSpec` or :func:`~ap_sim.nernst.goldman_potential` for a
+        :class:`GoldmanSpec`, using the concentrations stored on *neuron*.
 
         Args:
-            neuron: Ignored; present for interface consistency with custom
-                channels that compute a Nernst potential from ion
+            neuron: A :class:`~ap_sim.hodgkin_huxley.HodgkinHuxley` instance
+                whose ``ion_concentrations()`` method is used to look up ion
                 concentrations.
 
         Returns:
-            The fixed reversal potential in mV.
+            Reversal potential in mV.
         """
-        return self.e_rev
+        from .nernst import goldman_potential, nernst_potential
 
-    def compute_current(self, V: float, gating_state: dict[str, float]) -> float:
+        spec = self.reversal_spec
+        if isinstance(spec, NernstSpec):
+            c_out, c_in = neuron.ion_concentrations(spec.species)
+            return nernst_potential(spec.species.valence, neuron.T, c_out, c_in)
+        # GoldmanSpec — separate cations from anions
+        cation_terms = []
+        anion_terms = []
+        for species, p in spec.permeabilities:
+            c_out, c_in = neuron.ion_concentrations(species)
+            if species.valence > 0:
+                cation_terms.append((p, c_out, c_in))
+            else:
+                anion_terms.append((p, c_out, c_in))
+        return goldman_potential(neuron.T, cation_terms, anion_terms)
+
+    def compute_current(
+        self, V: float, gating_state: dict[str, float], neuron: Any
+    ) -> float:
         """Compute the ionic current through this channel.
 
-        Evaluates ``g_max * prod(gate^power) * (V - e_rev)``.
+        Evaluates ``g_max * prod(gate^power) * (V - E_rev)`` where ``E_rev``
+        is computed dynamically from the neuron's ion concentrations via
+        :meth:`reversal_potential`.
 
         Args:
             V: Membrane voltage in mV.
             gating_state: Mapping from gating variable name to current value.
+            neuron: The :class:`~ap_sim.hodgkin_huxley.HodgkinHuxley` model
+                used to compute the reversal potential.
 
         Returns:
             Ionic current in µA/cm².
@@ -197,4 +226,4 @@ class IonChannel:
         g = self.g_max
         for gv in self.gating_variables:
             g *= gating_state[gv.name] ** gv.power
-        return g * (V - self.e_rev)
+        return g * (V - self.reversal_potential(neuron))

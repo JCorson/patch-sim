@@ -21,6 +21,8 @@ DEFAULT_CA_IN: float = 0.0001  # mM intracellular Ca2+ (physiological resting)
 # Additional channel defaults
 DEFAULT_G_IH: float = 0.1  # HCN/Ih maximum conductance in mS/cm²
 DEFAULT_E_IH: float = -30.0  # Ih reversal potential in mV (mixed Na/K cation)
+# Ih Na+ permeability relative to K+ (GHK); yields ~-30 mV at default concentrations
+DEFAULT_IH_P_NA: float = 0.289
 
 DEFAULT_G_IKA: float = 5.0  # A-type K+ maximum conductance in mS/cm²
 DEFAULT_E_IKA: float = -77.0  # A-type K+ reversal potential in mV

@@ -12,6 +12,8 @@ from ap_sim.calcium import CalciumDynamics
 from ap_sim.channels import (
     GatingVariable,
     IonChannel,
+    IonSpecies,
+    NernstSpec,
 )
 from ap_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from ap_sim.hodgkin_huxley import HodgkinHuxley
@@ -34,7 +36,7 @@ _MOCK_CALCIUM_CHANNEL = IonChannel(
     name="mock_ca",
     g_max=1.0,
     gating_variables=(_CA_GATE,),
-    e_rev=120.0,
+    reversal_spec=NernstSpec(IonSpecies.CALCIUM),
     carries_calcium=True,
 )
 
@@ -127,7 +129,12 @@ def test_plain_ion_channel_does_not_carry_calcium() -> None:
     gv = GatingVariable(
         name="x", power=1, alpha=lambda V, ca_i: 0.01, beta=lambda V, ca_i: 0.01
     )
-    ch = IonChannel(name="test_ch", g_max=1.0, gating_variables=(gv,), e_rev=-70.0)
+    ch = IonChannel(
+        name="test_ch",
+        g_max=1.0,
+        gating_variables=(gv,),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
     assert not ch.carries_calcium
 
 

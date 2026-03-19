@@ -165,7 +165,9 @@ def _hh_derivatives(
     I_Na = neuron.g_Na * (m**3) * h * (V - neuron.E_Na)
     I_K = neuron.g_K * (n**4) * (V - neuron.E_K)
     I_L = neuron.g_L * (V - neuron.E_L)
-    I_add = sum(ch.compute_current(V, add_state) for ch in neuron.additional_channels)
+    I_add = sum(
+        ch.compute_current(V, add_state, neuron) for ch in neuron.additional_channels
+    )
     dV = (I_ext - I_Na - I_K - I_L - I_add) / neuron.C_m
     dn = neuron.alpha_n(V) * (1 - n) - neuron.beta_n(V) * n
     dm = neuron.alpha_m(V) * (1 - m) - neuron.beta_m(V) * m
@@ -458,7 +460,7 @@ def simulate_voltage_clamp(
     I_K[0] = g_K0 * (V0 - neuron.E_K)
     I_L[0] = neuron.g_L * (V0 - neuron.E_L)
     for ch in neuron.additional_channels:
-        add_ch_currents[ch.name][0] = ch.compute_current(V0, add_state)
+        add_ch_currents[ch.name][0] = ch.compute_current(V0, add_state, neuron)
     I_total[0] = (
         I_Na[0]
         + I_K[0]
@@ -488,7 +490,7 @@ def simulate_voltage_clamp(
         I_K[i] = g_K * (V - neuron.E_K)
         I_L[i] = neuron.g_L * (V - neuron.E_L)
         for ch in neuron.additional_channels:
-            add_ch_currents[ch.name][i] = ch.compute_current(V, add_state)
+            add_ch_currents[ch.name][i] = ch.compute_current(V, add_state, neuron)
         I_total[i] = (
             I_Na[i]
             + I_K[i]
@@ -594,7 +596,9 @@ def simulate_current_clamp(
         ca_arr[0] = ca_i
 
     for ch in neuron.additional_channels:
-        add_ch_currents[ch.name][0] = ch.compute_current(neuron.v_rest, add_state)
+        add_ch_currents[ch.name][0] = ch.compute_current(
+            neuron.v_rest, add_state, neuron
+        )
 
     # Main simulation loop — all state in plain numpy scalars
     for i in range(1, num_time_steps):
@@ -612,7 +616,7 @@ def simulate_current_clamp(
         if ca_arr is not None:
             ca_arr[i] = ca_i
         for ch in neuron.additional_channels:
-            add_ch_currents[ch.name][i] = ch.compute_current(V_new, add_state)
+            add_ch_currents[ch.name][i] = ch.compute_current(V_new, add_state, neuron)
 
     data: dict[str, np.ndarray] = {
         "voltage": V_arr,

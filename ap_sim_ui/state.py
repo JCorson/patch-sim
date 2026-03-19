@@ -63,8 +63,7 @@ from ap_sim_ui.protocol_builders import build_current_protocol, build_voltage_pr
 # Channel registry                                                   #
 # ------------------------------------------------------------------ #
 # Each entry is (enabled_attr, g_max_attr, factory, extra_kwargs).   #
-# extra_kwargs maps kwarg name → state attribute name; the value     #
-# "e_ca" is resolved at runtime from the computed Nernst potential.  #
+# extra_kwargs maps kwarg name → state attribute name.               #
 
 _CHANNEL_REGISTRY: list[tuple[str, str, object, dict[str, str]]] = [
     ("ih_enabled", "ih_g_max", make_ih_channel, {}),
@@ -74,9 +73,9 @@ _CHANNEL_REGISTRY: list[tuple[str, str, object, dict[str, str]]] = [
     ("im_enabled", "im_g_max", make_im_channel, {}),
     ("ikir_enabled", "ikir_g_max", make_ikir_channel, {}),
     ("ikca_enabled", "ikca_g_max", make_ikca_channel, {}),
-    ("ical_enabled", "ical_g_max", make_ical_channel, {"e_rev": "e_ca"}),
-    ("icat_enabled", "icat_g_max", make_icat_channel, {"e_rev": "e_ca"}),
-    ("ican_enabled", "ican_g_max", make_ican_channel, {"e_rev": "e_ca"}),
+    ("ical_enabled", "ical_g_max", make_ical_channel, {}),
+    ("icat_enabled", "icat_g_max", make_icat_channel, {}),
+    ("ican_enabled", "ican_g_max", make_ican_channel, {}),
 ]
 
 # ------------------------------------------------------------------ #
@@ -650,12 +649,10 @@ class AppState(rx.State):
             self.error_message = ""
 
         try:
-            e_ca = float(ap_sim.nernst_potential(2, self.T, self.Ca_out, self.Ca_in))
-            _extra_values = {"e_ca": e_ca}
             additional_channels = []
             for enabled_attr, g_max_attr, factory, extra_kwargs in _CHANNEL_REGISTRY:
                 if getattr(self, enabled_attr):
-                    kwargs = {k: _extra_values[v] for k, v in extra_kwargs.items()}
+                    kwargs = {k: getattr(self, v) for k, v in extra_kwargs.items()}
                     additional_channels.append(
                         factory(g_max=getattr(self, g_max_attr), **kwargs)  # type: ignore[operator]
                     )

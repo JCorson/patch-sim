@@ -155,7 +155,7 @@ class HodgkinHuxley:
             Total calcium current in µA/cm² (positive = outward).
         """
         return sum(
-            ch.compute_current(V, opt_state)
+            ch.compute_current(V, opt_state, self)
             for ch in self.additional_channels
             if ch.carries_calcium
         )
