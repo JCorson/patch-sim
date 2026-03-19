@@ -85,7 +85,7 @@ def test_boltzmann_cosh_rates_alpha_plus_beta_equals_one_over_tau():
     alpha, beta = boltzmann_cosh_rates(half, slope, tau_scale, tau_floor)
     tau_at_half = tau_scale / math.cosh(0.0)  # cosh(0) = 1
     expected = 1.0 / max(tau_at_half, tau_floor)
-    assert alpha(half) + beta(half) == pytest.approx(expected, rel=1e-9)
+    assert alpha(half, 0.0) + beta(half, 0.0) == pytest.approx(expected, rel=1e-9)
 
 
 def test_boltzmann_cosh_rates_steady_state_is_half_at_half_voltage():
@@ -94,7 +94,7 @@ def test_boltzmann_cosh_rates_steady_state_is_half_at_half_voltage():
         half=-52.6, slope=4.6, tau_scale=6.0, tau_floor=0.1
     )
     V = -52.6
-    ss = alpha(V) / (alpha(V) + beta(V))
+    ss = alpha(V, 0.0) / (alpha(V, 0.0) + beta(V, 0.0))
     assert ss == pytest.approx(0.5, rel=1e-9)
 
 
@@ -104,7 +104,7 @@ def test_boltzmann_cosh_rates_inverted_steady_state_is_half_at_half_voltage():
         half=-80.0, slope=12.0, tau_scale=10.0, tau_floor=0.5, inverted=True
     )
     V = -80.0
-    ss = alpha(V) / (alpha(V) + beta(V))
+    ss = alpha(V, 0.0) / (alpha(V, 0.0) + beta(V, 0.0))
     assert ss == pytest.approx(0.5, rel=1e-9)
 
 
@@ -115,7 +115,7 @@ def test_boltzmann_cosh_rates_tau_floor_respected():
         half=-80.0, slope=12.0, tau_scale=10.0, tau_floor=tau_floor
     )
     for V in (-200.0, 200.0):
-        total = alpha(V) + beta(V)  # = 1 / tau
+        total = alpha(V, 0.0) + beta(V, 0.0)  # = 1 / tau
         tau = 1.0 / total
         assert tau >= tau_floor - 1e-12
 
@@ -130,8 +130,8 @@ def test_boltzmann_cosh_rates_tau_rate_scales_correctly():
         half, slope, tau_scale, tau_floor, tau_rate=2.0
     )
     V = -35.0
-    tau1 = 1.0 / (alpha1(V) + beta1(V))
-    tau2 = 1.0 / (alpha2(V) + beta2(V))
+    tau1 = 1.0 / (alpha1(V, 0.0) + beta1(V, 0.0))
+    tau2 = 1.0 / (alpha2(V, 0.0) + beta2(V, 0.0))
     assert tau1 == pytest.approx(2.0 * tau2, rel=1e-9)
 
 
@@ -144,7 +144,11 @@ def test_boltzmann_cosh_rates_inverted_flips_boltzmann():
         half=-52.6, slope=4.6, tau_scale=6.0, tau_floor=0.1, inverted=True
     )
     V_hyper = -100.0
-    ss_std = alpha_std(V_hyper) / (alpha_std(V_hyper) + beta_std(V_hyper))
-    ss_inv = alpha_inv(V_hyper) / (alpha_inv(V_hyper) + beta_inv(V_hyper))
+    ss_std = alpha_std(V_hyper, 0.0) / (
+        alpha_std(V_hyper, 0.0) + beta_std(V_hyper, 0.0)
+    )
+    ss_inv = alpha_inv(V_hyper, 0.0) / (
+        alpha_inv(V_hyper, 0.0) + beta_inv(V_hyper, 0.0)
+    )
     assert ss_std < 0.1  # standard gate is mostly closed at hyperpolarisation
     assert ss_inv > 0.9  # inverted gate is mostly open at hyperpolarisation

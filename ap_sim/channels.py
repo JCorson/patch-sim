@@ -4,42 +4,23 @@ Provides the building blocks for defining additional ion channels that can be
 added on top of the classic Na, K, and leak channels.
 """
 
-from abc import ABC
-from dataclasses import dataclass
-from typing import Any, Callable, Protocol, Union, runtime_checkable
+from dataclasses import dataclass, field
+from typing import Any, Callable
 
 
 @dataclass(frozen=True)
 class GatingVariable:
     """A single gating variable with its kinetic rate functions.
 
+    Rate functions always accept ``(V, ca_i)`` — voltage in mV and
+    intracellular Ca²⁺ concentration in mM.  Voltage-only gates simply ignore
+    the ``ca_i`` argument.
+
     Attributes:
         name: Unique name used as a key in gating-state dicts (e.g. 'r').
         power: Exponent applied to this gate's value when computing conductance.
-        alpha: Forward rate function alpha(V) in units 1/ms.
-        beta: Backward rate function beta(V) in units 1/ms.
-    """
-
-    name: str
-    power: int
-    alpha: Callable[[float], float]
-    beta: Callable[[float], float]
-
-
-@dataclass(frozen=True)
-class CalciumGatingVariable:
-    """A gating variable whose kinetics depend on both voltage and [Ca²⁺]ᵢ.
-
-    Used for channels like I_KCa whose activation depends on intracellular
-    calcium concentration in addition to membrane voltage.  The alpha/beta
-    signatures take two arguments: ``(V, ca_i)`` where ``V`` is the membrane
-    voltage in mV and ``ca_i`` is the intracellular Ca²⁺ concentration in mM.
-
-    Attributes:
-        name: Unique name used as a key in gating-state dicts (e.g. 'q').
-        power: Exponent applied to this gate's value when computing conductance.
-        alpha: Forward rate function alpha(V, ca_i) in units 1/ms.
-        beta: Backward rate function beta(V, ca_i) in units 1/ms.
+        alpha: Forward rate function ``alpha(V, ca_i)`` in units 1/ms.
+        beta: Backward rate function ``beta(V, ca_i)`` in units 1/ms.
     """
 
     name: str
@@ -48,78 +29,22 @@ class CalciumGatingVariable:
     beta: Callable[[float, float], float]
 
 
-#: Type alias for any gating variable (voltage-only or calcium-dependent).
-AnyGatingVariable = Union[GatingVariable, CalciumGatingVariable]
-
-
-@runtime_checkable
-class IonChannel(Protocol):
-    """Structural protocol satisfied by any ion channel implementation.
-
-    Any class with the attributes and methods listed here qualifies, without
-    needing to inherit from this protocol explicitly.
-
-    Attributes:
-        name: Human-readable channel identifier (e.g. 'Ih').
-        g_max: Maximum conductance in mS/cm².
-        gating_variables: Tuple of gating variable descriptors.
-    """
-
-    name: str
-    g_max: float
-    gating_variables: tuple[AnyGatingVariable, ...]
-
-    def reversal_potential(self, neuron: Any) -> float:
-        """Return the reversal potential for this channel in mV.
-
-        Args:
-            neuron: The HodgkinHuxley neuron instance (may be used to compute
-                Nernst potentials for concentration-dependent channels).
-
-        Returns:
-            Reversal potential in mV.
-        """
-        ...
-
-    def compute_current(self, V: float, gating_state: dict[str, float]) -> float:
-        """Compute the ionic current through this channel.
-
-        Args:
-            V: Membrane voltage in mV.
-            gating_state: Mapping from gating variable name to current value.
-
-        Returns:
-            Ionic current in µA/cm².
-        """
-        ...
-
-
-class CalciumIonChannel(ABC):
-    """Marker base class for ion channels that carry Ca2+ ions.
-
-    A calcium channel declares itself by inheriting from this class alongside
-    its channel base (e.g. ``class ICaL(BaseIonChannel, CalciumIonChannel)``).
-    ``isinstance(ch, CalciumIonChannel)`` then correctly identifies only those
-    channels, without requiring a flag field on every non-calcium channel.
-    """
-
-    ...
-
-
 @dataclass(frozen=True)
-class BaseIonChannel:
-    """Generic ion channel with a fixed reversal potential.
+class IonChannel:
+    """An ion channel with a fixed reversal potential and gating mechanics.
 
     Computes current as ``g_max * prod(gate^power) * (V - e_rev)``.
 
-    Channels that require a concentration-dependent (Nernst) reversal potential
-    can subclass this and override ``reversal_potential``.
-
     Attributes:
-        name: Human-readable channel identifier.
+        name: Human-readable channel identifier (e.g. ``'Ih'``).
         g_max: Maximum conductance in mS/cm².
         gating_variables: Tuple of gating variable descriptors.
         e_rev: Fixed reversal potential in mV.
+        carries_calcium: ``True`` for channels that carry Ca²⁺ ions (e.g.
+            ICaL, ICaT, ICaN).  Used by
+            :meth:`~ap_sim.hodgkin_huxley.HodgkinHuxley.calcium_current` to
+            sum Ca²⁺ influx for the intracellular Ca²⁺ ODE.  Defaults to
+            ``False``.
 
     Raises:
         ValueError: If ``g_max`` is negative or if gating variable names are
@@ -128,8 +53,9 @@ class BaseIonChannel:
 
     name: str
     g_max: float
-    gating_variables: tuple[AnyGatingVariable, ...]
+    gating_variables: tuple["GatingVariable", ...]
     e_rev: float
+    carries_calcium: bool = field(default=False)
 
     def __post_init__(self) -> None:
         """Validate channel parameters on construction."""
@@ -148,7 +74,9 @@ class BaseIonChannel:
         """Return the fixed reversal potential for this channel.
 
         Args:
-            neuron: Ignored; present to satisfy the IonChannel protocol.
+            neuron: Ignored; present for interface consistency with custom
+                channels that compute a Nernst potential from ion
+                concentrations.
 
         Returns:
             The fixed reversal potential in mV.

@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 from typing import TYPE_CHECKING
 
-from .channels import CalciumGatingVariable
 
 if TYPE_CHECKING:
     from .hodgkin_huxley import HodgkinHuxley
@@ -49,7 +48,7 @@ def _initialize_gating_variables(
 
     Initializes both the classic HH gating variables (n, m, h) and the
     steady-state values for all additional channel gating variables.
-    CalciumGatingVariable instances receive both voltage and ca_i.
+    All rate functions are called as ``gv.alpha(V, ca_i)`` / ``gv.beta(V, ca_i)``.
 
     Args:
         neuron: The Hodgkin-Huxley neuron model.
@@ -70,10 +69,7 @@ def _initialize_gating_variables(
 
     add_state: dict[str, float] = {}
     for gv in neuron.all_additional_gating_variables:
-        if isinstance(gv, CalciumGatingVariable):
-            a, b = gv.alpha(V0, ca_i), gv.beta(V0, ca_i)
-        else:
-            a, b = gv.alpha(V0), gv.beta(V0)
+        a, b = gv.alpha(V0, ca_i), gv.beta(V0, ca_i)
         add_state[gv.name] = a / (a + b)
 
     return n0, m0, h0, add_state
@@ -87,8 +83,7 @@ def _additional_gating_derivatives(
 ) -> dict[str, float]:
     """Compute derivatives for all additional channel gating variables.
 
-    CalciumGatingVariable instances receive both voltage and ca_i for their
-    rate functions; standard GatingVariable instances receive only voltage.
+    All rate functions accept ``(V, ca_i)``; voltage-only gates ignore ``ca_i``.
 
     Args:
         neuron: The Hodgkin-Huxley neuron model.
@@ -102,10 +97,7 @@ def _additional_gating_derivatives(
     derivs: dict[str, float] = {}
     for gv in neuron.all_additional_gating_variables:
         x = add_state[gv.name]
-        if isinstance(gv, CalciumGatingVariable):
-            derivs[gv.name] = gv.alpha(V, ca_i) * (1 - x) - gv.beta(V, ca_i) * x
-        else:
-            derivs[gv.name] = gv.alpha(V) * (1 - x) - gv.beta(V) * x
+        derivs[gv.name] = gv.alpha(V, ca_i) * (1 - x) - gv.beta(V, ca_i) * x
     return derivs
 
 

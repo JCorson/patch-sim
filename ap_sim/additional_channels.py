@@ -6,13 +6,10 @@ with additional biophysical mechanisms.
 """
 
 import math
-from dataclasses import dataclass
 
 from .channels import (
-    BaseIonChannel,
-    CalciumGatingVariable,
-    CalciumIonChannel,
     GatingVariable,
+    IonChannel,
 )
 from .constants import (
     DEFAULT_E_CA,
@@ -37,21 +34,7 @@ from .constants import (
 from .utils import boltzmann_cosh_rates, safe_exp
 
 
-@dataclass(frozen=True)
-class CalciumBaseIonChannel(BaseIonChannel, CalciumIonChannel):
-    """A BaseIonChannel that also carries Ca²⁺ ions.
-
-    Inherits both :class:`~ap_sim.channels.BaseIonChannel` (for conductance
-    and gating mechanics) and :class:`~ap_sim.channels.CalciumIonChannel`
-    (marker so ``isinstance(ch, CalciumIonChannel)`` returns ``True``).
-
-    Use this as the return type for Ca²⁺-carrying channels (ICaL, ICaT,
-    ICaN) so that :func:`~ap_sim.hodgkin_huxley.HodgkinHuxley.calcium_current`
-    picks them up automatically.
-    """
-
-
-def _alpha_r(V: float) -> float:
+def _alpha_r(V: float, ca_i: float) -> float:
     """Forward rate for Ih gating variable r (Destexhe-style HCN kinetics).
 
     The Ih current is activated by hyperpolarization; alpha_r increases as
@@ -59,6 +42,7 @@ def _alpha_r(V: float) -> float:
 
     Args:
         V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (ignored).
 
     Returns:
         Forward rate alpha_r in 1/ms.
@@ -66,11 +50,12 @@ def _alpha_r(V: float) -> float:
     return safe_exp(-14.59 - 0.086 * V)
 
 
-def _beta_r(V: float) -> float:
+def _beta_r(V: float, ca_i: float) -> float:
     """Backward rate for Ih gating variable r (Destexhe-style HCN kinetics).
 
     Args:
         V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (ignored).
 
     Returns:
         Backward rate beta_r in 1/ms.
@@ -81,7 +66,7 @@ def _beta_r(V: float) -> float:
 _SINGULARITY_TOL: float = 1e-7
 
 
-def _alpha_a(V: float) -> float:
+def _alpha_a(V: float, ca_i: float) -> float:
     """Forward rate for IKa activation gating variable a (Traub & Miles 1991).
 
     Uses a Boltzmann-style rate shifted to the absolute voltage convention
@@ -90,6 +75,7 @@ def _alpha_a(V: float) -> float:
 
     Args:
         V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (ignored).
 
     Returns:
         Forward rate alpha_a in 1/ms.
@@ -100,7 +86,7 @@ def _alpha_a(V: float) -> float:
     return 0.02 * x / (safe_exp(x / 10.0) - 1.0)
 
 
-def _beta_a(V: float) -> float:
+def _beta_a(V: float, ca_i: float) -> float:
     """Backward rate for IKa activation gating variable a (Traub & Miles 1991).
 
     A singularity guard replaces the 0/0 form at V = -24.9 mV with the
@@ -108,6 +94,7 @@ def _beta_a(V: float) -> float:
 
     Args:
         V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (ignored).
 
     Returns:
         Backward rate beta_a in 1/ms.
@@ -118,11 +105,12 @@ def _beta_a(V: float) -> float:
     return 0.0175 * x / (safe_exp(x / 10.0) - 1.0)
 
 
-def _alpha_b(V: float) -> float:
+def _alpha_b(V: float, ca_i: float) -> float:
     """Forward rate for IKa inactivation gating variable b (Traub & Miles 1991).
 
     Args:
         V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (ignored).
 
     Returns:
         Forward rate alpha_b in 1/ms.
@@ -130,11 +118,12 @@ def _alpha_b(V: float) -> float:
     return 0.0016 * safe_exp(-(V + 73.0) / 18.0)
 
 
-def _beta_b(V: float) -> float:
+def _beta_b(V: float, ca_i: float) -> float:
     """Backward rate for IKa inactivation gating variable b (Traub & Miles 1991).
 
     Args:
         V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (ignored).
 
     Returns:
         Backward rate beta_b in 1/ms.
@@ -145,7 +134,7 @@ def _beta_b(V: float) -> float:
 def make_ika_channel(
     g_max: float = DEFAULT_G_IKA,
     e_rev: float = DEFAULT_E_IKA,
-) -> BaseIonChannel:
+) -> IonChannel:
     """Create an IKa (A-type K⁺) ion channel.
 
     IKa is a fast-inactivating, transient K⁺ current that delays the first
@@ -162,11 +151,11 @@ def make_ika_channel(
             :data:`~ap_sim.constants.DEFAULT_E_IKA`.
 
     Returns:
-        A :class:`~ap_sim.channels.BaseIonChannel` representing the IKa current.
+        An :class:`~ap_sim.channels.IonChannel` representing the IKa current.
     """
     a_var = GatingVariable(name="a", power=1, alpha=_alpha_a, beta=_beta_a)
     b_var = GatingVariable(name="b", power=1, alpha=_alpha_b, beta=_beta_b)
-    return BaseIonChannel(
+    return IonChannel(
         name="IKa",
         g_max=g_max,
         gating_variables=(a_var, b_var),
@@ -177,7 +166,7 @@ def make_ika_channel(
 def make_ih_channel(
     g_max: float = DEFAULT_G_IH,
     e_rev: float = DEFAULT_E_IH,
-) -> BaseIonChannel:
+) -> IonChannel:
     """Create an Ih (HCN/funny current) ion channel.
 
     The Ih channel is hyperpolarization-activated and carries a mixed Na⁺/K⁺
@@ -195,10 +184,10 @@ def make_ih_channel(
             :data:`~ap_sim.constants.DEFAULT_E_IH`.
 
     Returns:
-        A :class:`~ap_sim.channels.BaseIonChannel` representing the Ih current.
+        An :class:`~ap_sim.channels.IonChannel` representing the Ih current.
     """
     r_var = GatingVariable(name="r", power=1, alpha=_alpha_r, beta=_beta_r)
-    return BaseIonChannel(
+    return IonChannel(
         name="Ih",
         g_max=g_max,
         gating_variables=(r_var,),
@@ -218,7 +207,7 @@ _alpha_p, _beta_p = boltzmann_cosh_rates(
 def make_inap_channel(
     g_max: float = DEFAULT_G_NAP,
     e_rev: float = DEFAULT_E_NAP,
-) -> BaseIonChannel:
+) -> IonChannel:
     """Create an INaP (persistent Na⁺) ion channel.
 
     INaP is a non-inactivating Na⁺ current active near the resting potential.
@@ -236,10 +225,10 @@ def make_inap_channel(
             :data:`~ap_sim.constants.DEFAULT_E_NAP`.
 
     Returns:
-        A :class:`~ap_sim.channels.BaseIonChannel` representing the INaP current.
+        An :class:`~ap_sim.channels.IonChannel` representing the INaP current.
     """
     p_var = GatingVariable(name="p", power=1, alpha=_alpha_p, beta=_beta_p)
-    return BaseIonChannel(
+    return IonChannel(
         name="INaP",
         g_max=g_max,
         gating_variables=(p_var,),
@@ -296,13 +285,14 @@ def _nar_tau_hr(V: float) -> float:
     )
 
 
-def _alpha_hr(V: float) -> float:
+def _alpha_hr(V: float, ca_i: float) -> float:
     """Forward rate for INaR unblocking gating variable hr.
 
     Derived as alpha_hr = hr_inf / tau_hr.
 
     Args:
         V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (ignored).
 
     Returns:
         Forward rate alpha_hr in 1/ms.
@@ -310,13 +300,14 @@ def _alpha_hr(V: float) -> float:
     return _nar_hr_inf(V) / _nar_tau_hr(V)
 
 
-def _beta_hr(V: float) -> float:
+def _beta_hr(V: float, ca_i: float) -> float:
     """Backward rate for INaR unblocking gating variable hr.
 
     Derived as beta_hr = (1 - hr_inf) / tau_hr.
 
     Args:
         V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (ignored).
 
     Returns:
         Backward rate beta_hr in 1/ms.
@@ -327,7 +318,7 @@ def _beta_hr(V: float) -> float:
 def make_inar_channel(
     g_max: float = DEFAULT_G_NAR,
     e_rev: float = DEFAULT_E_NAR,
-) -> BaseIonChannel:
+) -> IonChannel:
     """Create an INaR (resurgent Na⁺) ion channel.
 
     INaR produces a transient inward Na⁺ current on membrane repolarization,
@@ -349,11 +340,11 @@ def make_inar_channel(
             :data:`~ap_sim.constants.DEFAULT_E_NAR`.
 
     Returns:
-        A :class:`~ap_sim.channels.BaseIonChannel` representing the INaR current.
+        An :class:`~ap_sim.channels.IonChannel` representing the INaR current.
     """
     s_var = GatingVariable(name="s", power=1, alpha=_alpha_s, beta=_beta_s)
     hr_var = GatingVariable(name="hr", power=1, alpha=_alpha_hr, beta=_beta_hr)
-    return BaseIonChannel(
+    return IonChannel(
         name="INaR",
         g_max=g_max,
         gating_variables=(s_var, hr_var),
@@ -373,7 +364,7 @@ _alpha_w, _beta_w = boltzmann_cosh_rates(
 def make_im_channel(
     g_max: float = DEFAULT_G_IM,
     e_rev: float = DEFAULT_E_IM,
-) -> BaseIonChannel:
+) -> IonChannel:
     """Create an IM (muscarinic K⁺) ion channel.
 
     IM is a slow, non-inactivating K⁺ current that is suppressed by
@@ -392,10 +383,10 @@ def make_im_channel(
             :data:`~ap_sim.constants.DEFAULT_E_IM`.
 
     Returns:
-        A :class:`~ap_sim.channels.BaseIonChannel` representing the IM current.
+        An :class:`~ap_sim.channels.IonChannel` representing the IM current.
     """
     w_var = GatingVariable(name="w", power=1, alpha=_alpha_w, beta=_beta_w)
-    return BaseIonChannel(
+    return IonChannel(
         name="IM",
         g_max=g_max,
         gating_variables=(w_var,),
@@ -415,7 +406,7 @@ _alpha_kir, _beta_kir = boltzmann_cosh_rates(
 def make_ikir_channel(
     g_max: float = DEFAULT_G_IKIR,
     e_rev: float = DEFAULT_E_IKIR,
-) -> BaseIonChannel:
+) -> IonChannel:
     """Create an IKir (inward rectifier K⁺) ion channel.
 
     IKir is a K⁺ channel that is most active at hyperpolarized potentials
@@ -434,10 +425,10 @@ def make_ikir_channel(
             :data:`~ap_sim.constants.DEFAULT_E_IKIR`.
 
     Returns:
-        A :class:`~ap_sim.channels.BaseIonChannel` representing the IKir current.
+        An :class:`~ap_sim.channels.IonChannel` representing the IKir current.
     """
     kir_var = GatingVariable(name="kir", power=1, alpha=_alpha_kir, beta=_beta_kir)
-    return BaseIonChannel(
+    return IonChannel(
         name="IKir",
         g_max=g_max,
         gating_variables=(kir_var,),
@@ -523,17 +514,17 @@ def _beta_q(V: float, ca_i: float) -> float:
 def make_ikca_channel(
     g_max: float = DEFAULT_G_IKCA,
     e_rev: float = DEFAULT_E_IKCA,
-) -> BaseIonChannel:
+) -> IonChannel:
     """Create an IKCa (calcium-activated K⁺) ion channel.
 
     IKCa is a BK-like K⁺ channel activated by both membrane depolarization
     and elevated intracellular Ca²⁺.  It contributes to spike repolarization
     and the afterhyperpolarization following Ca²⁺ entry.  It uses a single
-    CalciumGatingVariable ``q`` (power 1) whose kinetics depend on both
-    voltage and [Ca²⁺]ᵢ.
+    gating variable ``q`` (power 1) whose kinetics depend on both voltage and
+    [Ca²⁺]ᵢ.
 
-    Note: IKCa is calcium-*activated* but carries K⁺, not Ca²⁺.  It does NOT
-    inherit CalciumIonChannel.
+    Note: IKCa is calcium-*activated* but carries K⁺, not Ca²⁺.
+    ``carries_calcium`` is ``False``.
 
     Kinetics use a Hill function (K_d = 0.001 mM, n = 1) multiplied by a
     Boltzmann voltage factor (half-activation at -20 mV) for the steady state,
@@ -546,10 +537,10 @@ def make_ikca_channel(
             :data:`~ap_sim.constants.DEFAULT_E_IKCA`.
 
     Returns:
-        A :class:`~ap_sim.channels.BaseIonChannel` representing the IKCa current.
+        An :class:`~ap_sim.channels.IonChannel` representing the IKCa current.
     """
-    q_var = CalciumGatingVariable(name="q", power=1, alpha=_alpha_q, beta=_beta_q)
-    return BaseIonChannel(
+    q_var = GatingVariable(name="q", power=1, alpha=_alpha_q, beta=_beta_q)
+    return IonChannel(
         name="IKCa",
         g_max=g_max,
         gating_variables=(q_var,),
@@ -572,7 +563,7 @@ _alpha_f, _beta_f = boltzmann_cosh_rates(
 def make_ical_channel(
     g_max: float = DEFAULT_G_ICAL,
     e_rev: float = DEFAULT_E_CA,
-) -> CalciumBaseIonChannel:
+) -> IonChannel:
     """Create an ICaL (L-type Ca²⁺) ion channel.
 
     ICaL is a high-voltage-activated Ca²⁺ channel with slow voltage-dependent
@@ -580,9 +571,8 @@ def make_ical_channel(
     potentials in many neuron types.  It uses two gating variables: ``d``
     (activation, power 2) and ``f`` (inactivation, power 1).
 
-    Because ICaL carries Ca²⁺, the returned object inherits
-    :class:`~ap_sim.channels.CalciumIonChannel` so that
-    :func:`~ap_sim.hodgkin_huxley.HodgkinHuxley.calcium_current` sums its
+    Because ICaL carries Ca²⁺, ``carries_calcium=True`` is set so that
+    :meth:`~ap_sim.hodgkin_huxley.HodgkinHuxley.calcium_current` sums its
     contribution automatically.
 
     Kinetics use Boltzmann-cosh rate functions with activation centred at
@@ -596,15 +586,16 @@ def make_ical_channel(
             :data:`~ap_sim.constants.DEFAULT_E_CA`.
 
     Returns:
-        A :class:`CalciumBaseIonChannel` representing the ICaL current.
+        An :class:`~ap_sim.channels.IonChannel` representing the ICaL current.
     """
     d_var = GatingVariable(name="d", power=2, alpha=_alpha_d, beta=_beta_d)
     f_var = GatingVariable(name="f", power=1, alpha=_alpha_f, beta=_beta_f)
-    return CalciumBaseIonChannel(
+    return IonChannel(
         name="ICaL",
         g_max=g_max,
         gating_variables=(d_var, f_var),
         e_rev=e_rev,
+        carries_calcium=True,
     )
 
 
@@ -623,7 +614,7 @@ _alpha_ft, _beta_ft = boltzmann_cosh_rates(
 def make_icat_channel(
     g_max: float = DEFAULT_G_ICAT,
     e_rev: float = DEFAULT_E_CA,
-) -> CalciumBaseIonChannel:
+) -> IonChannel:
     """Create an ICaT (T-type Ca²⁺) ion channel.
 
     ICaT is a low-voltage-activated, transient Ca²⁺ channel.  It activates
@@ -641,15 +632,16 @@ def make_icat_channel(
             :data:`~ap_sim.constants.DEFAULT_E_CA`.
 
     Returns:
-        A :class:`CalciumBaseIonChannel` representing the ICaT current.
+        An :class:`~ap_sim.channels.IonChannel` representing the ICaT current.
     """
     dt_var = GatingVariable(name="dt", power=2, alpha=_alpha_dt, beta=_beta_dt)
     ft_var = GatingVariable(name="ft", power=1, alpha=_alpha_ft, beta=_beta_ft)
-    return CalciumBaseIonChannel(
+    return IonChannel(
         name="ICaT",
         g_max=g_max,
         gating_variables=(dt_var, ft_var),
         e_rev=e_rev,
+        carries_calcium=True,
     )
 
 
@@ -668,7 +660,7 @@ _alpha_fn, _beta_fn = boltzmann_cosh_rates(
 def make_ican_channel(
     g_max: float = DEFAULT_G_ICAN,
     e_rev: float = DEFAULT_E_CA,
-) -> CalciumBaseIonChannel:
+) -> IonChannel:
     """Create an ICaN (N-type Ca²⁺) ion channel.
 
     ICaN is a high-voltage-activated Ca²⁺ channel that inactivates more
@@ -687,13 +679,14 @@ def make_ican_channel(
             :data:`~ap_sim.constants.DEFAULT_E_CA`.
 
     Returns:
-        A :class:`CalciumBaseIonChannel` representing the ICaN current.
+        An :class:`~ap_sim.channels.IonChannel` representing the ICaN current.
     """
     dn_var = GatingVariable(name="dn", power=2, alpha=_alpha_dn, beta=_beta_dn)
     fn_var = GatingVariable(name="fn", power=1, alpha=_alpha_fn, beta=_beta_fn)
-    return CalciumBaseIonChannel(
+    return IonChannel(
         name="ICaN",
         g_max=g_max,
         gating_variables=(dn_var, fn_var),
         e_rev=e_rev,
+        carries_calcium=True,
     )

@@ -1,11 +1,8 @@
 """Tests for intracellular Ca2+ dynamics (issue #44).
 
 Covers CalciumDynamics ODE correctness, validation, backward compatibility,
-simulation integration, and the CalciumIonChannel marker class.
+simulation integration, and the carries_calcium flag on IonChannel.
 """
-
-from dataclasses import dataclass
-from typing import cast
 
 import numpy as np
 import pytest
@@ -13,8 +10,6 @@ import pytest
 import ap_sim
 from ap_sim.calcium import CalciumDynamics
 from ap_sim.channels import (
-    BaseIonChannel,
-    CalciumIonChannel,
     GatingVariable,
     IonChannel,
 )
@@ -25,24 +20,23 @@ from ap_sim.protocols import step_current, step_voltage
 
 # ---------------------------------------------------------------------------
 # Minimal calcium channel for use in tests.
-# Inherits BaseIonChannel for the channel mechanics and CalciumIonChannel
-# as a marker so that isinstance(ch, CalciumIonChannel) returns True.
+# Uses IonChannel with carries_calcium=True.
 # ---------------------------------------------------------------------------
 
 _CA_GATE = GatingVariable(
     name="ca_gate",
     power=1,
-    alpha=lambda V: 0.1,
-    beta=lambda V: 0.1,
+    alpha=lambda V, ca_i: 0.1,
+    beta=lambda V, ca_i: 0.1,
 )
 
-
-@dataclass(frozen=True)
-class _MockCalciumChannel(BaseIonChannel, CalciumIonChannel):
-    """Minimal Ca2+-carrying channel for testing."""
-
-    ...
-
+_MOCK_CALCIUM_CHANNEL = IonChannel(
+    name="mock_ca",
+    g_max=1.0,
+    gating_variables=(_CA_GATE,),
+    e_rev=120.0,
+    carries_calcium=True,
+)
 
 # ---------------------------------------------------------------------------
 # CalciumDynamics.derivative
@@ -124,23 +118,22 @@ def test_validation_ca_rest_zero_is_valid() -> None:
 
 
 # ---------------------------------------------------------------------------
-# CalciumIonChannel marker
+# carries_calcium flag
 # ---------------------------------------------------------------------------
 
 
-def test_base_ion_channel_is_not_calcium_ion_channel() -> None:
-    """A plain BaseIonChannel is not an instance of CalciumIonChannel."""
-    gv = GatingVariable(name="x", power=1, alpha=lambda V: 0.01, beta=lambda V: 0.01)
-    ch = BaseIonChannel(name="test_ch", g_max=1.0, gating_variables=(gv,), e_rev=-70.0)
-    assert not isinstance(ch, CalciumIonChannel)
-
-
-def test_mock_calcium_channel_is_calcium_ion_channel() -> None:
-    """A channel inheriting CalciumIonChannel is identified correctly."""
-    ch = _MockCalciumChannel(
-        name="mock_ca", g_max=1.0, gating_variables=(_CA_GATE,), e_rev=120.0
+def test_plain_ion_channel_does_not_carry_calcium() -> None:
+    """An IonChannel created without carries_calcium has carries_calcium=False."""
+    gv = GatingVariable(
+        name="x", power=1, alpha=lambda V, ca_i: 0.01, beta=lambda V, ca_i: 0.01
     )
-    assert isinstance(ch, CalciumIonChannel)
+    ch = IonChannel(name="test_ch", g_max=1.0, gating_variables=(gv,), e_rev=-70.0)
+    assert not ch.carries_calcium
+
+
+def test_mock_calcium_channel_carries_calcium() -> None:
+    """An IonChannel with carries_calcium=True has carries_calcium=True."""
+    assert _MOCK_CALCIUM_CHANNEL.carries_calcium
 
 
 # ---------------------------------------------------------------------------
@@ -210,19 +203,16 @@ def test_voltage_clamp_ca_stays_at_rest_no_calcium_channels() -> None:
 
 
 # ---------------------------------------------------------------------------
-# CalciumIonChannel in simulations: ca_i column exists and varies
+# carries_calcium=True in simulations: ca_i column exists and varies
 # ---------------------------------------------------------------------------
 
 
 def test_current_clamp_ca_varies_with_calcium_channel() -> None:
     """ca_i column is present and changes from ca_rest when a Ca2+ channel exists."""
     cd = CalciumDynamics(alpha_ca=1e-3, tau_ca=500.0, ca_rest=1e-4)
-    ch = _MockCalciumChannel(
-        name="mock_ca", g_max=1.0, gating_variables=(_CA_GATE,), e_rev=120.0
-    )
     neuron = HodgkinHuxley(
         calcium_dynamics=cd,
-        additional_channels=cast(tuple[IonChannel, ...], (ch,)),
+        additional_channels=(_MOCK_CALCIUM_CHANNEL,),
     )
     protocol = step_current(
         duration=20.0,
@@ -239,12 +229,9 @@ def test_current_clamp_ca_varies_with_calcium_channel() -> None:
 def test_voltage_clamp_ca_varies_with_calcium_channel() -> None:
     """ca_i column is present and changes from ca_rest in voltage clamp."""
     cd = CalciumDynamics(alpha_ca=1e-3, tau_ca=500.0, ca_rest=1e-4)
-    ch = _MockCalciumChannel(
-        name="mock_ca", g_max=1.0, gating_variables=(_CA_GATE,), e_rev=120.0
-    )
     neuron = HodgkinHuxley(
         calcium_dynamics=cd,
-        additional_channels=cast(tuple[IonChannel, ...], (ch,)),
+        additional_channels=(_MOCK_CALCIUM_CHANNEL,),
     )
     protocol = step_voltage(
         duration=20.0,
@@ -266,12 +253,9 @@ def test_voltage_clamp_ca_varies_with_calcium_channel() -> None:
 def test_ca_i_stays_non_negative_current_clamp() -> None:
     """ca_i is never negative throughout a current-clamp simulation."""
     cd = CalciumDynamics(alpha_ca=1.0, tau_ca=1.0, ca_rest=0.0)
-    ch = _MockCalciumChannel(
-        name="mock_ca", g_max=1.0, gating_variables=(_CA_GATE,), e_rev=120.0
-    )
     neuron = HodgkinHuxley(
         calcium_dynamics=cd,
-        additional_channels=cast(tuple[IonChannel, ...], (ch,)),
+        additional_channels=(_MOCK_CALCIUM_CHANNEL,),
     )
     protocol = step_current(
         duration=5.0,
@@ -286,12 +270,9 @@ def test_ca_i_stays_non_negative_current_clamp() -> None:
 def test_ca_i_stays_non_negative_voltage_clamp() -> None:
     """ca_i is never negative throughout a voltage-clamp simulation."""
     cd = CalciumDynamics(alpha_ca=1.0, tau_ca=1.0, ca_rest=0.0)
-    ch = _MockCalciumChannel(
-        name="mock_ca", g_max=1.0, gating_variables=(_CA_GATE,), e_rev=120.0
-    )
     neuron = HodgkinHuxley(
         calcium_dynamics=cd,
-        additional_channels=cast(tuple[IonChannel, ...], (ch,)),
+        additional_channels=(_MOCK_CALCIUM_CHANNEL,),
     )
     protocol = step_voltage(
         duration=5.0,

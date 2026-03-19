@@ -1,6 +1,6 @@
 """Tests for the additional ion channel framework.
 
-Covers BaseIonChannel math, GatingVariable steady states, Ih kinetics,
+Covers IonChannel math, GatingVariable steady states, Ih kinetics,
 backward compatibility with no additional channels, and validation errors.
 """
 
@@ -9,8 +9,6 @@ import pytest
 
 import ap_sim
 from ap_sim.channels import (
-    BaseIonChannel,
-    CalciumGatingVariable,
     GatingVariable,
     IonChannel,
 )
@@ -69,8 +67,8 @@ from ap_sim.protocols import step_current, step_voltage
 def test_gating_variable_steady_state_in_bounds():
     """Ih gating variable steady state is in [0, 1] for all physiological voltages."""
     for V in np.linspace(-120.0, 0.0, 50):
-        a = _alpha_r(V)
-        b = _beta_r(V)
+        a = _alpha_r(V, 0.0)
+        b = _beta_r(V, 0.0)
         assert a >= 0, f"alpha_r negative at V={V}"
         assert b >= 0, f"beta_r negative at V={V}"
         ss = a / (a + b)
@@ -79,35 +77,35 @@ def test_gating_variable_steady_state_in_bounds():
 
 def test_ih_kinetics_alpha_increases_with_hyperpolarisation():
     """alpha_r should increase as voltage becomes more negative (Ih is HCN-type)."""
-    alpha_at_minus100 = _alpha_r(-100.0)
-    alpha_at_minus65 = _alpha_r(-65.0)
-    alpha_at_minus40 = _alpha_r(-40.0)
+    alpha_at_minus100 = _alpha_r(-100.0, 0.0)
+    alpha_at_minus65 = _alpha_r(-65.0, 0.0)
+    alpha_at_minus40 = _alpha_r(-40.0, 0.0)
     assert alpha_at_minus100 > alpha_at_minus65 > alpha_at_minus40
 
 
 def test_ih_kinetics_steady_state_higher_at_hyperpolarised():
     """Ih r steady state is higher at -100 mV than at -65 mV."""
-    a65, b65 = _alpha_r(-65.0), _beta_r(-65.0)
-    a100, b100 = _alpha_r(-100.0), _beta_r(-100.0)
+    a65, b65 = _alpha_r(-65.0, 0.0), _beta_r(-65.0, 0.0)
+    a100, b100 = _alpha_r(-100.0, 0.0), _beta_r(-100.0, 0.0)
     ss65 = a65 / (a65 + b65)
     ss100 = a100 / (a100 + b100)
     assert ss100 > ss65
 
 
 # ---------------------------------------------------------------------------
-# BaseIonChannel
+# IonChannel
 # ---------------------------------------------------------------------------
 
 
-def _make_simple_channel(g_max: float = 1.0, e_rev: float = 0.0) -> BaseIonChannel:
+def _make_simple_channel(g_max: float = 1.0, e_rev: float = 0.0) -> IonChannel:
     """Helper: create a channel with a single linear gating variable (power=1)."""
     gv = GatingVariable(
         name="x",
         power=1,
-        alpha=lambda V: 0.1,
-        beta=lambda V: 0.1,
+        alpha=lambda V, ca_i: 0.1,
+        beta=lambda V, ca_i: 0.1,
     )
-    return BaseIonChannel(name="test", g_max=g_max, gating_variables=(gv,), e_rev=e_rev)
+    return IonChannel(name="test", g_max=g_max, gating_variables=(gv,), e_rev=e_rev)
 
 
 def test_base_ion_channel_compute_current_math():
@@ -121,8 +119,10 @@ def test_base_ion_channel_compute_current_math():
 
 def test_base_ion_channel_power_two():
     """compute_current correctly raises the gate to its power."""
-    gv = GatingVariable(name="y", power=2, alpha=lambda V: 0.1, beta=lambda V: 0.1)
-    ch = BaseIonChannel(name="pow2", g_max=1.0, gating_variables=(gv,), e_rev=0.0)
+    gv = GatingVariable(
+        name="y", power=2, alpha=lambda V, ca_i: 0.1, beta=lambda V, ca_i: 0.1
+    )
+    ch = IonChannel(name="pow2", g_max=1.0, gating_variables=(gv,), e_rev=0.0)
     # gate=0.5, power=2 → g = 1.0 * 0.5^2 = 0.25
     result = ch.compute_current(V=10.0, gating_state={"y": 0.5})
     assert result == pytest.approx(1.0 * (0.5**2) * (10.0 - 0.0))
@@ -142,7 +142,7 @@ def test_base_ion_channel_zero_current_at_reversal():
 
 
 def test_base_ion_channel_satisfies_protocol():
-    """BaseIonChannel is an instance of the IonChannel protocol."""
+    """IonChannel is an instance of the IonChannel dataclass."""
     ch = _make_simple_channel()
     assert isinstance(ch, IonChannel)
 
@@ -160,10 +160,14 @@ def test_base_ion_channel_negative_gmax_raises():
 
 def test_base_ion_channel_duplicate_gating_names_raises():
     """Duplicate gating variable names within a channel raise ValueError."""
-    gv1 = GatingVariable(name="x", power=1, alpha=lambda V: 0.1, beta=lambda V: 0.1)
-    gv2 = GatingVariable(name="x", power=2, alpha=lambda V: 0.2, beta=lambda V: 0.2)
+    gv1 = GatingVariable(
+        name="x", power=1, alpha=lambda V, ca_i: 0.1, beta=lambda V, ca_i: 0.1
+    )
+    gv2 = GatingVariable(
+        name="x", power=2, alpha=lambda V, ca_i: 0.2, beta=lambda V, ca_i: 0.2
+    )
     with pytest.raises(ValueError, match="names must be unique"):
-        BaseIonChannel(name="dup", g_max=1.0, gating_variables=(gv1, gv2), e_rev=0.0)
+        IonChannel(name="dup", g_max=1.0, gating_variables=(gv1, gv2), e_rev=0.0)
 
 
 def test_hh_duplicate_additional_channel_names_raises():
@@ -175,8 +179,10 @@ def test_hh_duplicate_additional_channel_names_raises():
 
 def test_hh_builtin_channel_name_collision_raises():
     """Additional channel named 'Na' collides with built-in and raises ValueError."""
-    gv = GatingVariable(name="r", power=1, alpha=lambda V: 0.1, beta=lambda V: 0.1)
-    ch = BaseIonChannel(name="Na", g_max=0.1, gating_variables=(gv,), e_rev=-30.0)
+    gv = GatingVariable(
+        name="r", power=1, alpha=lambda V, ca_i: 0.1, beta=lambda V, ca_i: 0.1
+    )
+    ch = IonChannel(name="Na", g_max=0.1, gating_variables=(gv,), e_rev=-30.0)
     with pytest.raises(ValueError, match="collides with a built-in"):
         HodgkinHuxley(additional_channels=(ch,))
 
@@ -345,8 +351,10 @@ def test_voltage_clamp_total_current_includes_ih():
 def test_multiple_optional_channels_coexist():
     """Two distinct optional channels can coexist and each contributes columns."""
     ch1 = make_ih_channel(g_max=0.1)
-    gv2 = GatingVariable(name="q", power=1, alpha=lambda V: 0.05, beta=lambda V: 0.05)
-    ch2 = BaseIonChannel(name="Iq", g_max=0.05, gating_variables=(gv2,), e_rev=-80.0)
+    gv2 = GatingVariable(
+        name="q", power=1, alpha=lambda V, ca_i: 0.05, beta=lambda V, ca_i: 0.05
+    )
+    ch2 = IonChannel(name="Iq", g_max=0.05, gating_variables=(gv2,), e_rev=-80.0)
     neuron = HodgkinHuxley(additional_channels=(ch1, ch2))
     stim = step_current(
         duration=10.0,
@@ -363,9 +371,8 @@ def test_multiple_optional_channels_coexist():
 
 
 def test_public_api_exports():
-    """GatingVariable, BaseIonChannel, IonChannel, and make_ih_channel are exported."""
+    """GatingVariable and IonChannel and make_ih_channel are exported."""
     assert hasattr(ap_sim, "GatingVariable")
-    assert hasattr(ap_sim, "BaseIonChannel")
     assert hasattr(ap_sim, "IonChannel")
     assert hasattr(ap_sim, "make_ih_channel")
 
@@ -379,8 +386,8 @@ def test_ika_gating_variable_steady_state_in_bounds():
     """IKa gating variables a_inf and b_inf are in [0, 1] for physiological voltages."""
     for V in np.linspace(-120.0, 0.0, 50):
         for alpha_fn, beta_fn in ((_alpha_a, _beta_a), (_alpha_b, _beta_b)):
-            a = alpha_fn(V)
-            b = beta_fn(V)
+            a = alpha_fn(V, 0.0)
+            b = beta_fn(V, 0.0)
             assert a >= 0, f"alpha negative at V={V}"
             assert b >= 0, f"beta negative at V={V}"
             ss = a / (a + b)
@@ -392,7 +399,7 @@ def test_ika_kinetics_activation_increases_with_depolarisation():
 
     def a_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
-        a, b = _alpha_a(V), _beta_a(V)
+        a, b = _alpha_a(V, 0.0), _beta_a(V, 0.0)
         return a / (a + b)
 
     assert a_inf(-20.0) > a_inf(-65.0) > a_inf(-100.0)
@@ -403,7 +410,7 @@ def test_ika_kinetics_inactivation_decreases_with_depolarisation():
 
     def b_inf(V: float) -> float:
         """Inactivation steady-state at voltage V."""
-        a, b = _alpha_b(V), _beta_b(V)
+        a, b = _alpha_b(V, 0.0), _beta_b(V, 0.0)
         return a / (a + b)
 
     assert b_inf(-100.0) > b_inf(-65.0) > b_inf(-20.0)
@@ -522,8 +529,8 @@ def test_public_api_exports_ika():
 def test_inap_gating_variable_steady_state_in_bounds():
     """INaP gating variable p_inf is in [0, 1] for physiological voltages."""
     for V in np.linspace(-120.0, 0.0, 50):
-        a = _alpha_p(V)
-        b = _beta_p(V)
+        a = _alpha_p(V, 0.0)
+        b = _beta_p(V, 0.0)
         assert a >= 0, f"alpha_p negative at V={V}"
         assert b >= 0, f"beta_p negative at V={V}"
         ss = a / (a + b)
@@ -535,7 +542,7 @@ def test_inap_activation_increases_with_depolarisation():
 
     def p_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
-        a, b = _alpha_p(V), _beta_p(V)
+        a, b = _alpha_p(V, 0.0), _beta_p(V, 0.0)
         return a / (a + b)
 
     assert p_inf(-20.0) > p_inf(-53.0) > p_inf(-100.0)
@@ -546,7 +553,7 @@ def test_inap_subthreshold_activation():
 
     def p_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
-        a, b = _alpha_p(V), _beta_p(V)
+        a, b = _alpha_p(V, 0.0), _beta_p(V, 0.0)
         return a / (a + b)
 
     # At half-activation voltage p_inf should be ~0.5
@@ -645,8 +652,8 @@ def test_public_api_exports_inap():
 def test_inar_s_gating_steady_state_in_bounds():
     """INaR activation variable s_inf is in [0, 1] for physiological voltages."""
     for V in np.linspace(-120.0, 0.0, 50):
-        a = _alpha_s(V)
-        b = _beta_s(V)
+        a = _alpha_s(V, 0.0)
+        b = _beta_s(V, 0.0)
         assert a >= 0, f"alpha_s negative at V={V}"
         assert b >= 0, f"beta_s negative at V={V}"
         ss = a / (a + b)
@@ -656,8 +663,8 @@ def test_inar_s_gating_steady_state_in_bounds():
 def test_inar_hr_gating_steady_state_in_bounds():
     """INaR unblocking variable hr_inf is in [0, 1] for physiological voltages."""
     for V in np.linspace(-120.0, 0.0, 50):
-        a = _alpha_hr(V)
-        b = _beta_hr(V)
+        a = _alpha_hr(V, 0.0)
+        b = _beta_hr(V, 0.0)
         assert a >= 0, f"alpha_hr negative at V={V}"
         assert b >= 0, f"beta_hr negative at V={V}"
         ss = a / (a + b)
@@ -669,7 +676,7 @@ def test_inar_activation_increases_with_depolarisation():
 
     def s_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
-        a, b = _alpha_s(V), _beta_s(V)
+        a, b = _alpha_s(V, 0.0), _beta_s(V, 0.0)
         return a / (a + b)
 
     assert s_inf(-20.0) > s_inf(-42.0) > s_inf(-100.0)
@@ -680,7 +687,7 @@ def test_inar_unblocking_decreases_with_depolarisation():
 
     def hr_inf(V: float) -> float:
         """Unblocking steady-state at voltage V."""
-        a, b = _alpha_hr(V), _beta_hr(V)
+        a, b = _alpha_hr(V, 0.0), _beta_hr(V, 0.0)
         return a / (a + b)
 
     assert hr_inf(-100.0) > hr_inf(-55.0) > hr_inf(-20.0)
@@ -689,10 +696,10 @@ def test_inar_unblocking_decreases_with_depolarisation():
 def test_inar_rates_non_negative():
     """All four INaR rate functions are non-negative across physiological voltages."""
     for V in np.linspace(-120.0, 60.0, 100):
-        assert _alpha_s(V) >= 0, f"alpha_s negative at V={V}"
-        assert _beta_s(V) >= 0, f"beta_s negative at V={V}"
-        assert _alpha_hr(V) >= 0, f"alpha_hr negative at V={V}"
-        assert _beta_hr(V) >= 0, f"beta_hr negative at V={V}"
+        assert _alpha_s(V, 0.0) >= 0, f"alpha_s negative at V={V}"
+        assert _beta_s(V, 0.0) >= 0, f"beta_s negative at V={V}"
+        assert _alpha_hr(V, 0.0) >= 0, f"alpha_hr negative at V={V}"
+        assert _beta_hr(V, 0.0) >= 0, f"beta_hr negative at V={V}"
 
 
 # ---------------------------------------------------------------------------
@@ -848,8 +855,8 @@ def test_public_api_exports_inar():
 def test_im_gating_variable_steady_state_in_bounds():
     """IM gating variable w_inf is in [0, 1] for physiological voltages."""
     for V in np.linspace(-120.0, 0.0, 50):
-        a = _alpha_w(V)
-        b = _beta_w(V)
+        a = _alpha_w(V, 0.0)
+        b = _beta_w(V, 0.0)
         assert a >= 0, f"alpha_w negative at V={V}"
         assert b >= 0, f"beta_w negative at V={V}"
         ss = a / (a + b)
@@ -861,7 +868,7 @@ def test_im_activation_increases_with_depolarisation():
 
     def w_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
-        a, b = _alpha_w(V), _beta_w(V)
+        a, b = _alpha_w(V, 0.0), _beta_w(V, 0.0)
         return a / (a + b)
 
     assert w_inf(-20.0) > w_inf(-35.0) > w_inf(-100.0)
@@ -869,7 +876,7 @@ def test_im_activation_increases_with_depolarisation():
 
 def test_im_slow_kinetics():
     """IM tau_w is greater than 50 ms near the half-activation voltage (-35 mV)."""
-    tau = 1.0 / (_alpha_w(-35.0) + _beta_w(-35.0))
+    tau = 1.0 / (_alpha_w(-35.0, 0.0) + _beta_w(-35.0, 0.0))
     assert tau > 50.0
 
 
@@ -962,8 +969,8 @@ def test_public_api_exports_im():
 def test_ikir_gating_variable_steady_state_in_bounds():
     """IKir gating variable kir_inf is in [0, 1] for physiological voltages."""
     for V in np.linspace(-120.0, 0.0, 50):
-        a = _alpha_kir(V)
-        b = _beta_kir(V)
+        a = _alpha_kir(V, 0.0)
+        b = _beta_kir(V, 0.0)
         assert a >= 0, f"alpha_kir negative at V={V}"
         assert b >= 0, f"beta_kir negative at V={V}"
         ss = a / (a + b)
@@ -975,7 +982,7 @@ def test_ikir_activation_increases_with_hyperpolarisation():
 
     def kir_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
-        a, b = _alpha_kir(V), _beta_kir(V)
+        a, b = _alpha_kir(V, 0.0), _beta_kir(V, 0.0)
         return a / (a + b)
 
     assert kir_inf(-100.0) > kir_inf(-80.0) > kir_inf(-40.0)
@@ -984,7 +991,7 @@ def test_ikir_activation_increases_with_hyperpolarisation():
 def test_ikir_fast_kinetics():
     """IKir tau_kir is at most 10 ms across physiological voltages."""
     for V in np.linspace(-120.0, 0.0, 50):
-        tau = 1.0 / (_alpha_kir(V) + _beta_kir(V))
+        tau = 1.0 / (_alpha_kir(V, 0.0) + _beta_kir(V, 0.0))
         assert tau <= 10.0, f"tau_kir too slow at V={V}"
 
 
@@ -1070,19 +1077,19 @@ def test_public_api_exports_ikir():
 
 
 # ---------------------------------------------------------------------------
-# CalciumGatingVariable infrastructure (Step 4)
+# Calcium-sensitive gating variable infrastructure
 # ---------------------------------------------------------------------------
 
 
 def test_calcium_gating_variable_in_integrator():
-    """A channel with CalciumGatingVariable initializes and runs without error."""
-    cg = CalciumGatingVariable(
+    """A channel with a Ca²⁺-sensitive GatingVariable runs without error."""
+    cg = GatingVariable(
         name="q_test",
         power=1,
-        alpha=lambda V, ca: 0.1 * ca if ca > 0 else 0.0,
-        beta=lambda V, ca: 0.1,
+        alpha=lambda V, ca_i: 0.1 * ca_i if ca_i > 0 else 0.0,
+        beta=lambda V, ca_i: 0.1,
     )
-    ch = BaseIonChannel(
+    ch = IonChannel(
         name="ITest",
         g_max=0.5,
         gating_variables=(cg,),
@@ -1107,12 +1114,12 @@ def test_calcium_gating_variable_in_integrator():
 
 
 def test_calcium_gating_variable_steady_state_depends_on_ca():
-    """CalciumGatingVariable steady state differs for different ca_i values."""
-    cg = CalciumGatingVariable(
+    """GatingVariable steady state differs for different ca_i when Ca2+-sensitive."""
+    cg = GatingVariable(
         name="q_test2",
         power=1,
-        alpha=lambda V, ca: ca / (ca + 0.001),
-        beta=lambda V, ca: 1.0 - ca / (ca + 0.001),
+        alpha=lambda V, ca_i: ca_i / (ca_i + 0.001),
+        beta=lambda V, ca_i: 1.0 - ca_i / (ca_i + 0.001),
     )
     V = -65.0
     ca_low = 1e-4
@@ -1125,7 +1132,7 @@ def test_calcium_gating_variable_steady_state_depends_on_ca():
 
 
 def test_existing_channels_unaffected_by_calcium_gating_infra():
-    """Voltage-only channels still work after CalciumGatingVariable addition."""
+    """Voltage-only channels still work alongside Ca²⁺-sensitive gate infrastructure."""
     neuron = HodgkinHuxley(additional_channels=(make_ih_channel(), make_ika_channel()))
     stim = step_current(
         duration=10.0,
@@ -1142,9 +1149,8 @@ def test_existing_channels_unaffected_by_calcium_gating_infra():
 
 
 def test_calcium_gating_variable_exported():
-    """CalciumGatingVariable and AnyGatingVariable are in the ap_sim public API."""
-    assert hasattr(ap_sim, "CalciumGatingVariable")
-    assert hasattr(ap_sim, "AnyGatingVariable")
+    """GatingVariable is in the ap_sim public API (replaces CalciumGatingVariable)."""
+    assert hasattr(ap_sim, "GatingVariable")
 
 
 # ---------------------------------------------------------------------------
@@ -1222,11 +1228,9 @@ def test_make_ikca_channel_custom_params():
 
 
 def test_ikca_is_not_calcium_ion_channel():
-    """IKCa does not inherit CalciumIonChannel — it carries K⁺, not Ca²⁺."""
-    from ap_sim.channels import CalciumIonChannel
-
+    """IKCa does not carry Ca²⁺ — carries_calcium is False."""
     ch = make_ikca_channel()
-    assert not isinstance(ch, CalciumIonChannel)
+    assert not ch.carries_calcium
 
 
 # ---------------------------------------------------------------------------
@@ -1288,8 +1292,8 @@ def test_ical_gating_steady_state_in_bounds():
     """ICaL gating variable steady states are in [0, 1] for physiological voltages."""
     for V in np.linspace(-120.0, 60.0, 60):
         for alpha_fn, beta_fn in ((_alpha_d, _beta_d), (_alpha_f, _beta_f)):
-            a = alpha_fn(V)
-            b = beta_fn(V)
+            a = alpha_fn(V, 0.0)
+            b = beta_fn(V, 0.0)
             assert a >= 0, f"alpha negative at V={V}"
             assert b >= 0, f"beta negative at V={V}"
             ss = a / (a + b)
@@ -1301,7 +1305,7 @@ def test_ical_activation_increases_with_depolarisation():
 
     def d_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
-        a, b = _alpha_d(V), _beta_d(V)
+        a, b = _alpha_d(V, 0.0), _beta_d(V, 0.0)
         return a / (a + b)
 
     assert d_inf(20.0) > d_inf(-30.0) > d_inf(-80.0)
@@ -1309,7 +1313,6 @@ def test_ical_activation_increases_with_depolarisation():
 
 def test_make_ical_channel_defaults():
     """make_ical_channel() produces a channel with the expected defaults."""
-    from ap_sim.channels import CalciumIonChannel
     from ap_sim.constants import DEFAULT_E_CA, DEFAULT_G_ICAL
 
     ch = make_ical_channel()
@@ -1321,7 +1324,7 @@ def test_make_ical_channel_defaults():
     assert ch.gating_variables[0].power == 2
     assert ch.gating_variables[1].name == "f"
     assert ch.gating_variables[1].power == 1
-    assert isinstance(ch, CalciumIonChannel)
+    assert ch.carries_calcium
 
 
 def test_current_clamp_with_ical_extra_columns():
@@ -1390,9 +1393,8 @@ def test_voltage_clamp_with_ical_extra_columns():
 
 
 def test_public_api_exports_ical():
-    """make_ical_channel and CalciumBaseIonChannel are exported from ap_sim."""
+    """make_ical_channel is exported from ap_sim."""
     assert hasattr(ap_sim, "make_ical_channel")
-    assert hasattr(ap_sim, "CalciumBaseIonChannel")
 
 
 # ---------------------------------------------------------------------------
@@ -1404,8 +1406,8 @@ def test_icat_gating_steady_state_in_bounds():
     """ICaT gating variable steady states are in [0, 1] for physiological voltages."""
     for V in np.linspace(-120.0, 60.0, 60):
         for alpha_fn, beta_fn in ((_alpha_dt, _beta_dt), (_alpha_ft, _beta_ft)):
-            a = alpha_fn(V)
-            b = beta_fn(V)
+            a = alpha_fn(V, 0.0)
+            b = beta_fn(V, 0.0)
             assert a >= 0, f"alpha negative at V={V}"
             assert b >= 0, f"beta negative at V={V}"
             ss = a / (a + b)
@@ -1417,7 +1419,7 @@ def test_icat_activation_increases_with_depolarisation():
 
     def dt_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
-        a, b = _alpha_dt(V), _beta_dt(V)
+        a, b = _alpha_dt(V, 0.0), _beta_dt(V, 0.0)
         return a / (a + b)
 
     assert dt_inf(-20.0) > dt_inf(-60.0) > dt_inf(-100.0)
@@ -1425,7 +1427,6 @@ def test_icat_activation_increases_with_depolarisation():
 
 def test_make_icat_channel_defaults():
     """make_icat_channel() produces a channel with the expected defaults."""
-    from ap_sim.channels import CalciumIonChannel
     from ap_sim.constants import DEFAULT_E_CA, DEFAULT_G_ICAT
 
     ch = make_icat_channel()
@@ -1437,7 +1438,7 @@ def test_make_icat_channel_defaults():
     assert ch.gating_variables[0].power == 2
     assert ch.gating_variables[1].name == "ft"
     assert ch.gating_variables[1].power == 1
-    assert isinstance(ch, CalciumIonChannel)
+    assert ch.carries_calcium
 
 
 def test_current_clamp_with_icat_extra_columns():
@@ -1519,8 +1520,8 @@ def test_ican_gating_steady_state_in_bounds():
     """ICaN gating variable steady states are in [0, 1] for physiological voltages."""
     for V in np.linspace(-120.0, 60.0, 60):
         for alpha_fn, beta_fn in ((_alpha_dn, _beta_dn), (_alpha_fn, _beta_fn)):
-            a = alpha_fn(V)
-            b = beta_fn(V)
+            a = alpha_fn(V, 0.0)
+            b = beta_fn(V, 0.0)
             assert a >= 0, f"alpha negative at V={V}"
             assert b >= 0, f"beta negative at V={V}"
             ss = a / (a + b)
@@ -1532,7 +1533,7 @@ def test_ican_activation_increases_with_depolarisation():
 
     def dn_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
-        a, b = _alpha_dn(V), _beta_dn(V)
+        a, b = _alpha_dn(V, 0.0), _beta_dn(V, 0.0)
         return a / (a + b)
 
     assert dn_inf(20.0) > dn_inf(-30.0) > dn_inf(-80.0)
@@ -1540,7 +1541,6 @@ def test_ican_activation_increases_with_depolarisation():
 
 def test_make_ican_channel_defaults():
     """make_ican_channel() produces a channel with the expected defaults."""
-    from ap_sim.channels import CalciumIonChannel
     from ap_sim.constants import DEFAULT_E_CA, DEFAULT_G_ICAN
 
     ch = make_ican_channel()
@@ -1552,7 +1552,7 @@ def test_make_ican_channel_defaults():
     assert ch.gating_variables[0].power == 2
     assert ch.gating_variables[1].name == "fn"
     assert ch.gating_variables[1].power == 1
-    assert isinstance(ch, CalciumIonChannel)
+    assert ch.carries_calcium
 
 
 def test_current_clamp_with_ican_extra_columns():

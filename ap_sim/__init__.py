@@ -6,16 +6,11 @@ A package for simulating action potentials using the Hodgkin-Huxley model.
 from . import constants
 from .calcium import CalciumDynamics
 from .channels import (
-    AnyGatingVariable,
-    BaseIonChannel,
-    CalciumGatingVariable,
-    CalciumIonChannel,
     GatingVariable,
     IonChannel,
 )
 from .hodgkin_huxley import HodgkinHuxley
 from .additional_channels import (
-    CalciumBaseIonChannel,
     make_ican_channel,
     make_ical_channel,
     make_icat_channel,
@@ -46,13 +41,8 @@ from .protocols import (
 
 __all__ = [
     "constants",
-    "AnyGatingVariable",
-    "CalciumBaseIonChannel",
     "CalciumDynamics",
-    "CalciumGatingVariable",
     "GatingVariable",
-    "BaseIonChannel",
-    "CalciumIonChannel",
     "IonChannel",
     "HodgkinHuxley",
     "make_ican_channel",

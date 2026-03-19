@@ -45,7 +45,7 @@ def boltzmann_cosh_rates(
     inverted: bool = False,
     tau_cosh_scale: float | None = None,
     tau_rate: float = 1.0,
-) -> tuple[Callable[[float], float], Callable[[float], float]]:
+) -> tuple[Callable[[float, float], float], Callable[[float, float], float]]:
     """Return (alpha, beta) callables from Boltzmann/cosh kinetic parameters.
 
     Constructs a pair of rate functions for a gating variable whose steady
@@ -56,6 +56,10 @@ def boltzmann_cosh_rates(
         tau(V) = tau_scale / (tau_rate * cosh((V - half) / cosh_scale))
         alpha  = inf / tau
         beta   = (1 - inf) / tau
+
+    The returned callables accept ``(V, ca_i)`` — the ``ca_i`` argument is
+    accepted but ignored, keeping the signature consistent with
+    :class:`~ap_sim.channels.GatingVariable` rate functions.
 
     Args:
         half: Half-activation voltage in mV.
@@ -70,8 +74,9 @@ def boltzmann_cosh_rates(
             absorb constant prefactors (e.g. ``tau_rate=6.6`` for IM).
 
     Returns:
-        Tuple of (alpha, beta) where each is a callable ``(V: float) -> float``
-        returning the corresponding rate in 1/ms.
+        Tuple of (alpha, beta) where each is a callable
+        ``(V: float, ca_i: float) -> float`` returning the corresponding
+        rate in 1/ms.
     """
     cosh_scale: float = tau_cosh_scale if tau_cosh_scale is not None else 2.0 * slope
 
@@ -95,12 +100,12 @@ def boltzmann_cosh_rates(
         if V != _last[0][0]:
             _last[0] = (V, _inf(V), _tau(V))
 
-    def alpha(V: float) -> float:
+    def alpha(V: float, ca_i: float) -> float:
         """Forward rate alpha = inf(V) / tau(V) in 1/ms."""
         _ensure(V)
         return _last[0][1] / _last[0][2]
 
-    def beta(V: float) -> float:
+    def beta(V: float, ca_i: float) -> float:
         """Backward rate beta = (1 - inf(V)) / tau(V) in 1/ms."""
         _ensure(V)
         return (1.0 - _last[0][1]) / _last[0][2]

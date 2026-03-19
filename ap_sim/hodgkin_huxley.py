@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 
 from .calcium import CalciumDynamics
-from .channels import AnyGatingVariable, CalciumIonChannel, IonChannel
+from .channels import GatingVariable, IonChannel
 from .constants import (
     DEFAULT_C_M,
     DEFAULT_CA_IN,
@@ -128,15 +128,14 @@ class HodgkinHuxley:
                 )
 
     @cached_property
-    def all_additional_gating_variables(self) -> tuple[AnyGatingVariable, ...]:
+    def all_additional_gating_variables(self) -> tuple[GatingVariable, ...]:
         """Return a flat tuple of all gating variables across additional channels.
 
         Returns:
             Tuple of gating variable objects from all additional channels, in
             the order the channels and their gating variables are declared.
-            May contain both GatingVariable and CalciumGatingVariable instances.
         """
-        result: list[AnyGatingVariable] = []
+        result: list[GatingVariable] = []
         for ch in self.additional_channels:
             result.extend(ch.gating_variables)
         return tuple(result)
@@ -144,8 +143,8 @@ class HodgkinHuxley:
     def calcium_current(self, V: float, opt_state: dict[str, float]) -> float:
         """Return the total current from all calcium-carrying additional channels.
 
-        Sums the current from every additional channel that is an instance of
-        CalciumIonChannel.  Used by the Ca2+ ODE to determine how much
+        Sums the current from every additional channel that has
+        ``carries_calcium=True``.  Used by the Ca2+ ODE to determine how much
         intracellular Ca2+ is entering the cell each time step.
 
         Args:
@@ -158,7 +157,7 @@ class HodgkinHuxley:
         return sum(
             ch.compute_current(V, opt_state)
             for ch in self.additional_channels
-            if isinstance(ch, CalciumIonChannel)
+            if ch.carries_calcium
         )
 
     # Reversal potentials — derived from ion concentrations via the Nernst
