@@ -11,6 +11,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
+from ap_sim_ui.constants import CC_VOLTAGE_COLOR, STIMULUS_COLOR
 from ap_sim_ui.plotting import (
     Sweep,
     TraceVisibility,
@@ -277,6 +278,53 @@ def test_build_figure_vc_single_sweep_trace_count() -> None:
     )
     # total, Na, K, leak(4) + n, m, h(3) + stimulus(1) = 8
     assert len(fig.data) == 8
+
+
+# ---------------------------------------------------------------------------
+# build_figure — CC voltage and stimulus/command trace colours
+# ---------------------------------------------------------------------------
+
+
+def test_build_figure_cc_voltage_uses_fixed_color() -> None:
+    """Current Clamp voltage trace uses CC_VOLTAGE_COLOR, not the sweep color."""
+    sweep = _make_sweep(label="", color="#ff0000", mode="Current Clamp")
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+    )
+    voltage_traces = [t for t in fig.data if "Voltage" in (t.name or "")]
+    assert len(voltage_traces) == 1, "Expected exactly one voltage trace"
+    assert voltage_traces[0].line.color == CC_VOLTAGE_COLOR, (
+        f"CC voltage should use CC_VOLTAGE_COLOR ({CC_VOLTAGE_COLOR!r}), "
+        f"got {voltage_traces[0].line.color!r}"
+    )
+
+
+def test_build_figure_cc_stimulus_uses_stimulus_color() -> None:
+    """Current Clamp stimulus trace uses STIMULUS_COLOR."""
+    sweep = _make_sweep(label="", color="#ff0000", mode="Current Clamp")
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+    )
+    stim_traces = [t for t in fig.data if "Stimulus" in (t.name or "")]
+    assert len(stim_traces) == 1, "Expected exactly one stimulus trace"
+    assert stim_traces[0].line.color == STIMULUS_COLOR, (
+        f"CC stimulus should use STIMULUS_COLOR ({STIMULUS_COLOR!r}), "
+        f"got {stim_traces[0].line.color!r}"
+    )
+
+
+def test_build_figure_vc_command_uses_stimulus_color() -> None:
+    """Voltage Clamp command trace uses STIMULUS_COLOR, matching CC stimulus."""
+    sweep = _make_sweep(label="", color="#ff0000", mode="Voltage Clamp")
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
+    cmd_traces = [t for t in fig.data if "Command" in (t.name or "")]
+    assert len(cmd_traces) == 1, "Expected exactly one Command trace"
+    assert cmd_traces[0].line.color == STIMULUS_COLOR, (
+        f"VC command should use STIMULUS_COLOR ({STIMULUS_COLOR!r}), "
+        f"got {cmd_traces[0].line.color!r}"
+    )
 
 
 # ---------------------------------------------------------------------------

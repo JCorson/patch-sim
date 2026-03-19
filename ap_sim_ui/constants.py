@@ -49,6 +49,16 @@ VOLTAGE_PROTOCOLS: list[str] = [
     "Activation",
 ]
 
+# Fixed colour for the Current Clamp voltage trace.  Matches the blue used for
+# I_total in Voltage Clamp so the primary response trace looks consistent across
+# both modes.
+CC_VOLTAGE_COLOR: str = "#1f77b4"
+
+# Colour for the stimulus/command trace in both clamp modes.  A neutral grey
+# keeps the stimulus visually unobtrusive relative to the physiologically
+# meaningful channel and gating-variable traces.
+STIMULUS_COLOR: str | None = "#888888"
+
 # Fixed colours per ion current channel (used in Voltage Clamp overlay plot).
 CHANNEL_COLORS: dict[str, str] = {
     "total_current": "#1f77b4",  # blue

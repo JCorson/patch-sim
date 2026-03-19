@@ -10,7 +10,12 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pydantic import BaseModel
 
-from ap_sim_ui.constants import CHANNEL_COLORS, GATING_VAR_COLORS
+from ap_sim_ui.constants import (
+    CC_VOLTAGE_COLOR,
+    CHANNEL_COLORS,
+    GATING_VAR_COLORS,
+    STIMULUS_COLOR,
+)
 
 # Classic column names that are always present in simulation DataFrames.
 _CLASSIC_COLUMNS = frozenset(
@@ -620,7 +625,7 @@ def build_figure(
                 sweep.voltage,
                 f"{pfx}Voltage (mV)",
                 1,
-                c,
+                CC_VOLTAGE_COLOR,
                 visible=visibility.voltage,
                 hoverinfo=hi,
             )
@@ -656,7 +661,9 @@ def build_figure(
                 hoverinfo=hi,
             )
 
-        _scatter(t, sweep.stimulus, stim_label, stimulus_row, c, hoverinfo=hi)
+        _scatter(
+            t, sweep.stimulus, stim_label, stimulus_row, STIMULUS_COLOR, hoverinfo=hi
+        )
 
     for sweep in saved_sweeps:
         c = sweep.color
