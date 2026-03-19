@@ -4,7 +4,7 @@ import dataclasses
 import pytest
 from ap_sim.channels import IonSpecies
 from ap_sim.hodgkin_huxley import HodgkinHuxley
-from ap_sim.nernst import nernst_potential
+from ap_sim.electrochemistry import nernst_potential
 
 
 def test_initialization(hh_model):

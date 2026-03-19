@@ -24,7 +24,7 @@ from .constants import (
     DEFAULT_T,
     DEFAULT_V_REST,
 )
-from .nernst import nernst_potential
+from .electrochemistry import nernst_potential
 from .utils import safe_exp
 
 # Threshold for detecting near-singularity in GHK-style rate equations.

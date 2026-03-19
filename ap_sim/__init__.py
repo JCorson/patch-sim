@@ -26,7 +26,7 @@ from .additional_channels import (
     make_inar_channel,
 )
 from .clamp_simulations import simulate_voltage_clamp, simulate_current_clamp
-from .nernst import goldman_potential, nernst_potential
+from .electrochemistry import goldman_potential, nernst_potential
 from .protocols import (
     step_current,
     ramp_current,

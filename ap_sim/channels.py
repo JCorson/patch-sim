@@ -176,8 +176,8 @@ class IonChannel:
     def reversal_potential(self, neuron: Any) -> float:
         """Compute the reversal potential from the neuron's ion concentrations.
 
-        Dispatches to :func:`~ap_sim.nernst.nernst_potential` for a
-        :class:`NernstSpec` or :func:`~ap_sim.nernst.goldman_potential` for a
+        Dispatches to :func:`~ap_sim.electrochemistry.nernst_potential` for a
+        :class:`NernstSpec` or :func:`~ap_sim.electrochemistry.goldman_potential` for a
         :class:`GoldmanSpec`, using the concentrations stored on *neuron*.
 
         Args:
@@ -188,7 +188,7 @@ class IonChannel:
         Returns:
             Reversal potential in mV.
         """
-        from .nernst import goldman_potential, nernst_potential
+        from .electrochemistry import goldman_potential, nernst_potential
 
         spec = self.reversal_spec
         if isinstance(spec, NernstSpec):

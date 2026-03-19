@@ -146,7 +146,7 @@ def test_base_ion_channel_power_two():
 
 def test_base_ion_channel_reversal_potential_uses_nernst():
     """reversal_potential() computes K⁺ Nernst potential from neuron concentrations."""
-    from ap_sim.nernst import nernst_potential
+    from ap_sim.electrochemistry import nernst_potential
 
     neuron = HodgkinHuxley()
     ch = _make_simple_channel()
