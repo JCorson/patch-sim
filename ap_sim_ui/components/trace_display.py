@@ -15,7 +15,6 @@ def trace_display() -> rx.Component:
                 use_resize_handler=True,
                 height="100%",
                 width="100%",
-                id="sim-plot",
             ),
             rx.center(
                 rx.vstack(

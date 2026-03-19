@@ -249,10 +249,7 @@ _NON_VISIBILITY_BOOL_FIELDS: list[str] = [
 _BOOL_FIELDS: list[str] = _VISIBILITY_FIELDS + _NON_VISIBILITY_BOOL_FIELDS
 
 # Shared JS snippet for targeting the Plotly graph element.
-_PLOTLY_GD_JS = (
-    "var gd=document.querySelector('#sim-plot .js-plotly-plot')"
-    "||document.getElementById('sim-plot');"
-)
+_PLOTLY_GD_JS = "var gd=document.querySelector('.js-plotly-plot');"
 
 
 def _make_bool_setter(field_name: str):
@@ -616,9 +613,9 @@ class AppState(rx.State):
         if not hidden:
             return None
         return (
-            f"{_PLOTLY_GD_JS}"
+            f"setTimeout(function(){{var gd=document.querySelector('.js-plotly-plot');"
             f"if(gd&&gd.data)Plotly.restyle(gd,"
-            f"{{visible:false}},{json.dumps(hidden)})"
+            f"{{visible:false}},{json.dumps(hidden)})}},0)"
         )
 
     def add_sweep(self):
