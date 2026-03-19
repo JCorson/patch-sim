@@ -242,6 +242,48 @@ def _build_hover_tables(
             out.append(f'<span style="{mono_style}">{header}<br>{body}</span>')
         return out
 
+    def _build_rows_html(
+        cols: list[tuple[str, str, str]],
+        additional_attr: str,
+        fmt_spec: str,
+    ) -> list[str]:
+        """Build per-time-point HTML for one subplot given column specs.
+
+        Closes over ``indices``, ``current_sweeps``, ``col_w``, ``label_w``,
+        ``n_pts``, and ``_fmt_table``.
+
+        Args:
+            cols: Column spec triples ``(header_label, source, data_key)``.
+                ``source`` is either ``"classic"`` (attribute on ``Sweep``) or
+                ``"additional"`` (looked up via ``additional_attr``).
+            additional_attr: Name of the ``Sweep`` dict attribute used for
+                ``"additional"`` columns (e.g. ``"additional_currents"`` or
+                ``"additional_gating"``).
+            fmt_spec: Python format spec for numeric values (e.g. ``".2f"``).
+
+        Returns:
+            List of HTML strings, one per time point, or a list of empty
+            strings when ``cols`` is empty.
+        """
+        if not cols:
+            return [""] * n_pts
+        header = " " * label_w + "".join(f"{c[0]:>{col_w}}" for c in cols)
+        row_groups: list[list[str]] = []
+        for idx in indices:
+            sweep_rows: list[str] = []
+            for sweep in current_sweeps:
+                vals: list[str] = []
+                for _, src, key in cols:
+                    if src == "classic":
+                        col_data: list[float] = getattr(sweep, key)
+                    else:
+                        col_data = getattr(sweep, additional_attr).get(key, [])
+                    v = col_data[idx] if idx < len(col_data) else float("nan")
+                    vals.append(f"{v:>{col_w}{fmt_spec}}")
+                sweep_rows.append(f"{sweep.label:<{label_w}}" + "".join(vals))
+            row_groups.append(sweep_rows)
+        return _fmt_table(header, row_groups)
+
     # --- Response subplot (row 1) ---
     # Col spec: (header_label, source, data_key)
     if is_vc:
@@ -260,25 +302,7 @@ def _build_hover_tables(
     else:
         resp_cols = [("V (mV)", "classic", "voltage")]
 
-    if resp_cols:
-        resp_header = " " * label_w + "".join(f"{c[0]:>{col_w}}" for c in resp_cols)
-        resp_row_groups: list[list[str]] = []
-        for idx in indices:
-            sweep_rows: list[str] = []
-            for sweep in current_sweeps:
-                vals: list[str] = []
-                for _, src, key in resp_cols:
-                    if src == "classic":
-                        col_data: list[float] = getattr(sweep, key)
-                    else:
-                        col_data = sweep.additional_currents.get(key, [])
-                    v = col_data[idx] if idx < len(col_data) else float("nan")
-                    vals.append(f"{v:>{col_w}.2f}")
-                sweep_rows.append(f"{sweep.label:<{label_w}}" + "".join(vals))
-            resp_row_groups.append(sweep_rows)
-        resp_html = _fmt_table(resp_header, resp_row_groups)
-    else:
-        resp_html = [""] * n_pts
+    resp_html = _build_rows_html(resp_cols, "additional_currents", ".2f")
 
     # --- Gating subplot (row 2) ---
     gating_cols: list[tuple[str, str, str]] = []
@@ -292,25 +316,7 @@ def _build_hover_tables(
         if visibility.additional_gating.get(gv_name, True):
             gating_cols.append((gv_name, "additional", gv_name))
 
-    if gating_cols:
-        gating_header = " " * label_w + "".join(f"{c[0]:>{col_w}}" for c in gating_cols)
-        gating_row_groups: list[list[str]] = []
-        for idx in indices:
-            sweep_rows = []
-            for sweep in current_sweeps:
-                vals = []
-                for _, src, key in gating_cols:
-                    if src == "classic":
-                        col_data = getattr(sweep, key)
-                    else:
-                        col_data = sweep.additional_gating.get(key, [])
-                    v = col_data[idx] if idx < len(col_data) else float("nan")
-                    vals.append(f"{v:>{col_w}.3f}")
-                sweep_rows.append(f"{sweep.label:<{label_w}}" + "".join(vals))
-            gating_row_groups.append(sweep_rows)
-        gating_html = _fmt_table(gating_header, gating_row_groups)
-    else:
-        gating_html = [""] * n_pts
+    gating_html = _build_rows_html(gating_cols, "additional_gating", ".3f")
 
     # --- Stimulus subplot (row 3) ---
     stim_col_label = "Cmd (mV)" if is_vc else "Stim"
@@ -437,6 +443,62 @@ def build_figure(
             col=1,
         )
 
+    def _add_vc_currents(
+        sweep: Sweep,
+        pfx: str,
+        dash: str | None = None,
+        hoverinfo: str | None = None,
+        visibility: TraceVisibility | None = None,
+    ) -> None:
+        """Add Voltage Clamp current traces for one sweep to the figure.
+
+        Iterates over the four classic current channels and any additional
+        channels, calling ``_scatter`` for each.
+
+        Args:
+            sweep: The sweep whose current data to plot.
+            pfx: Label prefix prepended to each trace name.
+            dash: Line dash style (e.g. ``"dash"``); ``None`` for solid.
+            hoverinfo: Plotly hoverinfo value; ``None`` uses the default.
+            visibility: Trace visibility flags; ``None`` treats every trace
+                as visible.
+        """
+        classic_defs: list[tuple[str, str, int | None]] = [
+            ("total_current", "I_total", _TOTAL_CURRENT_LINE_WIDTH),
+            ("sodium_current", "I_Na", None),
+            ("potassium_current", "I_K", None),
+            ("leak_current", "I_L", None),
+        ]
+        for attr, label, width in classic_defs:
+            vis = getattr(visibility, attr) if visibility is not None else True
+            _scatter(
+                sweep.time,
+                getattr(sweep, attr),
+                f"{pfx}{label}",
+                1,
+                CHANNEL_COLORS.get(attr),
+                visible=vis,
+                width=width,
+                dash=dash,
+                hoverinfo=hoverinfo,
+            )
+        for ch_name, vals in sweep.additional_currents.items():
+            vis = (
+                visibility.additional_currents.get(ch_name, True)
+                if visibility is not None
+                else True
+            )
+            _scatter(
+                sweep.time,
+                vals,
+                f"{pfx}I_{ch_name}",
+                1,
+                CHANNEL_COLORS.get(ch_name),
+                visible=vis,
+                dash=dash,
+                hoverinfo=hoverinfo,
+            )
+
     # In multi-sweep mode all real traces suppress hover; carrier traces
     # deliver the table tooltips instead.
     hi = "skip" if is_multi_sweep else None
@@ -462,84 +524,24 @@ def build_figure(
             )
         else:
             # Voltage Clamp: all currents overlaid on row 1 with channel colours.
-            _scatter(
-                t,
-                sweep.total_current,
-                f"{pfx}I_total",
-                1,
-                CHANNEL_COLORS.get("total_current"),
-                visible=visibility.total_current,
-                width=_TOTAL_CURRENT_LINE_WIDTH,
-                hoverinfo=hi,
-            )
-            _scatter(
-                t,
-                sweep.sodium_current,
-                f"{pfx}I_Na",
-                1,
-                CHANNEL_COLORS.get("sodium_current"),
-                visible=visibility.sodium_current,
-                hoverinfo=hi,
-            )
-            _scatter(
-                t,
-                sweep.potassium_current,
-                f"{pfx}I_K",
-                1,
-                CHANNEL_COLORS.get("potassium_current"),
-                visible=visibility.potassium_current,
-                hoverinfo=hi,
-            )
-            _scatter(
-                t,
-                sweep.leak_current,
-                f"{pfx}I_L",
-                1,
-                CHANNEL_COLORS.get("leak_current"),
-                visible=visibility.leak_current,
-                hoverinfo=hi,
-            )
-            for ch_name, vals in sweep.additional_currents.items():
-                vis = visibility.additional_currents.get(ch_name, True)
-                _scatter(
-                    t,
-                    vals,
-                    f"{pfx}I_{ch_name}",
-                    1,
-                    CHANNEL_COLORS.get(ch_name),
-                    visible=vis,
-                    hoverinfo=hi,
-                )
+            _add_vc_currents(sweep, pfx, hoverinfo=hi, visibility=visibility)
 
         # Gating row is always present; traces are always added with their
         # visibility flags so the layout never changes on toggle.
-        _scatter(
-            t,
-            sweep.potassium_activation,
-            f"{pfx}n",
-            gating_row,
-            GATING_VAR_COLORS.get("n"),
-            visible=visibility.potassium_activation,
-            hoverinfo=hi,
-        )
-        _scatter(
-            t,
-            sweep.sodium_activation,
-            f"{pfx}m",
-            gating_row,
-            GATING_VAR_COLORS.get("m"),
-            visible=visibility.sodium_activation,
-            hoverinfo=hi,
-        )
-        _scatter(
-            t,
-            sweep.sodium_inactivation,
-            f"{pfx}h",
-            gating_row,
-            GATING_VAR_COLORS.get("h"),
-            visible=visibility.sodium_inactivation,
-            hoverinfo=hi,
-        )
+        for gv_attr, gv_label in [
+            ("potassium_activation", "n"),
+            ("sodium_activation", "m"),
+            ("sodium_inactivation", "h"),
+        ]:
+            _scatter(
+                t,
+                getattr(sweep, gv_attr),
+                f"{pfx}{gv_label}",
+                gating_row,
+                GATING_VAR_COLORS.get(gv_label),
+                visible=getattr(visibility, gv_attr),
+                hoverinfo=hi,
+            )
         for gv_name, gv_vals in sweep.additional_gating.items():
             vis = visibility.additional_gating.get(gv_name, True)
             _scatter(
@@ -560,53 +562,7 @@ def build_figure(
             _scatter(sweep.time, sweep.voltage, f"{sweep.label} V", 1, c, hoverinfo=hi)
         elif is_vc:
             # Saved VC sweeps: all currents overlaid on row 1, dashed lines.
-            _scatter(
-                sweep.time,
-                sweep.total_current,
-                f"{sweep.label} I_total",
-                1,
-                CHANNEL_COLORS.get("total_current"),
-                dash="dash",
-                width=_TOTAL_CURRENT_LINE_WIDTH,
-                hoverinfo=hi,
-            )
-            _scatter(
-                sweep.time,
-                sweep.sodium_current,
-                f"{sweep.label} I_Na",
-                1,
-                CHANNEL_COLORS.get("sodium_current"),
-                dash="dash",
-                hoverinfo=hi,
-            )
-            _scatter(
-                sweep.time,
-                sweep.potassium_current,
-                f"{sweep.label} I_K",
-                1,
-                CHANNEL_COLORS.get("potassium_current"),
-                dash="dash",
-                hoverinfo=hi,
-            )
-            _scatter(
-                sweep.time,
-                sweep.leak_current,
-                f"{sweep.label} I_L",
-                1,
-                CHANNEL_COLORS.get("leak_current"),
-                dash="dash",
-                hoverinfo=hi,
-            )
-            for ch_name, vals in sweep.additional_currents.items():
-                _scatter(
-                    sweep.time,
-                    vals,
-                    f"{sweep.label} I_{ch_name}",
-                    1,
-                    CHANNEL_COLORS.get(ch_name),
-                    dash="dash",
-                    hoverinfo=hi,
-                )
+            _add_vc_currents(sweep, f"{sweep.label} ", dash="dash", hoverinfo=hi)
         else:
             _scatter(
                 sweep.time,
