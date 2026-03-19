@@ -2,6 +2,7 @@
 
 import dataclasses
 import pytest
+from ap_sim.channels import IonSpecies
 from ap_sim.hodgkin_huxley import HodgkinHuxley
 from ap_sim.nernst import nernst_potential
 
@@ -263,3 +264,38 @@ def test_custom_ca_concentrations_shift_e_ca():
     # Lower Ca_out → less positive E_Ca
     lower_out = HodgkinHuxley(Ca_out=0.5)
     assert lower_out.E_Ca < default_model.E_Ca
+
+
+# ---------------------------------------------------------------------------
+# ion_concentrations tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "species, expected_out_attr, expected_in_attr",
+    [
+        (IonSpecies.SODIUM, "Na_out", "Na_in"),
+        (IonSpecies.POTASSIUM, "K_out", "K_in"),
+        (IonSpecies.CALCIUM, "Ca_out", "Ca_in"),
+        (IonSpecies.CHLORIDE, "Cl_out", "Cl_in"),
+    ],
+)
+def test_ion_concentrations_returns_correct_pair(
+    hh_model: HodgkinHuxley,
+    species: IonSpecies,
+    expected_out_attr: str,
+    expected_in_attr: str,
+) -> None:
+    """ion_concentrations returns the correct (C_out, C_in) pair for each species."""
+    c_out, c_in = hh_model.ion_concentrations(species)
+    assert c_out == pytest.approx(getattr(hh_model, expected_out_attr))
+    assert c_in == pytest.approx(getattr(hh_model, expected_in_attr))
+
+
+def test_ion_concentrations_reflects_custom_values() -> None:
+    """ion_concentrations must return user-supplied concentration values."""
+    model = HodgkinHuxley(Na_out=200.0, K_in=100.0, Ca_out=5.0, Cl_in=20.0)
+    assert model.ion_concentrations(IonSpecies.SODIUM) == pytest.approx((200.0, 15.0))
+    assert model.ion_concentrations(IonSpecies.POTASSIUM) == pytest.approx((5.0, 100.0))
+    assert model.ion_concentrations(IonSpecies.CALCIUM) == pytest.approx((5.0, 0.0001))
+    assert model.ion_concentrations(IonSpecies.CHLORIDE) == pytest.approx((120.0, 20.0))

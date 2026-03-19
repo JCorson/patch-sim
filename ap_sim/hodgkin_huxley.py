@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 
 from .calcium import CalciumDynamics
-from .channels import GatingVariable, IonChannel
+from .channels import GatingVariable, IonChannel, IonSpecies
 from .constants import (
     DEFAULT_C_M,
     DEFAULT_CA_IN,
@@ -163,6 +163,32 @@ class HodgkinHuxley:
     # Reversal potentials — derived from ion concentrations via the Nernst
     # equation.  Using @cached_property avoids the object.__setattr__ hack
     # that would otherwise be needed in __post_init__ on a frozen dataclass.
+
+    def ion_concentrations(self, species: IonSpecies) -> tuple[float, float]:
+        """Return the extracellular and intracellular concentrations for an ion.
+
+        Used by :class:`~ap_sim.channels.IonChannel` to look up the
+        concentrations needed for dynamic reversal potential computation.
+
+        Args:
+            species: The ion species to look up.
+
+        Returns:
+            A ``(C_out, C_in)`` tuple of concentrations in mM.
+
+        Raises:
+            ValueError: If *species* is not recognised.
+        """
+        if species is IonSpecies.SODIUM:
+            return self.Na_out, self.Na_in
+        if species is IonSpecies.POTASSIUM:
+            return self.K_out, self.K_in
+        if species is IonSpecies.CALCIUM:
+            return self.Ca_out, self.Ca_in
+        if species is IonSpecies.CHLORIDE:
+            return self.Cl_out, self.Cl_in
+        raise ValueError(f"Unknown ion species: {species!r}")  # pragma: no cover
+
     @cached_property
     def E_Na(self) -> float:
         """Sodium reversal potential in mV."""

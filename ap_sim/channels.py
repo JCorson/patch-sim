@@ -5,7 +5,106 @@ added on top of the classic Na, K, and leak channels.
 """
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Callable
+
+
+class IonSpecies(Enum):
+    """Ion species with associated valence and symbol.
+
+    Each member stores its chemical symbol and ionic valence, which are used
+    when looking up concentrations from the neuron model and when computing
+    Nernst potentials.
+
+    Attributes:
+        SODIUM: Na⁺, valence +1.
+        POTASSIUM: K⁺, valence +1.
+        CALCIUM: Ca²⁺, valence +2.
+        CHLORIDE: Cl⁻, valence −1.
+    """
+
+    SODIUM = ("Na", 1)
+    POTASSIUM = ("K", 1)
+    CALCIUM = ("Ca", 2)
+    CHLORIDE = ("Cl", -1)
+
+    def __init__(self, symbol: str, valence: int) -> None:
+        """Initialise the enum member with its symbol and valence.
+
+        Args:
+            symbol: Chemical symbol string (e.g. ``'Na'``).
+            valence: Signed ionic charge (e.g. ``+1`` for Na⁺, ``-1`` for Cl⁻).
+        """
+        self._symbol = symbol
+        self._valence = valence
+
+    @property
+    def symbol(self) -> str:
+        """Chemical symbol string (e.g. ``'Na'``)."""
+        return self._symbol
+
+    @property
+    def valence(self) -> int:
+        """Signed ionic valence (e.g. +1 for Na⁺, -1 for Cl⁻)."""
+        return self._valence
+
+
+@dataclass(frozen=True)
+class NernstSpec:
+    """Reversal potential specification using the Nernst equation.
+
+    The reversal potential is computed at simulation time from the ion
+    concentrations stored in the neuron model using the Nernst equation.
+
+    Attributes:
+        species: The ion species that carries current through this channel.
+    """
+
+    species: IonSpecies
+
+
+@dataclass(frozen=True)
+class GoldmanSpec:
+    """Reversal potential specification using the Goldman-Hodgkin-Katz equation.
+
+    Used for channels permeable to multiple monovalent ion species (e.g. Ih,
+    which passes both Na⁺ and K⁺).  Each entry in *permeabilities* provides a
+    relative permeability weight and the corresponding :class:`IonSpecies`; the
+    actual concentrations are looked up from the neuron model at simulation time.
+
+    All species listed must be monovalent (|valence| == 1).  For divalent ions
+    use :class:`NernstSpec` instead.
+
+    Attributes:
+        permeabilities: Tuple of ``(species, relative_permeability)`` pairs.
+            Permeabilities are dimensionless and relative to each other; their
+            absolute scale cancels in the GHK equation.
+
+    Raises:
+        ValueError: If any species has |valence| != 1 or if any relative
+            permeability is negative.
+    """
+
+    permeabilities: tuple[tuple[IonSpecies, float], ...]
+
+    def __post_init__(self) -> None:
+        """Validate that all species are monovalent and permeabilities non-negative."""
+        for species, p in self.permeabilities:
+            if abs(species.valence) != 1:
+                raise ValueError(
+                    f"GoldmanSpec only supports monovalent ions; "
+                    f"{species.symbol} has valence {species.valence}. "
+                    "Use NernstSpec for divalent ions."
+                )
+            if p < 0:
+                raise ValueError(
+                    f"Relative permeability for {species.symbol} must be "
+                    f"non-negative, got {p}."
+                )
+
+
+# Union type for reversal potential specifications.
+ReversalSpec = NernstSpec | GoldmanSpec
 
 
 @dataclass(frozen=True)

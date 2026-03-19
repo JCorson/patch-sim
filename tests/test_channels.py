@@ -10,7 +10,10 @@ import pytest
 import ap_sim
 from ap_sim.channels import (
     GatingVariable,
+    GoldmanSpec,
     IonChannel,
+    IonSpecies,
+    NernstSpec,
 )
 from ap_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from ap_sim.hodgkin_huxley import HodgkinHuxley
@@ -145,6 +148,56 @@ def test_base_ion_channel_satisfies_protocol():
     """IonChannel is an instance of the IonChannel dataclass."""
     ch = _make_simple_channel()
     assert isinstance(ch, IonChannel)
+
+
+# ---------------------------------------------------------------------------
+# IonSpecies, NernstSpec, GoldmanSpec
+# ---------------------------------------------------------------------------
+
+
+def test_ion_species_valences():
+    """Each IonSpecies must carry the correct valence."""
+    assert IonSpecies.SODIUM.valence == 1
+    assert IonSpecies.POTASSIUM.valence == 1
+    assert IonSpecies.CALCIUM.valence == 2
+    assert IonSpecies.CHLORIDE.valence == -1
+
+
+def test_ion_species_symbols():
+    """Each IonSpecies must carry the correct chemical symbol."""
+    assert IonSpecies.SODIUM.symbol == "Na"
+    assert IonSpecies.POTASSIUM.symbol == "K"
+    assert IonSpecies.CALCIUM.symbol == "Ca"
+    assert IonSpecies.CHLORIDE.symbol == "Cl"
+
+
+def test_nernst_spec_stores_species():
+    """NernstSpec stores the ion species it was created with."""
+    spec = NernstSpec(species=IonSpecies.POTASSIUM)
+    assert spec.species is IonSpecies.POTASSIUM
+
+
+def test_goldman_spec_stores_permeabilities():
+    """GoldmanSpec stores the permeability tuple it was created with."""
+    spec = GoldmanSpec(
+        permeabilities=((IonSpecies.SODIUM, 0.289), (IonSpecies.POTASSIUM, 1.0))
+    )
+    assert spec.permeabilities[0] == (IonSpecies.SODIUM, 0.289)
+    assert spec.permeabilities[1] == (IonSpecies.POTASSIUM, 1.0)
+
+
+def test_goldman_spec_divalent_ion_raises():
+    """GoldmanSpec must reject divalent ions (use NernstSpec for Ca2+)."""
+    with pytest.raises(ValueError, match="monovalent"):
+        GoldmanSpec(permeabilities=((IonSpecies.CALCIUM, 1.0),))
+
+
+def test_goldman_spec_negative_permeability_raises():
+    """GoldmanSpec must reject negative permeabilities."""
+    with pytest.raises(ValueError, match="non-negative"):
+        GoldmanSpec(
+            permeabilities=((IonSpecies.SODIUM, -0.1), (IonSpecies.POTASSIUM, 1.0))
+        )
 
 
 # ---------------------------------------------------------------------------
