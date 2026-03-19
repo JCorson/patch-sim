@@ -1,7 +1,5 @@
 """Default neuron parameter values for the Hodgkin-Huxley model."""
 
-from .nernst import nernst_potential
-
 # Default neuron parameters (classic Hodgkin-Huxley values)
 DEFAULT_G_NA: float = 120.0
 DEFAULT_G_K: float = 36.0
@@ -20,34 +18,24 @@ DEFAULT_CA_IN: float = 0.0001  # mM intracellular Ca2+ (physiological resting)
 
 # Additional channel defaults
 DEFAULT_G_IH: float = 0.1  # HCN/Ih maximum conductance in mS/cm²
-DEFAULT_E_IH: float = -30.0  # Ih reversal potential in mV (mixed Na/K cation)
 # Ih Na+ permeability relative to K+ (GHK); yields ~-30 mV at default concentrations
 DEFAULT_IH_P_NA: float = 0.289
 
 DEFAULT_G_IKA: float = 5.0  # A-type K+ maximum conductance in mS/cm²
-DEFAULT_E_IKA: float = -77.0  # A-type K+ reversal potential in mV
 
 DEFAULT_G_NAP: float = 0.5  # Persistent Na+ maximum conductance in mS/cm²
-DEFAULT_E_NAP: float = 60.0  # Persistent Na+ reversal potential in mV
 
 DEFAULT_G_NAR: float = 0.3  # Resurgent Na+ maximum conductance in mS/cm²
-DEFAULT_E_NAR: float = 60.0  # Resurgent Na+ reversal potential in mV
 
 DEFAULT_G_IM: float = 0.5  # Muscarinic K+ maximum conductance in mS/cm²
-DEFAULT_E_IM: float = -77.0  # Muscarinic K+ reversal potential in mV
 
 DEFAULT_G_IKIR: float = 0.2  # Inward rectifier K+ maximum conductance in mS/cm²
-DEFAULT_E_IKIR: float = -77.0  # Inward rectifier K+ reversal potential in mV
 
 DEFAULT_G_IKCA: float = 1.0  # Calcium-activated K+ maximum conductance in mS/cm²
-DEFAULT_E_IKCA: float = -77.0  # Calcium-activated K+ reversal potential in mV
 
 DEFAULT_G_ICAL: float = 0.5  # L-type Ca2+ maximum conductance in mS/cm²
 DEFAULT_G_ICAT: float = 0.3  # T-type Ca2+ maximum conductance in mS/cm²
 DEFAULT_G_ICAN: float = 0.3  # N-type Ca2+ maximum conductance in mS/cm²
-DEFAULT_E_CA: float = nernst_potential(  # ~131 mV
-    2, DEFAULT_T, DEFAULT_CA_OUT, DEFAULT_CA_IN
-)
 
 # Calcium dynamics defaults
 DEFAULT_ALPHA_CA: float = 1e-4  # mM / (µA/cm² · ms)
