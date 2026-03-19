@@ -11,7 +11,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
-from ap_sim_ui.plotting import Sweep, TraceVisibility, _build_hover_tables, build_figure
+from ap_sim_ui.plotting import (
+    Sweep,
+    TraceVisibility,
+    _build_hover_tables,
+    build_figure,
+    compute_trace_visibility_map,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -551,3 +557,109 @@ def test_build_hover_tables_stride_2_length() -> None:
     args = {**_default_hover_args(sweeps), "stride": 2}
     resp, _, _ = _build_hover_tables(**args)
     assert len(resp) == math.ceil(n / 2)
+
+
+# ---------------------------------------------------------------------------
+# compute_trace_visibility_map
+# ---------------------------------------------------------------------------
+
+
+def test_compute_trace_visibility_map_cc_single_sweep_classic_fields() -> None:
+    """CC single sweep maps classic show_* fields to the correct indices."""
+    sweep = _make_sweep(mode="Current Clamp")
+    result = compute_trace_visibility_map([sweep], [], "Current Clamp")
+    # trace order: voltage(0), n(1), m(2), h(3), stimulus(4, not mapped)
+    assert result["show_voltage"] == [0]
+    assert result["show_potassium_activation"] == [1]
+    assert result["show_sodium_activation"] == [2]
+    assert result["show_sodium_inactivation"] == [3]
+    assert "show_leak_current" not in result
+
+
+def test_compute_trace_visibility_map_vc_single_sweep_classic_fields() -> None:
+    """VC single sweep maps classic show_* fields to the correct indices."""
+    sweep = _make_sweep(mode="Voltage Clamp")
+    result = compute_trace_visibility_map([sweep], [], "Voltage Clamp")
+    # trace order: total(0), Na(1), K(2), leak(3), n(4), m(5), h(6), stim(7)
+    assert result["show_total_current"] == [0]
+    assert result["show_sodium_current"] == [1]
+    assert result["show_potassium_current"] == [2]
+    assert result["show_leak_current"] == [3]
+    assert result["show_potassium_activation"] == [4]
+    assert result["show_sodium_activation"] == [5]
+    assert result["show_sodium_inactivation"] == [6]
+    assert "show_voltage" not in result
+
+
+def test_compute_trace_visibility_map_cc_multi_sweep_accumulates_indices() -> None:
+    """Multi-sweep CC maps each field to one index per sweep."""
+    sweeps = [_make_sweep(mode="Current Clamp"), _make_sweep(mode="Current Clamp")]
+    result = compute_trace_visibility_map(sweeps, [], "Current Clamp")
+    # Sweep 0: voltage(0), n(1), m(2), h(3), stim(4)
+    # Sweep 1: voltage(5), n(6), m(7), h(8), stim(9)
+    assert result["show_voltage"] == [0, 5]
+    assert result["show_potassium_activation"] == [1, 6]
+    assert result["show_sodium_activation"] == [2, 7]
+    assert result["show_sodium_inactivation"] == [3, 8]
+
+
+def test_compute_trace_visibility_map_saved_sweep_does_not_shift_current_indices() -> (
+    None
+):
+    """Adding a saved sweep does not change current-sweep trace indices."""
+    current = _make_sweep(mode="Current Clamp")
+    saved = _make_sweep(mode="Current Clamp")
+    result_without = compute_trace_visibility_map([current], [], "Current Clamp")
+    result_with = compute_trace_visibility_map([current], [saved], "Current Clamp")
+    assert result_without == result_with
+
+
+def test_compute_trace_visibility_map_cc_additional_gating_mapped() -> None:
+    """CC sweep with additional gating maps the field to the correct index."""
+    extra = {"r": [0.0] * _N}
+    sweep = _make_sweep(mode="Current Clamp", extra_cols=extra)
+    gating_map = {"r": "show_ih_gating"}
+    result = compute_trace_visibility_map(
+        [sweep], [], "Current Clamp", additional_gating_field_map=gating_map
+    )
+    # voltage(0), n(1), m(2), h(3), r(4), stim(5)
+    assert result["show_ih_gating"] == [4]
+    assert result["show_sodium_inactivation"] == [3]
+
+
+def test_compute_trace_visibility_map_vc_additional_current_mapped() -> None:
+    """VC sweep with additional current maps the field to the correct index."""
+    extra = {"foo_current": [0.0] * _N}
+    sweep = _make_sweep(mode="Voltage Clamp", extra_cols=extra)
+    curr_map = {"foo": "show_foo_current"}
+    result = compute_trace_visibility_map(
+        [sweep], [], "Voltage Clamp", additional_current_field_map=curr_map
+    )
+    # total(0), Na(1), K(2), leak(3), foo(4), n(5), m(6), h(7), stim(8)
+    assert result["show_foo_current"] == [4]
+    assert result["show_potassium_activation"] == [5]
+    assert result["show_sodium_activation"] == [6]
+    assert result["show_sodium_inactivation"] == [7]
+
+
+def test_compute_trace_visibility_map_multi_gating_keys_same_field() -> None:
+    """Two gating keys sharing one field name both map to that field."""
+    extra = {"a": [0.0] * _N, "b": [0.0] * _N}
+    sweep = _make_sweep(mode="Current Clamp", extra_cols=extra)
+    gating_map = {"a": "show_ika_gating", "b": "show_ika_gating"}
+    result = compute_trace_visibility_map(
+        [sweep], [], "Current Clamp", additional_gating_field_map=gating_map
+    )
+    # voltage(0), n(1), m(2), h(3), a(4), b(5), stim(6)
+    assert result["show_ika_gating"] == [4, 5]
+
+
+def test_compute_trace_visibility_map_unknown_additional_key_advances_counter() -> None:
+    """Additional keys absent from the field map still advance the index counter."""
+    extra = {"unknown_current": [0.0] * _N}
+    sweep = _make_sweep(mode="Voltage Clamp", extra_cols=extra)
+    result = compute_trace_visibility_map([sweep], [], "Voltage Clamp")
+    # unknown advances the counter; classic gating should be at 5, 6, 7
+    assert result["show_potassium_activation"] == [5]
+    assert result["show_sodium_activation"] == [6]
+    assert result["show_sodium_inactivation"] == [7]

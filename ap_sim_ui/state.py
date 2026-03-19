@@ -4,6 +4,8 @@ All reactive variables and event handlers live here. The state drives
 the Reflex component tree via computed properties.
 """
 
+import json
+
 import numpy as np
 import plotly.graph_objects as go
 import reflex as rx
@@ -49,7 +51,12 @@ from ap_sim.additional_channels import (
     make_inar_channel,
 )
 from ap_sim_ui import constants, presets
-from ap_sim_ui.plotting import Sweep, TraceVisibility, build_figure
+from ap_sim_ui.plotting import (
+    Sweep,
+    TraceVisibility,
+    build_figure,
+    compute_trace_visibility_map,
+)
 from ap_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
 
 # ------------------------------------------------------------------ #
@@ -71,6 +78,43 @@ _CHANNEL_REGISTRY: list[tuple[str, str, object, dict[str, str]]] = [
     ("icat_enabled", "icat_g_max", make_icat_channel, {"e_rev": "e_ca"}),
     ("ican_enabled", "ican_g_max", make_ican_channel, {"e_rev": "e_ca"}),
 ]
+
+# ------------------------------------------------------------------ #
+# Additional-channel visibility field maps                          #
+# ------------------------------------------------------------------ #
+# Maps from additional-channel sweep keys to show_* field names.    #
+# Used by compute_trace_visibility_map and _apply_visibility_js.    #
+
+_ADDITIONAL_CURRENT_FIELD_MAP: dict[str, str] = {
+    "Ih": "show_ih_current",
+    "IKa": "show_ika_current",
+    "INaP": "show_inap_current",
+    "INaR": "show_inar_current",
+    "IM": "show_im_current",
+    "IKir": "show_ikir_current",
+    "IKCa": "show_ikca_current",
+    "ICaL": "show_ical_current",
+    "ICaT": "show_icat_current",
+    "ICaN": "show_ican_current",
+}
+
+_ADDITIONAL_GATING_FIELD_MAP: dict[str, str] = {
+    "r": "show_ih_gating",
+    "a": "show_ika_gating",
+    "b": "show_ika_gating",
+    "p": "show_inap_gating",
+    "s": "show_inar_gating",
+    "hr": "show_inar_gating",
+    "w": "show_im_gating",
+    "kir": "show_ikir_gating",
+    "q": "show_ikca_gating",
+    "d": "show_ical_gating",
+    "f": "show_ical_gating",
+    "dt": "show_icat_gating",
+    "ft": "show_icat_gating",
+    "dn": "show_ican_gating",
+    "fn": "show_ican_gating",
+}
 
 # ------------------------------------------------------------------ #
 # Float setter generation                                            #
@@ -154,7 +198,8 @@ _FLOAT_FIELDS: list[str] = [
 ]
 
 
-_BOOL_FIELDS: list[str] = [
+# Visibility fields: show_* — toggled client-side via Plotly.restyle.
+_VISIBILITY_FIELDS: list[str] = [
     "show_voltage",
     "show_total_current",
     "show_sodium_current",
@@ -164,48 +209,110 @@ _BOOL_FIELDS: list[str] = [
     "show_sodium_activation",
     "show_sodium_inactivation",
     # Additional channel visibility
-    "ih_enabled",
     "show_ih_current",
     "show_ih_gating",
-    "ika_enabled",
     "show_ika_current",
     "show_ika_gating",
-    "inap_enabled",
     "show_inap_current",
     "show_inap_gating",
-    "inar_enabled",
     "show_inar_current",
     "show_inar_gating",
-    "im_enabled",
     "show_im_current",
     "show_im_gating",
-    "ikir_enabled",
     "show_ikir_current",
     "show_ikir_gating",
-    "ikca_enabled",
     "show_ikca_current",
     "show_ikca_gating",
-    "ical_enabled",
     "show_ical_current",
     "show_ical_gating",
-    "icat_enabled",
     "show_icat_current",
     "show_icat_gating",
-    "ican_enabled",
     "show_ican_current",
     "show_ican_gating",
 ]
 
+# Non-visibility bool fields: channel enable/disable toggles.
+_NON_VISIBILITY_BOOL_FIELDS: list[str] = [
+    "ih_enabled",
+    "ika_enabled",
+    "inap_enabled",
+    "inar_enabled",
+    "im_enabled",
+    "ikir_enabled",
+    "ikca_enabled",
+    "ical_enabled",
+    "icat_enabled",
+    "ican_enabled",
+]
+
+# Kept for backward compatibility; callers outside this module may reference it.
+_BOOL_FIELDS: list[str] = _VISIBILITY_FIELDS + _NON_VISIBILITY_BOOL_FIELDS
+
+# Shared JS snippet for targeting the Plotly graph element.
+_PLOTLY_GD_JS = (
+    "var gd=document.querySelector('#sim-plot .js-plotly-plot')"
+    "||document.getElementById('sim-plot');"
+)
+
 
 def _make_bool_setter(field_name: str):
-    """Factory returning a bool event handler for ``field_name``."""
+    """Factory returning a bool event handler for ``field_name``.
+
+    Args:
+        field_name: Name of the AppState attribute to update.
+
+    Returns:
+        An event handler method that sets the bool field.
+    """
 
     def setter(self, value: bool) -> None:
+        """Set the field from a checkbox event."""
         setattr(self, field_name, value)
 
     setter.__name__ = f"set_{field_name}"
     setter.__qualname__ = f"AppState.set_{field_name}"
     setter.__doc__ = f"Set {field_name} from a checkbox event."
+    return setter
+
+
+def _make_visibility_setter(field_name: str):
+    """Factory returning a visibility event handler for ``field_name``.
+
+    The generated handler updates the server-side state var and issues a
+    ``Plotly.restyle`` call to toggle the corresponding trace(s) client-side,
+    avoiding a full figure rebuild for what is otherwise a trivial DOM change.
+
+    Args:
+        field_name: Name of the AppState show_* attribute to update.
+
+    Returns:
+        An event handler method that sets the bool field and yields a
+        ``rx.call_script`` event to apply the visibility change in-browser.
+    """
+
+    def setter(self, value: bool):
+        """Set the visibility flag and apply a client-side Plotly restyle."""
+        setattr(self, field_name, value)
+        trace_map = compute_trace_visibility_map(
+            current_sweeps=self.current_sweeps,
+            saved_sweeps=self.saved_sweeps,
+            clamp_mode=self.clamp_mode,
+            additional_current_field_map=_ADDITIONAL_CURRENT_FIELD_MAP,
+            additional_gating_field_map=_ADDITIONAL_GATING_FIELD_MAP,
+        )
+        indices = trace_map.get(field_name, [])
+        if indices:
+            visible_js = "true" if value else "false"
+            js = (
+                f"{_PLOTLY_GD_JS}"
+                f"if(gd&&gd.data)Plotly.restyle(gd,"
+                f"{{visible:{visible_js}}},{json.dumps(indices)})"
+            )
+            return rx.call_script(js)
+
+    setter.__name__ = f"set_{field_name}"
+    setter.__qualname__ = f"AppState.set_{field_name}"
+    setter.__doc__ = f"Set {field_name} and apply client-side visibility restyle."
     return setter
 
 
@@ -411,49 +518,16 @@ class AppState(rx.State):
 
     @rx.var
     def figure_data(self) -> go.Figure:
-        """Plotly figure rebuilt whenever relevant state changes."""
+        """Plotly figure rebuilt when sweeps or clamp mode change.
+
+        All traces are built with full visibility; toggling show_* flags is
+        handled client-side via Plotly.restyle so that figure rebuilds are not
+        triggered by visibility changes.
+        """
         return build_figure(
             current_sweeps=self.current_sweeps,
             saved_sweeps=self.saved_sweeps,
-            visibility=TraceVisibility(
-                voltage=self.show_voltage,
-                total_current=self.show_total_current,
-                sodium_current=self.show_sodium_current,
-                potassium_current=self.show_potassium_current,
-                leak_current=self.show_leak_current,
-                potassium_activation=self.show_potassium_activation,
-                sodium_activation=self.show_sodium_activation,
-                sodium_inactivation=self.show_sodium_inactivation,
-                additional_currents={
-                    "Ih": self.show_ih_current,
-                    "IKa": self.show_ika_current,
-                    "INaP": self.show_inap_current,
-                    "INaR": self.show_inar_current,
-                    "IM": self.show_im_current,
-                    "IKir": self.show_ikir_current,
-                    "IKCa": self.show_ikca_current,
-                    "ICaL": self.show_ical_current,
-                    "ICaT": self.show_icat_current,
-                    "ICaN": self.show_ican_current,
-                },
-                additional_gating={
-                    "r": self.show_ih_gating,
-                    "a": self.show_ika_gating,
-                    "b": self.show_ika_gating,
-                    "p": self.show_inap_gating,
-                    "s": self.show_inar_gating,
-                    "hr": self.show_inar_gating,
-                    "w": self.show_im_gating,
-                    "kir": self.show_ikir_gating,
-                    "q": self.show_ikca_gating,
-                    "d": self.show_ical_gating,
-                    "f": self.show_ical_gating,
-                    "dt": self.show_icat_gating,
-                    "ft": self.show_icat_gating,
-                    "dn": self.show_ican_gating,
-                    "fn": self.show_ican_gating,
-                },
-            ),
+            visibility=TraceVisibility(),  # all visible; toggling handled client-side
             clamp_mode=self.clamp_mode,
         )
 
@@ -506,14 +580,48 @@ class AppState(rx.State):
     for _f in _FLOAT_FIELDS:
         vars()[f"set_{_f}"] = _make_float_setter(_f)
 
-    # One setter per bool field — same rationale as float setters above.
-    for _f in _BOOL_FIELDS:
+    # Non-visibility bool setters (channel enable/disable).
+    for _f in _NON_VISIBILITY_BOOL_FIELDS:
         vars()[f"set_{_f}"] = _make_bool_setter(_f)
+
+    # Visibility setters: update state + issue client-side Plotly.restyle.
+    for _f in _VISIBILITY_FIELDS:
+        vars()[f"set_{_f}"] = _make_visibility_setter(_f)
 
     # ------------------------------------------------------------------ #
     # Sweep management                                                   #
     # ------------------------------------------------------------------ #
-    def add_sweep(self) -> None:
+    def _apply_visibility_js(self) -> str | None:
+        """Build a JS snippet to re-apply hidden traces after a figure rebuild.
+
+        Called after any operation that triggers a full figure rebuild (run
+        simulation, add sweep, clear sweeps) so that traces the user has
+        toggled off are correctly hidden again.
+
+        Returns:
+            A ``Plotly.restyle`` JS string targeting all currently-hidden
+            trace indices, or ``None`` when every trace is visible.
+        """
+        trace_map = compute_trace_visibility_map(
+            current_sweeps=self.current_sweeps,
+            saved_sweeps=self.saved_sweeps,
+            clamp_mode=self.clamp_mode,
+            additional_current_field_map=_ADDITIONAL_CURRENT_FIELD_MAP,
+            additional_gating_field_map=_ADDITIONAL_GATING_FIELD_MAP,
+        )
+        hidden: list[int] = []
+        for field_name, indices in trace_map.items():
+            if not getattr(self, field_name):
+                hidden.extend(indices)
+        if not hidden:
+            return None
+        return (
+            f"{_PLOTLY_GD_JS}"
+            f"if(gd&&gd.data)Plotly.restyle(gd,"
+            f"{{visible:false}},{json.dumps(hidden)})"
+        )
+
+    def add_sweep(self):
         """Promote current simulation result to the saved sweep overlay."""
         if not self.has_result:
             return
@@ -523,10 +631,16 @@ class AppState(rx.State):
             self.saved_sweeps.append(
                 sweep.model_copy(update={"color": color, "label": f"Sweep {idx + 1}"})
             )
+        js = self._apply_visibility_js()
+        if js:
+            return rx.call_script(js)
 
-    def clear_sweeps(self) -> None:
+    def clear_sweeps(self):
         """Remove all saved sweeps."""
         self.saved_sweeps = []
+        js = self._apply_visibility_js()
+        if js:
+            return rx.call_script(js)
 
     @rx.event(background=True)
     async def run_simulation(self) -> None:
@@ -687,3 +801,6 @@ class AppState(rx.State):
         finally:
             async with self:
                 self.is_running = False
+            js = self._apply_visibility_js()
+            if js:
+                yield rx.call_script(js)
