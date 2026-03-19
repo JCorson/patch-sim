@@ -334,6 +334,108 @@ def _build_hover_tables(
     return resp_html, gating_html, stim_html
 
 
+def compute_trace_visibility_map(
+    current_sweeps: list[Sweep],
+    saved_sweeps: list[Sweep],
+    clamp_mode: str,
+    additional_current_field_map: dict[str, str] | None = None,
+    additional_gating_field_map: dict[str, str] | None = None,
+) -> dict[str, list[int]]:
+    """Return a mapping from show_* field names to Plotly trace indices.
+
+    Mirrors the trace-insertion order used by ``build_figure`` so callers can
+    toggle individual traces via ``Plotly.restyle`` without rebuilding the
+    figure.  Only current-sweep traces controlled by a ``show_*`` field are
+    mapped; saved-sweep traces and carrier traces advance the counter but are
+    not included (they are always visible).
+
+    Args:
+        current_sweeps: Latest simulation result sweeps.
+        saved_sweeps: User-saved sweeps displayed as overlays.
+        clamp_mode: Active UI clamp mode ("Current Clamp" or "Voltage Clamp").
+        additional_current_field_map: Optional mapping from additional-current
+            sweep keys (e.g. ``"Ih"``) to ``show_*`` field names
+            (e.g. ``"show_ih_current"``).  Keys absent from the map advance
+            the index counter but are not recorded.
+        additional_gating_field_map: Optional mapping from additional-gating
+            sweep keys (e.g. ``"r"``) to ``show_*`` field names
+            (e.g. ``"show_ih_gating"``).  Keys absent from the map advance
+            the index counter but are not recorded.
+
+    Returns:
+        Dict mapping each ``show_*`` field name to the list of Plotly trace
+        indices it controls.  When the same field controls one trace per sweep
+        (e.g. multi-sweep I-V Curve) the list contains one index per sweep.
+    """
+    result: dict[str, list[int]] = {}
+    idx = 0
+    add_curr = additional_current_field_map or {}
+    add_gating = additional_gating_field_map or {}
+    is_vc = clamp_mode == "Voltage Clamp"
+    is_multi_sweep = len(current_sweeps) > 1
+
+    def _map(field: str) -> None:
+        """Record the current index under field and advance the counter."""
+        nonlocal idx
+        result.setdefault(field, []).append(idx)
+        idx += 1
+
+    def _skip() -> None:
+        """Advance the trace index counter without recording a mapping."""
+        nonlocal idx
+        idx += 1
+
+    for sweep in current_sweeps:
+        if sweep.clamp_mode == "Current Clamp":
+            _map("show_voltage")
+        else:
+            # Voltage Clamp: matches _add_vc_currents insertion order.
+            _map("show_total_current")
+            _map("show_sodium_current")
+            _map("show_potassium_current")
+            _map("show_leak_current")
+            for ch_name in sweep.additional_currents:
+                field = add_curr.get(ch_name)
+                if field:
+                    _map(field)
+                else:
+                    _skip()
+
+        # Gating row is always present in both modes.
+        _map("show_potassium_activation")
+        _map("show_sodium_activation")
+        _map("show_sodium_inactivation")
+        for gv_name in sweep.additional_gating:
+            field = add_gating.get(gv_name)
+            if field:
+                _map(field)
+            else:
+                _skip()
+
+        _skip()  # stimulus — always visible, no show_* field
+
+    for sweep in saved_sweeps:
+        # Saved sweeps are always visible; just advance the counter.
+        if sweep.clamp_mode == "Current Clamp":
+            _skip()  # voltage
+        elif is_vc:
+            # _add_vc_currents: 4 classic + additional_currents (no gating).
+            for _ in range(4):
+                _skip()
+            for _ in sweep.additional_currents:
+                _skip()
+        else:
+            _skip()  # total_current only (VC sweep shown in CC context)
+        _skip()  # stimulus
+
+    # Invisible hover-carrier traces in multi-sweep mode — always visible.
+    if is_multi_sweep and current_sweeps:
+        for _ in range(3):
+            _skip()
+
+    return result
+
+
 def build_figure(
     current_sweeps: list[Sweep],
     saved_sweeps: list[Sweep],
