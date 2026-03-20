@@ -1,0 +1,93 @@
+"""Logging infrastructure for the ap_sim web UI.
+
+Provides a custom logging handler that buffers records in a deque so they
+can be drained into Reflex session state without the handler needing a
+direct reference to any state instance.
+"""
+
+import collections
+import logging
+import threading
+from datetime import datetime, timezone
+
+from pydantic import BaseModel
+
+
+class LogRecord(BaseModel):
+    """Serializable representation of a single log record.
+
+    Attributes:
+        timestamp: ISO-8601 formatted UTC timestamp string.
+        level: Log level name (e.g. ``"DEBUG"``, ``"INFO"``).
+        logger_name: Name of the logger that emitted the record.
+        message: Formatted log message.
+    """
+
+    timestamp: str
+    level: str
+    logger_name: str
+    message: str
+
+
+class StateLogHandler(logging.Handler):
+    """Logging handler that buffers records in a thread-safe deque.
+
+    Records are accumulated here and drained into Reflex state on demand
+    via :meth:`drain`. Using a drain pattern means the handler needs no
+    reference to any session-scoped Reflex state object.
+    """
+
+    _buffer: collections.deque[LogRecord] = collections.deque(maxlen=500)
+    _lock: threading.Lock = threading.Lock()
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Format the record and append it to the buffer.
+
+        Args:
+            record: The log record to buffer.
+        """
+        try:
+            ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime(
+                "%H:%M:%S.%f"
+            )[:-3]
+            log_entry = LogRecord(
+                timestamp=ts,
+                level=record.levelname,
+                logger_name=record.name,
+                message=self.format(record),
+            )
+            with self._lock:
+                self._buffer.append(log_entry)
+        except Exception:  # noqa: BLE001
+            self.handleError(record)
+
+    @classmethod
+    def drain(cls) -> list[LogRecord]:
+        """Return and clear all buffered log records.
+
+        Returns:
+            A list of buffered :class:`LogRecord` instances in emission order.
+            The internal buffer is empty after this call.
+        """
+        with cls._lock:
+            records = list(cls._buffer)
+            cls._buffer.clear()
+        return records
+
+
+def setup_logging() -> None:
+    """Configure the ``ap_sim_ui`` logger with :class:`StateLogHandler`.
+
+    Creates the logger at DEBUG level and attaches a single
+    :class:`StateLogHandler` instance (idempotent — repeated calls are safe).
+    """
+    logger = logging.getLogger("ap_sim_ui")
+    logger.setLevel(logging.DEBUG)
+
+    # Avoid duplicate handlers if setup_logging is called more than once.
+    if any(isinstance(h, StateLogHandler) for h in logger.handlers):
+        return
+
+    handler = StateLogHandler()
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(handler)
