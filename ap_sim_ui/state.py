@@ -5,6 +5,8 @@ the Reflex component tree via computed properties.
 """
 
 import json
+import logging
+import time
 
 import numpy as np
 import plotly.graph_objects as go
@@ -12,6 +14,7 @@ import reflex as rx
 
 import ap_sim
 import ap_sim.clamp_simulations
+from ap_sim_ui.log_handler import LogRecord, StateLogHandler
 from ap_sim.constants import (
     DEFAULT_C_M,
     DEFAULT_CA_IN,
@@ -58,6 +61,8 @@ from ap_sim_ui.plotting import (
     compute_trace_visibility_map,
 )
 from ap_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
+
+logger = logging.getLogger("ap_sim_ui.state")
 
 # ------------------------------------------------------------------ #
 # Channel registry                                                   #
@@ -478,6 +483,13 @@ class AppState(rx.State):
     error_message: str = ""
 
     # ------------------------------------------------------------------ #
+    # Log panel state                                                    #
+    # ------------------------------------------------------------------ #
+    log_panel_open: bool = False
+    log_entries: list[LogRecord] = []
+    log_level_filter: str = "DEBUG"
+
+    # ------------------------------------------------------------------ #
     # Derived reversal potentials (shown as read-only in neuron panel)  #
     # ------------------------------------------------------------------ #
     @rx.var
@@ -513,6 +525,20 @@ class AppState(rx.State):
         return len(self.current_sweeps) > 0
 
     @rx.var
+    def filtered_log_entries(self) -> list[LogRecord]:
+        """Log entries filtered to the selected minimum level.
+
+        Returns:
+            Entries whose numeric level is >= the selected filter level.
+        """
+        min_level = logging.getLevelName(self.log_level_filter)
+        if not isinstance(min_level, int):
+            min_level = logging.DEBUG
+        return [
+            e for e in self.log_entries if logging.getLevelName(e.level) >= min_level
+        ]
+
+    @rx.var
     def figure_data(self) -> go.Figure:
         """Plotly figure rebuilt when sweeps or clamp mode change.
 
@@ -526,6 +552,37 @@ class AppState(rx.State):
             visibility=TraceVisibility(),  # all visible; toggling handled client-side
             clamp_mode=self.clamp_mode,
         )
+
+    # ------------------------------------------------------------------ #
+    # Log panel event handlers                                          #
+    # ------------------------------------------------------------------ #
+    def toggle_log_panel(self) -> None:
+        """Toggle the log panel open/closed, refreshing logs on open."""
+        self.log_panel_open = not self.log_panel_open
+        if self.log_panel_open:
+            self._refresh_logs()
+
+    def refresh_logs(self) -> None:
+        """Public event handler: drain buffered records into state."""
+        self._refresh_logs()
+
+    def _refresh_logs(self) -> None:
+        """Drain buffered log records into state, capping at 500 entries."""
+        new_records = StateLogHandler.drain()
+        combined = list(self.log_entries) + new_records
+        self.log_entries = combined[-500:]
+
+    def clear_logs(self) -> None:
+        """Clear all displayed log entries."""
+        self.log_entries = []
+
+    def set_log_level_filter(self, value: str) -> None:
+        """Set the minimum display level for log entries.
+
+        Args:
+            value: Level name string (e.g. ``"DEBUG"``, ``"INFO"``).
+        """
+        self.log_level_filter = value
 
     # ------------------------------------------------------------------ #
     # Event handlers                                                     #
@@ -549,6 +606,7 @@ class AppState(rx.State):
         """Load a named preset configuration."""
         if name not in presets.PRESETS:
             return
+        logger.info("Loaded preset: %s", name)
         config = presets.PRESETS[name]
         for key, value in config.items():
             setattr(self, key, value)
@@ -621,6 +679,7 @@ class AppState(rx.State):
         """Promote current simulation result to the saved sweep overlay."""
         if not self.has_result:
             return
+        logger.debug("Adding %d sweep(s) to overlay", len(self.current_sweeps))
         for sweep in self.current_sweeps:
             idx = len(self.saved_sweeps)
             color = constants.SWEEP_COLORS[idx % len(constants.SWEEP_COLORS)]
@@ -633,6 +692,7 @@ class AppState(rx.State):
 
     def clear_sweeps(self):
         """Remove all saved sweeps."""
+        logger.debug("Cleared %d saved sweep(s)", len(self.saved_sweeps))
         self.saved_sweeps = []
         js = self._apply_visibility_js()
         if js:
@@ -648,6 +708,12 @@ class AppState(rx.State):
             self.is_running = True
             self.error_message = ""
 
+        _start_ms = time.monotonic() * 1000
+        logger.info(
+            "Simulation started: mode=%s, protocol=%s",
+            self.clamp_mode,
+            self.protocol_type,
+        )
         try:
             additional_channels = []
             for enabled_attr, g_max_attr, factory, extra_kwargs in _CHANNEL_REGISTRY:
@@ -798,11 +864,16 @@ class AppState(rx.State):
                         ]
 
         except ValueError as exc:
+            logger.error("Simulation error: %s", exc)
             async with self:
                 self.error_message = str(exc)
+        else:
+            elapsed = time.monotonic() * 1000 - _start_ms
+            logger.info("Simulation complete: %.0f ms", elapsed)
         finally:
             async with self:
                 self.is_running = False
+                self._refresh_logs()
             js = self._apply_visibility_js()
             if js:
                 yield rx.call_script(js)
