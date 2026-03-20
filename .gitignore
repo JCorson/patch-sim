@@ -26,3 +26,6 @@ wheels/
 
 # Claude Code
 .claude/
+
+# Scratch
+scratch/
