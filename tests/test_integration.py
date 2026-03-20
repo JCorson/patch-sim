@@ -30,6 +30,10 @@ from ap_sim.protocols import (
 
 CURRENT_CLAMP_COLUMNS = [
     "voltage",
+    "Na_current",
+    "K_current",
+    "leak_current",
+    "total_current",
     "potassium_activation",
     "sodium_activation",
     "sodium_inactivation",
@@ -38,8 +42,8 @@ CURRENT_CLAMP_COLUMNS = [
 VOLTAGE_CLAMP_COLUMNS = [
     "voltage",
     "total_current",
-    "sodium_current",
-    "potassium_current",
+    "Na_current",
+    "K_current",
     "leak_current",
     "potassium_activation",
     "sodium_activation",
@@ -217,7 +221,7 @@ def test_step_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
     # During the depolarising step there should be inward Na⁺ current
     step_mask = np.isclose(result["voltage"].to_numpy(), 0.0)
     assert step_mask.any(), "No rows matched the step voltage — mask is empty"
-    assert result.loc[step_mask, "sodium_current"].min() < -10.0
+    assert result.loc[step_mask, "Na_current"].min() < -10.0
 
 
 def test_ramp_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
@@ -238,8 +242,8 @@ def test_ramp_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
 
     # K⁺ current (outward) should be higher in second half of ramp
     n = len(result)
-    k_first_half = result["potassium_current"].iloc[: n // 2].mean()
-    k_second_half = result["potassium_current"].iloc[n // 2 :].mean()
+    k_first_half = result["K_current"].iloc[: n // 2].mean()
+    k_second_half = result["K_current"].iloc[n // 2 :].mean()
     assert k_second_half > k_first_half
 
 
@@ -259,7 +263,7 @@ def test_pulse_train_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
 
     # Each depolarising pulse should produce an inward Na⁺ transient
     # Verify at least one strong inward Na⁺ event occurred
-    assert result["sodium_current"].min() < -10.0
+    assert result["Na_current"].min() < -10.0
 
 
 def test_iv_curve_protocol_to_simulation(hh_model: HodgkinHuxley) -> None:

@@ -314,6 +314,10 @@ def test_current_clamp_no_additional_channels_identical_columns(hh_model):
     df = simulate_current_clamp(hh_model, stim)
     expected = {
         "voltage",
+        "Na_current",
+        "K_current",
+        "leak_current",
+        "total_current",
         "potassium_activation",
         "sodium_activation",
         "sodium_inactivation",
@@ -335,8 +339,8 @@ def test_voltage_clamp_no_additional_channels_identical_columns(hh_model):
     expected = {
         "voltage",
         "total_current",
-        "sodium_current",
-        "potassium_current",
+        "Na_current",
+        "K_current",
         "leak_current",
         "potassium_activation",
         "sodium_activation",
@@ -425,10 +429,7 @@ def test_voltage_clamp_total_current_includes_ih():
     )
     df = simulate_voltage_clamp(neuron, prot)
     expected = (
-        df["sodium_current"]
-        + df["potassium_current"]
-        + df["leak_current"]
-        + df["Ih_current"]
+        df["Na_current"] + df["K_current"] + df["leak_current"] + df["Ih_current"]
     )
     np.testing.assert_allclose(df["total_current"].values, expected.values, rtol=1e-10)
 

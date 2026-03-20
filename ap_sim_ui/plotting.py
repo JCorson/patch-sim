@@ -22,8 +22,8 @@ _CLASSIC_COLUMNS = frozenset(
     {
         "voltage",
         "total_current",
-        "sodium_current",
-        "potassium_current",
+        "Na_current",
+        "K_current",
         "leak_current",
         "potassium_activation",
         "sodium_activation",
@@ -35,8 +35,8 @@ _CLASSIC_COLUMNS = frozenset(
 _CLASSIC_CURRENT_COLUMNS = frozenset(
     {
         "total_current",
-        "sodium_current",
-        "potassium_current",
+        "Na_current",
+        "K_current",
         "leak_current",
     }
 )
@@ -186,8 +186,8 @@ class Sweep(BaseModel):
             time=df.index.tolist(),
             stimulus=stimulus.tolist(),
             voltage=_col("voltage"),
-            sodium_current=_col("sodium_current"),
-            potassium_current=_col("potassium_current"),
+            sodium_current=_col("Na_current"),
+            potassium_current=_col("K_current"),
             leak_current=_col("leak_current"),
             total_current=_col("total_current"),
             potassium_activation=_col("potassium_activation"),

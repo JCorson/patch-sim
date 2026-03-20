@@ -44,8 +44,8 @@ def _make_df(
     data: dict[str, list[float]] = {
         "voltage": list(np.full(n, -65.0)),
         "total_current": list(np.zeros(n)),
-        "sodium_current": list(np.zeros(n)),
-        "potassium_current": list(np.zeros(n)),
+        "Na_current": list(np.zeros(n)),
+        "K_current": list(np.zeros(n)),
         "leak_current": list(np.zeros(n)),
         "potassium_activation": list(np.full(n, 0.3)),
         "sodium_activation": list(np.full(n, 0.05)),
