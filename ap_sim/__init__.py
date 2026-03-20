@@ -12,6 +12,17 @@ from .channels import (
     IonSpecies,
     NernstSpec,
 )
+from .core_channels import (
+    alpha_h,
+    alpha_m,
+    alpha_n,
+    beta_h,
+    beta_m,
+    beta_n,
+    make_k_channel,
+    make_leak_channel,
+    make_na_channel,
+)
 from .hodgkin_huxley import HodgkinHuxley
 from .additional_channels import (
     make_ican_channel,
@@ -61,6 +72,15 @@ __all__ = [
     "make_im_channel",
     "make_inap_channel",
     "make_inar_channel",
+    "alpha_h",
+    "alpha_m",
+    "alpha_n",
+    "beta_h",
+    "beta_m",
+    "beta_n",
+    "make_k_channel",
+    "make_leak_channel",
+    "make_na_channel",
     "simulate_voltage_clamp",
     "simulate_current_clamp",
     "nernst_potential",
