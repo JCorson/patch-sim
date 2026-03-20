@@ -58,6 +58,18 @@ def example(x: float, y: int) -> str:
 
 mypy only enforces types in `ap_sim/` (core library). UI code (`ap_sim_ui/`) is excluded — see the `[[tool.mypy.overrides]]` section in `pyproject.toml`. Do not spend time fixing mypy errors in UI code.
 
+## Working on GitHub issues
+
+When addressing a GitHub issue, create a dedicated branch off `main` before writing any code:
+
+```bash
+git checkout main
+git pull
+git checkout -b <branch-name>
+```
+
+Name the branch descriptively (e.g. `issue-42-voltage-clamp-fix`). Do all work for that issue on that branch. Do not commit issue-related changes directly to `main`.
+
 ## Committing during multi-step plans
 
 When executing a plan that has discrete numbered steps, commit after each step
