@@ -1,100 +1,87 @@
 """Tests for the core Hodgkin-Huxley model functionality."""
 
 import dataclasses
+
 import pytest
-from ap_sim.channels import IonSpecies
+
+from ap_sim.channels import IonChannel, IonSpecies
+from ap_sim.core_channels import make_na_channel
 from ap_sim.hodgkin_huxley import HodgkinHuxley
-from ap_sim.electrochemistry import nernst_potential
 
 
-def test_initialization(hh_model):
+def test_initialization(hh_model: HodgkinHuxley) -> None:
     """Test that the model is initialized with correct parameters."""
     assert hh_model.C_m == pytest.approx(1.0)
     assert hh_model.g_Na == pytest.approx(120.0)
     assert hh_model.g_K == pytest.approx(36.0)
     assert hh_model.g_L == pytest.approx(0.3)
 
-    # Test that reversal potentials are within expected ranges
-    assert 60.0 < hh_model.E_Na < 65.0
-    assert -90.0 < hh_model.E_K < -65.0
-    assert -70.0 < hh_model.E_L < -40.0
+
+def test_core_channels_structure(hh_model: HodgkinHuxley) -> None:
+    """core_channels returns (Na, K, leak) IonChannel tuple in that order."""
+    chs = hh_model.core_channels
+    assert len(chs) == 3
+    assert chs[0].name == "Na"
+    assert chs[1].name == "K"
+    assert chs[2].name == "leak"
+    assert all(isinstance(ch, IonChannel) for ch in chs)
 
 
-@pytest.mark.parametrize("voltage", [-100.0, -65.0, 0.0, 40.0])
-def test_rate_constants(hh_model, voltage: float):
-    """Test that all rate constants are positive at a range of membrane voltages."""
-    assert hh_model.alpha_n(voltage) > 0
-    assert hh_model.beta_n(voltage) > 0
-    assert hh_model.alpha_m(voltage) > 0
-    assert hh_model.beta_m(voltage) > 0
-    assert hh_model.alpha_h(voltage) > 0
-    assert hh_model.beta_h(voltage) > 0
+def test_core_channels_conductances(hh_model: HodgkinHuxley) -> None:
+    """core_channels channels carry the constructor g_max values."""
+    chs = hh_model.core_channels
+    assert chs[0].g_max == pytest.approx(hh_model.g_Na)
+    assert chs[1].g_max == pytest.approx(hh_model.g_K)
+    assert chs[2].g_max == pytest.approx(hh_model.g_L)
 
 
-@pytest.mark.parametrize("voltage", [-100.0, -65.0, 0.0, 40.0])
-def test_steady_state_gating_bounds(hh_model, voltage: float):
-    """Test that steady-state gating variables stay in [0, 1] at any voltage."""
-    alpha_n = hh_model.alpha_n(voltage)
-    beta_n = hh_model.beta_n(voltage)
-    n_inf = alpha_n / (alpha_n + beta_n)
-
-    alpha_m = hh_model.alpha_m(voltage)
-    beta_m = hh_model.beta_m(voltage)
-    m_inf = alpha_m / (alpha_m + beta_m)
-
-    alpha_h = hh_model.alpha_h(voltage)
-    beta_h = hh_model.beta_h(voltage)
-    h_inf = alpha_h / (alpha_h + beta_h)
-
-    assert 0 <= n_inf <= 1
-    assert 0 <= m_inf <= 1
-    assert 0 <= h_inf <= 1
+def test_all_channels_no_additional(hh_model: HodgkinHuxley) -> None:
+    """all_channels equals core_channels when there are no additional channels."""
+    assert hh_model.all_channels == hh_model.core_channels
 
 
-def test_steady_state_values(hh_model):
-    """Test that steady-state gating variables have correct resting-potential values."""
-    voltage = -65.0
-
-    # Calculate steady-state values
-    alpha_n = hh_model.alpha_n(voltage)
-    beta_n = hh_model.beta_n(voltage)
-    n_inf = alpha_n / (alpha_n + beta_n)
-
-    alpha_m = hh_model.alpha_m(voltage)
-    beta_m = hh_model.beta_m(voltage)
-    m_inf = alpha_m / (alpha_m + beta_m)
-
-    alpha_h = hh_model.alpha_h(voltage)
-    beta_h = hh_model.beta_h(voltage)
-    h_inf = alpha_h / (alpha_h + beta_h)
-
-    # At resting potential, h should be high, m and n should be low
-    assert h_inf > 0.5  # Sodium inactivation high at rest
-    assert m_inf < 0.5  # Sodium activation low at rest
-    assert n_inf < 0.5  # Potassium activation low at rest
+def test_all_channels_with_additional() -> None:
+    """all_channels appends additional channels after the core three."""
+    extra = make_na_channel(g_max=5.0)
+    extra_named = dataclasses.replace(extra, name="NaExtra")
+    neuron = HodgkinHuxley(additional_channels=(extra_named,))
+    assert len(neuron.all_channels) == 4
+    assert neuron.all_channels[3].name == "NaExtra"
 
 
-def test_time_constants(hh_model):
-    """Test that time constants are positive and reasonable."""
-    voltage = -65.0
-
-    # Calculate time constants
-    tau_n = 1.0 / (hh_model.alpha_n(voltage) + hh_model.beta_n(voltage))
-    tau_m = 1.0 / (hh_model.alpha_m(voltage) + hh_model.beta_m(voltage))
-    tau_h = 1.0 / (hh_model.alpha_h(voltage) + hh_model.beta_h(voltage))
-
-    # Time constants should be positive
-    assert tau_n > 0
-    assert tau_m > 0
-    assert tau_h > 0
-
-    # Time constants should be in reasonable physiological range (ms)
-    assert 0.1 <= tau_n <= 10
-    assert 0.01 <= tau_m <= 1
-    assert 1 <= tau_h <= 10
+def test_all_gating_variables_no_additional(hh_model: HodgkinHuxley) -> None:
+    """all_gating_variables has exactly 3 variables for the default HH model."""
+    gvs = hh_model.all_gating_variables
+    names = [gv.name for gv in gvs]
+    assert "sodium_activation" in names
+    assert "sodium_inactivation" in names
+    assert "potassium_activation" in names
+    assert len(gvs) == 3
 
 
-def test_custom_initialization():
+def test_all_gating_variables_with_additional() -> None:
+    """all_gating_variables includes gating vars from additional channels."""
+    # Rename the gating variable to avoid name collision with the core K channel
+    from ap_sim.channels import GatingVariable, NernstSpec
+    from ap_sim.core_channels import alpha_n, beta_n
+
+    gv_new = GatingVariable(
+        name="kextra_activation", power=4, alpha=alpha_n, beta=beta_n
+    )
+    extra_ch2 = IonChannel(
+        name="Kextra",
+        g_max=1.0,
+        gating_variables=(gv_new,),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
+    neuron = HodgkinHuxley(additional_channels=(extra_ch2,))
+    gvs = neuron.all_gating_variables
+    names = [gv.name for gv in gvs]
+    assert "kextra_activation" in names
+    assert len(gvs) == 4  # 3 core + 1 extra
+
+
+def test_custom_initialization() -> None:
     """Test that the model can be initialized with custom parameters."""
     custom_g_Na = 100.0
     custom_model = HodgkinHuxley(g_Na=custom_g_Na)
@@ -107,73 +94,78 @@ def test_custom_initialization():
     assert custom_model.g_L == pytest.approx(0.3)
 
 
-def test_singularity_guards(hh_model):
-    """Test the near-singularity guards in alpha_n and alpha_m."""
-    # alpha_n has a removable singularity at V = -55 mV
-    # The limit as V -> -55 is 0.1
-    result = hh_model.alpha_n(-55.0)
-    assert result == pytest.approx(0.1)
-
-    # Values just outside the guard threshold should be continuous with the limit
-    # — approach from above
-    result_near_above = hh_model.alpha_n(-55.0 + 1e-5)
-    assert result_near_above == pytest.approx(0.1, rel=1e-3)
-
-    # — approach from below
-    result_near_below = hh_model.alpha_n(-55.0 - 1e-5)
-    assert result_near_below == pytest.approx(0.1, rel=1e-3)
-
-    # alpha_m has a removable singularity at V = -40 mV
-    # The limit as V -> -40 is 1.0
-    result = hh_model.alpha_m(-40.0)
-    assert result == pytest.approx(1.0)
-
-    # Values just outside the guard threshold should be continuous with the limit
-    # — approach from above
-    result_near_above = hh_model.alpha_m(-40.0 + 1e-5)
-    assert result_near_above == pytest.approx(1.0, rel=1e-3)
-
-    # — approach from below
-    result_near_below = hh_model.alpha_m(-40.0 - 1e-5)
-    assert result_near_below == pytest.approx(1.0, rel=1e-3)
-
-
-def test_frozen_immutability(hh_model):
+def test_frozen_immutability(hh_model: HodgkinHuxley) -> None:
     """Assigning to a frozen dataclass field must raise FrozenInstanceError."""
     with pytest.raises(dataclasses.FrozenInstanceError):
         hh_model.g_Na = 999.0  # type: ignore[misc]
 
 
-def test_reversal_potentials_match_nernst(hh_model):
-    """E_Na, E_K, E_L must match Nernst equation for default concentrations."""
+def test_reversal_potentials_from_core_channels(hh_model: HodgkinHuxley) -> None:
+    """Core channel reversal potentials match direct Nernst calculation."""
+    from ap_sim.electrochemistry import nernst_potential
+
+    na_ch, k_ch, leak_ch = hh_model.core_channels
     expected_E_Na = nernst_potential(1, hh_model.T, hh_model.Na_out, hh_model.Na_in)
     expected_E_K = nernst_potential(1, hh_model.T, hh_model.K_out, hh_model.K_in)
     expected_E_L = nernst_potential(-1, hh_model.T, hh_model.Cl_out, hh_model.Cl_in)
 
-    assert hh_model.E_Na == pytest.approx(expected_E_Na)
-    assert hh_model.E_K == pytest.approx(expected_E_K)
-    assert hh_model.E_L == pytest.approx(expected_E_L)
+    assert na_ch.reversal_potential(hh_model) == pytest.approx(expected_E_Na)
+    assert k_ch.reversal_potential(hh_model) == pytest.approx(expected_E_K)
+    assert leak_ch.reversal_potential(hh_model) == pytest.approx(expected_E_L)
 
 
-def test_custom_ion_concentrations_shift_reversal_potentials():
+def test_reversal_potentials_in_physiological_range(hh_model: HodgkinHuxley) -> None:
+    """Core channel reversal potentials are in expected physiological ranges."""
+    na_ch, k_ch, leak_ch = hh_model.core_channels
+    assert 60.0 < na_ch.reversal_potential(hh_model) < 65.0
+    assert -90.0 < k_ch.reversal_potential(hh_model) < -65.0
+    assert -70.0 < leak_ch.reversal_potential(hh_model) < -40.0
+
+
+def test_custom_ion_concentrations_shift_reversal_potentials() -> None:
     """Changing ion concentrations must produce shifted reversal potentials."""
+    from ap_sim.electrochemistry import nernst_potential
+
     custom_model = HodgkinHuxley(Na_out=200.0, K_in=100.0, T=293.15)
     default_model = HodgkinHuxley()
 
+    na_custom, k_custom, _ = custom_model.core_channels
+    na_default, k_default, _ = default_model.core_channels
+
     # Higher extracellular Na+ → more positive E_Na
-    assert custom_model.E_Na > default_model.E_Na
+    assert na_custom.reversal_potential(custom_model) > na_default.reversal_potential(
+        default_model
+    )
 
-    # Lower intracellular K+ (100 vs 140 mM) → K_out/K_in ratio is larger
-    # → more positive E_K
-    assert custom_model.E_K > default_model.E_K
+    # Lower intracellular K+ (100 vs 140 mM) → K_out/K_in ratio is larger → more +ve E_K
+    assert k_custom.reversal_potential(custom_model) > k_default.reversal_potential(
+        default_model
+    )
 
-    # Values must still agree with direct Nernst calculation
-    assert custom_model.E_Na == pytest.approx(
+    # Values must agree with direct Nernst calculation
+    assert na_custom.reversal_potential(custom_model) == pytest.approx(
         nernst_potential(1, custom_model.T, custom_model.Na_out, custom_model.Na_in)
     )
-    assert custom_model.E_K == pytest.approx(
+    assert k_custom.reversal_potential(custom_model) == pytest.approx(
         nernst_potential(1, custom_model.T, custom_model.K_out, custom_model.K_in)
     )
+
+
+def test_calcium_reversal_potential() -> None:
+    """Calcium channel reversal potential matches Nernst with z=2."""
+    from ap_sim.channels import IonChannel, NernstSpec
+    from ap_sim.electrochemistry import nernst_potential
+
+    model = HodgkinHuxley()
+    ca_ch = IonChannel(
+        name="CaTest",
+        g_max=1.0,
+        gating_variables=(),
+        reversal_spec=NernstSpec(IonSpecies.CALCIUM),
+    )
+    expected = nernst_potential(2, model.T, model.Ca_out, model.Ca_in)
+    assert ca_ch.reversal_potential(model) == pytest.approx(expected)
+    assert ca_ch.reversal_potential(model) > 100.0
 
 
 # ---------------------------------------------------------------------------
@@ -182,35 +174,35 @@ def test_custom_ion_concentrations_shift_reversal_potentials():
 
 
 @pytest.mark.parametrize("g_Na", [-1.0, -0.001])
-def test_negative_g_Na_raises(g_Na: float):
+def test_negative_g_Na_raises(g_Na: float) -> None:
     """Negative sodium conductance must raise ValueError."""
     with pytest.raises(ValueError, match="g_Na"):
         HodgkinHuxley(g_Na=g_Na)
 
 
 @pytest.mark.parametrize("g_K", [-1.0, -0.001])
-def test_negative_g_K_raises(g_K: float):
+def test_negative_g_K_raises(g_K: float) -> None:
     """Negative potassium conductance must raise ValueError."""
     with pytest.raises(ValueError, match="g_K"):
         HodgkinHuxley(g_K=g_K)
 
 
 @pytest.mark.parametrize("g_L", [-1.0, -0.001])
-def test_negative_g_L_raises(g_L: float):
+def test_negative_g_L_raises(g_L: float) -> None:
     """Negative leak conductance must raise ValueError."""
     with pytest.raises(ValueError, match="g_L"):
         HodgkinHuxley(g_L=g_L)
 
 
 @pytest.mark.parametrize("C_m", [0.0, -1.0])
-def test_non_positive_capacitance_raises(C_m: float):
+def test_non_positive_capacitance_raises(C_m: float) -> None:
     """Non-positive membrane capacitance must raise ValueError."""
     with pytest.raises(ValueError, match="C_m"):
         HodgkinHuxley(C_m=C_m)
 
 
 @pytest.mark.parametrize("T", [0.0, -1.0])
-def test_non_positive_temperature_raises(T: float):
+def test_non_positive_temperature_raises(T: float) -> None:
     """Non-positive temperature must raise ValueError."""
     with pytest.raises(ValueError, match="Temperature"):
         HodgkinHuxley(T=T)
@@ -237,33 +229,10 @@ def test_non_positive_temperature_raises(T: float):
         {"Ca_in": -1.0},
     ],
 )
-def test_non_positive_ion_concentration_raises(kwargs: dict):
+def test_non_positive_ion_concentration_raises(kwargs: dict) -> None:
     """Non-positive ion concentration must raise ValueError."""
     with pytest.raises(ValueError, match="concentration"):
         HodgkinHuxley(**kwargs)
-
-
-def test_e_ca_matches_nernst(hh_model):
-    """E_Ca must match Nernst equation with z=2 for default Ca concentrations."""
-    expected = nernst_potential(2, hh_model.T, hh_model.Ca_out, hh_model.Ca_in)
-    assert hh_model.E_Ca == pytest.approx(expected)
-
-
-def test_e_ca_default_is_positive():
-    """Default E_Ca should be large and positive (~131 mV)."""
-    model = HodgkinHuxley()
-    assert model.E_Ca > 100.0
-
-
-def test_custom_ca_concentrations_shift_e_ca():
-    """Changing Ca concentrations must produce a shifted E_Ca."""
-    default_model = HodgkinHuxley()
-    # Higher Ca_out → more positive E_Ca
-    higher_out = HodgkinHuxley(Ca_out=10.0)
-    assert higher_out.E_Ca > default_model.E_Ca
-    # Lower Ca_out → less positive E_Ca
-    lower_out = HodgkinHuxley(Ca_out=0.5)
-    assert lower_out.E_Ca < default_model.E_Ca
 
 
 # ---------------------------------------------------------------------------

@@ -24,13 +24,7 @@ from .constants import (
     DEFAULT_T,
     DEFAULT_V_REST,
 )
-from .electrochemistry import nernst_potential
-from .utils import safe_exp
-
-# Threshold for detecting near-singularity in GHK-style rate equations.
-# When the denominator voltage term is within this tolerance of zero, the
-# L'Hôpital limit is used instead to avoid division by zero.
-SINGULARITY_THRESHOLD = 1e-6
+from .core_channels import make_k_channel, make_leak_channel, make_na_channel
 
 
 @dataclass(frozen=True)
@@ -42,26 +36,29 @@ class HodgkinHuxley:
     potentials have been computed.
 
     Attributes:
-        C_m (float): Membrane capacitance in uF/cm^2.
-        g_Na (float): Maximum sodium conductance in mS/cm^2.
-        g_K (float): Maximum potassium conductance in mS/cm^2.
-        g_L (float): Leak conductance in mS/cm^2.
-        v_rest (float): Resting potential in mV.
-        Na_out (float): Extracellular sodium concentration in mM.
-        Na_in (float): Intracellular sodium concentration in mM.
-        K_out (float): Extracellular potassium concentration in mM.
-        K_in (float): Intracellular potassium concentration in mM.
-        Cl_out (float): Extracellular chloride concentration in mM.
-        Cl_in (float): Intracellular chloride concentration in mM.
-        T (float): Temperature in Kelvin.
+        C_m: Membrane capacitance in uF/cm^2.
+        g_Na: Maximum sodium conductance in mS/cm^2.
+        g_K: Maximum potassium conductance in mS/cm^2.
+        g_L: Leak conductance in mS/cm^2.
+        v_rest: Resting potential in mV.
+        Na_out: Extracellular sodium concentration in mM.
+        Na_in: Intracellular sodium concentration in mM.
+        K_out: Extracellular potassium concentration in mM.
+        K_in: Intracellular potassium concentration in mM.
+        Cl_out: Extracellular chloride concentration in mM.
+        Cl_in: Intracellular chloride concentration in mM.
+        T: Temperature in Kelvin.
         additional_channels: Tuple of additional ion channels added on top of
             the classic Na/K/leak triad.  Defaults to an empty tuple so that
             all existing code is unaffected.
+        calcium_dynamics: Optional calcium dynamics model.
 
-    Cached properties (derived from ion concentrations on first access):
-        E_Na (float): Sodium reversal potential in mV.
-        E_K (float): Potassium reversal potential in mV.
-        E_L (float): Leak reversal potential in mV.
+    Cached properties (built on first access):
+        core_channels: Tuple of three IonChannel objects (Na, K, leak) built
+            from the constructor conductances.
+        all_channels: All channels — core_channels + additional_channels.
+        all_gating_variables: Flat tuple of every gating variable across all
+            channels, in channel-declaration order.
     """
 
     # Membrane properties
@@ -128,41 +125,60 @@ class HodgkinHuxley:
                 )
 
     @cached_property
-    def all_additional_gating_variables(self) -> tuple[GatingVariable, ...]:
-        """Return a flat tuple of all gating variables across additional channels.
+    def core_channels(self) -> tuple[IonChannel, ...]:
+        """Return the three classic HH channels built from constructor conductances.
 
         Returns:
-            Tuple of gating variable objects from all additional channels, in
-            the order the channels and their gating variables are declared.
+            Tuple of (Na, K, leak) IonChannel objects in that order.
+        """
+        return (
+            make_na_channel(self.g_Na),
+            make_k_channel(self.g_K),
+            make_leak_channel(self.g_L),
+        )
+
+    @cached_property
+    def all_channels(self) -> tuple[IonChannel, ...]:
+        """Return all channels: core channels followed by additional channels.
+
+        Returns:
+            Tuple of all IonChannel objects in declaration order.
+        """
+        return self.core_channels + self.additional_channels
+
+    @cached_property
+    def all_gating_variables(self) -> tuple[GatingVariable, ...]:
+        """Return a flat tuple of all gating variables across all channels.
+
+        Returns:
+            Tuple of GatingVariable objects from all channels, in the order
+            the channels and their gating variables are declared.
         """
         result: list[GatingVariable] = []
-        for ch in self.additional_channels:
+        for ch in self.all_channels:
             result.extend(ch.gating_variables)
         return tuple(result)
 
-    def calcium_current(self, V: float, opt_state: dict[str, float]) -> float:
-        """Return the total current from all calcium-carrying additional channels.
+    def calcium_current(self, V: float, gating_state: dict[str, float]) -> float:
+        """Return the total current from all calcium-carrying channels.
 
-        Sums the current from every additional channel that has
+        Sums the current from every channel (core or additional) that has
         ``carries_calcium=True``.  Used by the Ca2+ ODE to determine how much
         intracellular Ca2+ is entering the cell each time step.
 
         Args:
             V: Membrane voltage in mV.
-            opt_state: Additional channel gating state (name → value).
+            gating_state: Full gating state mapping variable name → value,
+                covering both core and additional channels.
 
         Returns:
             Total calcium current in µA/cm² (positive = outward).
         """
         return sum(
-            ch.compute_current(V, opt_state, self)
-            for ch in self.additional_channels
+            ch.compute_current(V, gating_state, self)
+            for ch in self.all_channels
             if ch.carries_calcium
         )
-
-    # Reversal potentials — derived from ion concentrations via the Nernst
-    # equation.  Using @cached_property avoids the object.__setattr__ hack
-    # that would otherwise be needed in __post_init__ on a frozen dataclass.
 
     def ion_concentrations(self, species: IonSpecies) -> tuple[float, float]:
         """Return the extracellular and intracellular concentrations for an ion.
@@ -188,101 +204,3 @@ class HodgkinHuxley:
         if species is IonSpecies.CHLORIDE:
             return self.Cl_out, self.Cl_in
         raise ValueError(f"Unknown ion species: {species!r}")  # pragma: no cover
-
-    @cached_property
-    def E_Na(self) -> float:
-        """Sodium reversal potential in mV."""
-        return nernst_potential(1, self.T, self.Na_out, self.Na_in)
-
-    @cached_property
-    def E_K(self) -> float:
-        """Potassium reversal potential in mV."""
-        return nernst_potential(1, self.T, self.K_out, self.K_in)
-
-    @cached_property
-    def E_L(self) -> float:
-        """Leak reversal potential in mV."""
-        return nernst_potential(-1, self.T, self.Cl_out, self.Cl_in)
-
-    @cached_property
-    def E_Ca(self) -> float:
-        """Calcium reversal potential in mV (z=+2)."""
-        return nernst_potential(2, self.T, self.Ca_out, self.Ca_in)
-
-    def alpha_n(self, V: float) -> float:
-        """Calculate the rate constant alpha_n for potassium channel activation.
-
-        Args:
-            V: Membrane voltage in mV.
-
-        Returns:
-            The rate constant alpha_n.
-        """
-        if abs(V + 55) < SINGULARITY_THRESHOLD:
-            # Handle near-singularity case
-            # This is the limit as V approaches -55
-            return 0.1
-        else:
-            denominator = 1 - safe_exp(-(V + 55) / 10)
-            return 0.01 * (V + 55) / denominator
-
-    def beta_n(self, V: float) -> float:
-        """Calculate the rate constant beta_n for potassium channel deactivation.
-
-        Args:
-            V: Membrane voltage in mV.
-
-        Returns:
-            The rate constant beta_n.
-        """
-        return 0.125 * safe_exp(-(V + 65) / 80)
-
-    def alpha_m(self, V: float) -> float:
-        """Calculate the rate constant alpha_m for sodium channel activation.
-
-        Args:
-            V: Membrane voltage in mV.
-
-        Returns:
-            The rate constant alpha_m.
-        """
-        if abs(V + 40) < SINGULARITY_THRESHOLD:
-            # Handle near-singularity case
-            # This is the limit as V approaches -40
-            return 1.0
-        else:
-            denominator = 1 - safe_exp(-(V + 40) / 10)
-            return 0.1 * (V + 40) / denominator
-
-    def beta_m(self, V: float) -> float:
-        """Calculate the rate constant beta_m for sodium channel deactivation.
-
-        Args:
-            V: Membrane voltage in mV.
-
-        Returns:
-            The rate constant beta_m.
-        """
-        return 4.0 * safe_exp(-(V + 65) / 18)
-
-    def alpha_h(self, V: float) -> float:
-        """Calculate the rate constant alpha_h for sodium channel inactivation.
-
-        Args:
-            V: Membrane voltage in mV.
-
-        Returns:
-            The rate constant alpha_h.
-        """
-        return 0.07 * safe_exp(-(V + 65) / 20)
-
-    def beta_h(self, V: float) -> float:
-        """Calculate the rate constant beta_h for sodium channel reactivation.
-
-        Args:
-            V: Membrane voltage in mV.
-
-        Returns:
-            The rate constant beta_h.
-        """
-        return 1 / (1 + safe_exp(-(V + 35) / 10))
