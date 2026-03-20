@@ -9,6 +9,8 @@ Both clamp modes use a unified gating-state dictionary that covers all channels
 
 import numpy as np
 import pandas as pd
+from collections.abc import Callable, Iterator, Sequence
+from concurrent.futures import ProcessPoolExecutor
 from typing import TYPE_CHECKING
 
 
@@ -483,3 +485,45 @@ def simulate_current_clamp(
     results = pd.DataFrame(data, index=time_array)
     results.index.name = "time"
     return results
+
+
+def simulate_batch(
+    neuron: "HodgkinHuxley",
+    protocols: Sequence[np.ndarray],
+    simulate_fn: Callable[
+        ["HodgkinHuxley", np.ndarray], pd.DataFrame
+    ] = simulate_voltage_clamp,
+    max_workers: int | None = None,
+) -> Iterator[pd.DataFrame]:
+    """Run multiple simulation protocols in parallel and yield results in order.
+
+    Each protocol is submitted to a process pool and executed independently
+    (fresh initial conditions per protocol).  Results are yielded in submission
+    order so callers can process them progressively as simulations complete.
+
+    An empty *protocols* sequence yields nothing.  A single-element sequence
+    is equivalent to calling *simulate_fn* directly, but still routed through
+    the pool.
+
+    Args:
+        neuron: The Hodgkin-Huxley neuron model to simulate.
+        protocols: Sequence of protocol arrays, each passed individually to
+            *simulate_fn*.
+        simulate_fn: The simulation function to apply to each protocol.
+            Defaults to :func:`simulate_voltage_clamp`; pass
+            :func:`simulate_current_clamp` for current-clamp batch runs.
+        max_workers: Maximum number of worker processes.  ``None`` (default)
+            uses the CPU count.
+
+    Yields:
+        DataFrames in the same order as *protocols*, one per protocol.
+    """
+    if not protocols:
+        return
+
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(simulate_fn, neuron, protocol) for protocol in protocols
+        ]
+        for future in futures:
+            yield future.result()

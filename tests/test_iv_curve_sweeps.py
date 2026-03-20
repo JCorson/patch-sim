@@ -11,6 +11,7 @@ import pytest
 
 import ap_sim
 import ap_sim.clamp_simulations
+from ap_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 
 
 # ---------------------------------------------------------------------------
@@ -18,6 +19,45 @@ import ap_sim.clamp_simulations
 # ---------------------------------------------------------------------------
 
 _FS = ap_sim.clamp_simulations.SIM_SAMPLING_FREQ
+
+
+def _make_iv_protocols(
+    voltage_min: float = -100.0,
+    voltage_max: float = 60.0,
+    voltage_step: float = 10.0,
+    step_duration: float = 20.0,
+    pre_pulse_duration: float = 5.0,
+    post_pulse_duration: float = 5.0,
+    holding_voltage: float = -70.0,
+) -> tuple[np.ndarray, list[np.ndarray]]:
+    """Build I-V curve protocol arrays without running simulations.
+
+    Args:
+        voltage_min: Minimum test voltage in mV.
+        voltage_max: Maximum test voltage in mV.
+        voltage_step: Voltage increment between steps in mV.
+        step_duration: Duration of the test pulse in milliseconds.
+        pre_pulse_duration: Duration of the pre-pulse holding period in ms.
+        post_pulse_duration: Duration of the post-pulse holding period in ms.
+        holding_voltage: Holding voltage in mV.
+
+    Returns:
+        Tuple of (voltages array, list of protocol arrays), one protocol per voltage.
+    """
+    sweep_duration = pre_pulse_duration + step_duration + post_pulse_duration
+    voltages = np.arange(voltage_min, voltage_max + voltage_step, voltage_step)
+    protocols = [
+        ap_sim.step_voltage(
+            duration=sweep_duration,
+            voltage_amplitude=float(v),
+            step_start=pre_pulse_duration,
+            step_duration=step_duration,
+            holding_voltage=holding_voltage,
+            sampling_frequency=_FS,
+        )
+        for v in voltages
+    ]
+    return voltages, protocols
 
 
 def _make_iv_sweeps(
@@ -136,3 +176,84 @@ def test_iv_curve_protocol_peak_voltage_matches_step_voltage() -> None:
         else:
             peak = float(np.min(protocol))
         assert peak == pytest.approx(float(expected_v), abs=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# simulate_batch tests
+# ---------------------------------------------------------------------------
+
+
+def test_batch_matches_sequential() -> None:
+    """simulate_batch results are identical to sequential simulate_voltage_clamp."""
+    neuron = ap_sim.HodgkinHuxley()
+    _voltages, protocols = _make_iv_protocols(
+        voltage_min=-60.0,
+        voltage_max=0.0,
+        voltage_step=20.0,
+    )
+    sequential = [simulate_voltage_clamp(neuron, p) for p in protocols]
+    batch = list(ap_sim.simulate_batch(neuron, protocols, max_workers=2))
+    assert len(batch) == len(sequential)
+    for seq_df, batch_df in zip(sequential, batch):
+        pd.testing.assert_frame_equal(seq_df, batch_df)
+
+
+def test_batch_single_sweep() -> None:
+    """A single-protocol batch yields exactly one correct DataFrame."""
+    neuron = ap_sim.HodgkinHuxley()
+    _voltages, protocols = _make_iv_protocols(
+        voltage_min=0.0,
+        voltage_max=0.0,
+        voltage_step=10.0,
+    )
+    results = list(ap_sim.simulate_batch(neuron, protocols, max_workers=2))
+    assert len(results) == 1
+    expected = simulate_voltage_clamp(neuron, protocols[0])
+    pd.testing.assert_frame_equal(results[0], expected)
+
+
+def test_batch_empty_protocols() -> None:
+    """An empty protocol list yields no results."""
+    neuron = ap_sim.HodgkinHuxley()
+    results = list(ap_sim.simulate_batch(neuron, [], max_workers=2))
+    assert results == []
+
+
+def test_batch_preserves_order() -> None:
+    """Results come back in voltage order (same order as input protocols)."""
+    neuron = ap_sim.HodgkinHuxley()
+    voltages, protocols = _make_iv_protocols(
+        voltage_min=-80.0,
+        voltage_max=40.0,
+        voltage_step=20.0,
+    )
+    results = list(ap_sim.simulate_batch(neuron, protocols, max_workers=2))
+    assert len(results) == len(voltages)
+    for df, voltage in zip(results, voltages):
+        # Each protocol steps to its commanded voltage — check the peak matches.
+        holding = -70.0
+        if voltage >= holding:
+            peak = float(np.max(df["voltage"].to_numpy()))
+        else:
+            peak = float(np.min(df["voltage"].to_numpy()))
+        assert peak == pytest.approx(float(voltage), abs=1e-6)
+
+
+def test_batch_with_current_clamp() -> None:
+    """simulate_batch with simulate_fn=simulate_current_clamp works correctly."""
+    neuron = ap_sim.HodgkinHuxley()
+    num_steps = int(_FS * 0.05)  # 50 ms
+    stimulus = np.zeros(num_steps)
+    stimulus[int(_FS * 0.01) : int(_FS * 0.04)] = 10.0
+
+    results = list(
+        ap_sim.simulate_batch(
+            neuron,
+            [stimulus],
+            simulate_fn=simulate_current_clamp,
+            max_workers=2,
+        )
+    )
+    assert len(results) == 1
+    expected = simulate_current_clamp(neuron, stimulus)
+    pd.testing.assert_frame_equal(results[0], expected)

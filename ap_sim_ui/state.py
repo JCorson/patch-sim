@@ -710,11 +710,13 @@ class AppState(rx.State):
                     mean_current=self.mean_current,
                     std_current=self.std_current,
                 )
-                df = ap_sim.simulate_current_clamp(neuron, stimulus)
-                async with self:
-                    self.current_sweeps = [
-                        Sweep.from_dataframe(df, stimulus, "", "", mode)
-                    ]
+                for df in ap_sim.simulate_batch(
+                    neuron, [stimulus], simulate_fn=ap_sim.simulate_current_clamp
+                ):
+                    async with self:
+                        self.current_sweeps = [
+                            Sweep.from_dataframe(df, stimulus, "", "", mode)
+                        ]
 
             elif ptype in ("I-V Curve",):
                 # Run each voltage step as an independent sweep so that
@@ -730,9 +732,8 @@ class AppState(rx.State):
                     self.vc_voltage_max + self.vc_voltage_step,
                     self.vc_voltage_step,
                 )
-                new_sweeps: list[Sweep] = []
-                for voltage in voltages:
-                    protocol = ap_sim.step_voltage(
+                protocols = [
+                    ap_sim.step_voltage(
                         duration=sweep_duration,
                         voltage_amplitude=float(voltage),
                         step_start=self.vc_pre_pulse_duration,
@@ -740,7 +741,14 @@ class AppState(rx.State):
                         holding_voltage=self.vc_holding_voltage,
                         sampling_frequency=fs,
                     )
-                    sweep_df = ap_sim.simulate_voltage_clamp(neuron, protocol)
+                    for voltage in voltages
+                ]
+                new_sweeps: list[Sweep] = []
+                for sweep_df, voltage, protocol in zip(
+                    ap_sim.simulate_batch(neuron, protocols),
+                    voltages,
+                    protocols,
+                ):
                     label = f"{voltage:+.0f} mV"
                     color_index = len(new_sweeps) % len(constants.SWEEP_COLORS)
                     new_sweeps.append(
@@ -783,11 +791,11 @@ class AppState(rx.State):
                     vc_test_voltage_max=self.vc_test_voltage_max,
                     vc_interpulse_duration=self.vc_interpulse_duration,
                 )
-                df = ap_sim.simulate_voltage_clamp(neuron, stimulus)
-                async with self:
-                    self.current_sweeps = [
-                        Sweep.from_dataframe(df, stimulus, "", "", mode)
-                    ]
+                for df in ap_sim.simulate_batch(neuron, [stimulus]):
+                    async with self:
+                        self.current_sweeps = [
+                            Sweep.from_dataframe(df, stimulus, "", "", mode)
+                        ]
 
         except ValueError as exc:
             async with self:
