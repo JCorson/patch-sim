@@ -189,12 +189,12 @@ class HodgkinHuxley:
 
     @cached_property
     def _channel_gate_info(self) -> tuple[tuple[np.ndarray, np.ndarray], ...]:
-        """Pre-computed index/power arrays for vectorized conductance computation.
+        """Pre-computed index/power arrays for per-channel conductance computation.
 
         For each channel in ``all_channels``, stores a ``(indices, powers)``
-        pair of numpy arrays so that the conductance gate product can be
-        evaluated as ``np.prod(state[indices] ** powers)`` without iterating
-        over gating variables individually.
+        pair of numpy arrays.  The simulation loop iterates over these pairs
+        to compute ``g_max * prod(state[i] ** p for i, p in zip(indices, powers))``
+        without per-step dict lookups.
 
         Returns:
             Tuple of ``(indices, powers)`` numpy array pairs, one per channel.
@@ -242,6 +242,19 @@ class HodgkinHuxley:
         return np.array(
             [ch.reversal_potential(self) for ch in self.all_channels], dtype=np.float64
         )
+
+    @cached_property
+    def _g_max_arr(self) -> np.ndarray:
+        """Pre-computed maximum conductance for each channel.
+
+        Avoids re-allocating this small array on every simulation call.
+        Paired with ``_reversal_potentials`` for the Numba JIT kernel.
+
+        Returns:
+            Float64 array of length ``len(all_channels)`` where entry ``i``
+            is ``all_channels[i].g_max`` in mS/cm².
+        """
+        return np.array([ch.g_max for ch in self.all_channels], dtype=np.float64)
 
     @cached_property
     def _rate_func_ids(self) -> np.ndarray:

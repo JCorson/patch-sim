@@ -2,6 +2,7 @@
 
 import dataclasses
 
+import numpy as np
 import pytest
 
 from patch_sim.channels import IonChannel, IonSpecies
@@ -268,3 +269,88 @@ def test_ion_concentrations_reflects_custom_values() -> None:
     assert model.ion_concentrations(IonSpecies.POTASSIUM) == pytest.approx((5.0, 100.0))
     assert model.ion_concentrations(IonSpecies.CALCIUM) == pytest.approx((5.0, 0.0001))
     assert model.ion_concentrations(IonSpecies.CHLORIDE) == pytest.approx((120.0, 20.0))
+
+
+# ---------------------------------------------------------------------------
+# Cached flat-array property tests
+# ---------------------------------------------------------------------------
+
+
+def test_reversal_potentials_matches_per_channel(hh_model: HodgkinHuxley) -> None:
+    """_reversal_potentials must match calling reversal_potential() per channel."""
+    expected = np.array(
+        [ch.reversal_potential(hh_model) for ch in hh_model.all_channels]
+    )
+    assert np.allclose(hh_model._reversal_potentials, expected)
+
+
+def test_g_max_arr_matches_channels(hh_model: HodgkinHuxley) -> None:
+    """_g_max_arr must match g_max from each channel in declaration order."""
+    expected = np.array([ch.g_max for ch in hh_model.all_channels])
+    assert np.allclose(hh_model._g_max_arr, expected)
+
+
+def test_rate_func_ids_core_model_all_non_negative(hh_model: HodgkinHuxley) -> None:
+    """_rate_func_ids must be ≥ 0 for every gate in the default HH model."""
+    assert np.all(hh_model._rate_func_ids >= 0)
+    assert hh_model._rate_func_ids.shape == (len(hh_model.all_gating_variables), 2)
+
+
+def test_rate_func_ids_custom_channel_has_sentinel() -> None:
+    """_rate_func_ids must be -1 for gates using non-core rate functions."""
+    from ap_sim.channels import GatingVariable, NernstSpec
+    from ap_sim.utils import boltzmann_cosh_rates
+
+    alpha_custom, beta_custom = boltzmann_cosh_rates(
+        half=-20.0, slope=10.0, tau_scale=5.0, tau_floor=0.1
+    )
+    custom_gv = GatingVariable(
+        name="custom_gate", power=1, alpha=alpha_custom, beta=beta_custom
+    )
+    custom_ch = IonChannel(
+        name="CustomCh",
+        g_max=1.0,
+        gating_variables=(custom_gv,),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
+    neuron = HodgkinHuxley(additional_channels=(custom_ch,))
+    # The custom gate's IDs must be -1; core gates must still be ≥ 0.
+    n_core_gates = len(HodgkinHuxley().all_gating_variables)
+    core_ids = neuron._rate_func_ids[:n_core_gates]
+    custom_ids = neuron._rate_func_ids[n_core_gates:]
+    assert np.all(core_ids >= 0)
+    assert np.all(custom_ids == -1)
+
+
+def test_gate_layout_flat_arrays_default_model(hh_model: HodgkinHuxley) -> None:
+    """_gate_starts, _gate_ends, _flat_powers, _gate_idx_flat are consistent."""
+    starts = hh_model._gate_starts
+    ends = hh_model._gate_ends
+    powers = hh_model._flat_powers
+    idx_flat = hh_model._gate_idx_flat
+
+    n_channels = len(hh_model.all_channels)
+    total_gates = sum(len(ch.gating_variables) for ch in hh_model.all_channels)
+
+    assert len(starts) == n_channels
+    assert len(ends) == n_channels
+    assert len(powers) == total_gates
+    assert len(idx_flat) == total_gates
+
+    # starts[0] == 0, ends[-1] == total_gates
+    assert starts[0] == 0
+    assert ends[-1] == total_gates
+
+    # Each channel's slice length matches its gating variable count.
+    for j, ch in enumerate(hh_model.all_channels):
+        assert ends[j] - starts[j] == len(ch.gating_variables)
+
+
+def test_use_jit_default_model(hh_model: HodgkinHuxley) -> None:
+    """_use_jit returns True for the default model when numba is installed."""
+    from ap_sim.clamp_simulations import HAS_NUMBA, _use_jit
+
+    if HAS_NUMBA:
+        assert _use_jit(hh_model) is True
+    else:
+        assert _use_jit(hh_model) is False

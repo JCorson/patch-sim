@@ -302,3 +302,37 @@ def test_single_element_voltage_protocol(hh_model):
     assert isinstance(result, pd.DataFrame)
     assert len(result) == 1
     assert result["voltage"].iloc[0] == pytest.approx(-65.0)
+
+
+# ---------------------------------------------------------------------------
+# JIT / Python path agreement
+# ---------------------------------------------------------------------------
+
+
+def test_jit_and_python_paths_agree_vc(hh_model, monkeypatch) -> None:
+    """Numba JIT and pure-Python paths must produce numerically identical VC output.
+
+    Skipped when numba is not installed (HAS_NUMBA is False).
+    """
+    import ap_sim.clamp_simulations as cs
+
+    if not cs.HAS_NUMBA:
+        pytest.skip("numba not installed")
+
+    n = int(10.0 * cs.SIM_SAMPLING_FREQ / 1000.0)
+    protocol = np.concatenate(
+        [np.full(n // 4, -65.0), np.full(n // 2, 0.0), np.full(n - 3 * n // 4, -65.0)]
+    )
+
+    # JIT path (normal run — HAS_NUMBA is True)
+    df_jit = simulate_voltage_clamp(hh_model, voltage_protocol=protocol)
+
+    # Python path (patch HAS_NUMBA off for this call)
+    monkeypatch.setattr(cs, "HAS_NUMBA", False)
+    df_py = simulate_voltage_clamp(hh_model, voltage_protocol=protocol)
+
+    assert list(df_jit.columns) == list(df_py.columns)
+    for col in df_jit.columns:
+        assert np.allclose(df_jit[col].to_numpy(), df_py[col].to_numpy(), rtol=1e-10), (
+            f"Column '{col}' differs between JIT and Python paths"
+        )

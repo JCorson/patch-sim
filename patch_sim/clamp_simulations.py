@@ -94,9 +94,8 @@ def _jit_arrays(
 ]:
     """Extract flat numeric arrays from *neuron* for the Numba JIT kernels.
 
-    Bundles the per-channel conductance, reversal potential, gate layout, and
-    rate-function ID arrays into a tuple that can be passed directly to
-    ``_jit_rk4_vc_loop`` or ``_jit_rk4_cc_loop``.
+    All returned arrays are cached properties on *neuron*, so this function
+    performs no allocation — it just bundles references for the two call sites.
 
     Args:
         neuron: The Hodgkin-Huxley neuron model.
@@ -105,10 +104,9 @@ def _jit_arrays(
         Tuple of ``(func_ids, g_max_arr, e_rev_arr, gate_starts, gate_ends,
         gate_idx_flat, powers_flat)`` as numpy arrays ready for the JIT kernel.
     """
-    g_max_arr = np.array([ch.g_max for ch in neuron.all_channels], dtype=np.float64)
     return (
         neuron._rate_func_ids,
-        g_max_arr,
+        neuron._g_max_arr,
         neuron._reversal_potentials,
         neuron._gate_starts,
         neuron._gate_ends,
