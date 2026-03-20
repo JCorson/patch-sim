@@ -7,6 +7,8 @@ import logging
 from dataclasses import dataclass, field
 from functools import cached_property
 
+import numpy as np
+
 from .calcium import CalciumDynamics
 from .channels import GatingVariable, IonChannel, IonSpecies
 from .constants import (
@@ -172,6 +174,58 @@ class HodgkinHuxley:
         for ch in self.all_channels:
             result.extend(ch.gating_variables)
         return tuple(result)
+
+    @cached_property
+    def gating_index(self) -> dict[str, int]:
+        """Map each gating variable name to its index in the flat state array.
+
+        The order matches ``all_gating_variables``: gating variable at position
+        ``i`` in that tuple maps to index ``i`` in the flat numpy state array.
+
+        Returns:
+            Dict mapping gating variable name to integer array index.
+        """
+        return {gv.name: i for i, gv in enumerate(self.all_gating_variables)}
+
+    @cached_property
+    def _channel_gate_info(self) -> tuple[tuple[np.ndarray, np.ndarray], ...]:
+        """Pre-computed index/power arrays for vectorized conductance computation.
+
+        For each channel in ``all_channels``, stores a ``(indices, powers)``
+        pair of numpy arrays so that the conductance gate product can be
+        evaluated as ``np.prod(state[indices] ** powers)`` without iterating
+        over gating variables individually.
+
+        Returns:
+            Tuple of ``(indices, powers)`` numpy array pairs, one per channel.
+        """
+        result = []
+        idx = self.gating_index
+        for ch in self.all_channels:
+            if ch.gating_variables:
+                indices = np.array(
+                    [idx[gv.name] for gv in ch.gating_variables], dtype=np.intp
+                )
+                powers = np.array(
+                    [gv.power for gv in ch.gating_variables], dtype=np.float64
+                )
+            else:
+                indices = np.empty(0, dtype=np.intp)
+                powers = np.empty(0, dtype=np.float64)
+            result.append((indices, powers))
+        return tuple(result)
+
+    @cached_property
+    def _calcium_channel_indices(self) -> tuple[int, ...]:
+        """Indices into ``all_channels`` for calcium-carrying channels.
+
+        Used by the internal simulation loop to sum only the Ca²⁺-carrying
+        channel currents when updating the intracellular Ca²⁺ ODE.
+
+        Returns:
+            Tuple of integer indices into ``all_channels``.
+        """
+        return tuple(i for i, ch in enumerate(self.all_channels) if ch.carries_calcium)
 
     def calcium_current(self, V: float, gating_state: dict[str, float]) -> float:
         """Return the total current from all calcium-carrying channels.
