@@ -8,6 +8,12 @@ Both clamp modes use a unified gating-state numpy array that covers all channels
 Gating variables are indexed by position using the ``gating_index`` mapping on
 the neuron model, and channel conductance products are computed using the
 pre-built ``_channel_gate_info`` index/power arrays.
+
+When ``numba`` is installed, voltage-clamp and current-clamp simulations
+automatically use JIT-compiled inner loops for significantly faster execution.
+The Numba path is activated only when all gating variables use the six core
+Hodgkin-Huxley rate functions and no calcium dynamics are configured; otherwise
+the pure-Python path is used transparently.
 """
 
 import logging
@@ -17,6 +23,12 @@ from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from typing import TYPE_CHECKING
 
+try:
+    from .numba_kernel import _jit_rk4_cc_loop, _jit_rk4_vc_loop
+
+    HAS_NUMBA: bool = True
+except ImportError:
+    HAS_NUMBA = False
 
 if TYPE_CHECKING:
     from .hodgkin_huxley import HodgkinHuxley
@@ -44,6 +56,65 @@ def _setup_simulation(
     actual_simulation_time = (num_time_steps - 1) * time_step
     time_array = np.linspace(0, actual_simulation_time, num_time_steps)
     return time_step, time_array
+
+
+def _use_jit(neuron: "HodgkinHuxley") -> bool:
+    """Return True when the Numba JIT path can be used for *neuron*.
+
+    The JIT path requires:
+
+    - numba installed (``HAS_NUMBA`` is True), **and**
+    - all gating variables use one of the six core HH rate functions (all
+      entries in ``_rate_func_ids`` are ≥ 0), **and**
+    - no calcium dynamics (``calcium_dynamics`` is None).
+
+    Args:
+        neuron: The Hodgkin-Huxley neuron model to test.
+
+    Returns:
+        True if the JIT kernel should be used, False otherwise.
+    """
+    return (
+        HAS_NUMBA
+        and neuron.calcium_dynamics is None
+        and bool(np.all(neuron._rate_func_ids >= 0))
+    )
+
+
+def _jit_arrays(
+    neuron: "HodgkinHuxley",
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+]:
+    """Extract flat numeric arrays from *neuron* for the Numba JIT kernels.
+
+    Bundles the per-channel conductance, reversal potential, gate layout, and
+    rate-function ID arrays into a tuple that can be passed directly to
+    ``_jit_rk4_vc_loop`` or ``_jit_rk4_cc_loop``.
+
+    Args:
+        neuron: The Hodgkin-Huxley neuron model.
+
+    Returns:
+        Tuple of ``(func_ids, g_max_arr, e_rev_arr, gate_starts, gate_ends,
+        gate_idx_flat, powers_flat)`` as numpy arrays ready for the JIT kernel.
+    """
+    g_max_arr = np.array([ch.g_max for ch in neuron.all_channels], dtype=np.float64)
+    return (
+        neuron._rate_func_ids,
+        g_max_arr,
+        neuron._reversal_potentials,
+        neuron._gate_starts,
+        neuron._gate_ends,
+        neuron._gate_idx_flat,
+        neuron._flat_powers,
+    )
 
 
 def _initialize_gating_array(
@@ -285,49 +356,68 @@ def _simulate_voltage_clamp_core(
 
     time_step, time_array = _setup_simulation(num_time_steps, SIM_SAMPLING_FREQ)
 
-    n_gates = len(neuron.all_gating_variables)
     n_channels = len(neuron.all_channels)
 
-    # Pre-allocate 2-D gating array (time × gates) and per-channel current arrays
-    gating_arr = np.empty((num_time_steps, n_gates), dtype=np.float64)
-    ch_current_arrs = np.empty((num_time_steps, n_channels), dtype=np.float64)
-    I_total = np.empty(num_time_steps, dtype=np.float64)
+    if _use_jit(neuron):
+        # --- Numba JIT path ---
+        jit_args = _jit_arrays(neuron)
+        func_ids, g_max_arr, e_rev_arr = jit_args[0], jit_args[1], jit_args[2]
+        gate_starts, gate_ends = jit_args[3], jit_args[4]
+        gate_idx_flat, powers_flat = jit_args[5], jit_args[6]
+        state0 = _initialize_gating_array(neuron, voltage_protocol[0])
+        gating_arr, ch_current_arrs = _jit_rk4_vc_loop(  # type: ignore[name-defined]
+            voltage_protocol,
+            time_step,
+            state0,
+            func_ids,
+            g_max_arr,
+            e_rev_arr,
+            gate_starts,
+            gate_ends,
+            gate_idx_flat,
+            powers_flat,
+        )
+        ca_arr = None
+    else:
+        # --- Pure-Python path ---
+        n_gates = len(neuron.all_gating_variables)
 
-    ca_arr: np.ndarray | None = (
-        np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
-    )
+        gating_arr = np.empty((num_time_steps, n_gates), dtype=np.float64)
+        ch_current_arrs = np.empty((num_time_steps, n_channels), dtype=np.float64)
 
-    # Initialize all gating variables at steady state for the first voltage
-    state = _initialize_gating_array(neuron, voltage_protocol[0], ca_i)
-    gating_arr[0, :] = state
+        ca_arr = (
+            np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
+        )
+        ca_i: float = (
+            neuron.calcium_dynamics.ca_rest
+            if neuron.calcium_dynamics is not None
+            else 0.0
+        )
 
-    if ca_arr is not None:
-        ca_arr[0] = ca_i
-
-    # Compute initial currents
-    V0 = voltage_protocol[0]
-    ch_currents_0 = [
-        _compute_channel_current(V0, state, neuron, j) for j in range(n_channels)
-    ]
-    ch_current_arrs[0, :] = ch_currents_0
-    I_total[0] = sum(ch_currents_0)
-
-    # Main simulation loop
-    for i in range(1, num_time_steps):
-        V = voltage_protocol[i]
-
-        state, ca_i = _rk4_step_voltage_clamp(neuron, V, state, time_step, ca_i)
-
-        gating_arr[i, :] = state
+        state = _initialize_gating_array(neuron, voltage_protocol[0], ca_i)
+        gating_arr[0, :] = state
 
         if ca_arr is not None:
-            ca_arr[i] = ca_i
+            ca_arr[0] = ca_i
 
-        ch_currents_i = [
-            _compute_channel_current(V, state, neuron, j) for j in range(n_channels)
+        V0 = voltage_protocol[0]
+        ch_currents_0 = [
+            _compute_channel_current(V0, state, neuron, j) for j in range(n_channels)
         ]
-        ch_current_arrs[i, :] = ch_currents_i
-        I_total[i] = sum(ch_currents_i)
+        ch_current_arrs[0, :] = ch_currents_0
+
+        for i in range(1, num_time_steps):
+            V = voltage_protocol[i]
+            state, ca_i = _rk4_step_voltage_clamp(neuron, V, state, time_step, ca_i)
+            gating_arr[i, :] = state
+            if ca_arr is not None:
+                ca_arr[i] = ca_i
+            ch_currents_i = [
+                _compute_channel_current(V, state, neuron, j) for j in range(n_channels)
+            ]
+            ch_current_arrs[i, :] = ch_currents_i
+
+    I_total: np.ndarray = ch_current_arrs.sum(axis=1)
 
     # Assemble output DataFrame
     gating_index = neuron.gating_index
@@ -385,55 +475,76 @@ def _simulate_current_clamp_core(
 
     time_step, time_array = _setup_simulation(num_time_steps, SIM_SAMPLING_FREQ)
 
-    n_gates = len(neuron.all_gating_variables)
     n_channels = len(neuron.all_channels)
 
-    V_arr = np.empty(num_time_steps, dtype=np.float64)
+    if _use_jit(neuron):
+        # --- Numba JIT path ---
+        jit_args = _jit_arrays(neuron)
+        func_ids, g_max_arr, e_rev_arr = jit_args[0], jit_args[1], jit_args[2]
+        gate_starts, gate_ends = jit_args[3], jit_args[4]
+        gate_idx_flat, powers_flat = jit_args[5], jit_args[6]
+        state0 = _initialize_gating_array(neuron, neuron.v_rest)
+        V_arr, gating_arr, ch_current_arrs = _jit_rk4_cc_loop(  # type: ignore[name-defined]
+            current_external,
+            time_step,
+            neuron.v_rest,
+            state0,
+            neuron.C_m,
+            func_ids,
+            g_max_arr,
+            e_rev_arr,
+            gate_starts,
+            gate_ends,
+            gate_idx_flat,
+            powers_flat,
+        )
+        ca_arr = None
+    else:
+        # --- Pure-Python path ---
+        n_gates = len(neuron.all_gating_variables)
 
-    # Pre-allocate 2-D gating array (time × gates) and per-channel current arrays
-    gating_arr = np.empty((num_time_steps, n_gates), dtype=np.float64)
-    ch_current_arrs = np.empty((num_time_steps, n_channels), dtype=np.float64)
-    I_total = np.empty(num_time_steps, dtype=np.float64)
+        V_arr = np.empty(num_time_steps, dtype=np.float64)
+        gating_arr = np.empty((num_time_steps, n_gates), dtype=np.float64)
+        ch_current_arrs = np.empty((num_time_steps, n_channels), dtype=np.float64)
 
-    ca_arr: np.ndarray | None = (
-        np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
-    )
-
-    # Initialize at resting potential
-    V_arr[0] = neuron.v_rest
-    state = _initialize_gating_array(neuron, neuron.v_rest, ca_i)
-    gating_arr[0, :] = state
-
-    if ca_arr is not None:
-        ca_arr[0] = ca_i
-
-    # Compute initial currents
-    V0 = neuron.v_rest
-    ch_currents_0 = [
-        _compute_channel_current(V0, state, neuron, j) for j in range(n_channels)
-    ]
-    ch_current_arrs[0, :] = ch_currents_0
-    I_total[0] = sum(ch_currents_0)
-
-    # Main simulation loop
-    for i in range(1, num_time_steps):
-        V = V_arr[i - 1]
-
-        V_new, state, ca_i = _rk4_step_current_clamp(
-            neuron, V, state, current_external[i - 1], time_step, ca_i
+        ca_arr = (
+            np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
+        )
+        ca_i: float = (
+            neuron.calcium_dynamics.ca_rest
+            if neuron.calcium_dynamics is not None
+            else 0.0
         )
 
-        V_arr[i] = V_new
-        gating_arr[i, :] = state
+        V_arr[0] = neuron.v_rest
+        state = _initialize_gating_array(neuron, neuron.v_rest, ca_i)
+        gating_arr[0, :] = state
 
         if ca_arr is not None:
-            ca_arr[i] = ca_i
+            ca_arr[0] = ca_i
 
-        ch_currents_i = [
-            _compute_channel_current(V_new, state, neuron, j) for j in range(n_channels)
+        ch_currents_0 = [
+            _compute_channel_current(neuron.v_rest, state, neuron, j)
+            for j in range(n_channels)
         ]
-        ch_current_arrs[i, :] = ch_currents_i
-        I_total[i] = sum(ch_currents_i)
+        ch_current_arrs[0, :] = ch_currents_0
+
+        for i in range(1, num_time_steps):
+            V = V_arr[i - 1]
+            V_new, state, ca_i = _rk4_step_current_clamp(
+                neuron, V, state, current_external[i - 1], time_step, ca_i
+            )
+            V_arr[i] = V_new
+            gating_arr[i, :] = state
+            if ca_arr is not None:
+                ca_arr[i] = ca_i
+            ch_currents_i = [
+                _compute_channel_current(V_new, state, neuron, j)
+                for j in range(n_channels)
+            ]
+            ch_current_arrs[i, :] = ch_currents_i
+
+    I_total: np.ndarray = ch_current_arrs.sum(axis=1)
 
     # Assemble output DataFrame
     gating_index = neuron.gating_index

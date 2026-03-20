@@ -23,6 +23,9 @@ convention = "google"
 [project.optional-dependencies]
 dev = ["ruff", "pytest", "mypy", "pandas-stubs"]
 ui = ["reflex>=0.8", "plotly"]
+numba = [
+    "numba",
+]
 
 [tool.uv.sources]
 patch_sim = {path = "./patch_sim", editable = true}
@@ -31,7 +34,7 @@ patch_sim = {path = "./patch_sim", editable = true}
 exclude = ["scratch/"]
 
 [[tool.mypy.overrides]]
-module = ["patch_sim_ui.*", "reflex.*", "plotly.*", "rxconfig"]
+module = ["patch_sim_ui.*", "reflex.*", "plotly.*", "rxconfig", "numba.*", "patch_sim.numba_kernel"]
 ignore_errors = true
 
 [[tool.mypy.overrides]]

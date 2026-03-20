@@ -243,6 +243,105 @@ class HodgkinHuxley:
             [ch.reversal_potential(self) for ch in self.all_channels], dtype=np.float64
         )
 
+    @cached_property
+    def _rate_func_ids(self) -> np.ndarray:
+        """Rate function IDs for every gating variable, for Numba dispatch.
+
+        Maps each gating variable's alpha and beta callables to integer IDs
+        used by the JIT kernel.  The six core HH functions receive IDs 0–5;
+        any other callable (custom channel, closure) receives −1, which is a
+        sentinel meaning "fall back to the Python path".
+
+        IDs: alpha_n=0, beta_n=1, alpha_m=2, beta_m=3, alpha_h=4, beta_h=5.
+
+        Returns:
+            Int32 array of shape ``(n_gates, 2)`` where ``[i, 0]`` is the
+            alpha ID and ``[i, 1]`` is the beta ID for gating variable ``i``.
+        """
+        from .core_channels import alpha_h, alpha_m, alpha_n, beta_h, beta_m, beta_n
+
+        n_gates = len(self.all_gating_variables)
+        ids = np.full((n_gates, 2), -1, dtype=np.int32)
+        for i, gv in enumerate(self.all_gating_variables):
+            # Use identity checks so mypy doesn't need Callable as a dict key.
+            if gv.alpha is alpha_n:
+                ids[i, 0] = 0
+            elif gv.alpha is alpha_m:
+                ids[i, 0] = 2
+            elif gv.alpha is alpha_h:
+                ids[i, 0] = 4
+            if gv.beta is beta_n:
+                ids[i, 1] = 1
+            elif gv.beta is beta_m:
+                ids[i, 1] = 3
+            elif gv.beta is beta_h:
+                ids[i, 1] = 5
+        return ids
+
+    @cached_property
+    def _gate_starts(self) -> np.ndarray:
+        """Start index into flat gate arrays for each channel.
+
+        Together with ``_gate_ends``, defines a slice of ``_gate_idx_flat``
+        and ``_flat_powers`` that belongs to each channel. Used by the Numba
+        JIT kernel to compute conductance products without Python object access.
+
+        Returns:
+            Int64 array of length ``len(all_channels)``.
+        """
+        starts = []
+        pos = 0
+        for indices, _ in self._channel_gate_info:
+            starts.append(pos)
+            pos += len(indices)
+        return np.array(starts, dtype=np.int64)
+
+    @cached_property
+    def _gate_ends(self) -> np.ndarray:
+        """End index into flat gate arrays for each channel.
+
+        Together with ``_gate_starts``, defines the slice of
+        ``_gate_idx_flat`` and ``_flat_powers`` belonging to each channel.
+
+        Returns:
+            Int64 array of length ``len(all_channels)``.
+        """
+        ends = []
+        pos = 0
+        for indices, _ in self._channel_gate_info:
+            pos += len(indices)
+            ends.append(pos)
+        return np.array(ends, dtype=np.int64)
+
+    @cached_property
+    def _flat_powers(self) -> np.ndarray:
+        """Flattened gate powers for all channels, in channel-declaration order.
+
+        Entry ``k`` is the power for the gate whose state index is
+        ``_gate_idx_flat[k]``.  Channel boundaries are stored in
+        ``_gate_starts`` / ``_gate_ends``.
+
+        Returns:
+            Float64 array of total length equal to the number of gating
+            variables summed across all channels (counting multiplicity).
+        """
+        parts = [powers for _, powers in self._channel_gate_info]
+        return np.concatenate(parts) if parts else np.empty(0, dtype=np.float64)
+
+    @cached_property
+    def _gate_idx_flat(self) -> np.ndarray:
+        """Flattened state-array indices for all channel gates.
+
+        Entry ``k`` gives the position in the flat gating state array for
+        the gate corresponding to ``_flat_powers[k]``.
+
+        Returns:
+            Int64 array of the same length as ``_flat_powers``.
+        """
+        parts = [indices for indices, _ in self._channel_gate_info]
+        arr = np.concatenate(parts) if parts else np.empty(0, dtype=np.intp)
+        return arr.astype(np.int64)
+
     def calcium_current(self, V: float, gating_state: dict[str, float]) -> float:
         """Return the total current from all calcium-carrying channels.
 
