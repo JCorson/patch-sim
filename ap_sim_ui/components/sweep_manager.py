@@ -342,6 +342,14 @@ def sweep_manager() -> rx.Component:
         rx.hstack(
             _trace_visibility_popover(),
             rx.separator(orientation="vertical"),
+            rx.button(
+                rx.icon("scroll-text"),
+                "Logs",
+                on_click=AppState.toggle_log_panel,
+                size="1",
+                variant="soft",
+            ),
+            rx.separator(orientation="vertical"),
             rx.text("Sweeps:", size="2", weight="bold"),
             rx.foreach(AppState.saved_sweeps, _sweep_chip),
             rx.spacer(),
