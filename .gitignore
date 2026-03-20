@@ -27,5 +27,5 @@ wheels/
 # Claude Code
 .claude/
 
-# Scratch
+# Local scratch files (profiling, experiments, one-off scripts)
 scratch/
