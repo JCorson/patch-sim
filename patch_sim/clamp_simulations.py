@@ -3,8 +3,11 @@
 This module contains functions for voltage clamp and current clamp experiments
 that can be performed on Hodgkin-Huxley neuron objects.
 
-Both clamp modes use a unified gating-state dictionary that covers all channels
+Both clamp modes use a unified gating-state numpy array that covers all channels
 (core Na/K/leak and any additional channels) and a single RK4 integrator path.
+Gating variables are indexed by position using the ``gating_index`` mapping on
+the neuron model, and channel conductance products are computed using the
+pre-built ``_channel_gate_info`` index/power arrays.
 """
 
 import logging
@@ -43,15 +46,16 @@ def _setup_simulation(
     return time_step, time_array
 
 
-def _initialize_gating_variables(
+def _initialize_gating_array(
     neuron: "HodgkinHuxley",
     initial_voltage: float,
     ca_i: float = 0.0,
-) -> dict[str, float]:
+) -> np.ndarray:
     """Compute steady-state gating variables at a given initial voltage.
 
     Initialises every gating variable (core Na/K/leak and additional channels)
-    to its infinite-time steady-state value at *initial_voltage*.
+    to its infinite-time steady-state value at *initial_voltage*, returned as
+    a flat numpy array indexed by ``neuron.gating_index``.
 
     Args:
         neuron: The Hodgkin-Huxley neuron model.
@@ -59,22 +63,53 @@ def _initialize_gating_variables(
         ca_i: Initial intracellular Ca²⁺ concentration in mM.
 
     Returns:
-        Dict mapping each gating variable name to its steady-state value.
+        1-D float64 array of length ``len(neuron.all_gating_variables)``
+        with each entry set to its steady-state value.
     """
-    state: dict[str, float] = {}
-    for gv in neuron.all_gating_variables:
+    state = np.empty(len(neuron.all_gating_variables), dtype=np.float64)
+    for i, gv in enumerate(neuron.all_gating_variables):
         a = gv.alpha(initial_voltage, ca_i)
         b = gv.beta(initial_voltage, ca_i)
-        state[gv.name] = a / (a + b)
+        state[i] = a / (a + b)
     return state
+
+
+def _compute_channel_current(
+    V: float,
+    state: np.ndarray,
+    neuron: "HodgkinHuxley",
+    ch_idx: int,
+) -> float:
+    """Compute ionic current for a single channel using pre-built index arrays.
+
+    Evaluates ``g_max * prod(state[indices] ** powers) * (V - E_rev)`` using
+    the ``_channel_gate_info`` arrays on *neuron* to avoid per-step dict
+    lookups.
+
+    Args:
+        V: Membrane voltage in mV.
+        state: Flat gating state array indexed by ``neuron.gating_index``.
+        neuron: The Hodgkin-Huxley neuron model.
+        ch_idx: Index into ``neuron.all_channels`` for the channel to evaluate.
+
+    Returns:
+        Ionic current in µA/cm².
+    """
+    ch = neuron.all_channels[ch_idx]
+    indices, powers = neuron._channel_gate_info[ch_idx]
+    if len(indices):
+        g = ch.g_max * float(np.prod(state[indices] ** powers))
+    else:
+        g = ch.g_max
+    return g * (V - ch.reversal_potential(neuron))
 
 
 def _gating_derivatives(
     neuron: "HodgkinHuxley",
     V: float,
-    gating_state: dict[str, float],
+    state: np.ndarray,
     ca_i: float = 0.0,
-) -> tuple[dict[str, float], float]:
+) -> tuple[np.ndarray, float]:
     """Compute derivatives for all gating variables at a prescribed voltage.
 
     Used in voltage-clamp mode where V is held constant and only the gating
@@ -84,19 +119,22 @@ def _gating_derivatives(
     Args:
         neuron: The Hodgkin-Huxley neuron model.
         V: Membrane voltage in mV.
-        gating_state: Current gating state mapping variable name → value.
+        state: Current flat gating state array.
         ca_i: Current intracellular Ca²⁺ concentration in mM.
 
     Returns:
-        Tuple of (derivs, dca_i) where derivs maps each gating variable name
-        to its dx/dt and dca_i is 0.0 when no calcium_dynamics are configured.
+        Tuple of (derivs, dca_i) where derivs is a float64 array of the same
+        length as *state* and dca_i is 0.0 when no calcium_dynamics are
+        configured.
     """
-    derivs: dict[str, float] = {}
-    for gv in neuron.all_gating_variables:
-        x = gating_state[gv.name]
-        derivs[gv.name] = gv.alpha(V, ca_i) * (1 - x) - gv.beta(V, ca_i) * x
+    derivs = np.empty_like(state)
+    for i, gv in enumerate(neuron.all_gating_variables):
+        x = state[i]
+        derivs[i] = gv.alpha(V, ca_i) * (1.0 - x) - gv.beta(V, ca_i) * x
     if neuron.calcium_dynamics is not None:
-        I_Ca = neuron.calcium_current(V, gating_state)
+        # Build a gating dict for the public calcium_current API
+        gs = {gv.name: state[i] for i, gv in enumerate(neuron.all_gating_variables)}
+        I_Ca = neuron.calcium_current(V, gs)
         dca_i = neuron.calcium_dynamics.derivative(I_Ca, ca_i)
     else:
         dca_i = 0.0
@@ -106,10 +144,10 @@ def _gating_derivatives(
 def _hh_derivatives(
     neuron: "HodgkinHuxley",
     V: float,
-    gating_state: dict[str, float],
+    state: np.ndarray,
     I_ext: float,
     ca_i: float,
-) -> tuple[float, dict[str, float], float]:
+) -> tuple[float, np.ndarray, float]:
     """Compute HH ODE derivatives for the current-clamp system.
 
     Computes dV/dt by summing currents from all channels (core + additional),
@@ -118,60 +156,31 @@ def _hh_derivatives(
     Args:
         neuron: The Hodgkin-Huxley neuron model.
         V: Membrane voltage in mV.
-        gating_state: Current gating state mapping variable name → value.
+        state: Current flat gating state array.
         I_ext: External current in µA/cm².
         ca_i: Current intracellular Ca²⁺ concentration in mM.
 
     Returns:
-        Tuple of (dV, derivs, dca_i) where dV is dV/dt in mV/ms, derivs maps
-        each gating variable name to its derivative, and dca_i is 0.0 when no
+        Tuple of (dV, derivs, dca_i) where dV is dV/dt in mV/ms, derivs is a
+        float64 array of gating derivatives, and dca_i is 0.0 when no
         calcium_dynamics are configured.
     """
     I_total = sum(
-        ch.compute_current(V, gating_state, neuron) for ch in neuron.all_channels
+        _compute_channel_current(V, state, neuron, ch_idx)
+        for ch_idx in range(len(neuron.all_channels))
     )
     dV = (I_ext - I_total) / neuron.C_m
-    derivs, dca_i = _gating_derivatives(neuron, V, gating_state, ca_i)
+    derivs, dca_i = _gating_derivatives(neuron, V, state, ca_i)
     return dV, derivs, dca_i
-
-
-def _advance_state(
-    state: dict[str, float],
-    derivs: dict[str, float],
-    dt: float,
-) -> dict[str, float]:
-    """Advance gating state by a scaled derivative step.
-
-    Args:
-        state: Current gating state.
-        derivs: Derivatives dict (same keys as state).
-        dt: Scaled time step (may be a half-step for RK4 midpoints) in ms.
-
-    Returns:
-        New gating state with each value advanced by dt * deriv[key].
-    """
-    return {k: state[k] + dt * derivs[k] for k in state}
-
-
-def _clip_state(state: dict[str, float]) -> dict[str, float]:
-    """Clip all gating variable values to [0, 1].
-
-    Args:
-        state: Gating state to clip.
-
-    Returns:
-        New dict with all values clipped to [0, 1].
-    """
-    return {k: max(0.0, min(1.0, v)) for k, v in state.items()}
 
 
 def _rk4_step_voltage_clamp(
     neuron: "HodgkinHuxley",
     V: float,
-    gating_state: dict[str, float],
+    state: np.ndarray,
     dt: float,
     ca_i: float,
-) -> tuple[dict[str, float], float]:
+) -> tuple[np.ndarray, float]:
     """Advance voltage-clamp gating variables by one RK4 step.
 
     Voltage is held constant at *V*; only the gating variables and optional
@@ -180,27 +189,23 @@ def _rk4_step_voltage_clamp(
     Args:
         neuron: The Hodgkin-Huxley neuron model.
         V: Prescribed membrane voltage in mV.
-        gating_state: Current gating state mapping variable name → value.
+        state: Current flat gating state array.
         dt: Time step in milliseconds.
         ca_i: Current intracellular Ca²⁺ concentration in mM.
 
     Returns:
-        Tuple of (new_gating_state, new_ca_i) with gating variables clipped to
+        Tuple of (new_state, new_ca_i) with gating variables clipped to
         [0, 1] and ca_i floored at 0.0.
     """
-    d1, dca1 = _gating_derivatives(neuron, V, gating_state, ca_i)
-    s2 = _advance_state(gating_state, d1, 0.5 * dt)
-    d2, dca2 = _gating_derivatives(neuron, V, s2, ca_i + 0.5 * dt * dca1)
-    s3 = _advance_state(gating_state, d2, 0.5 * dt)
-    d3, dca3 = _gating_derivatives(neuron, V, s3, ca_i + 0.5 * dt * dca2)
-    s4 = _advance_state(gating_state, d3, dt)
-    d4, dca4 = _gating_derivatives(neuron, V, s4, ca_i + dt * dca3)
-    new_state = _clip_state(
-        {
-            k: gating_state[k] + (dt / 6.0) * (d1[k] + 2 * d2[k] + 2 * d3[k] + d4[k])
-            for k in gating_state
-        }
+    d1, dca1 = _gating_derivatives(neuron, V, state, ca_i)
+    d2, dca2 = _gating_derivatives(
+        neuron, V, state + 0.5 * dt * d1, ca_i + 0.5 * dt * dca1
     )
+    d3, dca3 = _gating_derivatives(
+        neuron, V, state + 0.5 * dt * d2, ca_i + 0.5 * dt * dca2
+    )
+    d4, dca4 = _gating_derivatives(neuron, V, state + dt * d3, ca_i + dt * dca3)
+    new_state = np.clip(state + (dt / 6.0) * (d1 + 2.0 * d2 + 2.0 * d3 + d4), 0.0, 1.0)
     new_ca = max(0.0, ca_i + (dt / 6.0) * (dca1 + 2 * dca2 + 2 * dca3 + dca4))
     return new_state, new_ca
 
@@ -208,11 +213,11 @@ def _rk4_step_voltage_clamp(
 def _rk4_step_current_clamp(
     neuron: "HodgkinHuxley",
     V: float,
-    gating_state: dict[str, float],
+    state: np.ndarray,
     I_ext: float,
     dt: float,
     ca_i: float,
-) -> tuple[float, dict[str, float], float]:
+) -> tuple[float, np.ndarray, float]:
     """Advance the current-clamp state by one RK4 step.
 
     Both the membrane voltage and the gating variables evolve together.
@@ -220,33 +225,27 @@ def _rk4_step_current_clamp(
     Args:
         neuron: The Hodgkin-Huxley neuron model.
         V: Membrane voltage in mV.
-        gating_state: Current gating state mapping variable name → value.
+        state: Current flat gating state array.
         I_ext: External current in µA/cm², held constant over the step.
         dt: Time step in milliseconds.
         ca_i: Current intracellular Ca²⁺ concentration in mM.
 
     Returns:
-        Tuple of (new_V, new_gating_state, new_ca_i) with gating variables
+        Tuple of (new_V, new_state, new_ca_i) with gating variables
         clipped to [0, 1] and ca_i floored at 0.0.
     """
-    dV1, d1, dca1 = _hh_derivatives(neuron, V, gating_state, I_ext, ca_i)
-    s2 = _advance_state(gating_state, d1, 0.5 * dt)
+    dV1, d1, dca1 = _hh_derivatives(neuron, V, state, I_ext, ca_i)
     dV2, d2, dca2 = _hh_derivatives(
-        neuron, V + 0.5 * dt * dV1, s2, I_ext, ca_i + 0.5 * dt * dca1
+        neuron, V + 0.5 * dt * dV1, state + 0.5 * dt * d1, I_ext, ca_i + 0.5 * dt * dca1
     )
-    s3 = _advance_state(gating_state, d2, 0.5 * dt)
     dV3, d3, dca3 = _hh_derivatives(
-        neuron, V + 0.5 * dt * dV2, s3, I_ext, ca_i + 0.5 * dt * dca2
+        neuron, V + 0.5 * dt * dV2, state + 0.5 * dt * d2, I_ext, ca_i + 0.5 * dt * dca2
     )
-    s4 = _advance_state(gating_state, d3, dt)
-    dV4, d4, dca4 = _hh_derivatives(neuron, V + dt * dV3, s4, I_ext, ca_i + dt * dca3)
-    V_new = V + (dt / 6.0) * (dV1 + 2 * dV2 + 2 * dV3 + dV4)
-    new_state = _clip_state(
-        {
-            k: gating_state[k] + (dt / 6.0) * (d1[k] + 2 * d2[k] + 2 * d3[k] + d4[k])
-            for k in gating_state
-        }
+    dV4, d4, dca4 = _hh_derivatives(
+        neuron, V + dt * dV3, state + dt * d3, I_ext, ca_i + dt * dca3
     )
+    V_new = V + (dt / 6.0) * (dV1 + 2.0 * dV2 + 2.0 * dV3 + dV4)
+    new_state = np.clip(state + (dt / 6.0) * (d1 + 2.0 * d2 + 2.0 * d3 + d4), 0.0, 1.0)
     new_ca = max(0.0, ca_i + (dt / 6.0) * (dca1 + 2 * dca2 + 2 * dca3 + dca4))
     return V_new, new_state, new_ca
 
@@ -286,22 +285,21 @@ def _simulate_voltage_clamp_core(
 
     time_step, time_array = _setup_simulation(num_time_steps, SIM_SAMPLING_FREQ)
 
-    ch_current_arrs: dict[str, np.ndarray] = {
-        ch.name: np.empty(num_time_steps) for ch in neuron.all_channels
-    }
-    I_total = np.empty(num_time_steps)
+    n_gates = len(neuron.all_gating_variables)
+    n_channels = len(neuron.all_channels)
 
-    gating_arrs: dict[str, np.ndarray] = {
-        gv.name: np.empty(num_time_steps) for gv in neuron.all_gating_variables
-    }
+    # Pre-allocate 2-D gating array (time × gates) and per-channel current arrays
+    gating_arr = np.empty((num_time_steps, n_gates), dtype=np.float64)
+    ch_current_arrs = np.empty((num_time_steps, n_channels), dtype=np.float64)
+    I_total = np.empty(num_time_steps, dtype=np.float64)
 
     ca_arr: np.ndarray | None = (
         np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
     )
 
-    # Record initial state
-    for gv_name, val in gating_state.items():
-        gating_arrs[gv_name][0] = val
+    # Initialize all gating variables at steady state for the first voltage
+    state = _initialize_gating_array(neuron, voltage_protocol[0], ca_i)
+    gating_arr[0, :] = state
 
     if ca_arr is not None:
         ca_arr[0] = ca_i
@@ -309,42 +307,38 @@ def _simulate_voltage_clamp_core(
     # Compute initial currents
     V0 = voltage_protocol[0]
     ch_currents_0 = [
-        ch.compute_current(V0, gating_state, neuron) for ch in neuron.all_channels
+        _compute_channel_current(V0, state, neuron, j) for j in range(n_channels)
     ]
-    for ch, i_ch in zip(neuron.all_channels, ch_currents_0):
-        ch_current_arrs[ch.name][0] = i_ch
+    ch_current_arrs[0, :] = ch_currents_0
     I_total[0] = sum(ch_currents_0)
 
     # Main simulation loop
     for i in range(1, num_time_steps):
         V = voltage_protocol[i]
 
-        gating_state, ca_i = _rk4_step_voltage_clamp(
-            neuron, V, gating_state, time_step, ca_i
-        )
+        state, ca_i = _rk4_step_voltage_clamp(neuron, V, state, time_step, ca_i)
 
-        for gv_name, val in gating_state.items():
-            gating_arrs[gv_name][i] = val
+        gating_arr[i, :] = state
 
         if ca_arr is not None:
             ca_arr[i] = ca_i
 
         ch_currents_i = [
-            ch.compute_current(V, gating_state, neuron) for ch in neuron.all_channels
+            _compute_channel_current(V, state, neuron, j) for j in range(n_channels)
         ]
-        for ch, i_ch in zip(neuron.all_channels, ch_currents_i):
-            ch_current_arrs[ch.name][i] = i_ch
+        ch_current_arrs[i, :] = ch_currents_i
         I_total[i] = sum(ch_currents_i)
 
     # Assemble output DataFrame
+    gating_index = neuron.gating_index
     data: dict[str, np.ndarray] = {
         "voltage": voltage_protocol,
         "total_current": I_total,
     }
-    for ch in neuron.all_channels:
-        data[f"{ch.name}_current"] = ch_current_arrs[ch.name]
+    for j, ch in enumerate(neuron.all_channels):
+        data[f"{ch.name}_current"] = ch_current_arrs[:, j]
     for gv in neuron.all_gating_variables:
-        data[gv.name] = gating_arrs[gv.name]
+        data[gv.name] = gating_arr[:, gating_index[gv.name]]
     if ca_arr is not None:
         data["ca_i"] = ca_arr
 
@@ -391,69 +385,66 @@ def _simulate_current_clamp_core(
 
     time_step, time_array = _setup_simulation(num_time_steps, SIM_SAMPLING_FREQ)
 
-    V_arr = np.empty(num_time_steps)
-    V_arr[0] = initial_V
+    n_gates = len(neuron.all_gating_variables)
+    n_channels = len(neuron.all_channels)
 
-    ch_current_arrs: dict[str, np.ndarray] = {
-        ch.name: np.empty(num_time_steps) for ch in neuron.all_channels
-    }
-    I_total = np.empty(num_time_steps)
+    V_arr = np.empty(num_time_steps, dtype=np.float64)
 
-    gating_arrs: dict[str, np.ndarray] = {
-        gv.name: np.empty(num_time_steps) for gv in neuron.all_gating_variables
-    }
+    # Pre-allocate 2-D gating array (time × gates) and per-channel current arrays
+    gating_arr = np.empty((num_time_steps, n_gates), dtype=np.float64)
+    ch_current_arrs = np.empty((num_time_steps, n_channels), dtype=np.float64)
+    I_total = np.empty(num_time_steps, dtype=np.float64)
 
     ca_arr: np.ndarray | None = (
         np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
     )
 
-    # Record initial state
-    for gv_name, val in gating_state.items():
-        gating_arrs[gv_name][0] = val
+    # Initialize at resting potential
+    V_arr[0] = neuron.v_rest
+    state = _initialize_gating_array(neuron, neuron.v_rest, ca_i)
+    gating_arr[0, :] = state
 
     if ca_arr is not None:
         ca_arr[0] = ca_i
 
     # Compute initial currents
+    V0 = neuron.v_rest
     ch_currents_0 = [
-        ch.compute_current(initial_V, gating_state, neuron)
-        for ch in neuron.all_channels
+        _compute_channel_current(V0, state, neuron, j) for j in range(n_channels)
     ]
-    for ch, i_ch in zip(neuron.all_channels, ch_currents_0):
-        ch_current_arrs[ch.name][0] = i_ch
+    ch_current_arrs[0, :] = ch_currents_0
     I_total[0] = sum(ch_currents_0)
 
     # Main simulation loop
     for i in range(1, num_time_steps):
         V = V_arr[i - 1]
 
-        V_new, gating_state, ca_i = _rk4_step_current_clamp(
-            neuron, V, gating_state, current_external[i - 1], time_step, ca_i
+        V_new, state, ca_i = _rk4_step_current_clamp(
+            neuron, V, state, current_external[i - 1], time_step, ca_i
         )
 
         V_arr[i] = V_new
-        for gv_name, val in gating_state.items():
-            gating_arrs[gv_name][i] = val
+        gating_arr[i, :] = state
+
         if ca_arr is not None:
             ca_arr[i] = ca_i
 
         ch_currents_i = [
-            ch.compute_current(V_new, gating_state, neuron)
-            for ch in neuron.all_channels
+            _compute_channel_current(V_new, state, neuron, j) for j in range(n_channels)
         ]
-        for ch, i_ch in zip(neuron.all_channels, ch_currents_i):
-            ch_current_arrs[ch.name][i] = i_ch
+        ch_current_arrs[i, :] = ch_currents_i
         I_total[i] = sum(ch_currents_i)
 
     # Assemble output DataFrame
+    gating_index = neuron.gating_index
     data: dict[str, np.ndarray] = {
         "voltage": V_arr,
     }
-    for ch in neuron.all_channels:
-        data[f"{ch.name}_current"] = ch_current_arrs[ch.name]
+    for j, ch in enumerate(neuron.all_channels):
+        data[f"{ch.name}_current"] = ch_current_arrs[:, j]
     data["total_current"] = I_total
     for gv in neuron.all_gating_variables:
-        data[gv.name] = gating_arrs[gv.name]
+        data[gv.name] = gating_arr[:, gating_index[gv.name]]
     if ca_arr is not None:
         data["ca_i"] = ca_arr
 
