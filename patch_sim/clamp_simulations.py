@@ -82,9 +82,10 @@ def _compute_channel_current(
 ) -> float:
     """Compute ionic current for a single channel using pre-built index arrays.
 
-    Evaluates ``g_max * prod(state[indices] ** powers) * (V - E_rev)`` using
-    the ``_channel_gate_info`` arrays on *neuron* to avoid per-step dict
-    lookups.
+    Evaluates ``g_max * prod(state[i] ** power) * (V - E_rev)`` using the
+    ``_channel_gate_info`` arrays and the pre-computed ``_reversal_potentials``
+    on *neuron*.  The gate product is computed with a plain Python loop instead
+    of ``np.prod`` to avoid numpy call overhead for 1–4 element arrays.
 
     Args:
         V: Membrane voltage in mV.
@@ -97,11 +98,10 @@ def _compute_channel_current(
     """
     ch = neuron.all_channels[ch_idx]
     indices, powers = neuron._channel_gate_info[ch_idx]
-    if len(indices):
-        g = ch.g_max * float(np.prod(state[indices] ** powers))
-    else:
-        g = ch.g_max
-    return g * (V - ch.reversal_potential(neuron))
+    g = ch.g_max
+    for idx, pw in zip(indices, powers):
+        g *= state[idx] ** pw
+    return g * (V - neuron._reversal_potentials[ch_idx])
 
 
 def _gating_derivatives(

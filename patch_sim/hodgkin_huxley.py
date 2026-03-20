@@ -227,6 +227,22 @@ class HodgkinHuxley:
         """
         return tuple(i for i, ch in enumerate(self.all_channels) if ch.carries_calcium)
 
+    @cached_property
+    def _reversal_potentials(self) -> np.ndarray:
+        """Pre-computed reversal potential for each channel.
+
+        Ion concentrations are fixed model parameters, so reversal potentials
+        are constant for the lifetime of the model. This avoids calling
+        ``ch.reversal_potential(neuron)`` 60 000+ times per simulation.
+
+        Returns:
+            Float64 array of length ``len(all_channels)`` where entry ``i``
+            is the reversal potential in mV for ``all_channels[i]``.
+        """
+        return np.array(
+            [ch.reversal_potential(self) for ch in self.all_channels], dtype=np.float64
+        )
+
     def calcium_current(self, V: float, gating_state: dict[str, float]) -> float:
         """Return the total current from all calcium-carrying channels.
 
