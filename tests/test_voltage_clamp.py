@@ -314,7 +314,7 @@ def test_jit_and_python_paths_agree_vc(hh_model, monkeypatch) -> None:
 
     Skipped when numba is not installed (HAS_NUMBA is False).
     """
-    import ap_sim.clamp_simulations as cs
+    import patch_sim.clamp_simulations as cs
 
     if not cs.HAS_NUMBA:
         pytest.skip("numba not installed")

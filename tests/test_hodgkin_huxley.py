@@ -298,8 +298,8 @@ def test_rate_func_ids_core_model_all_non_negative(hh_model: HodgkinHuxley) -> N
 
 def test_rate_func_ids_custom_channel_has_sentinel() -> None:
     """_rate_func_ids must be -1 for gates using non-core rate functions."""
-    from ap_sim.channels import GatingVariable, NernstSpec
-    from ap_sim.utils import boltzmann_cosh_rates
+    from patch_sim.channels import GatingVariable, NernstSpec
+    from patch_sim.utils import boltzmann_cosh_rates
 
     alpha_custom, beta_custom = boltzmann_cosh_rates(
         half=-20.0, slope=10.0, tau_scale=5.0, tau_floor=0.1
@@ -348,7 +348,7 @@ def test_gate_layout_flat_arrays_default_model(hh_model: HodgkinHuxley) -> None:
 
 def test_use_jit_default_model(hh_model: HodgkinHuxley) -> None:
     """_use_jit returns True for the default model when numba is installed."""
-    from ap_sim.clamp_simulations import HAS_NUMBA, _use_jit
+    from patch_sim.clamp_simulations import HAS_NUMBA, _use_jit
 
     if HAS_NUMBA:
         assert _use_jit(hh_model) is True
