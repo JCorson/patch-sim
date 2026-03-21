@@ -331,6 +331,30 @@ def _sweep_chip(sweep) -> rx.Component:
     )
 
 
+def _stored_chip(sweep) -> rx.Component:
+    """Render a colour-coded badge for an oscilloscope stored trace.
+
+    Args:
+        sweep: A ``Sweep`` instance from the stored traces list.
+
+    Returns:
+        A badge component showing the stored trace colour dot and label.
+    """
+    return rx.badge(
+        rx.box(
+            width="10px",
+            height="10px",
+            border_radius="50%",
+            background_color=sweep.color,
+            display="inline-block",
+            margin_right="4px",
+        ),
+        sweep.label,
+        variant="outline",
+        color_scheme="orange",
+    )
+
+
 def sweep_manager() -> rx.Component:
     """Trace visibility popover and sweep overlay management bar.
 
@@ -367,6 +391,25 @@ def sweep_manager() -> rx.Component:
                 variant="soft",
                 color_scheme="red",
                 disabled=AppState.saved_sweeps.length() == 0,
+            ),
+            rx.separator(orientation="vertical"),
+            rx.text("Stored:", size="2", weight="bold"),
+            rx.foreach(AppState.stored_traces, _stored_chip),
+            rx.button(
+                "Store",
+                on_click=AppState.store_trace,
+                size="1",
+                variant="soft",
+                color_scheme="orange",
+                disabled=~AppState.has_result,
+            ),
+            rx.button(
+                "Clear Stored",
+                on_click=AppState.clear_stored_traces,
+                size="1",
+                variant="soft",
+                color_scheme="red",
+                disabled=~AppState.has_stored_traces,
             ),
             spacing="2",
             align="center",
