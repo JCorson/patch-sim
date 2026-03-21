@@ -129,6 +129,7 @@ def log_panel() -> rx.Component:
                     width="100%",
                     align="start",
                 ),
+                id="log-scroll-area",
                 height="160px",
                 padding_x="3",
                 padding_y="1",

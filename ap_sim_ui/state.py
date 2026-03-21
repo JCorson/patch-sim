@@ -255,6 +255,14 @@ _BOOL_FIELDS: list[str] = _VISIBILITY_FIELDS + _NON_VISIBILITY_BOOL_FIELDS
 # Shared JS snippet for targeting the Plotly graph element.
 _PLOTLY_GD_JS = "var gd=document.querySelector('.js-plotly-plot');"
 
+# Scroll the log panel viewport to the top so the newest entry (displayed
+# first in newest-first order) is always visible after a refresh.
+_LOG_SCROLL_JS = (
+    "var vp=document.querySelector("
+    "'#log-scroll-area [data-radix-scroll-area-viewport]');"
+    "if(vp)vp.scrollTop=0;"
+)
+
 
 def _make_bool_setter(field_name: str):
     """Factory returning a bool event handler for ``field_name``.
@@ -560,15 +568,17 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     # Log panel event handlers                                          #
     # ------------------------------------------------------------------ #
-    def toggle_log_panel(self) -> None:
+    def toggle_log_panel(self):
         """Toggle the log panel open/closed, refreshing logs on open."""
         self.log_panel_open = not self.log_panel_open
         if self.log_panel_open:
             self._refresh_logs()
+            return rx.call_script(_LOG_SCROLL_JS)
 
-    def refresh_logs(self) -> None:
+    def refresh_logs(self):
         """Public event handler: drain buffered records into state."""
         self._refresh_logs()
+        return rx.call_script(_LOG_SCROLL_JS)
 
     def _refresh_logs(self) -> None:
         """Drain buffered log records into state, capping at MAX_LOG_ENTRIES."""
@@ -881,3 +891,4 @@ class AppState(rx.State):
             js = self._apply_visibility_js()
             if js:
                 yield rx.call_script(js)
+            yield rx.call_script(_LOG_SCROLL_JS)
