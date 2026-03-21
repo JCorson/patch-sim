@@ -2,14 +2,14 @@
 
 ## Project overview
 
-Hodgkin-Huxley action potential simulator with a core library (`ap_sim/`) and a Reflex web UI (`ap_sim_ui/`). The core library models ion channels, gating variables, voltage/current clamp protocols, and the HH differential equations. The UI provides interactive controls and live trace plots.
+Patch clamp experiment simulator with a core library (`patch_sim/`) and a Reflex web UI (`patch_sim_ui/`). The core library models ion channels, gating variables, voltage/current clamp protocols, and the HH differential equations. The UI provides interactive controls and live trace plots.
 
 ## Architecture
 
-- `ap_sim/` — pure Python library, **no Reflex dependency**. All simulation logic lives here.
-- `ap_sim_ui/` — Reflex application. State lives in `ap_sim_ui/state.py`; components are Python functions returning `rx.Component`.
+- `patch_sim/` — pure Python library, **no Reflex dependency**. All simulation logic lives here.
+- `patch_sim_ui/` — Reflex application. State lives in `patch_sim_ui/state.py`; components are Python functions returning `rx.Component`.
 
-Keep these layers cleanly separated: do not import Reflex types into `ap_sim/`, and do not import `ap_sim_ui` modules from `ap_sim/`.
+Keep these layers cleanly separated: do not import Reflex types into `patch_sim/`, and do not import `patch_sim_ui` modules from `patch_sim/`.
 
 ## UI framework
 
@@ -56,7 +56,7 @@ def example(x: float, y: int) -> str:
 
 ## Type checking
 
-mypy only enforces types in `ap_sim/` (core library). UI code (`ap_sim_ui/`) is excluded — see the `[[tool.mypy.overrides]]` section in `pyproject.toml`. Do not spend time fixing mypy errors in UI code.
+mypy only enforces types in `patch_sim/` (core library). UI code (`patch_sim_ui/`) is excluded — see the `[[tool.mypy.overrides]]` section in `pyproject.toml`. Do not spend time fixing mypy errors in UI code.
 
 ## Working on GitHub issues
 

@@ -1,6 +1,6 @@
-## ap-sim: Action Potential Simulator
+## patch-sim: Patch Clamp Simulator
 
-`ap_sim` is a Python library for simulating neuronal electrophysiology using the
+`patch_sim` is a Python library for simulating neuronal electrophysiology using the
 [Hodgkin-Huxley model](https://en.wikipedia.org/wiki/Hodgkin%E2%80%93Huxley_model).
 It models how action potentials arise at a neuron's membrane by simulating the dynamics
 of voltage-gated ion channels (sodium, potassium, and leak) over time.
@@ -25,7 +25,7 @@ Key features:
 
 ## Web UI
 
-`ap_sim` includes an interactive web interface inspired by pClamp electrophysiology software. It lets you configure Hodgkin-Huxley neuron parameters, choose stimulation protocols, run simulations, and view stacked response/stimulus traces with sweep overlay support.
+`patch_sim` includes an interactive web interface inspired by pClamp electrophysiology software. It lets you configure Hodgkin-Huxley neuron parameters, choose stimulation protocols, run simulations, and view stacked response/stimulus traces with sweep overlay support.
 
 ### Installing the UI
 
@@ -87,13 +87,13 @@ uv run --frozen -m pytest --verbose
 To see a line-by-line coverage report for the core library:
 
 ```
-uv run --frozen -m pytest --cov=ap_sim --cov-report=term-missing
+uv run --frozen -m pytest --cov=patch_sim --cov-report=term-missing
 ```
 
 To generate an HTML report (written to `htmlcov/`):
 
 ```
-uv run --frozen -m pytest --cov=ap_sim --cov-report=html
+uv run --frozen -m pytest --cov=patch_sim --cov-report=html
 ```
 
 #### Linting and code style

@@ -1,6 +1,6 @@
-"""Action Potential Simulator.
+"""Patch Clamp Simulator.
 
-A package for simulating action potentials using the Hodgkin-Huxley model.
+A package for simulating patch clamp experiments using the Hodgkin-Huxley model.
 """
 
 from . import constants

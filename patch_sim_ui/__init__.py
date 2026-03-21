@@ -1,1 +1,1 @@
-"""Interactive web UI for the patch_sim action potential simulator."""
+"""Interactive web UI for the patch_sim patch clamp simulator."""
