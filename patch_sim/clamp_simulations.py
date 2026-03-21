@@ -248,71 +248,46 @@ def _rk4_step_current_clamp(
     return V_new, new_state, new_ca
 
 
-def simulate_voltage_clamp(
+def _simulate_voltage_clamp_core(
     neuron: "HodgkinHuxley",
     voltage_protocol: np.ndarray,
+    gating_state: dict[str, float],
+    ca_i: float,
 ) -> pd.DataFrame:
-    """Simulate a voltage clamp experiment using the Hodgkin-Huxley model.
+    """Run the voltage clamp simulation loop given pre-initialized state.
 
-    In a voltage clamp experiment, the membrane potential is held at specified
-    values and the current required to maintain those voltages is measured. This
-    function simulates this process by computing the ionic currents that would
-    flow at each voltage step in the protocol.
-
-    The simulation always uses :data:`SIM_SAMPLING_FREQ` (40 kHz, dt = 0.025 ms)
-    as the integration time step.
-
-    All ion channels — core (Na, K, leak) and additional — are handled via a
-    single unified loop. The DataFrame includes a ``{ch.name}_current`` column
-    for every channel and a column for every gating variable.
-
-    When the neuron has ``calcium_dynamics`` configured, a ``ca_i`` column
-    containing intracellular Ca²⁺ concentration in mM is included.
+    This is the shared implementation called by both :func:`simulate_voltage_clamp`
+    (steady-state initialization) and :func:`simulate_voltage_clamp_from_state`
+    (caller-provided initialization).
 
     Args:
         neuron: The Hodgkin-Huxley neuron object to simulate.
         voltage_protocol: Voltage values in mV to clamp the membrane at for each
-            time step. The length of the array determines the simulation duration.
+            time step. Must be non-empty and finite.
+        gating_state: Initial gating variable values, keyed by variable name.
+            Mutated during the simulation; callers should pass a copy if needed.
+        ca_i: Initial intracellular Ca²⁺ concentration in mM.
 
     Returns:
-        DataFrame indexed by time in milliseconds (named 'time'), with columns:
-        voltage, total_current, Na_current, K_current, leak_current,
-        potassium_activation, sodium_activation, sodium_inactivation.
-        Additional channel columns are appended when present.
-        A ca_i column is appended when calcium_dynamics is configured.
+        DataFrame indexed by time in milliseconds (named 'time').
     """
     num_time_steps = len(voltage_protocol)
-
-    if num_time_steps == 0:
-        raise ValueError("voltage_protocol must not be empty.")
-    if not np.all(np.isfinite(voltage_protocol)):
-        raise ValueError("voltage_protocol must not contain NaN or Inf values.")
-
     time_step, time_array = _setup_simulation(num_time_steps, SIM_SAMPLING_FREQ)
 
-    # Pre-allocate per-channel current arrays
     ch_current_arrs: dict[str, np.ndarray] = {
         ch.name: np.empty(num_time_steps) for ch in neuron.all_channels
     }
     I_total = np.empty(num_time_steps)
 
-    # Pre-allocate per-gating-variable arrays
     gating_arrs: dict[str, np.ndarray] = {
         gv.name: np.empty(num_time_steps) for gv in neuron.all_gating_variables
     }
 
-    # Pre-allocate calcium array if dynamics are active
     ca_arr: np.ndarray | None = (
         np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
     )
-    ca_i: float = (
-        neuron.calcium_dynamics.ca_rest if neuron.calcium_dynamics is not None else 0.0
-    )
 
-    # Initialize all gating variables at steady state for the first voltage
-    gating_state = _initialize_gating_variables(neuron, voltage_protocol[0], ca_i)
-
-    # Record initial gating state
+    # Record initial state
     for gv_name, val in gating_state.items():
         gating_arrs[gv_name][0] = val
 
@@ -366,83 +341,60 @@ def simulate_voltage_clamp(
     return results
 
 
-def simulate_current_clamp(
+def _simulate_current_clamp_core(
     neuron: "HodgkinHuxley",
     current_external: np.ndarray,
+    initial_V: float,
+    gating_state: dict[str, float],
+    ca_i: float,
 ) -> pd.DataFrame:
-    """Simulate a current clamp experiment using the Hodgkin-Huxley model.
+    """Run the current clamp simulation loop given pre-initialized state.
 
-    In a current clamp experiment, current is injected into the cell membrane and
-    the resulting voltage changes are recorded. This function simulates this process
-    by computing the membrane voltage over time in response to the specified
-    external current.
-
-    The simulation always uses :data:`SIM_SAMPLING_FREQ` (40 kHz, dt = 0.025 ms)
-    as the integration time step.
-
-    All ion channels — core (Na, K, leak) and additional — are handled via a
-    single unified loop.  The DataFrame includes a ``{ch.name}_current`` column
-    for every channel (including core channels) and ``total_current``.
-
-    When the neuron has ``calcium_dynamics`` configured, a ``ca_i`` column
-    containing intracellular Ca²⁺ concentration in mM is included.
+    This is the shared implementation called by both :func:`simulate_current_clamp`
+    (steady-state initialization) and :func:`simulate_current_clamp_from_state`
+    (caller-provided initialization).
 
     Args:
         neuron: The Hodgkin-Huxley neuron object to simulate.
-        current_external: External current in µA/cm² for a time-varying current
-            waveform. The length of the array determines the simulation duration.
+        current_external: External current in µA/cm² waveform. Must be non-empty
+            and finite.
+        initial_V: Initial membrane voltage in mV.
+        gating_state: Initial gating variable values, keyed by variable name.
+            Mutated during the simulation; callers should pass a copy if needed.
+        ca_i: Initial intracellular Ca²⁺ concentration in mM.
 
     Returns:
-        DataFrame indexed by time in milliseconds (named 'time'), with columns:
-        voltage, Na_current, K_current, leak_current, total_current,
-        potassium_activation, sodium_activation, sodium_inactivation.
-        Additional channel columns are appended when present.
-        A ca_i column is appended when calcium_dynamics is configured.
+        DataFrame indexed by time in milliseconds (named 'time').
     """
     num_time_steps = len(current_external)
-
-    if num_time_steps == 0:
-        raise ValueError("current_external must not be empty.")
-    if not np.all(np.isfinite(current_external)):
-        raise ValueError("current_external must not contain NaN or Inf values.")
-
     time_step, time_array = _setup_simulation(num_time_steps, SIM_SAMPLING_FREQ)
 
     V_arr = np.empty(num_time_steps)
+    V_arr[0] = initial_V
 
-    # Pre-allocate per-channel current arrays
     ch_current_arrs: dict[str, np.ndarray] = {
         ch.name: np.empty(num_time_steps) for ch in neuron.all_channels
     }
     I_total = np.empty(num_time_steps)
 
-    # Pre-allocate per-gating-variable arrays
     gating_arrs: dict[str, np.ndarray] = {
         gv.name: np.empty(num_time_steps) for gv in neuron.all_gating_variables
     }
 
-    # Pre-allocate calcium array if dynamics are active
     ca_arr: np.ndarray | None = (
         np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
     )
-    ca_i: float = (
-        neuron.calcium_dynamics.ca_rest if neuron.calcium_dynamics is not None else 0.0
-    )
 
-    # Initialize at resting potential
-    V_arr[0] = neuron.v_rest
-    gating_state = _initialize_gating_variables(neuron, neuron.v_rest, ca_i)
-
-    # Record initial gating state and compute initial currents
+    # Record initial state
     for gv_name, val in gating_state.items():
         gating_arrs[gv_name][0] = val
 
     if ca_arr is not None:
         ca_arr[0] = ca_i
 
-    V0 = neuron.v_rest
+    # Compute initial currents
     ch_currents_0 = [
-        ch.compute_current(V0, gating_state, neuron) for ch in neuron.all_channels
+        ch.compute_current(initial_V, gating_state, neuron) for ch in neuron.all_channels
     ]
     for ch, i_ch in zip(neuron.all_channels, ch_currents_0):
         ch_current_arrs[ch.name][0] = i_ch
@@ -487,6 +439,98 @@ def simulate_current_clamp(
     return results
 
 
+def simulate_voltage_clamp(
+    neuron: "HodgkinHuxley",
+    voltage_protocol: np.ndarray,
+) -> pd.DataFrame:
+    """Simulate a voltage clamp experiment using the Hodgkin-Huxley model.
+
+    In a voltage clamp experiment, the membrane potential is held at specified
+    values and the current required to maintain those voltages is measured. This
+    function simulates this process by computing the ionic currents that would
+    flow at each voltage step in the protocol.
+
+    The simulation always uses :data:`SIM_SAMPLING_FREQ` (40 kHz, dt = 0.025 ms)
+    as the integration time step.
+
+    All ion channels — core (Na, K, leak) and additional — are handled via a
+    single unified loop. The DataFrame includes a ``{ch.name}_current`` column
+    for every channel and a column for every gating variable.
+
+    When the neuron has ``calcium_dynamics`` configured, a ``ca_i`` column
+    containing intracellular Ca²⁺ concentration in mM is included.
+
+    Args:
+        neuron: The Hodgkin-Huxley neuron object to simulate.
+        voltage_protocol: Voltage values in mV to clamp the membrane at for each
+            time step. The length of the array determines the simulation duration.
+
+    Returns:
+        DataFrame indexed by time in milliseconds (named 'time'), with columns:
+        voltage, total_current, Na_current, K_current, leak_current,
+        potassium_activation, sodium_activation, sodium_inactivation.
+        Additional channel columns are appended when present.
+        A ca_i column is appended when calcium_dynamics is configured.
+    """
+    if len(voltage_protocol) == 0:
+        raise ValueError("voltage_protocol must not be empty.")
+    if not np.all(np.isfinite(voltage_protocol)):
+        raise ValueError("voltage_protocol must not contain NaN or Inf values.")
+
+    ca_i: float = (
+        neuron.calcium_dynamics.ca_rest if neuron.calcium_dynamics is not None else 0.0
+    )
+    gating_state = _initialize_gating_variables(neuron, voltage_protocol[0], ca_i)
+    return _simulate_voltage_clamp_core(neuron, voltage_protocol, gating_state, ca_i)
+
+
+def simulate_current_clamp(
+    neuron: "HodgkinHuxley",
+    current_external: np.ndarray,
+) -> pd.DataFrame:
+    """Simulate a current clamp experiment using the Hodgkin-Huxley model.
+
+    In a current clamp experiment, current is injected into the cell membrane and
+    the resulting voltage changes are recorded. This function simulates this process
+    by computing the membrane voltage over time in response to the specified
+    external current.
+
+    The simulation always uses :data:`SIM_SAMPLING_FREQ` (40 kHz, dt = 0.025 ms)
+    as the integration time step.
+
+    All ion channels — core (Na, K, leak) and additional — are handled via a
+    single unified loop.  The DataFrame includes a ``{ch.name}_current`` column
+    for every channel (including core channels) and ``total_current``.
+
+    When the neuron has ``calcium_dynamics`` configured, a ``ca_i`` column
+    containing intracellular Ca²⁺ concentration in mM is included.
+
+    Args:
+        neuron: The Hodgkin-Huxley neuron object to simulate.
+        current_external: External current in µA/cm² for a time-varying current
+            waveform. The length of the array determines the simulation duration.
+
+    Returns:
+        DataFrame indexed by time in milliseconds (named 'time'), with columns:
+        voltage, Na_current, K_current, leak_current, total_current,
+        potassium_activation, sodium_activation, sodium_inactivation.
+        Additional channel columns are appended when present.
+        A ca_i column is appended when calcium_dynamics is configured.
+    """
+    if len(current_external) == 0:
+        raise ValueError("current_external must not be empty.")
+    if not np.all(np.isfinite(current_external)):
+        raise ValueError("current_external must not contain NaN or Inf values.")
+
+    ca_i: float = (
+        neuron.calcium_dynamics.ca_rest if neuron.calcium_dynamics is not None else 0.0
+    )
+    gating_state = _initialize_gating_variables(neuron, neuron.v_rest, ca_i)
+    return _simulate_current_clamp_core(
+        neuron, current_external, neuron.v_rest, gating_state, ca_i
+    )
+
+
 def simulate_voltage_clamp_from_state(
     neuron: "HodgkinHuxley",
     voltage_protocol: np.ndarray,
@@ -511,79 +555,14 @@ def simulate_voltage_clamp_from_state(
     Returns:
         DataFrame with the same columns as :func:`simulate_voltage_clamp`.
     """
-    num_time_steps = len(voltage_protocol)
-
-    if num_time_steps == 0:
+    if len(voltage_protocol) == 0:
         raise ValueError("voltage_protocol must not be empty.")
     if not np.all(np.isfinite(voltage_protocol)):
         raise ValueError("voltage_protocol must not contain NaN or Inf values.")
 
-    time_step, time_array = _setup_simulation(num_time_steps, SIM_SAMPLING_FREQ)
-
-    ch_current_arrs: dict[str, np.ndarray] = {
-        ch.name: np.empty(num_time_steps) for ch in neuron.all_channels
-    }
-    I_total = np.empty(num_time_steps)
-
-    gating_arrs: dict[str, np.ndarray] = {
-        gv.name: np.empty(num_time_steps) for gv in neuron.all_gating_variables
-    }
-
-    ca_arr: np.ndarray | None = (
-        np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
+    return _simulate_voltage_clamp_core(
+        neuron, voltage_protocol, dict(initial_gating_state), initial_ca_i
     )
-    ca_i: float = initial_ca_i
-
-    gating_state = dict(initial_gating_state)
-
-    for gv_name, val in gating_state.items():
-        gating_arrs[gv_name][0] = val
-
-    if ca_arr is not None:
-        ca_arr[0] = ca_i
-
-    V0 = voltage_protocol[0]
-    ch_currents_0 = [
-        ch.compute_current(V0, gating_state, neuron) for ch in neuron.all_channels
-    ]
-    for ch, i_ch in zip(neuron.all_channels, ch_currents_0):
-        ch_current_arrs[ch.name][0] = i_ch
-    I_total[0] = sum(ch_currents_0)
-
-    for i in range(1, num_time_steps):
-        V = voltage_protocol[i]
-
-        gating_state, ca_i = _rk4_step_voltage_clamp(
-            neuron, V, gating_state, time_step, ca_i
-        )
-
-        for gv_name, val in gating_state.items():
-            gating_arrs[gv_name][i] = val
-
-        if ca_arr is not None:
-            ca_arr[i] = ca_i
-
-        ch_currents_i = [
-            ch.compute_current(V, gating_state, neuron) for ch in neuron.all_channels
-        ]
-        for ch, i_ch in zip(neuron.all_channels, ch_currents_i):
-            ch_current_arrs[ch.name][i] = i_ch
-        I_total[i] = sum(ch_currents_i)
-
-    data: dict[str, np.ndarray] = {
-        "voltage": voltage_protocol,
-        "total_current": I_total,
-    }
-    for ch in neuron.all_channels:
-        data[f"{ch.name}_current"] = ch_current_arrs[ch.name]
-    for gv in neuron.all_gating_variables:
-        data[gv.name] = gating_arrs[gv.name]
-    if ca_arr is not None:
-        data["ca_i"] = ca_arr
-
-    results = pd.DataFrame(data, index=time_array)
-    results.index.name = "time"
-    return results
 
 
 def simulate_current_clamp_from_state(
@@ -612,83 +591,14 @@ def simulate_current_clamp_from_state(
     Returns:
         DataFrame with the same columns as :func:`simulate_current_clamp`.
     """
-    num_time_steps = len(current_external)
-
-    if num_time_steps == 0:
+    if len(current_external) == 0:
         raise ValueError("current_external must not be empty.")
     if not np.all(np.isfinite(current_external)):
         raise ValueError("current_external must not contain NaN or Inf values.")
 
-    time_step, time_array = _setup_simulation(num_time_steps, SIM_SAMPLING_FREQ)
-
-    V_arr = np.empty(num_time_steps)
-
-    ch_current_arrs: dict[str, np.ndarray] = {
-        ch.name: np.empty(num_time_steps) for ch in neuron.all_channels
-    }
-    I_total = np.empty(num_time_steps)
-
-    gating_arrs: dict[str, np.ndarray] = {
-        gv.name: np.empty(num_time_steps) for gv in neuron.all_gating_variables
-    }
-
-    ca_arr: np.ndarray | None = (
-        np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
+    return _simulate_current_clamp_core(
+        neuron, current_external, initial_V, dict(initial_gating_state), initial_ca_i
     )
-    ca_i: float = initial_ca_i
-
-    V_arr[0] = initial_V
-    gating_state = dict(initial_gating_state)
-
-    for gv_name, val in gating_state.items():
-        gating_arrs[gv_name][0] = val
-
-    if ca_arr is not None:
-        ca_arr[0] = ca_i
-
-    V0 = initial_V
-    ch_currents_0 = [
-        ch.compute_current(V0, gating_state, neuron) for ch in neuron.all_channels
-    ]
-    for ch, i_ch in zip(neuron.all_channels, ch_currents_0):
-        ch_current_arrs[ch.name][0] = i_ch
-    I_total[0] = sum(ch_currents_0)
-
-    for i in range(1, num_time_steps):
-        V = V_arr[i - 1]
-
-        V_new, gating_state, ca_i = _rk4_step_current_clamp(
-            neuron, V, gating_state, current_external[i - 1], time_step, ca_i
-        )
-
-        V_arr[i] = V_new
-        for gv_name, val in gating_state.items():
-            gating_arrs[gv_name][i] = val
-        if ca_arr is not None:
-            ca_arr[i] = ca_i
-
-        ch_currents_i = [
-            ch.compute_current(V_new, gating_state, neuron)
-            for ch in neuron.all_channels
-        ]
-        for ch, i_ch in zip(neuron.all_channels, ch_currents_i):
-            ch_current_arrs[ch.name][i] = i_ch
-        I_total[i] = sum(ch_currents_i)
-
-    data: dict[str, np.ndarray] = {
-        "voltage": V_arr,
-    }
-    for ch in neuron.all_channels:
-        data[f"{ch.name}_current"] = ch_current_arrs[ch.name]
-    data["total_current"] = I_total
-    for gv in neuron.all_gating_variables:
-        data[gv.name] = gating_arrs[gv.name]
-    if ca_arr is not None:
-        data["ca_i"] = ca_arr
-
-    results = pd.DataFrame(data, index=time_array)
-    results.index.name = "time"
-    return results
 
 
 def simulate_batch(
