@@ -59,7 +59,7 @@ def boltzmann_cosh_rates(
 
     The returned callables accept ``(V, ca_i)`` — the ``ca_i`` argument is
     accepted but ignored, keeping the signature consistent with
-    :class:`~ap_sim.channels.GatingVariable` rate functions.
+    :class:`~patch_sim.channels.GatingVariable` rate functions.
 
     Args:
         half: Half-activation voltage in mV.

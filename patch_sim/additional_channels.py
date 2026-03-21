@@ -144,10 +144,10 @@ def make_ika_channel(
 
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
-            Defaults to :data:`~ap_sim.constants.DEFAULT_G_IKA`.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_IKA`.
 
     Returns:
-        An :class:`~ap_sim.channels.IonChannel` representing the IKa current.
+        An :class:`~patch_sim.channels.IonChannel` representing the IKa current.
     """
     a_var = GatingVariable(name="a", power=1, alpha=_alpha_a, beta=_beta_a)
     b_var = GatingVariable(name="b", power=1, alpha=_alpha_b, beta=_beta_b)
@@ -179,14 +179,14 @@ def make_ih_channel(
 
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
-            Defaults to :data:`~ap_sim.constants.DEFAULT_G_IH`.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_IH`.
         p_na: Na⁺ permeability relative to K⁺ (dimensionless). A value of
             ~0.289 yields a reversal potential near -30 mV at default HH ion
             concentrations.  Defaults to
-            :data:`~ap_sim.constants.DEFAULT_IH_P_NA`.
+            :data:`~patch_sim.constants.DEFAULT_IH_P_NA`.
 
     Returns:
-        An :class:`~ap_sim.channels.IonChannel` representing the Ih current.
+        An :class:`~patch_sim.channels.IonChannel` representing the Ih current.
     """
     r_var = GatingVariable(name="r", power=1, alpha=_alpha_r, beta=_beta_r)
     return IonChannel(
@@ -229,10 +229,10 @@ def make_inap_channel(
 
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
-            Defaults to :data:`~ap_sim.constants.DEFAULT_G_NAP`.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_NAP`.
 
     Returns:
-        An :class:`~ap_sim.channels.IonChannel` representing the INaP current.
+        An :class:`~patch_sim.channels.IonChannel` representing the INaP current.
     """
     p_var = GatingVariable(name="p", power=1, alpha=_alpha_p, beta=_beta_p)
     return IonChannel(
@@ -344,10 +344,10 @@ def make_inar_channel(
 
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
-            Defaults to :data:`~ap_sim.constants.DEFAULT_G_NAR`.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_NAR`.
 
     Returns:
-        An :class:`~ap_sim.channels.IonChannel` representing the INaR current.
+        An :class:`~patch_sim.channels.IonChannel` representing the INaR current.
     """
     s_var = GatingVariable(name="s", power=1, alpha=_alpha_s, beta=_beta_s)
     hr_var = GatingVariable(name="hr", power=1, alpha=_alpha_hr, beta=_beta_hr)
@@ -387,10 +387,10 @@ def make_im_channel(
 
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
-            Defaults to :data:`~ap_sim.constants.DEFAULT_G_IM`.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_IM`.
 
     Returns:
-        An :class:`~ap_sim.channels.IonChannel` representing the IM current.
+        An :class:`~patch_sim.channels.IonChannel` representing the IM current.
     """
     w_var = GatingVariable(name="w", power=1, alpha=_alpha_w, beta=_beta_w)
     return IonChannel(
@@ -429,10 +429,10 @@ def make_ikir_channel(
 
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
-            Defaults to :data:`~ap_sim.constants.DEFAULT_G_IKIR`.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_IKIR`.
 
     Returns:
-        An :class:`~ap_sim.channels.IonChannel` representing the IKir current.
+        An :class:`~patch_sim.channels.IonChannel` representing the IKir current.
     """
     kir_var = GatingVariable(name="kir", power=1, alpha=_alpha_kir, beta=_beta_kir)
     return IonChannel(
@@ -541,10 +541,10 @@ def make_ikca_channel(
 
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
-            Defaults to :data:`~ap_sim.constants.DEFAULT_G_IKCA`.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_IKCA`.
 
     Returns:
-        An :class:`~ap_sim.channels.IonChannel` representing the IKCa current.
+        An :class:`~patch_sim.channels.IonChannel` representing the IKCa current.
     """
     q_var = GatingVariable(name="q", power=1, alpha=_alpha_q, beta=_beta_q)
     return IonChannel(
@@ -578,7 +578,7 @@ def make_ical_channel(
     (activation, power 2) and ``f`` (inactivation, power 1).
 
     Because ICaL carries Ca²⁺, ``carries_calcium=True`` is set so that
-    :meth:`~ap_sim.hodgkin_huxley.HodgkinHuxley.calcium_current` sums its
+    :meth:`~patch_sim.hodgkin_huxley.HodgkinHuxley.calcium_current` sums its
     contribution automatically.
 
     Kinetics use Boltzmann-cosh rate functions with activation centred at
@@ -590,10 +590,10 @@ def make_ical_channel(
 
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
-            Defaults to :data:`~ap_sim.constants.DEFAULT_G_ICAL`.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_ICAL`.
 
     Returns:
-        An :class:`~ap_sim.channels.IonChannel` representing the ICaL current.
+        An :class:`~patch_sim.channels.IonChannel` representing the ICaL current.
     """
     d_var = GatingVariable(name="d", power=2, alpha=_alpha_d, beta=_beta_d)
     f_var = GatingVariable(name="f", power=1, alpha=_alpha_f, beta=_beta_f)
@@ -636,10 +636,10 @@ def make_icat_channel(
 
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
-            Defaults to :data:`~ap_sim.constants.DEFAULT_G_ICAT`.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_ICAT`.
 
     Returns:
-        An :class:`~ap_sim.channels.IonChannel` representing the ICaT current.
+        An :class:`~patch_sim.channels.IonChannel` representing the ICaT current.
     """
     dt_var = GatingVariable(name="dt", power=2, alpha=_alpha_dt, beta=_beta_dt)
     ft_var = GatingVariable(name="ft", power=1, alpha=_alpha_ft, beta=_beta_ft)
@@ -683,10 +683,10 @@ def make_ican_channel(
 
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
-            Defaults to :data:`~ap_sim.constants.DEFAULT_G_ICAN`.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_ICAN`.
 
     Returns:
-        An :class:`~ap_sim.channels.IonChannel` representing the ICaN current.
+        An :class:`~patch_sim.channels.IonChannel` representing the ICaN current.
     """
     dn_var = GatingVariable(name="dn", power=2, alpha=_alpha_dn, beta=_beta_dn)
     fn_var = GatingVariable(name="fn", power=1, alpha=_alpha_fn, beta=_beta_fn)

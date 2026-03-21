@@ -145,7 +145,7 @@ class IonChannel:
             from the neuron's ion concentrations.
         carries_calcium: ``True`` for channels that carry Ca²⁺ ions (e.g.
             ICaL, ICaT, ICaN).  Used by
-            :meth:`~ap_sim.hodgkin_huxley.HodgkinHuxley.calcium_current` to
+            :meth:`~patch_sim.hodgkin_huxley.HodgkinHuxley.calcium_current` to
             sum Ca²⁺ influx for the intracellular Ca²⁺ ODE.  Defaults to
             ``False``.
 
@@ -176,12 +176,12 @@ class IonChannel:
     def reversal_potential(self, neuron: Any) -> float:
         """Compute the reversal potential from the neuron's ion concentrations.
 
-        Dispatches to :func:`~ap_sim.electrochemistry.nernst_potential` for a
-        :class:`NernstSpec` or :func:`~ap_sim.electrochemistry.goldman_potential` for a
+        Dispatches to :func:`~patch_sim.electrochemistry.nernst_potential` for a
+        :class:`NernstSpec` or :func:`~patch_sim.electrochemistry.goldman_potential` for a
         :class:`GoldmanSpec`, using the concentrations stored on *neuron*.
 
         Args:
-            neuron: A :class:`~ap_sim.hodgkin_huxley.HodgkinHuxley` instance
+            neuron: A :class:`~patch_sim.hodgkin_huxley.HodgkinHuxley` instance
                 whose ``ion_concentrations()`` method is used to look up ion
                 concentrations.
 
@@ -217,7 +217,7 @@ class IonChannel:
         Args:
             V: Membrane voltage in mV.
             gating_state: Mapping from gating variable name to current value.
-            neuron: The :class:`~ap_sim.hodgkin_huxley.HodgkinHuxley` model
+            neuron: The :class:`~patch_sim.hodgkin_huxley.HodgkinHuxley` model
                 used to compute the reversal potential.
 
         Returns:

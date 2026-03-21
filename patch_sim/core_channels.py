@@ -4,7 +4,7 @@ This module provides the six classic HH rate functions as module-level
 callables and three factory functions that bundle them into IonChannel objects.
 
 Rate functions all follow the ``(V: float, ca_i: float) -> float`` signature so
-they can be used directly as :class:`~ap_sim.channels.GatingVariable` rate
+they can be used directly as :class:`~patch_sim.channels.GatingVariable` rate
 functions.  The ``ca_i`` argument is accepted but ignored; it exists only for
 interface compatibility with calcium-sensitive gating variables.
 """
@@ -123,7 +123,7 @@ def make_na_channel(g_max: float) -> IonChannel:
         g_max: Maximum conductance in mS/cm².
 
     Returns:
-        An :class:`~ap_sim.channels.IonChannel` representing the fast Na⁺
+        An :class:`~patch_sim.channels.IonChannel` representing the fast Na⁺
         channel.
     """
     return IonChannel(
@@ -154,7 +154,7 @@ def make_k_channel(g_max: float) -> IonChannel:
         g_max: Maximum conductance in mS/cm².
 
     Returns:
-        An :class:`~ap_sim.channels.IonChannel` representing the delayed
+        An :class:`~patch_sim.channels.IonChannel` representing the delayed
         rectifier K⁺ channel.
     """
     return IonChannel(
@@ -179,7 +179,7 @@ def make_leak_channel(g_max: float) -> IonChannel:
         g_max: Maximum (and constant) conductance in mS/cm².
 
     Returns:
-        An :class:`~ap_sim.channels.IonChannel` representing the leak channel.
+        An :class:`~patch_sim.channels.IonChannel` representing the leak channel.
     """
     return IonChannel(
         name="leak",

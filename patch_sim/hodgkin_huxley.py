@@ -183,7 +183,7 @@ class HodgkinHuxley:
     def ion_concentrations(self, species: IonSpecies) -> tuple[float, float]:
         """Return the extracellular and intracellular concentrations for an ion.
 
-        Used by :class:`~ap_sim.channels.IonChannel` to look up the
+        Used by :class:`~patch_sim.channels.IonChannel` to look up the
         concentrations needed for dynamic reversal potential computation.
 
         Args:
