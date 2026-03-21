@@ -55,6 +55,7 @@ from patch_sim.additional_channels import (
     make_inar_channel,
 )
 from patch_sim_ui import constants, presets
+from patch_sim_ui.constants import CURRENT_CLAMP, VOLTAGE_CLAMP
 from patch_sim_ui.plotting import (
     Sweep,
     TraceVisibility,
@@ -399,7 +400,7 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     # Experiment mode                                                     #
     # ------------------------------------------------------------------ #
-    clamp_mode: str = "Current Clamp"  # "Current Clamp" | "Voltage Clamp"
+    clamp_mode: str = CURRENT_CLAMP  # CURRENT_CLAMP | VOLTAGE_CLAMP
 
     # ------------------------------------------------------------------ #
     # Protocol parameters — shared                                       #
@@ -542,7 +543,7 @@ class AppState(rx.State):
     @rx.var
     def protocol_options(self) -> list[str]:
         """Protocol type options filtered by clamp mode."""
-        if self.clamp_mode == "Current Clamp":
+        if self.clamp_mode == CURRENT_CLAMP:
             return constants.CURRENT_PROTOCOLS
         return constants.VOLTAGE_PROTOCOLS
 
@@ -648,7 +649,7 @@ class AppState(rx.State):
         """Switch between Current Clamp and Voltage Clamp modes."""
         self.clamp_mode = mode
         # Reset protocol type to first option for the new mode
-        if mode == "Current Clamp":
+        if mode == CURRENT_CLAMP:
             self.protocol_type = constants.CURRENT_PROTOCOLS[0]
         else:
             self.protocol_type = constants.VOLTAGE_PROTOCOLS[0]
@@ -869,7 +870,7 @@ class AppState(rx.State):
                     prior_ca_i = self._cont_ca_i
 
                     # Build protocol snapshot
-                    if mode == "Current Clamp":
+                    if mode == CURRENT_CLAMP:
                         stimulus = build_current_protocol(
                             protocol_type=ptype,
                             duration=self.duration,
@@ -925,7 +926,7 @@ class AppState(rx.State):
                 # Run simulation outside the state lock in a thread executor.
                 loop = asyncio.get_running_loop()
                 try:
-                    if mode == "Current Clamp":
+                    if mode == CURRENT_CLAMP:
                         if use_prior_state:
                             df = await loop.run_in_executor(
                                 None,
@@ -1052,7 +1053,7 @@ class AppState(rx.State):
             mode = self.clamp_mode
             ptype = self.protocol_type
 
-            if mode == "Current Clamp":
+            if mode == CURRENT_CLAMP:
                 stimulus = build_current_protocol(
                     protocol_type=ptype,
                     duration=self.duration,
