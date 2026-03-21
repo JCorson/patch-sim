@@ -47,50 +47,6 @@ wheels = [
 ]
 
 [[package]]
-name = "ap-sim"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "pandas" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "mypy" },
-    { name = "pandas-stubs" },
-    { name = "pytest" },
-    { name = "ruff" },
-]
-ui = [
-    { name = "plotly" },
-    { name = "reflex" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest-cov" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "matplotlib" },
-    { name = "mypy", marker = "extra == 'dev'" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "pandas-stubs", marker = "extra == 'dev'" },
-    { name = "plotly", marker = "extra == 'ui'" },
-    { name = "pytest", marker = "extra == 'dev'" },
-    { name = "reflex", marker = "extra == 'ui'", specifier = ">=0.8" },
-    { name = "ruff", marker = "extra == 'dev'" },
-]
-provides-extras = ["dev", "ui"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest-cov", specifier = ">=7.0.0" }]
-
-[[package]]
 name = "async-timeout"
 version = "5.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1134,6 +1090,50 @@ sdist = { url = "https://files.pythonhosted.org/packages/27/1d/297ff2c7ea50a768a
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7c/2f/f91e4eee21585ff548e83358332d5632ee49f6b2dcd96cb5dca4e0468951/pandas_stubs-3.0.0.260204-py3-none-any.whl", hash = "sha256:5ab9e4d55a6e2752e9720828564af40d48c4f709e6a2c69b743014a6fcb6c241", size = 168540, upload-time = "2026-02-04T15:17:15.615Z" },
 ]
+
+[[package]]
+name = "patch-sim"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pandas" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "mypy" },
+    { name = "pandas-stubs" },
+    { name = "pytest" },
+    { name = "ruff" },
+]
+ui = [
+    { name = "plotly" },
+    { name = "reflex" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest-cov" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "matplotlib" },
+    { name = "mypy", marker = "extra == 'dev'" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "pandas-stubs", marker = "extra == 'dev'" },
+    { name = "plotly", marker = "extra == 'ui'" },
+    { name = "pytest", marker = "extra == 'dev'" },
+    { name = "reflex", marker = "extra == 'ui'", specifier = ">=0.8" },
+    { name = "ruff", marker = "extra == 'dev'" },
+]
+provides-extras = ["dev", "ui"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest-cov", specifier = ">=7.0.0" }]
 
 [[package]]
 name = "pathspec"

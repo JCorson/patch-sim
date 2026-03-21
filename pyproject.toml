@@ -1,7 +1,7 @@
 [project]
-name = "ap_sim"
+name = "patch_sim"
 version = "0.1.0"
-description = "Action potential simulator implementing the Hodgkin-Huxley model for neuronal electrophysiology"
+description = "Patch clamp experiment simulator implementing the Hodgkin-Huxley model for neuronal electrophysiology"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -25,13 +25,13 @@ dev = ["ruff", "pytest", "mypy", "pandas-stubs"]
 ui = ["reflex>=0.8", "plotly"]
 
 [tool.uv.sources]
-ap_sim = {path = "./ap_sim", editable = true}
+patch_sim = {path = "./patch_sim", editable = true}
 
 [tool.mypy]
 exclude = ["scratch/"]
 
 [[tool.mypy.overrides]]
-module = ["ap_sim_ui.*", "reflex.*", "plotly.*", "rxconfig"]
+module = ["patch_sim_ui.*", "reflex.*", "plotly.*", "rxconfig"]
 ignore_errors = true
 
 [[tool.mypy.overrides]]

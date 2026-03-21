@@ -1,8 +1,8 @@
-"""Reflex configuration for the ap_sim web UI."""
+"""Reflex configuration for the patch_sim web UI."""
 
 import reflex as rx
 
 config = rx.Config(
-    app_name="ap_sim_ui",
+    app_name="patch_sim_ui",
     disable_plugins=["reflex.plugins.sitemap.SitemapPlugin"],
 )
