@@ -120,16 +120,86 @@ def _param_row(
 
 # (label, enabled_var, enabled_setter, g_var, g_setter, param_key)
 _ADDITIONAL_CHANNEL_ROW_SPECS = [
-    ("Ih (HCN)", AppState.ih_enabled, AppState.set_ih_enabled, AppState.ih_g_max, AppState.set_ih_g_max, "ih_g_max"),
-    ("IKa (A-type K\u207a)", AppState.ika_enabled, AppState.set_ika_enabled, AppState.ika_g_max, AppState.set_ika_g_max, "ika_g_max"),
-    ("INaP (Persistent Na\u207a)", AppState.inap_enabled, AppState.set_inap_enabled, AppState.inap_g_max, AppState.set_inap_g_max, "inap_g_max"),
-    ("INaR (Resurgent Na\u207a)", AppState.inar_enabled, AppState.set_inar_enabled, AppState.inar_g_max, AppState.set_inar_g_max, "inar_g_max"),
-    ("IM (Muscarinic K\u207a)", AppState.im_enabled, AppState.set_im_enabled, AppState.im_g_max, AppState.set_im_g_max, "im_g_max"),
-    ("IKir (Inward Rectifier K\u207a)", AppState.ikir_enabled, AppState.set_ikir_enabled, AppState.ikir_g_max, AppState.set_ikir_g_max, "ikir_g_max"),
-    ("IKCa (Ca\u00b2\u207a-activated K\u207a)", AppState.ikca_enabled, AppState.set_ikca_enabled, AppState.ikca_g_max, AppState.set_ikca_g_max, "ikca_g_max"),
-    ("ICaL (L-type Ca\u00b2\u207a)", AppState.ical_enabled, AppState.set_ical_enabled, AppState.ical_g_max, AppState.set_ical_g_max, "ical_g_max"),
-    ("ICaT (T-type Ca\u00b2\u207a)", AppState.icat_enabled, AppState.set_icat_enabled, AppState.icat_g_max, AppState.set_icat_g_max, "icat_g_max"),
-    ("ICaN (N-type Ca\u00b2\u207a)", AppState.ican_enabled, AppState.set_ican_enabled, AppState.ican_g_max, AppState.set_ican_g_max, "ican_g_max"),
+    (
+        "Ih (HCN)",
+        AppState.ih_enabled,
+        AppState.set_ih_enabled,
+        AppState.ih_g_max,
+        AppState.set_ih_g_max,
+        "ih_g_max",
+    ),
+    (
+        "IKa (A-type K\u207a)",
+        AppState.ika_enabled,
+        AppState.set_ika_enabled,
+        AppState.ika_g_max,
+        AppState.set_ika_g_max,
+        "ika_g_max",
+    ),
+    (
+        "INaP (Persistent Na\u207a)",
+        AppState.inap_enabled,
+        AppState.set_inap_enabled,
+        AppState.inap_g_max,
+        AppState.set_inap_g_max,
+        "inap_g_max",
+    ),
+    (
+        "INaR (Resurgent Na\u207a)",
+        AppState.inar_enabled,
+        AppState.set_inar_enabled,
+        AppState.inar_g_max,
+        AppState.set_inar_g_max,
+        "inar_g_max",
+    ),
+    (
+        "IM (Muscarinic K\u207a)",
+        AppState.im_enabled,
+        AppState.set_im_enabled,
+        AppState.im_g_max,
+        AppState.set_im_g_max,
+        "im_g_max",
+    ),
+    (
+        "IKir (Inward Rectifier K\u207a)",
+        AppState.ikir_enabled,
+        AppState.set_ikir_enabled,
+        AppState.ikir_g_max,
+        AppState.set_ikir_g_max,
+        "ikir_g_max",
+    ),
+    (
+        "IKCa (Ca\u00b2\u207a-activated K\u207a)",
+        AppState.ikca_enabled,
+        AppState.set_ikca_enabled,
+        AppState.ikca_g_max,
+        AppState.set_ikca_g_max,
+        "ikca_g_max",
+    ),
+    (
+        "ICaL (L-type Ca\u00b2\u207a)",
+        AppState.ical_enabled,
+        AppState.set_ical_enabled,
+        AppState.ical_g_max,
+        AppState.set_ical_g_max,
+        "ical_g_max",
+    ),
+    (
+        "ICaT (T-type Ca\u00b2\u207a)",
+        AppState.icat_enabled,
+        AppState.set_icat_enabled,
+        AppState.icat_g_max,
+        AppState.set_icat_g_max,
+        "icat_g_max",
+    ),
+    (
+        "ICaN (N-type Ca\u00b2\u207a)",
+        AppState.ican_enabled,
+        AppState.set_ican_enabled,
+        AppState.ican_g_max,
+        AppState.set_ican_g_max,
+        "ican_g_max",
+    ),
 ]
 
 
@@ -232,7 +302,10 @@ def neuron_panel() -> rx.Component:
                     color="var(--gray-12)",
                 ),
                 content=rx.vstack(
-                    *[_additional_channel_row(*spec) for spec in _ADDITIONAL_CHANNEL_ROW_SPECS],
+                    *[
+                        _additional_channel_row(*spec)
+                        for spec in _ADDITIONAL_CHANNEL_ROW_SPECS
+                    ],
                     spacing="2",
                     width="100%",
                 ),

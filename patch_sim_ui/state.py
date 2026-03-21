@@ -55,7 +55,7 @@ from patch_sim.additional_channels import (
     make_inar_channel,
 )
 from patch_sim_ui import constants, presets
-from patch_sim_ui.constants import CURRENT_CLAMP, VOLTAGE_CLAMP
+from patch_sim_ui.constants import CURRENT_CLAMP
 from patch_sim_ui.plotting import (
     Sweep,
     TraceVisibility,

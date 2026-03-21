@@ -82,16 +82,106 @@ def _channel_trace_group(
 # (header, enabled_var, current_label, current_var, current_handler,
 #  gating_label, gating_var, gating_handler)
 _ADDITIONAL_CHANNEL_TRACE_SPECS = [
-    ("Ih (HCN)", AppState.ih_enabled, "I_Ih", AppState.show_ih_current, AppState.set_show_ih_current, "Ih gating (r)", AppState.show_ih_gating, AppState.set_show_ih_gating),
-    ("IKa (A-type K\u207a)", AppState.ika_enabled, "I_IKa", AppState.show_ika_current, AppState.set_show_ika_current, "IKa gating (a, b)", AppState.show_ika_gating, AppState.set_show_ika_gating),
-    ("INaP (Persistent Na\u207a)", AppState.inap_enabled, "I_INaP", AppState.show_inap_current, AppState.set_show_inap_current, "INaP gating (p)", AppState.show_inap_gating, AppState.set_show_inap_gating),
-    ("INaR (Resurgent Na\u207a)", AppState.inar_enabled, "I_INaR", AppState.show_inar_current, AppState.set_show_inar_current, "INaR gating (s, hr)", AppState.show_inar_gating, AppState.set_show_inar_gating),
-    ("IM (Muscarinic K\u207a)", AppState.im_enabled, "I_IM", AppState.show_im_current, AppState.set_show_im_current, "IM gating (w)", AppState.show_im_gating, AppState.set_show_im_gating),
-    ("IKir (Inward Rectifier K\u207a)", AppState.ikir_enabled, "I_IKir", AppState.show_ikir_current, AppState.set_show_ikir_current, "IKir gating (kir)", AppState.show_ikir_gating, AppState.set_show_ikir_gating),
-    ("IKCa (Ca\u00b2\u207a-activated K\u207a)", AppState.ikca_enabled, "I_IKCa", AppState.show_ikca_current, AppState.set_show_ikca_current, "IKCa gating (q)", AppState.show_ikca_gating, AppState.set_show_ikca_gating),
-    ("ICaL (L-type Ca\u00b2\u207a)", AppState.ical_enabled, "I_ICaL", AppState.show_ical_current, AppState.set_show_ical_current, "ICaL gating (d, f)", AppState.show_ical_gating, AppState.set_show_ical_gating),
-    ("ICaT (T-type Ca\u00b2\u207a)", AppState.icat_enabled, "I_ICaT", AppState.show_icat_current, AppState.set_show_icat_current, "ICaT gating (dt, ft)", AppState.show_icat_gating, AppState.set_show_icat_gating),
-    ("ICaN (N-type Ca\u00b2\u207a)", AppState.ican_enabled, "I_ICaN", AppState.show_ican_current, AppState.set_show_ican_current, "ICaN gating (dn, fn)", AppState.show_ican_gating, AppState.set_show_ican_gating),
+    (
+        "Ih (HCN)",
+        AppState.ih_enabled,
+        "I_Ih",
+        AppState.show_ih_current,
+        AppState.set_show_ih_current,
+        "Ih gating (r)",
+        AppState.show_ih_gating,
+        AppState.set_show_ih_gating,
+    ),
+    (
+        "IKa (A-type K\u207a)",
+        AppState.ika_enabled,
+        "I_IKa",
+        AppState.show_ika_current,
+        AppState.set_show_ika_current,
+        "IKa gating (a, b)",
+        AppState.show_ika_gating,
+        AppState.set_show_ika_gating,
+    ),
+    (
+        "INaP (Persistent Na\u207a)",
+        AppState.inap_enabled,
+        "I_INaP",
+        AppState.show_inap_current,
+        AppState.set_show_inap_current,
+        "INaP gating (p)",
+        AppState.show_inap_gating,
+        AppState.set_show_inap_gating,
+    ),
+    (
+        "INaR (Resurgent Na\u207a)",
+        AppState.inar_enabled,
+        "I_INaR",
+        AppState.show_inar_current,
+        AppState.set_show_inar_current,
+        "INaR gating (s, hr)",
+        AppState.show_inar_gating,
+        AppState.set_show_inar_gating,
+    ),
+    (
+        "IM (Muscarinic K\u207a)",
+        AppState.im_enabled,
+        "I_IM",
+        AppState.show_im_current,
+        AppState.set_show_im_current,
+        "IM gating (w)",
+        AppState.show_im_gating,
+        AppState.set_show_im_gating,
+    ),
+    (
+        "IKir (Inward Rectifier K\u207a)",
+        AppState.ikir_enabled,
+        "I_IKir",
+        AppState.show_ikir_current,
+        AppState.set_show_ikir_current,
+        "IKir gating (kir)",
+        AppState.show_ikir_gating,
+        AppState.set_show_ikir_gating,
+    ),
+    (
+        "IKCa (Ca\u00b2\u207a-activated K\u207a)",
+        AppState.ikca_enabled,
+        "I_IKCa",
+        AppState.show_ikca_current,
+        AppState.set_show_ikca_current,
+        "IKCa gating (q)",
+        AppState.show_ikca_gating,
+        AppState.set_show_ikca_gating,
+    ),
+    (
+        "ICaL (L-type Ca\u00b2\u207a)",
+        AppState.ical_enabled,
+        "I_ICaL",
+        AppState.show_ical_current,
+        AppState.set_show_ical_current,
+        "ICaL gating (d, f)",
+        AppState.show_ical_gating,
+        AppState.set_show_ical_gating,
+    ),
+    (
+        "ICaT (T-type Ca\u00b2\u207a)",
+        AppState.icat_enabled,
+        "I_ICaT",
+        AppState.show_icat_current,
+        AppState.set_show_icat_current,
+        "ICaT gating (dt, ft)",
+        AppState.show_icat_gating,
+        AppState.set_show_icat_gating,
+    ),
+    (
+        "ICaN (N-type Ca\u00b2\u207a)",
+        AppState.ican_enabled,
+        "I_ICaN",
+        AppState.show_ican_current,
+        AppState.set_show_ican_current,
+        "ICaN gating (dn, fn)",
+        AppState.show_ican_gating,
+        AppState.set_show_ican_gating,
+    ),
 ]
 
 
@@ -103,7 +193,9 @@ def _additional_channels_section() -> rx.Component:
     Returns:
         A fragment containing all additional channel trace groups.
     """
-    return rx.fragment(*[_channel_trace_group(*spec) for spec in _ADDITIONAL_CHANNEL_TRACE_SPECS])
+    return rx.fragment(
+        *[_channel_trace_group(*spec) for spec in _ADDITIONAL_CHANNEL_TRACE_SPECS]
+    )
 
 
 def _cc_popover_content() -> rx.Component:
