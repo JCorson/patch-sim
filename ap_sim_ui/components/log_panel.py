@@ -2,7 +2,7 @@
 
 import reflex as rx
 
-from ap_sim_ui.log_handler import LogRecord
+from ap_sim_ui.log_handler import UILogRecord
 from ap_sim_ui.state import AppState
 
 _LEVEL_COLORS: dict[str, str] = {
@@ -16,14 +16,14 @@ _LEVEL_COLORS: dict[str, str] = {
 _LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR"]
 
 
-def _log_entry(entry: LogRecord) -> rx.Component:
+def _log_entry(entry: UILogRecord) -> rx.Component:
     """Render a single log entry row.
 
     Each row shows the timestamp, level badge, and message, colour-coded
     by severity.
 
     Args:
-        entry: The :class:`~ap_sim_ui.log_handler.LogRecord` to display.
+        entry: The :class:`~ap_sim_ui.log_handler.UILogRecord` to display.
 
     Returns:
         An hstack row component.

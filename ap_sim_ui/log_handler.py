@@ -12,8 +12,11 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel
 
+#: Maximum number of log records retained in the handler buffer and in state.
+MAX_LOG_ENTRIES = 500
 
-class LogRecord(BaseModel):
+
+class UILogRecord(BaseModel):
     """Serializable representation of a single log record.
 
     Attributes:
@@ -35,9 +38,14 @@ class StateLogHandler(logging.Handler):
     Records are accumulated here and drained into Reflex state on demand
     via :meth:`drain`. Using a drain pattern means the handler needs no
     reference to any session-scoped Reflex state object.
+
+    Note:
+        ``_buffer`` and ``_lock`` are class-level attributes so that a single
+        buffer is shared across all instances.  ``setup_logging`` ensures only
+        one instance is ever registered, so this is safe.
     """
 
-    _buffer: collections.deque[LogRecord] = collections.deque(maxlen=500)
+    _buffer: collections.deque[UILogRecord] = collections.deque(maxlen=MAX_LOG_ENTRIES)
     _lock: threading.Lock = threading.Lock()
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -50,7 +58,7 @@ class StateLogHandler(logging.Handler):
             ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime(
                 "%H:%M:%S.%f"
             )[:-3]
-            log_entry = LogRecord(
+            log_entry = UILogRecord(
                 timestamp=ts,
                 level=record.levelname,
                 logger_name=record.name,
@@ -62,11 +70,11 @@ class StateLogHandler(logging.Handler):
             self.handleError(record)
 
     @classmethod
-    def drain(cls) -> list[LogRecord]:
+    def drain(cls) -> list[UILogRecord]:
         """Return and clear all buffered log records.
 
         Returns:
-            A list of buffered :class:`LogRecord` instances in emission order.
+            A list of buffered :class:`UILogRecord` instances in emission order.
             The internal buffer is empty after this call.
         """
         with cls._lock:
@@ -79,7 +87,8 @@ def setup_logging() -> None:
     """Configure the ``ap_sim_ui`` logger with :class:`StateLogHandler`.
 
     Creates the logger at DEBUG level and attaches a single
-    :class:`StateLogHandler` instance (idempotent — repeated calls are safe).
+    :class:`StateLogHandler` instance.  Safe to call multiple times —
+    subsequent calls are no-ops if the handler is already registered.
     """
     logger = logging.getLogger("ap_sim_ui")
     logger.setLevel(logging.DEBUG)

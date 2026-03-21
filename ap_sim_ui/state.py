@@ -14,7 +14,7 @@ import reflex as rx
 
 import ap_sim
 import ap_sim.clamp_simulations
-from ap_sim_ui.log_handler import LogRecord, StateLogHandler
+from ap_sim_ui.log_handler import MAX_LOG_ENTRIES, StateLogHandler, UILogRecord
 from ap_sim.constants import (
     DEFAULT_C_M,
     DEFAULT_CA_IN,
@@ -486,7 +486,7 @@ class AppState(rx.State):
     # Log panel state                                                    #
     # ------------------------------------------------------------------ #
     log_panel_open: bool = False
-    log_entries: list[LogRecord] = []
+    log_entries: list[UILogRecord] = []
     log_level_filter: str = "DEBUG"
 
     # ------------------------------------------------------------------ #
@@ -525,17 +525,21 @@ class AppState(rx.State):
         return len(self.current_sweeps) > 0
 
     @rx.var
-    def filtered_log_entries(self) -> list[LogRecord]:
-        """Log entries filtered to the selected minimum level.
+    def filtered_log_entries(self) -> list[UILogRecord]:
+        """Log entries filtered to the selected minimum level, newest first.
 
         Returns:
-            Entries whose numeric level is >= the selected filter level.
+            Entries whose numeric level is >= the selected filter level,
+            in reverse chronological order so the most recent entry is
+            always visible at the top of the panel without scrolling.
         """
         min_level = logging.getLevelName(self.log_level_filter)
         if not isinstance(min_level, int):
             min_level = logging.DEBUG
         return [
-            e for e in self.log_entries if logging.getLevelName(e.level) >= min_level
+            e
+            for e in reversed(self.log_entries)
+            if logging.getLevelName(e.level) >= min_level
         ]
 
     @rx.var
@@ -567,10 +571,10 @@ class AppState(rx.State):
         self._refresh_logs()
 
     def _refresh_logs(self) -> None:
-        """Drain buffered log records into state, capping at 500 entries."""
+        """Drain buffered log records into state, capping at MAX_LOG_ENTRIES."""
         new_records = StateLogHandler.drain()
         combined = list(self.log_entries) + new_records
-        self.log_entries = combined[-500:]
+        self.log_entries = combined[-MAX_LOG_ENTRIES:]
 
     def clear_logs(self) -> None:
         """Clear all displayed log entries."""
@@ -864,7 +868,7 @@ class AppState(rx.State):
                         ]
 
         except ValueError as exc:
-            logger.error("Simulation error: %s", exc)
+            logger.exception("Simulation error: %s", exc)
             async with self:
                 self.error_message = str(exc)
         else:
