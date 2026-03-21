@@ -7,6 +7,7 @@ Both clamp modes use a unified gating-state dictionary that covers all channels
 (core Na/K/leak and any additional channels) and a single RK4 integrator path.
 """
 
+import logging
 import numpy as np
 import pandas as pd
 from collections.abc import Callable, Iterator, Sequence
@@ -16,6 +17,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .hodgkin_huxley import HodgkinHuxley
+
+logger = logging.getLogger(__name__)
 
 #: Fixed simulation sampling frequency (Hz). dt = 1000 / SIM_SAMPLING_FREQ ms.
 #: 40 kHz (dt = 0.025 ms) is standard for Hodgkin-Huxley models.
@@ -272,6 +275,15 @@ def _simulate_voltage_clamp_core(
         DataFrame indexed by time in milliseconds (named 'time').
     """
     num_time_steps = len(voltage_protocol)
+
+    duration_ms = (num_time_steps - 1) / SIM_SAMPLING_FREQ * 1000.0
+    logger.debug(
+        "simulate_voltage_clamp: start — %d steps, %.2f ms, %d channels",
+        num_time_steps,
+        duration_ms,
+        len(neuron.all_channels),
+    )
+
     time_step, time_array = _setup_simulation(num_time_steps, SIM_SAMPLING_FREQ)
 
     ch_current_arrs: dict[str, np.ndarray] = {
@@ -338,6 +350,7 @@ def _simulate_voltage_clamp_core(
 
     results = pd.DataFrame(data, index=time_array)
     results.index.name = "time"
+    logger.debug("simulate_voltage_clamp: complete — %d steps", num_time_steps)
     return results
 
 
@@ -367,6 +380,15 @@ def _simulate_current_clamp_core(
         DataFrame indexed by time in milliseconds (named 'time').
     """
     num_time_steps = len(current_external)
+
+    duration_ms = (num_time_steps - 1) / SIM_SAMPLING_FREQ * 1000.0
+    logger.debug(
+        "simulate_current_clamp: start — %d steps, %.2f ms, %d channels",
+        num_time_steps,
+        duration_ms,
+        len(neuron.all_channels),
+    )
+
     time_step, time_array = _setup_simulation(num_time_steps, SIM_SAMPLING_FREQ)
 
     V_arr = np.empty(num_time_steps)
@@ -437,6 +459,7 @@ def _simulate_current_clamp_core(
 
     results = pd.DataFrame(data, index=time_array)
     results.index.name = "time"
+    logger.debug("simulate_current_clamp: complete — %d steps", num_time_steps)
     return results
 
 
@@ -561,9 +584,21 @@ def simulate_voltage_clamp_from_state(
     if not np.all(np.isfinite(voltage_protocol)):
         raise ValueError("voltage_protocol must not contain NaN or Inf values.")
 
-    return _simulate_voltage_clamp_core(
+    num_time_steps = len(voltage_protocol)
+    duration_ms = (num_time_steps - 1) / SIM_SAMPLING_FREQ * 1000.0
+    logger.debug(
+        "simulate_voltage_clamp_from_state: start — %d steps, %.2f ms, %d channels",
+        num_time_steps,
+        duration_ms,
+        len(neuron.all_channels),
+    )
+    result = _simulate_voltage_clamp_core(
         neuron, voltage_protocol, dict(initial_gating_state), initial_ca_i
     )
+    logger.debug(
+        "simulate_voltage_clamp_from_state: complete — %d steps", num_time_steps
+    )
+    return result
 
 
 def simulate_current_clamp_from_state(
@@ -597,9 +632,21 @@ def simulate_current_clamp_from_state(
     if not np.all(np.isfinite(current_external)):
         raise ValueError("current_external must not contain NaN or Inf values.")
 
-    return _simulate_current_clamp_core(
+    num_time_steps = len(current_external)
+    duration_ms = (num_time_steps - 1) / SIM_SAMPLING_FREQ * 1000.0
+    logger.debug(
+        "simulate_current_clamp_from_state: start — %d steps, %.2f ms, %d channels",
+        num_time_steps,
+        duration_ms,
+        len(neuron.all_channels),
+    )
+    result = _simulate_current_clamp_core(
         neuron, current_external, initial_V, dict(initial_gating_state), initial_ca_i
     )
+    logger.debug(
+        "simulate_current_clamp_from_state: complete — %d steps", num_time_steps
+    )
+    return result
 
 
 def simulate_batch(
