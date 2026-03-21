@@ -394,7 +394,8 @@ def _simulate_current_clamp_core(
 
     # Compute initial currents
     ch_currents_0 = [
-        ch.compute_current(initial_V, gating_state, neuron) for ch in neuron.all_channels
+        ch.compute_current(initial_V, gating_state, neuron)
+        for ch in neuron.all_channels
     ]
     for ch, i_ch in zip(neuron.all_channels, ch_currents_0):
         ch_current_arrs[ch.name][0] = i_ch
