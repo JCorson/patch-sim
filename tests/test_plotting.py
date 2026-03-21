@@ -1,4 +1,4 @@
-"""Unit tests for ap_sim_ui/plotting.py.
+"""Unit tests for patch_sim_ui/plotting.py.
 
 Covers Sweep.from_dataframe, build_figure, and _build_hover_tables.
 All three are pure functions with no Reflex dependency.
@@ -11,8 +11,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
-from ap_sim_ui.constants import CC_VOLTAGE_COLOR, STIMULUS_COLOR
-from ap_sim_ui.plotting import (
+from patch_sim_ui.constants import CC_VOLTAGE_COLOR, STIMULUS_COLOR
+from patch_sim_ui.plotting import (
     Sweep,
     TraceVisibility,
     _build_hover_tables,

@@ -1,4 +1,4 @@
-"""Tests for ap_sim_ui/log_handler.py.
+"""Tests for patch_sim_ui/log_handler.py.
 
 Covers UILogRecord, StateLogHandler buffering/draining, the MAX_LOG_ENTRIES
 cap, thread safety of drain, and the setup_logging idempotency guard.
@@ -9,7 +9,7 @@ import threading
 
 import pytest
 
-from ap_sim_ui.log_handler import (
+from patch_sim_ui.log_handler import (
     MAX_LOG_ENTRIES,
     StateLogHandler,
     UILogRecord,
@@ -64,12 +64,12 @@ def test_ui_log_record_fields():
     rec = UILogRecord(
         timestamp="12:00:00.000",
         level="INFO",
-        logger_name="ap_sim_ui",
+        logger_name="patch_sim_ui",
         message="hello",
     )
     assert rec.timestamp == "12:00:00.000"
     assert rec.level == "INFO"
-    assert rec.logger_name == "ap_sim_ui"
+    assert rec.logger_name == "patch_sim_ui"
     assert rec.message == "hello"
 
 
@@ -177,8 +177,8 @@ def test_drain_is_thread_safe():
 
 
 def test_setup_logging_attaches_handler():
-    """setup_logging registers a StateLogHandler on the ap_sim_ui logger."""
-    logger = logging.getLogger("ap_sim_ui")
+    """setup_logging registers a StateLogHandler on the patch_sim_ui logger."""
+    logger = logging.getLogger("patch_sim_ui")
     # Remove any existing handlers first.
     logger.handlers.clear()
 
@@ -188,7 +188,7 @@ def test_setup_logging_attaches_handler():
 
 def test_setup_logging_is_idempotent():
     """Calling setup_logging twice does not add a second handler."""
-    logger = logging.getLogger("ap_sim_ui")
+    logger = logging.getLogger("patch_sim_ui")
     logger.handlers.clear()
 
     setup_logging()

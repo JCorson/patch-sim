@@ -9,16 +9,16 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import ap_sim
-import ap_sim.clamp_simulations
-from ap_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
+import patch_sim
+import patch_sim.clamp_simulations
+from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-_FS = ap_sim.clamp_simulations.SIM_SAMPLING_FREQ
+_FS = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
 
 
 def _make_iv_protocols(
@@ -47,7 +47,7 @@ def _make_iv_protocols(
     sweep_duration = pre_pulse_duration + step_duration + post_pulse_duration
     voltages = np.arange(voltage_min, voltage_max + voltage_step, voltage_step)
     protocols = [
-        ap_sim.step_voltage(
+        patch_sim.step_voltage(
             duration=sweep_duration,
             voltage_amplitude=float(v),
             step_start=pre_pulse_duration,
@@ -83,12 +83,12 @@ def _make_iv_sweeps(
     Returns:
         List of (protocol_array, result_dataframe) tuples, one per voltage.
     """
-    neuron = ap_sim.HodgkinHuxley()
+    neuron = patch_sim.HodgkinHuxley()
     sweep_duration = pre_pulse_duration + step_duration + post_pulse_duration
     voltages = np.arange(voltage_min, voltage_max + voltage_step, voltage_step)
     results: list[tuple[np.ndarray, pd.DataFrame]] = []
     for voltage in voltages:
-        protocol = ap_sim.step_voltage(
+        protocol = patch_sim.step_voltage(
             duration=sweep_duration,
             voltage_amplitude=float(voltage),
             step_start=pre_pulse_duration,
@@ -96,7 +96,7 @@ def _make_iv_sweeps(
             holding_voltage=holding_voltage,
             sampling_frequency=_FS,
         )
-        df = ap_sim.simulate_voltage_clamp(neuron, protocol)
+        df = patch_sim.simulate_voltage_clamp(neuron, protocol)
         results.append((protocol, df))
     return results
 
@@ -185,14 +185,14 @@ def test_iv_curve_protocol_peak_voltage_matches_step_voltage() -> None:
 
 def test_batch_matches_sequential() -> None:
     """simulate_batch results are identical to sequential simulate_voltage_clamp."""
-    neuron = ap_sim.HodgkinHuxley()
+    neuron = patch_sim.HodgkinHuxley()
     _voltages, protocols = _make_iv_protocols(
         voltage_min=-60.0,
         voltage_max=0.0,
         voltage_step=20.0,
     )
     sequential = [simulate_voltage_clamp(neuron, p) for p in protocols]
-    batch = list(ap_sim.simulate_batch(neuron, protocols, max_workers=2))
+    batch = list(patch_sim.simulate_batch(neuron, protocols, max_workers=2))
     assert len(batch) == len(sequential)
     for seq_df, batch_df in zip(sequential, batch):
         pd.testing.assert_frame_equal(seq_df, batch_df)
@@ -200,13 +200,13 @@ def test_batch_matches_sequential() -> None:
 
 def test_batch_single_sweep() -> None:
     """A single-protocol batch yields exactly one correct DataFrame."""
-    neuron = ap_sim.HodgkinHuxley()
+    neuron = patch_sim.HodgkinHuxley()
     _voltages, protocols = _make_iv_protocols(
         voltage_min=0.0,
         voltage_max=0.0,
         voltage_step=10.0,
     )
-    results = list(ap_sim.simulate_batch(neuron, protocols, max_workers=2))
+    results = list(patch_sim.simulate_batch(neuron, protocols, max_workers=2))
     assert len(results) == 1
     expected = simulate_voltage_clamp(neuron, protocols[0])
     pd.testing.assert_frame_equal(results[0], expected)
@@ -214,20 +214,20 @@ def test_batch_single_sweep() -> None:
 
 def test_batch_empty_protocols() -> None:
     """An empty protocol list yields no results."""
-    neuron = ap_sim.HodgkinHuxley()
-    results = list(ap_sim.simulate_batch(neuron, [], max_workers=2))
+    neuron = patch_sim.HodgkinHuxley()
+    results = list(patch_sim.simulate_batch(neuron, [], max_workers=2))
     assert results == []
 
 
 def test_batch_preserves_order() -> None:
     """Results come back in voltage order (same order as input protocols)."""
-    neuron = ap_sim.HodgkinHuxley()
+    neuron = patch_sim.HodgkinHuxley()
     voltages, protocols = _make_iv_protocols(
         voltage_min=-80.0,
         voltage_max=40.0,
         voltage_step=20.0,
     )
-    results = list(ap_sim.simulate_batch(neuron, protocols, max_workers=2))
+    results = list(patch_sim.simulate_batch(neuron, protocols, max_workers=2))
     assert len(results) == len(voltages)
     for df, voltage in zip(results, voltages):
         # Each protocol steps to its commanded voltage — check the peak matches.
@@ -241,13 +241,13 @@ def test_batch_preserves_order() -> None:
 
 def test_batch_with_current_clamp() -> None:
     """simulate_batch with simulate_fn=simulate_current_clamp works correctly."""
-    neuron = ap_sim.HodgkinHuxley()
+    neuron = patch_sim.HodgkinHuxley()
     num_steps = int(_FS * 0.05)  # 50 ms
     stimulus = np.zeros(num_steps)
     stimulus[int(_FS * 0.01) : int(_FS * 0.04)] = 10.0
 
     results = list(
-        ap_sim.simulate_batch(
+        patch_sim.simulate_batch(
             neuron,
             [stimulus],
             simulate_fn=simulate_current_clamp,

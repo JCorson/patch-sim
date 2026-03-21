@@ -1,4 +1,4 @@
-"""Regression tests for ap_sim_ui.protocol_builders.
+"""Regression tests for patch_sim_ui.protocol_builders.
 
 These tests call build_current_protocol and build_voltage_protocol directly,
 requiring no Reflex runtime.
@@ -7,8 +7,8 @@ requiring no Reflex runtime.
 import numpy as np
 import pytest
 
-from ap_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
-from ap_sim_ui.presets import PRESETS
+from patch_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
+from patch_sim_ui.presets import PRESETS
 
 # ---------------------------------------------------------------------------
 # Helpers

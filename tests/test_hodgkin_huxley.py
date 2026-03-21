@@ -4,9 +4,9 @@ import dataclasses
 
 import pytest
 
-from ap_sim.channels import IonChannel, IonSpecies
-from ap_sim.core_channels import make_na_channel
-from ap_sim.hodgkin_huxley import HodgkinHuxley
+from patch_sim.channels import IonChannel, IonSpecies
+from patch_sim.core_channels import make_na_channel
+from patch_sim.hodgkin_huxley import HodgkinHuxley
 
 
 def test_initialization(hh_model: HodgkinHuxley) -> None:
@@ -62,8 +62,8 @@ def test_all_gating_variables_no_additional(hh_model: HodgkinHuxley) -> None:
 def test_all_gating_variables_with_additional() -> None:
     """all_gating_variables includes gating vars from additional channels."""
     # Rename the gating variable to avoid name collision with the core K channel
-    from ap_sim.channels import GatingVariable, NernstSpec
-    from ap_sim.core_channels import alpha_n, beta_n
+    from patch_sim.channels import GatingVariable, NernstSpec
+    from patch_sim.core_channels import alpha_n, beta_n
 
     gv_new = GatingVariable(
         name="kextra_activation", power=4, alpha=alpha_n, beta=beta_n
@@ -102,7 +102,7 @@ def test_frozen_immutability(hh_model: HodgkinHuxley) -> None:
 
 def test_reversal_potentials_from_core_channels(hh_model: HodgkinHuxley) -> None:
     """Core channel reversal potentials match direct Nernst calculation."""
-    from ap_sim.electrochemistry import nernst_potential
+    from patch_sim.electrochemistry import nernst_potential
 
     na_ch, k_ch, leak_ch = hh_model.core_channels
     expected_E_Na = nernst_potential(1, hh_model.T, hh_model.Na_out, hh_model.Na_in)
@@ -124,7 +124,7 @@ def test_reversal_potentials_in_physiological_range(hh_model: HodgkinHuxley) -> 
 
 def test_custom_ion_concentrations_shift_reversal_potentials() -> None:
     """Changing ion concentrations must produce shifted reversal potentials."""
-    from ap_sim.electrochemistry import nernst_potential
+    from patch_sim.electrochemistry import nernst_potential
 
     custom_model = HodgkinHuxley(Na_out=200.0, K_in=100.0, T=293.15)
     default_model = HodgkinHuxley()
@@ -153,8 +153,8 @@ def test_custom_ion_concentrations_shift_reversal_potentials() -> None:
 
 def test_calcium_reversal_potential() -> None:
     """Calcium channel reversal potential matches Nernst with z=2."""
-    from ap_sim.channels import IonChannel, NernstSpec
-    from ap_sim.electrochemistry import nernst_potential
+    from patch_sim.channels import IonChannel, NernstSpec
+    from patch_sim.electrochemistry import nernst_potential
 
     model = HodgkinHuxley()
     ca_ch = IonChannel(

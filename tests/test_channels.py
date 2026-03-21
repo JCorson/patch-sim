@@ -7,17 +7,17 @@ backward compatibility with no additional channels, and validation errors.
 import numpy as np
 import pytest
 
-import ap_sim
-from ap_sim.channels import (
+import patch_sim
+from patch_sim.channels import (
     GatingVariable,
     GoldmanSpec,
     IonChannel,
     IonSpecies,
     NernstSpec,
 )
-from ap_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
-from ap_sim.hodgkin_huxley import HodgkinHuxley
-from ap_sim.additional_channels import (
+from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
+from patch_sim.hodgkin_huxley import HodgkinHuxley
+from patch_sim.additional_channels import (
     _alpha_a,
     _alpha_b,
     _alpha_d,
@@ -59,7 +59,7 @@ from ap_sim.additional_channels import (
     make_inar_channel,
     make_inap_channel,
 )
-from ap_sim.protocols import step_current, step_voltage
+from patch_sim.protocols import step_current, step_voltage
 
 
 # ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ def test_base_ion_channel_power_two():
 
 def test_base_ion_channel_reversal_potential_uses_nernst():
     """reversal_potential() computes K⁺ Nernst potential from neuron concentrations."""
-    from ap_sim.electrochemistry import nernst_potential
+    from patch_sim.electrochemistry import nernst_potential
 
     neuron = HodgkinHuxley()
     ch = _make_simple_channel()
@@ -276,7 +276,7 @@ def test_hh_builtin_channel_name_collision_raises():
 
 def test_make_ih_channel_defaults():
     """make_ih_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_G_IH, DEFAULT_IH_P_NA
+    from patch_sim.constants import DEFAULT_G_IH, DEFAULT_IH_P_NA
 
     ch = make_ih_channel()
     assert ch.name == "Ih"
@@ -463,9 +463,9 @@ def test_multiple_optional_channels_coexist():
 
 def test_public_api_exports():
     """GatingVariable and IonChannel and make_ih_channel are exported."""
-    assert hasattr(ap_sim, "GatingVariable")
-    assert hasattr(ap_sim, "IonChannel")
-    assert hasattr(ap_sim, "make_ih_channel")
+    assert hasattr(patch_sim, "GatingVariable")
+    assert hasattr(patch_sim, "IonChannel")
+    assert hasattr(patch_sim, "make_ih_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -514,7 +514,7 @@ def test_ika_kinetics_inactivation_decreases_with_depolarisation():
 
 def test_make_ika_channel_defaults():
     """make_ika_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_G_IKA
+    from patch_sim.constants import DEFAULT_G_IKA
 
     ch = make_ika_channel()
     assert ch.name == "IKa"
@@ -610,8 +610,8 @@ def test_ika_and_ih_coexist():
 
 
 def test_public_api_exports_ika():
-    """make_ika_channel is exported from the ap_sim public API."""
-    assert hasattr(ap_sim, "make_ika_channel")
+    """make_ika_channel is exported from the patch_sim public API."""
+    assert hasattr(patch_sim, "make_ika_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -663,7 +663,7 @@ def test_inap_subthreshold_activation():
 
 def test_make_inap_channel_defaults():
     """make_inap_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_G_NAP
+    from patch_sim.constants import DEFAULT_G_NAP
 
     ch = make_inap_channel()
     assert ch.name == "INaP"
@@ -735,8 +735,8 @@ def test_current_clamp_inap_gating_in_bounds():
 
 
 def test_public_api_exports_inap():
-    """make_inap_channel is exported from the ap_sim public API."""
-    assert hasattr(ap_sim, "make_inap_channel")
+    """make_inap_channel is exported from the patch_sim public API."""
+    assert hasattr(patch_sim, "make_inap_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -804,7 +804,7 @@ def test_inar_rates_non_negative():
 
 def test_make_inar_channel_defaults():
     """make_inar_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_G_NAR
+    from patch_sim.constants import DEFAULT_G_NAR
 
     ch = make_inar_channel()
     assert ch.name == "INaR"
@@ -903,7 +903,7 @@ def test_inap_and_inar_coexist():
 
 def test_all_additional_channels_coexist():
     """All seven additional channels (Ih, IKa, INaP, INaR, IM, IKir, IKCa) coexist."""
-    from ap_sim.calcium import CalciumDynamics
+    from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
         additional_channels=(
@@ -940,8 +940,8 @@ def test_all_additional_channels_coexist():
 
 
 def test_public_api_exports_inar():
-    """make_inar_channel is exported from the ap_sim public API."""
-    assert hasattr(ap_sim, "make_inar_channel")
+    """make_inar_channel is exported from the patch_sim public API."""
+    assert hasattr(patch_sim, "make_inar_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -984,7 +984,7 @@ def test_im_slow_kinetics():
 
 def test_make_im_channel_defaults():
     """make_im_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_G_IM
+    from patch_sim.constants import DEFAULT_G_IM
 
     ch = make_im_channel()
     assert ch.name == "IM"
@@ -1056,8 +1056,8 @@ def test_current_clamp_im_gating_in_bounds():
 
 
 def test_public_api_exports_im():
-    """make_im_channel is exported from the ap_sim public API."""
-    assert hasattr(ap_sim, "make_im_channel")
+    """make_im_channel is exported from the patch_sim public API."""
+    assert hasattr(patch_sim, "make_im_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -1101,7 +1101,7 @@ def test_ikir_fast_kinetics():
 
 def test_make_ikir_channel_defaults():
     """make_ikir_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_G_IKIR
+    from patch_sim.constants import DEFAULT_G_IKIR
 
     ch = make_ikir_channel()
     assert ch.name == "IKir"
@@ -1173,8 +1173,8 @@ def test_current_clamp_ikir_gating_in_bounds():
 
 
 def test_public_api_exports_ikir():
-    """make_ikir_channel is exported from the ap_sim public API."""
-    assert hasattr(ap_sim, "make_ikir_channel")
+    """make_ikir_channel is exported from the patch_sim public API."""
+    assert hasattr(patch_sim, "make_ikir_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -1196,7 +1196,7 @@ def test_calcium_gating_variable_in_integrator():
         gating_variables=(cg,),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )
-    from ap_sim.calcium import CalciumDynamics
+    from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
         additional_channels=(ch,),
@@ -1250,8 +1250,8 @@ def test_existing_channels_unaffected_by_calcium_gating_infra():
 
 
 def test_calcium_gating_variable_exported():
-    """GatingVariable is in the ap_sim public API (replaces CalciumGatingVariable)."""
-    assert hasattr(ap_sim, "GatingVariable")
+    """GatingVariable is in the patch_sim public API (replaces CalciumGatingVariable)."""
+    assert hasattr(patch_sim, "GatingVariable")
 
 
 # ---------------------------------------------------------------------------
@@ -1273,7 +1273,7 @@ def test_ikca_gating_steady_state_in_bounds():
 
 def test_ikca_activation_increases_with_calcium():
     """IKCa q_inf is higher at higher [Ca²⁺]ᵢ at a fixed voltage."""
-    from ap_sim.additional_channels import _ikca_q_inf
+    from patch_sim.additional_channels import _ikca_q_inf
 
     V = -20.0
     assert _ikca_q_inf(V, 1e-2) > _ikca_q_inf(V, 1e-3) > _ikca_q_inf(V, 1e-4)
@@ -1281,7 +1281,7 @@ def test_ikca_activation_increases_with_calcium():
 
 def test_ikca_activation_increases_with_depolarisation():
     """IKCa q_inf is higher at depolarised voltages at fixed [Ca²⁺]ᵢ."""
-    from ap_sim.additional_channels import _ikca_q_inf
+    from patch_sim.additional_channels import _ikca_q_inf
 
     ca = 1e-3
     assert _ikca_q_inf(20.0, ca) > _ikca_q_inf(-20.0, ca) > _ikca_q_inf(-80.0, ca)
@@ -1289,7 +1289,7 @@ def test_ikca_activation_increases_with_depolarisation():
 
 def test_ikca_zero_calcium_gives_zero_activation():
     """IKCa q_inf is zero when [Ca²⁺]ᵢ is zero, regardless of voltage."""
-    from ap_sim.additional_channels import _ikca_q_inf
+    from patch_sim.additional_channels import _ikca_q_inf
 
     for V in np.linspace(-120.0, 60.0, 10):
         assert _ikca_q_inf(V, 0.0) == 0.0, f"q_inf non-zero at V={V} with ca=0"
@@ -1310,7 +1310,7 @@ def test_ikca_rates_non_negative():
 
 def test_make_ikca_channel_defaults():
     """make_ikca_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_G_IKCA
+    from patch_sim.constants import DEFAULT_G_IKCA
 
     ch = make_ikca_channel()
     assert ch.name == "IKCa"
@@ -1343,7 +1343,7 @@ def test_ikca_is_not_calcium_ion_channel():
 
 def test_current_clamp_with_ikca():
     """Current clamp with IKCa channel adds IKCa_current and q columns."""
-    from ap_sim.calcium import CalciumDynamics
+    from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
         additional_channels=(make_ikca_channel(),),
@@ -1363,7 +1363,7 @@ def test_current_clamp_with_ikca():
 
 def test_current_clamp_ikca_gating_in_bounds():
     """IKCa gating variable q stays in [0, 1] during current clamp."""
-    from ap_sim.calcium import CalciumDynamics
+    from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
         additional_channels=(make_ikca_channel(),),
@@ -1382,8 +1382,8 @@ def test_current_clamp_ikca_gating_in_bounds():
 
 
 def test_public_api_exports_ikca():
-    """make_ikca_channel is exported from the ap_sim public API."""
-    assert hasattr(ap_sim, "make_ikca_channel")
+    """make_ikca_channel is exported from the patch_sim public API."""
+    assert hasattr(patch_sim, "make_ikca_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -1416,7 +1416,7 @@ def test_ical_activation_increases_with_depolarisation():
 
 def test_make_ical_channel_defaults():
     """make_ical_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_G_ICAL
+    from patch_sim.constants import DEFAULT_G_ICAL
 
     ch = make_ical_channel()
     assert ch.name == "ICaL"
@@ -1433,7 +1433,7 @@ def test_make_ical_channel_defaults():
 
 def test_current_clamp_with_ical_extra_columns():
     """Current clamp with ICaL channel adds ICaL_current, d, and f columns."""
-    from ap_sim.calcium import CalciumDynamics
+    from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
         additional_channels=(make_ical_channel(),),
@@ -1454,7 +1454,7 @@ def test_current_clamp_with_ical_extra_columns():
 
 def test_current_clamp_ical_gating_in_bounds():
     """ICaL gating variables d and f stay in [0, 1] during current clamp."""
-    from ap_sim.calcium import CalciumDynamics
+    from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
         additional_channels=(make_ical_channel(),),
@@ -1476,7 +1476,7 @@ def test_current_clamp_ical_gating_in_bounds():
 
 def test_voltage_clamp_with_ical_extra_columns():
     """Voltage clamp with ICaL channel adds ICaL_current, d, and f columns."""
-    from ap_sim.calcium import CalciumDynamics
+    from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
         additional_channels=(make_ical_channel(),),
@@ -1497,8 +1497,8 @@ def test_voltage_clamp_with_ical_extra_columns():
 
 
 def test_public_api_exports_ical():
-    """make_ical_channel is exported from ap_sim."""
-    assert hasattr(ap_sim, "make_ical_channel")
+    """make_ical_channel is exported from patch_sim."""
+    assert hasattr(patch_sim, "make_ical_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -1531,7 +1531,7 @@ def test_icat_activation_increases_with_depolarisation():
 
 def test_make_icat_channel_defaults():
     """make_icat_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_G_ICAT
+    from patch_sim.constants import DEFAULT_G_ICAT
 
     ch = make_icat_channel()
     assert ch.name == "ICaT"
@@ -1548,7 +1548,7 @@ def test_make_icat_channel_defaults():
 
 def test_current_clamp_with_icat_extra_columns():
     """Current clamp with ICaT channel adds ICaT_current, dt, and ft columns."""
-    from ap_sim.calcium import CalciumDynamics
+    from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
         additional_channels=(make_icat_channel(),),
@@ -1569,7 +1569,7 @@ def test_current_clamp_with_icat_extra_columns():
 
 def test_current_clamp_icat_gating_in_bounds():
     """ICaT gating variables dt and ft stay in [0, 1] during current clamp."""
-    from ap_sim.calcium import CalciumDynamics
+    from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
         additional_channels=(make_icat_channel(),),
@@ -1591,7 +1591,7 @@ def test_current_clamp_icat_gating_in_bounds():
 
 def test_voltage_clamp_with_icat_extra_columns():
     """Voltage clamp with ICaT channel adds ICaT_current, dt, and ft columns."""
-    from ap_sim.calcium import CalciumDynamics
+    from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
         additional_channels=(make_icat_channel(),),
@@ -1612,8 +1612,8 @@ def test_voltage_clamp_with_icat_extra_columns():
 
 
 def test_public_api_exports_icat():
-    """make_icat_channel is exported from the ap_sim public API."""
-    assert hasattr(ap_sim, "make_icat_channel")
+    """make_icat_channel is exported from the patch_sim public API."""
+    assert hasattr(patch_sim, "make_icat_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -1646,7 +1646,7 @@ def test_ican_activation_increases_with_depolarisation():
 
 def test_make_ican_channel_defaults():
     """make_ican_channel() produces a channel with the expected defaults."""
-    from ap_sim.constants import DEFAULT_G_ICAN
+    from patch_sim.constants import DEFAULT_G_ICAN
 
     ch = make_ican_channel()
     assert ch.name == "ICaN"
@@ -1663,7 +1663,7 @@ def test_make_ican_channel_defaults():
 
 def test_current_clamp_with_ican_extra_columns():
     """Current clamp with ICaN channel adds ICaN_current, dn, and fn columns."""
-    from ap_sim.calcium import CalciumDynamics
+    from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
         additional_channels=(make_ican_channel(),),
@@ -1684,7 +1684,7 @@ def test_current_clamp_with_ican_extra_columns():
 
 def test_current_clamp_ican_gating_in_bounds():
     """ICaN gating variables dn and fn stay in [0, 1] during current clamp."""
-    from ap_sim.calcium import CalciumDynamics
+    from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
         additional_channels=(make_ican_channel(),),
@@ -1706,7 +1706,7 @@ def test_current_clamp_ican_gating_in_bounds():
 
 def test_voltage_clamp_with_ican_extra_columns():
     """Voltage clamp with ICaN channel adds ICaN_current, dn, and fn columns."""
-    from ap_sim.calcium import CalciumDynamics
+    from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
         additional_channels=(make_ican_channel(),),
@@ -1727,5 +1727,5 @@ def test_voltage_clamp_with_ican_extra_columns():
 
 
 def test_public_api_exports_ican():
-    """make_ican_channel is exported from the ap_sim public API."""
-    assert hasattr(ap_sim, "make_ican_channel")
+    """make_ican_channel is exported from the patch_sim public API."""
+    assert hasattr(patch_sim, "make_ican_channel")

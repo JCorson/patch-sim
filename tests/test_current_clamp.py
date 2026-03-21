@@ -3,8 +3,8 @@
 import pytest
 import pandas as pd
 import numpy as np
-from ap_sim.hodgkin_huxley import HodgkinHuxley
-from ap_sim.clamp_simulations import simulate_current_clamp, SIM_SAMPLING_FREQ
+from patch_sim.hodgkin_huxley import HodgkinHuxley
+from patch_sim.clamp_simulations import simulate_current_clamp, SIM_SAMPLING_FREQ
 
 
 def test_simulate_current_clamp_returns_dataframe(hh_model):

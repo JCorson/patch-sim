@@ -1,7 +1,7 @@
 """Tests for electrochemical potential calculations (Nernst and GHK)."""
 
 import pytest
-from ap_sim.electrochemistry import goldman_potential, nernst_potential
+from patch_sim.electrochemistry import goldman_potential, nernst_potential
 
 
 @pytest.mark.parametrize(

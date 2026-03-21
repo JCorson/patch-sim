@@ -7,17 +7,17 @@ simulation integration, and the carries_calcium flag on IonChannel.
 import numpy as np
 import pytest
 
-import ap_sim
-from ap_sim.calcium import CalciumDynamics
-from ap_sim.channels import (
+import patch_sim
+from patch_sim.calcium import CalciumDynamics
+from patch_sim.channels import (
     GatingVariable,
     IonChannel,
     IonSpecies,
     NernstSpec,
 )
-from ap_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
-from ap_sim.hodgkin_huxley import HodgkinHuxley
-from ap_sim.protocols import step_current, step_voltage
+from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
+from patch_sim.hodgkin_huxley import HodgkinHuxley
+from patch_sim.protocols import step_current, step_voltage
 
 
 # ---------------------------------------------------------------------------
@@ -297,8 +297,8 @@ def test_ca_i_stays_non_negative_voltage_clamp() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_calcium_dynamics_exported_from_ap_sim() -> None:
-    """CalciumDynamics is accessible from the top-level ap_sim package."""
-    assert hasattr(ap_sim, "CalciumDynamics")
-    cd = ap_sim.CalciumDynamics()
+def test_calcium_dynamics_exported_from_patch_sim() -> None:
+    """CalciumDynamics is accessible from the top-level patch_sim package."""
+    assert hasattr(patch_sim, "CalciumDynamics")
+    cd = patch_sim.CalciumDynamics()
     assert isinstance(cd, CalciumDynamics)

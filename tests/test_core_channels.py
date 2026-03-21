@@ -2,8 +2,8 @@
 
 import pytest
 
-from ap_sim.channels import IonChannel, IonSpecies, NernstSpec
-from ap_sim.core_channels import (
+from patch_sim.channels import IonChannel, IonSpecies, NernstSpec
+from patch_sim.core_channels import (
     alpha_h,
     alpha_m,
     alpha_n,
@@ -14,7 +14,7 @@ from ap_sim.core_channels import (
     make_leak_channel,
     make_na_channel,
 )
-from ap_sim.hodgkin_huxley import HodgkinHuxley
+from patch_sim.hodgkin_huxley import HodgkinHuxley
 
 
 # ---------------------------------------------------------------------------

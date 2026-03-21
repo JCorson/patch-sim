@@ -1,6 +1,6 @@
 """Integration tests for the protocol → simulation pipeline.
 
-Each test generates a stimulus protocol via ap_sim.protocols and feeds it
+Each test generates a stimulus protocol via patch_sim.protocols and feeds it
 directly into simulate_current_clamp() or simulate_voltage_clamp(), exercising
 the full end-to-end workflow rather than either component in isolation.
 """
@@ -8,9 +8,9 @@ the full end-to-end workflow rather than either component in isolation.
 import numpy as np
 import pandas as pd
 
-from ap_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
-from ap_sim.hodgkin_huxley import HodgkinHuxley
-from ap_sim.protocols import (
+from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
+from patch_sim.hodgkin_huxley import HodgkinHuxley
+from patch_sim.protocols import (
     activation_protocol,
     chirp_current,
     iv_curve_protocol,

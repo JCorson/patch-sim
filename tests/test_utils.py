@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from ap_sim.utils import boltzmann_cosh_rates, safe_exp
+from patch_sim.utils import boltzmann_cosh_rates, safe_exp
 
 
 class TestSafeExp:

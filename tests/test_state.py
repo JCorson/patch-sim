@@ -1,4 +1,4 @@
-"""Unit tests for pure logic in ap_sim_ui/state.py.
+"""Unit tests for pure logic in patch_sim_ui/state.py.
 
 These tests exercise AppState methods that contain no Reflex event-loop
 machinery.  Instantiation uses ``_reflex_internal_init=True`` (the same
@@ -21,8 +21,8 @@ os.environ.setdefault("PYTEST_CURRENT_TEST", "test_state.py::setup")
 
 pytest.importorskip("reflex")
 
-from ap_sim_ui.plotting import Sweep  # noqa: E402
-from ap_sim_ui.state import AppState  # noqa: E402
+from patch_sim_ui.plotting import Sweep  # noqa: E402
+from patch_sim_ui.state import AppState  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers

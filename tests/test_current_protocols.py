@@ -6,7 +6,7 @@ This module contains unit tests for all current clamp protocol functions.
 import numpy as np
 import pytest
 
-from ap_sim.protocols import (
+from patch_sim.protocols import (
     chirp_current,
     noise_current,
     pulse_train,
