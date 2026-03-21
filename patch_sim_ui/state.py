@@ -619,6 +619,10 @@ class AppState(rx.State):
         self.current_sweeps = []
         self.saved_sweeps = []
 
+    def reset_to_defaults(self) -> None:
+        """Reset all parameters and sweeps to their class-level defaults."""
+        self.reset()
+
     def load_preset(self, name: str) -> None:
         """Load a named preset configuration."""
         if name not in presets.PRESETS:
