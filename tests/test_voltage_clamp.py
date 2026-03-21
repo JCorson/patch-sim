@@ -344,8 +344,11 @@ def test_jit_and_python_paths_agree_vc(hh_model, monkeypatch) -> None:
 
 
 def test_simulate_voltage_clamp_custom_channel_python_path() -> None:
-    """simulate_voltage_clamp uses the Python path and returns correct columns
-    when a custom (non-core) channel forces JIT to be skipped."""
+    """simulate_voltage_clamp uses the Python path with a non-core channel.
+
+    A custom channel with non-standard rate functions must force JIT to be
+    skipped and the returned DataFrame must contain the custom channel columns.
+    """
     from patch_sim.channels import GatingVariable, IonChannel, IonSpecies, NernstSpec
     from patch_sim.utils import boltzmann_cosh_rates
     import patch_sim.clamp_simulations as cs
