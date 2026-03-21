@@ -15,6 +15,7 @@ from patch_sim_ui.constants import (
     CHANNEL_COLORS,
     GATING_VAR_COLORS,
     STIMULUS_COLOR,
+    STORED_TRACE_COLORS,
 )
 
 # Classic column names that are always present in simulation DataFrames.
@@ -345,14 +346,15 @@ def compute_trace_visibility_map(
     clamp_mode: str,
     additional_current_field_map: dict[str, str] | None = None,
     additional_gating_field_map: dict[str, str] | None = None,
+    stored_traces: list[Sweep] | None = None,
 ) -> dict[str, list[int]]:
     """Return a mapping from show_* field names to Plotly trace indices.
 
     Mirrors the trace-insertion order used by ``build_figure`` so callers can
     toggle individual traces via ``Plotly.restyle`` without rebuilding the
     figure.  Only current-sweep traces controlled by a ``show_*`` field are
-    mapped; saved-sweep traces and carrier traces advance the counter but are
-    not included (they are always visible).
+    mapped; saved-sweep traces, stored traces, and carrier traces advance the
+    counter but are not included (they are always visible).
 
     Args:
         current_sweeps: Latest simulation result sweeps.
@@ -366,6 +368,8 @@ def compute_trace_visibility_map(
             sweep keys (e.g. ``"r"``) to ``show_*`` field names
             (e.g. ``"show_ih_gating"``).  Keys absent from the map advance
             the index counter but are not recorded.
+        stored_traces: Oscilloscope-style stored reference traces.  Always
+            visible; their indices are not recorded in the result map.
 
     Returns:
         Dict mapping each ``show_*`` field name to the list of Plotly trace
@@ -433,6 +437,14 @@ def compute_trace_visibility_map(
             _skip()  # total_current only (VC sweep shown in CC context)
         _skip()  # stimulus
 
+    for sweep in stored_traces or []:
+        # Stored traces are always visible; just advance the counter.
+        if sweep.clamp_mode == "Current Clamp":
+            _skip()  # voltage
+        else:
+            _skip()  # total_current
+        _skip()  # stimulus
+
     # Invisible hover-carrier traces in multi-sweep mode — always visible.
     if is_multi_sweep and current_sweeps:
         for _ in range(3):
@@ -446,6 +458,7 @@ def build_figure(
     saved_sweeps: list[Sweep],
     visibility: TraceVisibility,
     clamp_mode: str,
+    stored_traces: list[Sweep] | None = None,
 ) -> go.Figure:
     """Build a Plotly figure from current and saved sweeps.
 
@@ -457,6 +470,9 @@ def build_figure(
     Current sweeps are rendered with visibility-flag filtering applied.
     Saved sweeps are rendered as overlays showing the primary trace and
     stimulus only, always visible.
+    Stored traces are oscilloscope-style background reference snapshots,
+    rendered with dashed faded lines; only voltage (CC) or total_current (VC)
+    and stimulus are plotted.
 
     Both **Current Clamp** and **Voltage Clamp** use a fixed 3-row layout.
     In Voltage Clamp mode all ion current channels are overlaid on a single
@@ -476,6 +492,8 @@ def build_figure(
         saved_sweeps: User-saved sweeps for comparison overlay.
         visibility: Consolidated trace visibility flags.
         clamp_mode: Active UI clamp mode, used for layout and axis labels.
+        stored_traces: Oscilloscope-style stored reference traces; rendered as
+            faded dashed lines behind the live traces.
 
     Returns:
         A Plotly Figure with response, gating, and stimulus subplots.
@@ -682,6 +700,39 @@ def build_figure(
                 hoverinfo=hi,
             )
         _scatter(sweep.time, sweep.stimulus, sweep.label, stimulus_row, c, hoverinfo=hi)
+
+    for i, sweep in enumerate(stored_traces or []):
+        c = STORED_TRACE_COLORS[i % len(STORED_TRACE_COLORS)]
+        label = sweep.label or f"Stored {i + 1}"
+        if sweep.clamp_mode == "Current Clamp":
+            _scatter(
+                sweep.time,
+                sweep.voltage,
+                label,
+                1,
+                c,
+                dash="dash",
+                hoverinfo="skip",
+            )
+        else:
+            _scatter(
+                sweep.time,
+                sweep.total_current,
+                label,
+                1,
+                c,
+                dash="dash",
+                hoverinfo="skip",
+            )
+        _scatter(
+            sweep.time,
+            sweep.stimulus,
+            label,
+            stimulus_row,
+            c,
+            dash="dash",
+            hoverinfo="skip",
+        )
 
     # Add invisible hover carrier traces for multi-sweep (I-V Curve) mode.
     # Each carrier sits on one subplot and delivers a per-time-point HTML

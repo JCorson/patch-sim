@@ -15,7 +15,7 @@ setup_logging()
 
 
 def _header() -> rx.Component:
-    """Top navigation bar with preset selector, title, and Run button."""
+    """Top navigation bar with preset selector, title, and Run/Continuous buttons."""
     return rx.hstack(
         rx.select(
             presets.PRESET_NAMES,
@@ -35,21 +35,46 @@ def _header() -> rx.Component:
         rx.spacer(),
         rx.heading("Patch Clamp Simulator", size="4"),
         rx.spacer(),
-        rx.cond(
-            AppState.is_running,
-            rx.hstack(
-                rx.spinner(size="2"),
-                rx.text("Running…", size="2", color="gray"),
-                spacing="2",
-                align="center",
+        rx.hstack(
+            rx.cond(
+                AppState.is_running,
+                rx.hstack(
+                    rx.spinner(size="2"),
+                    rx.text("Running…", size="2", color="gray"),
+                    spacing="2",
+                    align="center",
+                ),
+                rx.button(
+                    rx.icon("play"),
+                    "Run",
+                    on_click=AppState.run_simulation,
+                    color_scheme="blue",
+                    size="2",
+                    disabled=AppState.continuous_loop_running,
+                ),
             ),
-            rx.button(
-                rx.icon("play"),
-                "Run",
-                on_click=AppState.run_simulation,
-                color_scheme="blue",
-                size="2",
+            rx.cond(
+                AppState.continuous_active,
+                rx.button(
+                    rx.icon("square"),
+                    "Stop",
+                    on_click=AppState.toggle_continuous_mode,
+                    color_scheme="red",
+                    variant="soft",
+                    size="2",
+                ),
+                rx.button(
+                    rx.icon("repeat"),
+                    "Continuous",
+                    on_click=AppState.toggle_continuous_mode,
+                    color_scheme="green",
+                    variant="soft",
+                    size="2",
+                    disabled=~AppState.can_run_continuous,
+                ),
             ),
+            spacing="2",
+            align="center",
         ),
         width="100%",
         padding_x="4",

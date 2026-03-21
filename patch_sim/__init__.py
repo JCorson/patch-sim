@@ -39,6 +39,8 @@ from .additional_channels import (
 from .clamp_simulations import (
     simulate_voltage_clamp,
     simulate_current_clamp,
+    simulate_voltage_clamp_from_state,
+    simulate_current_clamp_from_state,
     simulate_batch,
 )
 from .electrochemistry import goldman_potential, nernst_potential
@@ -87,6 +89,8 @@ __all__ = [
     "make_na_channel",
     "simulate_voltage_clamp",
     "simulate_current_clamp",
+    "simulate_voltage_clamp_from_state",
+    "simulate_current_clamp_from_state",
     "simulate_batch",
     "nernst_potential",
     "goldman_potential",

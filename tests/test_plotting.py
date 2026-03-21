@@ -711,3 +711,46 @@ def test_compute_trace_visibility_map_unknown_additional_key_advances_counter() 
     assert result["show_potassium_activation"] == [5]
     assert result["show_sodium_activation"] == [6]
     assert result["show_sodium_inactivation"] == [7]
+
+
+# ---------------------------------------------------------------------------
+# build_figure with stored_traces
+# ---------------------------------------------------------------------------
+
+
+def test_build_figure_with_stored_traces_does_not_raise() -> None:
+    """build_figure with non-empty stored_traces returns a Figure without error."""
+    sweep = _make_sweep(mode="Current Clamp")
+    stored = _make_sweep(mode="Current Clamp")
+    stored = stored.model_copy(update={"label": "Stored 1"})
+    fig = build_figure(
+        [sweep], [], TraceVisibility(), "Current Clamp", stored_traces=[stored]
+    )
+    assert isinstance(fig, go.Figure)
+
+
+def test_build_figure_stored_traces_adds_extra_traces() -> None:
+    """build_figure with stored traces produces more traces than without."""
+    sweep = _make_sweep(mode="Current Clamp")
+    stored = _make_sweep(mode="Current Clamp")
+
+    fig_no_stored = build_figure([sweep], [], TraceVisibility(), "Current Clamp")
+    fig_with_stored = build_figure(
+        [sweep], [], TraceVisibility(), "Current Clamp", stored_traces=[stored]
+    )
+
+    assert len(fig_with_stored.data) > len(fig_no_stored.data)
+
+
+def test_compute_trace_visibility_map_with_stored_traces_advances_counter() -> None:
+    """Stored traces advance trace index counter without polluting the result map."""
+    sweep = _make_sweep(mode="Current Clamp")
+    stored = _make_sweep(mode="Current Clamp")
+
+    result_without = compute_trace_visibility_map([sweep], [], "Current Clamp")
+    result_with = compute_trace_visibility_map(
+        [sweep], [], "Current Clamp", stored_traces=[stored]
+    )
+
+    # The recorded show_* indices must be identical regardless of stored traces.
+    assert result_without == result_with

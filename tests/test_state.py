@@ -250,9 +250,118 @@ def test_load_preset_clears_saved_sweeps() -> None:
     assert len(s.saved_sweeps) == 0
 
 
+def test_load_preset_clears_stored_traces() -> None:
+    """load_preset resets stored_traces to an empty list."""
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    s.store_trace()
+    assert len(s.stored_traces) == 1
+    s.load_preset("Action Potential")
+    assert len(s.stored_traces) == 0
+
+
+def test_load_preset_resets_cont_has_state() -> None:
+    """load_preset resets _cont_has_state so the next continuous iter starts fresh."""
+    s = _make_state()
+    s._cont_has_state = True
+    s.load_preset("Action Potential")
+    assert s._cont_has_state is False
+
+
 def test_load_preset_unknown_name_is_ignored() -> None:
     """load_preset silently ignores an unknown preset name."""
     s = _make_state()
     original_duration = s.duration
     s.load_preset("NonExistentPreset")
     assert s.duration == pytest.approx(original_duration)
+
+
+# ---------------------------------------------------------------------------
+# store_trace / clear_stored_traces
+# ---------------------------------------------------------------------------
+
+
+def test_store_trace_appends_to_stored_traces() -> None:
+    """store_trace promotes the current result to stored_traces."""
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    assert len(s.stored_traces) == 0
+    s.store_trace()
+    assert len(s.stored_traces) == 1
+
+
+def test_store_trace_sets_stored_label() -> None:
+    """store_trace labels the stored entry 'Stored 1'."""
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    s.store_trace()
+    assert s.stored_traces[0].label == "Stored 1"
+
+
+def test_store_trace_twice_increments_label() -> None:
+    """Calling store_trace twice creates 'Stored 1' and 'Stored 2'."""
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    s.store_trace()
+    s.store_trace()
+    assert len(s.stored_traces) == 2
+    assert s.stored_traces[1].label == "Stored 2"
+
+
+def test_store_trace_does_nothing_when_no_result() -> None:
+    """store_trace is a no-op when current_sweeps is empty."""
+    s = _make_state()
+    assert len(s.current_sweeps) == 0
+    s.store_trace()
+    assert len(s.stored_traces) == 0
+
+
+def test_clear_stored_traces_empties_list() -> None:
+    """clear_stored_traces removes all entries from stored_traces."""
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    s.store_trace()
+    s.store_trace()
+    assert len(s.stored_traces) == 2
+    s.clear_stored_traces()
+    assert len(s.stored_traces) == 0
+
+
+def test_has_stored_traces_false_when_empty() -> None:
+    """has_stored_traces is False when no traces have been stored."""
+    s = _make_state()
+    assert s.has_stored_traces is False
+
+
+def test_has_stored_traces_true_after_store() -> None:
+    """has_stored_traces is True after store_trace is called."""
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    s.store_trace()
+    assert s.has_stored_traces is True
+
+
+def test_set_clamp_mode_clears_stored_traces() -> None:
+    """set_clamp_mode clears stored_traces when switching modes.
+
+    Stored traces from the old mode must not persist — they would have
+    incompatible axes alongside new-mode data.
+    """
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    s.store_trace()
+    assert len(s.stored_traces) == 1
+    s.set_clamp_mode("Voltage Clamp")
+    assert len(s.stored_traces) == 0
+
+
+def test_set_clamp_mode_resets_cont_has_state() -> None:
+    """set_clamp_mode resets _cont_has_state so the next continuous iter starts fresh.
+
+    This ensures that switching clamp modes during continuous simulation does
+    not carry over stale gating state from the previous mode.
+    """
+    s = _make_state()
+    s._cont_has_state = True
+    s.set_clamp_mode("Voltage Clamp")
+    assert s._cont_has_state is False
