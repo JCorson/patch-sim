@@ -232,3 +232,162 @@ def test_vc_from_state_empty_raises(hh_model):
             np.array([]),
             initial_gating_state=gating,
         )
+
+
+# ---------------------------------------------------------------------------
+# Multi-iteration sequential _from_state tests (continuous loop simulation)
+# ---------------------------------------------------------------------------
+
+
+def _extract_terminal_cc_state(df, hh_model):
+    """Return (last_V, last_gating_dict) from a current-clamp result DataFrame."""
+    gating_cols = [
+        col
+        for col in df.columns
+        if col in {gv.name for gv in hh_model.all_gating_variables}
+    ]
+    last_V = float(df["voltage"].iloc[-1])
+    last_gating = {col: float(df[col].iloc[-1]) for col in gating_cols}
+    return last_V, last_gating
+
+
+def _extract_terminal_vc_state(df, hh_model):
+    """Return last_gating_dict from a voltage-clamp result DataFrame."""
+    gating_cols = [
+        col
+        for col in df.columns
+        if col in {gv.name for gv in hh_model.all_gating_variables}
+    ]
+    return {col: float(df[col].iloc[-1]) for col in gating_cols}
+
+
+def test_cc_three_iteration_loop_state_continuity(hh_model):
+    """Three chained CC _from_state calls maintain junction continuity.
+
+    Simulates three consecutive iterations of the continuous loop.  At each
+    junction the terminal voltage and gating state of iteration N must equal
+    the initial voltage and gating state at t=0 of iteration N+1.
+    """
+    stimulus = _make_steps(5.0, current=15.0)
+
+    # Iteration 1 — fresh start
+    df1 = simulate_current_clamp(hh_model, stimulus)
+    last_V1, last_gating1 = _extract_terminal_cc_state(df1, hh_model)
+
+    # Iteration 2 — carry forward from iteration 1
+    df2 = simulate_current_clamp_from_state(
+        hh_model, stimulus, initial_V=last_V1, initial_gating_state=last_gating1
+    )
+    assert df2["voltage"].iloc[0] == pytest.approx(last_V1)
+    for col, val in last_gating1.items():
+        assert df2[col].iloc[0] == pytest.approx(val, abs=1e-9)
+
+    last_V2, last_gating2 = _extract_terminal_cc_state(df2, hh_model)
+
+    # Iteration 3 — carry forward from iteration 2
+    df3 = simulate_current_clamp_from_state(
+        hh_model, stimulus, initial_V=last_V2, initial_gating_state=last_gating2
+    )
+    assert df3["voltage"].iloc[0] == pytest.approx(last_V2)
+    for col, val in last_gating2.items():
+        assert df3[col].iloc[0] == pytest.approx(val, abs=1e-9)
+
+
+def test_cc_three_iteration_loop_matches_full_run(hh_model):
+    """Three chained CC iterations match a single equivalent full run.
+
+    Running three back-to-back _from_state iterations over a zero-current
+    stimulus must produce the same terminal state as a single run of three
+    times the duration (zero current keeps the membrane at rest throughout).
+    """
+    segment = _make_steps(5.0, current=0.0)
+    full = _make_steps(15.0, current=0.0)
+
+    df_full = simulate_current_clamp(hh_model, full)
+
+    df1 = simulate_current_clamp(hh_model, segment)
+    last_V1, last_gating1 = _extract_terminal_cc_state(df1, hh_model)
+
+    df2 = simulate_current_clamp_from_state(
+        hh_model, segment, initial_V=last_V1, initial_gating_state=last_gating1
+    )
+    last_V2, last_gating2 = _extract_terminal_cc_state(df2, hh_model)
+
+    df3 = simulate_current_clamp_from_state(
+        hh_model, segment, initial_V=last_V2, initial_gating_state=last_gating2
+    )
+    last_V3, last_gating3 = _extract_terminal_cc_state(df3, hh_model)
+
+    gating_cols = list(last_gating3.keys())
+    assert last_V3 == pytest.approx(float(df_full["voltage"].iloc[-1]), abs=1e-6)
+    for col in gating_cols:
+        assert last_gating3[col] == pytest.approx(
+            float(df_full[col].iloc[-1]), abs=1e-6
+        )
+
+
+def test_vc_three_iteration_loop_state_continuity(hh_model):
+    """Three chained VC _from_state calls maintain junction continuity.
+
+    Simulates three consecutive voltage-clamp iterations.  At each junction
+    the terminal gating state of iteration N must equal the initial gating
+    state at t=0 of iteration N+1.
+    """
+    protocol = _make_voltage_steps(5.0, voltage=-20.0)
+
+    # Iteration 1 — fresh start
+    df1 = simulate_voltage_clamp(hh_model, protocol)
+    last_gating1 = _extract_terminal_vc_state(df1, hh_model)
+
+    # Iteration 2
+    df2 = simulate_voltage_clamp_from_state(
+        hh_model, protocol, initial_gating_state=last_gating1
+    )
+    for col, val in last_gating1.items():
+        assert df2[col].iloc[0] == pytest.approx(val, abs=1e-9)
+
+    last_gating2 = _extract_terminal_vc_state(df2, hh_model)
+
+    # Iteration 3
+    df3 = simulate_voltage_clamp_from_state(
+        hh_model, protocol, initial_gating_state=last_gating2
+    )
+    for col, val in last_gating2.items():
+        assert df3[col].iloc[0] == pytest.approx(val, abs=1e-9)
+
+
+def test_vc_three_iteration_loop_matches_full_run(hh_model):
+    """Three chained VC iterations match a single equivalent full run.
+
+    Running three back-to-back _from_state iterations at the holding voltage
+    must produce the same terminal gating state as a single run of three times
+    the duration.
+    """
+    hold = -70.0
+    segment = _make_voltage_steps(5.0, voltage=hold)
+    full = _make_voltage_steps(15.0, voltage=hold)
+
+    df_full = simulate_voltage_clamp(hh_model, full)
+    gating_cols = [
+        col
+        for col in df_full.columns
+        if col in {gv.name for gv in hh_model.all_gating_variables}
+    ]
+
+    df1 = simulate_voltage_clamp(hh_model, segment)
+    last_gating1 = _extract_terminal_vc_state(df1, hh_model)
+
+    df2 = simulate_voltage_clamp_from_state(
+        hh_model, segment, initial_gating_state=last_gating1
+    )
+    last_gating2 = _extract_terminal_vc_state(df2, hh_model)
+
+    df3 = simulate_voltage_clamp_from_state(
+        hh_model, segment, initial_gating_state=last_gating2
+    )
+    last_gating3 = _extract_terminal_vc_state(df3, hh_model)
+
+    for col in gating_cols:
+        assert last_gating3[col] == pytest.approx(
+            float(df_full[col].iloc[-1]), abs=1e-6
+        )

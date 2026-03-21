@@ -9,6 +9,7 @@ The environment variable is set at import time so the AppState metaclass
 registration does not see a non-testing environment.
 """
 
+import logging
 import os
 
 import numpy as np
@@ -21,6 +22,8 @@ os.environ.setdefault("PYTEST_CURRENT_TEST", "test_state.py::setup")
 
 pytest.importorskip("reflex")
 
+from patch_sim_ui import constants  # noqa: E402
+from patch_sim_ui.log_handler import UILogRecord  # noqa: E402
 from patch_sim_ui.plotting import Sweep  # noqa: E402
 from patch_sim_ui.state import AppState  # noqa: E402
 
@@ -365,3 +368,203 @@ def test_set_clamp_mode_resets_cont_has_state() -> None:
     s._cont_has_state = True
     s.set_clamp_mode("Voltage Clamp")
     assert s._cont_has_state is False
+
+
+def test_set_clamp_mode_to_current_resets_protocol_type() -> None:
+    """set_clamp_mode('Current Clamp') resets protocol_type to the first CC option."""
+    s = _make_state()
+    s.clamp_mode = "Voltage Clamp"
+    s.protocol_type = "I-V Curve"
+    s.set_clamp_mode("Current Clamp")
+    assert s.protocol_type == constants.CURRENT_PROTOCOLS[0]
+
+
+def test_set_clamp_mode_to_voltage_resets_protocol_type() -> None:
+    """set_clamp_mode('Voltage Clamp') resets protocol_type to the first VC option."""
+    s = _make_state()
+    s.set_clamp_mode("Voltage Clamp")
+    assert s.protocol_type == constants.VOLTAGE_PROTOCOLS[0]
+
+
+# ---------------------------------------------------------------------------
+# protocol_options computed var
+# ---------------------------------------------------------------------------
+
+
+def test_protocol_options_current_clamp() -> None:
+    """protocol_options returns the current clamp list when mode is Current Clamp."""
+    s = _make_state()
+    s.clamp_mode = "Current Clamp"
+    assert s.protocol_options == constants.CURRENT_PROTOCOLS
+
+
+def test_protocol_options_voltage_clamp() -> None:
+    """protocol_options returns the voltage clamp list when mode is Voltage Clamp."""
+    s = _make_state()
+    s.clamp_mode = "Voltage Clamp"
+    assert s.protocol_options == constants.VOLTAGE_PROTOCOLS
+
+
+# ---------------------------------------------------------------------------
+# can_run_continuous computed var
+# ---------------------------------------------------------------------------
+
+
+def test_can_run_continuous_true_for_step() -> None:
+    """can_run_continuous is True for the Step protocol."""
+    s = _make_state()
+    s.protocol_type = "Step"
+    assert s.can_run_continuous is True
+
+
+def test_can_run_continuous_true_for_ramp() -> None:
+    """can_run_continuous is True for the Ramp protocol."""
+    s = _make_state()
+    s.protocol_type = "Ramp"
+    assert s.can_run_continuous is True
+
+
+def test_can_run_continuous_false_for_iv_curve() -> None:
+    """can_run_continuous is False for the I-V Curve protocol."""
+    s = _make_state()
+    s.protocol_type = "I-V Curve"
+    assert s.can_run_continuous is False
+
+
+def test_can_run_continuous_false_for_activation() -> None:
+    """can_run_continuous is False for the Activation protocol."""
+    s = _make_state()
+    s.protocol_type = "Activation"
+    assert s.can_run_continuous is False
+
+
+# ---------------------------------------------------------------------------
+# continuous_active computed var
+# ---------------------------------------------------------------------------
+
+
+def test_continuous_active_false_by_default() -> None:
+    """continuous_active is False when neither flag is set."""
+    s = _make_state()
+    assert s.continuous_active is False
+
+
+def test_continuous_active_false_when_mode_only() -> None:
+    """continuous_active is False when continuous_mode is True but loop not running."""
+    s = _make_state()
+    s.continuous_mode = True
+    assert s.continuous_active is False
+
+
+def test_continuous_active_false_when_loop_only() -> None:
+    """continuous_active is False when loop is running but mode is False."""
+    s = _make_state()
+    s.continuous_loop_running = True
+    assert s.continuous_active is False
+
+
+def test_continuous_active_true_when_both_set() -> None:
+    """continuous_active is True when both continuous_mode and the loop are active."""
+    s = _make_state()
+    s.continuous_mode = True
+    s.continuous_loop_running = True
+    assert s.continuous_active is True
+
+
+# ---------------------------------------------------------------------------
+# toggle_continuous_mode state transitions
+# ---------------------------------------------------------------------------
+
+
+def test_toggle_continuous_mode_sets_continuous_mode_true() -> None:
+    """toggle_continuous_mode enables continuous_mode when the loop is not running."""
+    s = _make_state()
+    assert s.continuous_loop_running is False
+    s.toggle_continuous_mode()
+    assert s.continuous_mode is True
+
+
+def test_toggle_continuous_mode_clears_continuous_mode_when_running() -> None:
+    """toggle_continuous_mode disables continuous_mode when the loop is already running."""
+    s = _make_state()
+    s.continuous_loop_running = True
+    s.continuous_mode = True
+    s.toggle_continuous_mode()
+    assert s.continuous_mode is False
+
+
+# ---------------------------------------------------------------------------
+# filtered_log_entries computed var
+# ---------------------------------------------------------------------------
+
+
+def _make_log_record(level: str, message: str) -> UILogRecord:
+    """Return a minimal UILogRecord for testing."""
+    return UILogRecord(
+        timestamp="2026-01-01T00:00:00Z",
+        level=level,
+        logger_name="test",
+        message=message,
+    )
+
+
+def test_filtered_log_entries_returns_all_at_debug() -> None:
+    """filtered_log_entries returns all records when filter is DEBUG."""
+    s = _make_state()
+    s.log_level_filter = "DEBUG"
+    s.log_entries = [
+        _make_log_record("DEBUG", "dbg"),
+        _make_log_record("INFO", "info"),
+        _make_log_record("WARNING", "warn"),
+        _make_log_record("ERROR", "err"),
+    ]
+    assert len(s.filtered_log_entries) == 4
+
+
+def test_filtered_log_entries_filters_below_info() -> None:
+    """filtered_log_entries omits DEBUG entries when filter is INFO."""
+    s = _make_state()
+    s.log_level_filter = "INFO"
+    s.log_entries = [
+        _make_log_record("DEBUG", "dbg"),
+        _make_log_record("INFO", "info"),
+        _make_log_record("WARNING", "warn"),
+    ]
+    result = s.filtered_log_entries
+    assert len(result) == 2
+    assert all(e.level != "DEBUG" for e in result)
+
+
+def test_filtered_log_entries_only_errors_at_error_level() -> None:
+    """filtered_log_entries returns only ERROR records when filter is ERROR."""
+    s = _make_state()
+    s.log_level_filter = "ERROR"
+    s.log_entries = [
+        _make_log_record("DEBUG", "dbg"),
+        _make_log_record("INFO", "info"),
+        _make_log_record("WARNING", "warn"),
+        _make_log_record("ERROR", "err"),
+    ]
+    result = s.filtered_log_entries
+    assert len(result) == 1
+    assert result[0].level == "ERROR"
+
+
+def test_filtered_log_entries_newest_first() -> None:
+    """filtered_log_entries returns entries in reverse order (newest first)."""
+    s = _make_state()
+    s.log_level_filter = "DEBUG"
+    s.log_entries = [
+        _make_log_record("INFO", "first"),
+        _make_log_record("INFO", "second"),
+        _make_log_record("INFO", "third"),
+    ]
+    result = s.filtered_log_entries
+    assert result[0].message == "third"
+    assert result[-1].message == "first"
+
+
+def test_filtered_log_entries_empty_when_no_entries() -> None:
+    """filtered_log_entries returns an empty list when log_entries is empty."""
+    s = _make_state()
+    assert s.filtered_log_entries == []
