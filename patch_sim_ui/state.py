@@ -4,6 +4,7 @@ All reactive variables and event handlers live here. The state drives
 the Reflex component tree via computed properties.
 """
 
+import asyncio
 import json
 import logging
 import time
@@ -311,6 +312,7 @@ def _make_visibility_setter(field_name: str):
             clamp_mode=self.clamp_mode,
             additional_current_field_map=_ADDITIONAL_CURRENT_FIELD_MAP,
             additional_gating_field_map=_ADDITIONAL_GATING_FIELD_MAP,
+            stored_traces=self.stored_traces,
         )
         indices = trace_map.get(field_name, [])
         if indices:
@@ -454,6 +456,7 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     current_sweeps: list[Sweep] = []  # Latest simulation result
     saved_sweeps: list[Sweep] = []  # User-saved sweeps for comparison overlay
+    stored_traces: list[Sweep] = []  # Oscilloscope-style stored reference traces
 
     # ------------------------------------------------------------------ #
     # Trace visibility checkboxes                                        #
@@ -486,6 +489,19 @@ class AppState(rx.State):
     show_icat_gating: bool = True
     show_ican_current: bool = True
     show_ican_gating: bool = True
+
+    # ------------------------------------------------------------------ #
+    # Continuous simulation mode                                        #
+    # ------------------------------------------------------------------ #
+    continuous_mode: bool = False  # user has toggled continuous on
+    continuous_loop_running: bool = False  # background task is executing
+
+    # Terminal neuron state carried between continuous loop iterations.
+    # Prefixed with _ by convention; still full Reflex state vars.
+    _cont_V: float = 0.0
+    _cont_gating: dict[str, float] = {}
+    _cont_ca_i: float = 0.0
+    _cont_has_state: bool = False  # True once at least one iteration has run
 
     # ------------------------------------------------------------------ #
     # UI state                                                           #
@@ -536,6 +552,25 @@ class AppState(rx.State):
         return len(self.current_sweeps) > 0
 
     @rx.var
+    def has_stored_traces(self) -> bool:
+        """Whether any oscilloscope-stored reference traces exist."""
+        return len(self.stored_traces) > 0
+
+    @rx.var
+    def continuous_active(self) -> bool:
+        """True when continuous mode is enabled and the loop is running."""
+        return self.continuous_mode and self.continuous_loop_running
+
+    @rx.var
+    def can_run_continuous(self) -> bool:
+        """True when the active protocol is compatible with continuous mode.
+
+        Multi-sweep protocols (I-V Curve, Activation) are excluded because
+        each of their sweeps uses independent initial conditions.
+        """
+        return self.protocol_type not in ("I-V Curve", "Activation")
+
+    @rx.var
     def filtered_log_entries(self) -> list[UILogRecord]:
         """Log entries filtered to the selected minimum level, newest first.
 
@@ -566,6 +601,7 @@ class AppState(rx.State):
             saved_sweeps=self.saved_sweeps,
             visibility=TraceVisibility(),  # all visible; toggling handled client-side
             clamp_mode=self.clamp_mode,
+            stored_traces=self.stored_traces,
         )
 
     # ------------------------------------------------------------------ #
@@ -618,6 +654,7 @@ class AppState(rx.State):
             self.protocol_type = constants.VOLTAGE_PROTOCOLS[0]
         self.current_sweeps = []
         self.saved_sweeps = []
+        self._cont_has_state = False
 
     def reset_to_defaults(self) -> None:
         """Reset all parameters and sweeps to their class-level defaults."""
@@ -683,6 +720,7 @@ class AppState(rx.State):
             clamp_mode=self.clamp_mode,
             additional_current_field_map=_ADDITIONAL_CURRENT_FIELD_MAP,
             additional_gating_field_map=_ADDITIONAL_GATING_FIELD_MAP,
+            stored_traces=self.stored_traces,
         )
         hidden: list[int] = []
         for field_name, indices in trace_map.items():
@@ -718,6 +756,257 @@ class AppState(rx.State):
         js = self._apply_visibility_js()
         if js:
             return rx.call_script(js)
+
+    # ------------------------------------------------------------------ #
+    # Stored trace management                                            #
+    # ------------------------------------------------------------------ #
+    def store_trace(self) -> None:
+        """Snapshot the current sweep into the oscilloscope stored traces."""
+        if not self.has_result:
+            return
+        idx = len(self.stored_traces)
+        color = constants.STORED_TRACE_COLORS[idx % len(constants.STORED_TRACE_COLORS)]
+        label = f"Stored {idx + 1}"
+        self.stored_traces.append(
+            self.current_sweeps[0].model_copy(update={"color": color, "label": label})
+        )
+        js = self._apply_visibility_js()
+        if js:
+            return rx.call_script(js)
+
+    def clear_stored_traces(self) -> None:
+        """Remove all oscilloscope stored traces."""
+        self.stored_traces = []
+        js = self._apply_visibility_js()
+        if js:
+            return rx.call_script(js)
+
+    # ------------------------------------------------------------------ #
+    # Continuous simulation mode                                        #
+    # ------------------------------------------------------------------ #
+    def toggle_continuous_mode(self) -> None:
+        """Enable or disable continuous simulation mode."""
+        if self.continuous_loop_running:
+            # Signal the running loop to stop
+            self.continuous_mode = False
+        else:
+            self.continuous_mode = True
+            return AppState.run_continuous  # type: ignore[return-value]
+
+    @rx.event(background=True)
+    async def run_continuous(self) -> None:
+        """Run simulations in a continuous loop until continuous_mode is False.
+
+        Each iteration picks up the terminal neuron state (voltage, gating
+        variables, Ca²⁺) from the previous iteration, giving true continuity.
+        Parameter changes made while the loop runs take effect at the start
+        of the next iteration.
+        """
+        async with self:
+            self.continuous_loop_running = True
+            self.error_message = ""
+
+        try:
+            while True:
+                # Snapshot all state needed for this iteration.
+                async with self:
+                    if not self.continuous_mode:
+                        break
+
+                    mode = self.clamp_mode
+                    ptype = self.protocol_type
+
+                    # Build neuron params snapshot
+                    additional_channels = []
+                    for (
+                        enabled_attr,
+                        g_max_attr,
+                        factory,
+                        extra_kwargs,
+                    ) in _CHANNEL_REGISTRY:
+                        if getattr(self, enabled_attr):
+                            kwargs = {
+                                k: getattr(self, v) for k, v in extra_kwargs.items()
+                            }
+                            additional_channels.append(
+                                factory(g_max=getattr(self, g_max_attr), **kwargs)  # type: ignore[operator]
+                            )
+                    needs_calcium = (
+                        self.ikca_enabled
+                        or self.ical_enabled
+                        or self.icat_enabled
+                        or self.ican_enabled
+                    )
+                    calcium_dynamics = (
+                        patch_sim.CalciumDynamics() if needs_calcium else None
+                    )
+                    neuron = patch_sim.HodgkinHuxley(
+                        g_Na=self.g_Na,
+                        g_K=self.g_K,
+                        g_L=self.g_L,
+                        C_m=self.C_m,
+                        v_rest=self.v_rest,
+                        Na_out=self.Na_out,
+                        Na_in=self.Na_in,
+                        K_out=self.K_out,
+                        K_in=self.K_in,
+                        Cl_out=self.Cl_out,
+                        Cl_in=self.Cl_in,
+                        Ca_out=self.Ca_out,
+                        Ca_in=self.Ca_in,
+                        T=self.T,
+                        additional_channels=tuple(additional_channels),
+                        calcium_dynamics=calcium_dynamics,
+                    )
+
+                    fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
+                    use_prior_state = self._cont_has_state
+                    prior_V = self._cont_V
+                    prior_gating = dict(self._cont_gating)
+                    prior_ca_i = self._cont_ca_i
+
+                    # Build protocol snapshot
+                    if mode == "Current Clamp":
+                        stimulus = build_current_protocol(
+                            protocol_type=ptype,
+                            duration=self.duration,
+                            sampling_frequency=fs,
+                            current_amplitude=self.current_amplitude,
+                            step_start=self.step_start,
+                            step_duration=self.step_duration,
+                            start_current=self.start_current,
+                            end_current=self.end_current,
+                            ramp_start=self.ramp_start,
+                            ramp_duration=self.ramp_duration,
+                            pulse_amplitude=self.pulse_amplitude,
+                            pulse_width=self.pulse_width,
+                            pulse_interval=self.pulse_interval,
+                            train_start=self.train_start,
+                            dc_offset=self.dc_offset,
+                            amplitude=self.amplitude,
+                            frequency=self.frequency,
+                            start_frequency=self.start_frequency,
+                            end_frequency=self.end_frequency,
+                            mean_current=self.mean_current,
+                            std_current=self.std_current,
+                        )
+                    else:
+                        stimulus = build_voltage_protocol(
+                            protocol_type=ptype,
+                            duration=self.duration,
+                            sampling_frequency=fs,
+                            vc_holding_voltage=self.vc_holding_voltage,
+                            vc_voltage_amplitude=self.vc_voltage_amplitude,
+                            vc_step_start=self.vc_step_start,
+                            vc_step_duration=self.vc_step_duration,
+                            vc_start_voltage=self.vc_start_voltage,
+                            vc_end_voltage=self.vc_end_voltage,
+                            vc_ramp_start=self.vc_ramp_start,
+                            vc_ramp_duration=self.vc_ramp_duration,
+                            vc_pulse_amplitude=self.vc_pulse_amplitude,
+                            vc_pulse_width=self.vc_pulse_width,
+                            vc_pulse_interval=self.vc_pulse_interval,
+                            vc_train_start=self.vc_train_start,
+                            vc_voltage_min=self.vc_voltage_min,
+                            vc_voltage_max=self.vc_voltage_max,
+                            vc_voltage_step=self.vc_voltage_step,
+                            vc_pre_pulse_duration=self.vc_pre_pulse_duration,
+                            vc_post_pulse_duration=self.vc_post_pulse_duration,
+                            vc_prepulse_voltage=self.vc_prepulse_voltage,
+                            vc_prepulse_duration=self.vc_prepulse_duration,
+                            vc_test_voltage_min=self.vc_test_voltage_min,
+                            vc_test_voltage_max=self.vc_test_voltage_max,
+                            vc_interpulse_duration=self.vc_interpulse_duration,
+                        )
+
+                # Run simulation outside the state lock in a thread executor.
+                loop = asyncio.get_event_loop()
+                try:
+                    if mode == "Current Clamp":
+                        if use_prior_state:
+                            df = await loop.run_in_executor(
+                                None,
+                                patch_sim.simulate_current_clamp_from_state,
+                                neuron,
+                                stimulus,
+                                prior_V,
+                                prior_gating,
+                                prior_ca_i,
+                            )
+                        else:
+                            df = await loop.run_in_executor(
+                                None,
+                                patch_sim.simulate_current_clamp,
+                                neuron,
+                                stimulus,
+                            )
+                    else:
+                        if use_prior_state:
+                            df = await loop.run_in_executor(
+                                None,
+                                patch_sim.simulate_voltage_clamp_from_state,
+                                neuron,
+                                stimulus,
+                                prior_gating,
+                                prior_ca_i,
+                            )
+                        else:
+                            df = await loop.run_in_executor(
+                                None,
+                                patch_sim.simulate_voltage_clamp,
+                                neuron,
+                                stimulus,
+                            )
+                except ValueError as exc:
+                    logger.exception("Continuous simulation error: %s", exc)
+                    async with self:
+                        self.error_message = str(exc)
+                        self.continuous_mode = False
+                    break
+
+                # Extract terminal state for next iteration.
+                last_V = float(df["voltage"].iloc[-1])
+                gating_cols = [
+                    col
+                    for col in df.columns
+                    if col
+                    not in (
+                        "voltage",
+                        "total_current",
+                        "Na_current",
+                        "K_current",
+                        "leak_current",
+                        "ca_i",
+                    )
+                    and not col.endswith("_current")
+                    and col in {gv.name for gv in neuron.all_gating_variables}
+                ]
+                last_gating = {col: float(df[col].iloc[-1]) for col in gating_cols}
+                last_ca_i = float(df["ca_i"].iloc[-1]) if "ca_i" in df.columns else 0.0
+
+                sweep = Sweep.from_dataframe(df, stimulus, "", "", mode)
+
+                async with self:
+                    if not self.continuous_mode:
+                        break
+                    self.current_sweeps = [sweep]
+                    self._cont_V = last_V
+                    self._cont_gating = last_gating
+                    self._cont_ca_i = last_ca_i
+                    self._cont_has_state = True
+
+                # Yield to allow UI events (parameter changes) to be processed.
+                await asyncio.sleep(0)
+
+        finally:
+            async with self:
+                self.continuous_mode = False
+                self.continuous_loop_running = False
+                self._refresh_logs()
+            js = self._apply_visibility_js()
+            if js:
+                yield rx.call_script(js)
+            yield rx.call_script(_LOG_SCROLL_JS)
 
     @rx.event(background=True)
     async def run_simulation(self) -> None:
