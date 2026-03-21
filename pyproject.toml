@@ -28,6 +28,7 @@ ui = ["reflex>=0.8", "plotly"]
 ap_sim = {path = "./ap_sim", editable = true}
 
 [tool.mypy]
+exclude = ["scratch/"]
 
 [[tool.mypy.overrides]]
 module = ["ap_sim_ui.*", "reflex.*", "plotly.*", "rxconfig"]
