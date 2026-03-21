@@ -336,3 +336,40 @@ def test_jit_and_python_paths_agree_vc(hh_model, monkeypatch) -> None:
         assert np.allclose(df_jit[col].to_numpy(), df_py[col].to_numpy(), rtol=1e-10), (
             f"Column '{col}' differs between JIT and Python paths"
         )
+
+
+# ---------------------------------------------------------------------------
+# Custom-channel fallback (Python path)
+# ---------------------------------------------------------------------------
+
+
+def test_simulate_voltage_clamp_custom_channel_python_path() -> None:
+    """simulate_voltage_clamp uses the Python path and returns correct columns
+    when a custom (non-core) channel forces JIT to be skipped."""
+    from patch_sim.channels import GatingVariable, IonChannel, IonSpecies, NernstSpec
+    from patch_sim.utils import boltzmann_cosh_rates
+    import patch_sim.clamp_simulations as cs
+
+    alpha_c, beta_c = boltzmann_cosh_rates(
+        half=-20.0, slope=10.0, tau_scale=5.0, tau_floor=0.1
+    )
+    custom_gv = GatingVariable(name="c_gate", power=1, alpha=alpha_c, beta=beta_c)
+    custom_ch = IonChannel(
+        name="CustomK",
+        g_max=1.0,
+        gating_variables=(custom_gv,),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
+    neuron = HodgkinHuxley(additional_channels=(custom_ch,))
+
+    # Custom rate functions must force the Python path.
+    assert not cs._use_jit(neuron)
+
+    n = int(5.0 * cs.SIM_SAMPLING_FREQ / 1000.0)
+    protocol = np.full(n, -65.0)
+    result = simulate_voltage_clamp(neuron, voltage_protocol=protocol)
+
+    assert isinstance(result, pd.DataFrame)
+    assert "CustomK_current" in result.columns
+    assert "c_gate" in result.columns
+    assert np.all(np.isfinite(result.to_numpy()))

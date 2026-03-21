@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ProcessPoolExecutor
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 try:
     from .numba_kernel import _jit_rk4_cc_loop, _jit_rk4_vc_loop
@@ -34,6 +34,18 @@ if TYPE_CHECKING:
     from .hodgkin_huxley import HodgkinHuxley
 
 logger = logging.getLogger(__name__)
+
+
+class _JitArrays(NamedTuple):
+    """Flat numeric arrays extracted from a neuron model for the Numba JIT kernels."""
+
+    func_ids: np.ndarray
+    g_max_arr: np.ndarray
+    e_rev_arr: np.ndarray
+    gate_starts: np.ndarray
+    gate_ends: np.ndarray
+    gate_idx_flat: np.ndarray
+    powers_flat: np.ndarray
 
 #: Fixed simulation sampling frequency (Hz). dt = 1000 / SIM_SAMPLING_FREQ ms.
 #: 40 kHz (dt = 0.025 ms) is standard for Hodgkin-Huxley models.
@@ -74,24 +86,15 @@ def _use_jit(neuron: "HodgkinHuxley") -> bool:
     Returns:
         True if the JIT kernel should be used, False otherwise.
     """
+    ids = neuron._rate_func_ids
     return (
         HAS_NUMBA
         and neuron.calcium_dynamics is None
-        and bool(np.all(neuron._rate_func_ids >= 0))
+        and bool(np.all((ids >= 0) & (ids <= 5)))
     )
 
 
-def _jit_arrays(
-    neuron: "HodgkinHuxley",
-) -> tuple[
-    np.ndarray,
-    np.ndarray,
-    np.ndarray,
-    np.ndarray,
-    np.ndarray,
-    np.ndarray,
-    np.ndarray,
-]:
+def _jit_arrays(neuron: "HodgkinHuxley") -> _JitArrays:
     """Extract flat numeric arrays from *neuron* for the Numba JIT kernels.
 
     All returned arrays are cached properties on *neuron*, so this function
@@ -101,17 +104,16 @@ def _jit_arrays(
         neuron: The Hodgkin-Huxley neuron model.
 
     Returns:
-        Tuple of ``(func_ids, g_max_arr, e_rev_arr, gate_starts, gate_ends,
-        gate_idx_flat, powers_flat)`` as numpy arrays ready for the JIT kernel.
+        Named tuple of numpy arrays ready for the JIT kernel.
     """
-    return (
-        neuron._rate_func_ids,
-        neuron._g_max_arr,
-        neuron._reversal_potentials,
-        neuron._gate_starts,
-        neuron._gate_ends,
-        neuron._gate_idx_flat,
-        neuron._flat_powers,
+    return _JitArrays(
+        func_ids=neuron._rate_func_ids,
+        g_max_arr=neuron._g_max_arr,
+        e_rev_arr=neuron._reversal_potentials,
+        gate_starts=neuron._gate_starts,
+        gate_ends=neuron._gate_ends,
+        gate_idx_flat=neuron._gate_idx_flat,
+        powers_flat=neuron._flat_powers,
     )
 
 
@@ -340,7 +342,11 @@ def _simulate_voltage_clamp_core(
         ca_i: Initial intracellular Ca²⁺ concentration in mM.
 
     Returns:
-        DataFrame indexed by time in milliseconds (named 'time').
+        DataFrame indexed by time in milliseconds (named 'time'), with columns:
+        voltage, total_current, one ``{name}_current`` column per channel
+        (Na, K, leak, plus any additional channels), and one column per gating
+        variable.  A ``ca_i`` column is appended when calcium_dynamics is
+        configured.
     """
     num_time_steps = len(voltage_protocol)
 
@@ -358,22 +364,19 @@ def _simulate_voltage_clamp_core(
 
     if _use_jit(neuron):
         # --- Numba JIT path ---
-        jit_args = _jit_arrays(neuron)
-        func_ids, g_max_arr, e_rev_arr = jit_args[0], jit_args[1], jit_args[2]
-        gate_starts, gate_ends = jit_args[3], jit_args[4]
-        gate_idx_flat, powers_flat = jit_args[5], jit_args[6]
+        ja = _jit_arrays(neuron)
         state0 = _initialize_gating_array(neuron, voltage_protocol[0])
         gating_arr, ch_current_arrs = _jit_rk4_vc_loop(  # type: ignore[name-defined]
             voltage_protocol,
             time_step,
             state0,
-            func_ids,
-            g_max_arr,
-            e_rev_arr,
-            gate_starts,
-            gate_ends,
-            gate_idx_flat,
-            powers_flat,
+            ja.func_ids,
+            ja.g_max_arr,
+            ja.e_rev_arr,
+            ja.gate_starts,
+            ja.gate_ends,
+            ja.gate_idx_flat,
+            ja.powers_flat,
         )
         ca_arr = None
     else:
@@ -477,10 +480,7 @@ def _simulate_current_clamp_core(
 
     if _use_jit(neuron):
         # --- Numba JIT path ---
-        jit_args = _jit_arrays(neuron)
-        func_ids, g_max_arr, e_rev_arr = jit_args[0], jit_args[1], jit_args[2]
-        gate_starts, gate_ends = jit_args[3], jit_args[4]
-        gate_idx_flat, powers_flat = jit_args[5], jit_args[6]
+        ja = _jit_arrays(neuron)
         state0 = _initialize_gating_array(neuron, neuron.v_rest)
         V_arr, gating_arr, ch_current_arrs = _jit_rk4_cc_loop(  # type: ignore[name-defined]
             current_external,
@@ -488,13 +488,13 @@ def _simulate_current_clamp_core(
             neuron.v_rest,
             state0,
             neuron.C_m,
-            func_ids,
-            g_max_arr,
-            e_rev_arr,
-            gate_starts,
-            gate_ends,
-            gate_idx_flat,
-            powers_flat,
+            ja.func_ids,
+            ja.g_max_arr,
+            ja.e_rev_arr,
+            ja.gate_starts,
+            ja.gate_ends,
+            ja.gate_idx_flat,
+            ja.powers_flat,
         )
         ca_arr = None
     else:

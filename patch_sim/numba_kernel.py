@@ -8,7 +8,7 @@ numba is not installed.
 The six standard Hodgkin-Huxley rate functions (alpha/beta for n, m, h) are
 inlined as pure math inside the JIT boundary using integer dispatch IDs that
 correspond to the values stored in
-:attr:`~ap_sim.hodgkin_huxley.HodgkinHuxley._rate_func_ids`.
+:attr:`~patch_sim.hodgkin_huxley.HodgkinHuxley._rate_func_ids`.
 
 Rate-function ID table
 ----------------------
@@ -40,7 +40,7 @@ def _safe_exp_jit(x: float) -> float:
     """Numba-compatible exponential with overflow protection.
 
     Clips the argument to ``[-100, 100]`` before calling ``math.exp``,
-    matching the behaviour of :func:`~ap_sim.utils.safe_exp`.
+    matching the behaviour of :func:`~patch_sim.utils.safe_exp`.
 
     Args:
         x: Exponent value.
@@ -372,6 +372,8 @@ def _jit_rk4_cc_loop(
     dt_half = 0.5 * dt
 
     for i in range(1, n_steps):
+        # current_external[i-1] drives the step that produces V_arr[i],
+        # matching the Python path in simulate_current_clamp.
         I_ext = current_external[i - 1]
 
         dV1, d1 = _jit_hh_derivatives(
