@@ -1250,7 +1250,7 @@ def test_existing_channels_unaffected_by_calcium_gating_infra():
 
 
 def test_calcium_gating_variable_exported():
-    """GatingVariable is in the patch_sim public API (replaces CalciumGatingVariable)."""
+    """GatingVariable is in the patch_sim public API."""
     assert hasattr(patch_sim, "GatingVariable")
 
 

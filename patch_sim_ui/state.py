@@ -60,7 +60,10 @@ from patch_sim_ui.plotting import (
     build_figure,
     compute_trace_visibility_map,
 )
-from patch_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
+from patch_sim_ui.protocol_builders import (
+    build_current_protocol,
+    build_voltage_protocol,
+)
 
 logger = logging.getLogger("patch_sim_ui.state")
 

@@ -177,7 +177,8 @@ class IonChannel:
         """Compute the reversal potential from the neuron's ion concentrations.
 
         Dispatches to :func:`~patch_sim.electrochemistry.nernst_potential` for a
-        :class:`NernstSpec` or :func:`~patch_sim.electrochemistry.goldman_potential` for a
+        :class:`NernstSpec` or
+        :func:`~patch_sim.electrochemistry.goldman_potential` for a
         :class:`GoldmanSpec`, using the concentrations stored on *neuron*.
 
         Args:
