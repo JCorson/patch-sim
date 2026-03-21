@@ -9,7 +9,6 @@ The environment variable is set at import time so the AppState metaclass
 registration does not see a non-testing environment.
 """
 
-import logging
 import os
 
 import numpy as np
@@ -485,7 +484,7 @@ def test_toggle_continuous_mode_sets_continuous_mode_true() -> None:
 
 
 def test_toggle_continuous_mode_clears_continuous_mode_when_running() -> None:
-    """toggle_continuous_mode disables continuous_mode when the loop is already running."""
+    """toggle_continuous_mode disables continuous_mode when the loop is running."""
     s = _make_state()
     s.continuous_loop_running = True
     s.continuous_mode = True
