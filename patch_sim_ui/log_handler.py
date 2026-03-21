@@ -1,4 +1,4 @@
-"""Logging infrastructure for the ap_sim web UI.
+"""Logging infrastructure for the patch_sim web UI.
 
 Provides a custom logging handler that buffers records in a deque so they
 can be drained into Reflex session state without the handler needing a
@@ -84,13 +84,13 @@ class StateLogHandler(logging.Handler):
 
 
 def setup_logging() -> None:
-    """Configure the ``ap_sim_ui`` logger with :class:`StateLogHandler`.
+    """Configure the ``patch_sim_ui`` logger with :class:`StateLogHandler`.
 
     Creates the logger at DEBUG level and attaches a single
     :class:`StateLogHandler` instance.  Safe to call multiple times —
     subsequent calls are no-ops if the handler is already registered.
     """
-    logger = logging.getLogger("ap_sim_ui")
+    logger = logging.getLogger("patch_sim_ui")
     logger.setLevel(logging.DEBUG)
 
     # Avoid duplicate handlers if setup_logging is called more than once.

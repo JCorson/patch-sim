@@ -1,4 +1,4 @@
-"""Application state for the ap_sim web UI.
+"""Application state for the patch_sim web UI.
 
 All reactive variables and event handlers live here. The state drives
 the Reflex component tree via computed properties.
@@ -12,10 +12,10 @@ import numpy as np
 import plotly.graph_objects as go
 import reflex as rx
 
-import ap_sim
-import ap_sim.clamp_simulations
-from ap_sim_ui.log_handler import MAX_LOG_ENTRIES, StateLogHandler, UILogRecord
-from ap_sim.constants import (
+import patch_sim
+import patch_sim.clamp_simulations
+from patch_sim_ui.log_handler import MAX_LOG_ENTRIES, StateLogHandler, UILogRecord
+from patch_sim.constants import (
     DEFAULT_C_M,
     DEFAULT_CA_IN,
     DEFAULT_CA_OUT,
@@ -41,7 +41,7 @@ from ap_sim.constants import (
     DEFAULT_T,
     DEFAULT_V_REST,
 )
-from ap_sim.additional_channels import (
+from patch_sim.additional_channels import (
     make_ican_channel,
     make_ical_channel,
     make_icat_channel,
@@ -53,16 +53,16 @@ from ap_sim.additional_channels import (
     make_inap_channel,
     make_inar_channel,
 )
-from ap_sim_ui import constants, presets
-from ap_sim_ui.plotting import (
+from patch_sim_ui import constants, presets
+from patch_sim_ui.plotting import (
     Sweep,
     TraceVisibility,
     build_figure,
     compute_trace_visibility_map,
 )
-from ap_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
+from patch_sim_ui.protocol_builders import build_current_protocol, build_voltage_protocol
 
-logger = logging.getLogger("ap_sim_ui.state")
+logger = logging.getLogger("patch_sim_ui.state")
 
 # ------------------------------------------------------------------ #
 # Channel registry                                                   #
@@ -503,22 +503,22 @@ class AppState(rx.State):
     @rx.var
     def E_Na(self) -> float:
         """Sodium reversal potential in mV."""
-        return float(ap_sim.nernst_potential(1, self.T, self.Na_out, self.Na_in))
+        return float(patch_sim.nernst_potential(1, self.T, self.Na_out, self.Na_in))
 
     @rx.var
     def E_K(self) -> float:
         """Potassium reversal potential in mV."""
-        return float(ap_sim.nernst_potential(1, self.T, self.K_out, self.K_in))
+        return float(patch_sim.nernst_potential(1, self.T, self.K_out, self.K_in))
 
     @rx.var
     def E_L(self) -> float:
         """Leak reversal potential in mV."""
-        return float(ap_sim.nernst_potential(-1, self.T, self.Cl_out, self.Cl_in))
+        return float(patch_sim.nernst_potential(-1, self.T, self.Cl_out, self.Cl_in))
 
     @rx.var
     def E_Ca(self) -> float:
         """Calcium reversal potential in mV (z=+2)."""
-        return float(ap_sim.nernst_potential(2, self.T, self.Ca_out, self.Ca_in))
+        return float(patch_sim.nernst_potential(2, self.T, self.Ca_out, self.Ca_in))
 
     @rx.var
     def protocol_options(self) -> list[str]:
@@ -742,8 +742,8 @@ class AppState(rx.State):
                 or self.icat_enabled
                 or self.ican_enabled
             )
-            calcium_dynamics = ap_sim.CalciumDynamics() if needs_calcium else None
-            neuron = ap_sim.HodgkinHuxley(
+            calcium_dynamics = patch_sim.CalciumDynamics() if needs_calcium else None
+            neuron = patch_sim.HodgkinHuxley(
                 g_Na=self.g_Na,
                 g_K=self.g_K,
                 g_L=self.g_L,
@@ -762,7 +762,7 @@ class AppState(rx.State):
                 calcium_dynamics=calcium_dynamics,
             )
 
-            fs = ap_sim.clamp_simulations.SIM_SAMPLING_FREQ
+            fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
             mode = self.clamp_mode
             ptype = self.protocol_type
 
@@ -790,8 +790,8 @@ class AppState(rx.State):
                     mean_current=self.mean_current,
                     std_current=self.std_current,
                 )
-                for df in ap_sim.simulate_batch(
-                    neuron, [stimulus], simulate_fn=ap_sim.simulate_current_clamp
+                for df in patch_sim.simulate_batch(
+                    neuron, [stimulus], simulate_fn=patch_sim.simulate_current_clamp
                 ):
                     async with self:
                         self.current_sweeps = [
@@ -813,7 +813,7 @@ class AppState(rx.State):
                     self.vc_voltage_step,
                 )
                 protocols = [
-                    ap_sim.step_voltage(
+                    patch_sim.step_voltage(
                         duration=sweep_duration,
                         voltage_amplitude=float(voltage),
                         step_start=self.vc_pre_pulse_duration,
@@ -825,7 +825,7 @@ class AppState(rx.State):
                 ]
                 new_sweeps: list[Sweep] = []
                 for sweep_df, voltage, protocol in zip(
-                    ap_sim.simulate_batch(neuron, protocols),
+                    patch_sim.simulate_batch(neuron, protocols),
                     voltages,
                     protocols,
                 ):
@@ -871,7 +871,7 @@ class AppState(rx.State):
                     vc_test_voltage_max=self.vc_test_voltage_max,
                     vc_interpulse_duration=self.vc_interpulse_duration,
                 )
-                for df in ap_sim.simulate_batch(neuron, [stimulus]):
+                for df in patch_sim.simulate_batch(neuron, [stimulus]):
                     async with self:
                         self.current_sweeps = [
                             Sweep.from_dataframe(df, stimulus, "", "", mode)

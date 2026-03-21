@@ -1,8 +1,8 @@
-"""Built-in preset configurations for the ap_sim web UI."""
+"""Built-in preset configurations for the patch_sim web UI."""
 
 from typing import Any
 
-from ap_sim.constants import DEFAULT_NEURON_PARAMS
+from patch_sim.constants import DEFAULT_NEURON_PARAMS
 
 # Each preset is a dict of state variable names → values.
 # Keys must match field names in AppState exactly.

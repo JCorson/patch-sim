@@ -2,8 +2,8 @@
 
 import reflex as rx
 
-from ap_sim_ui.constants import PARAM_RANGES
-from ap_sim_ui.state import AppState
+from patch_sim_ui.constants import PARAM_RANGES
+from patch_sim_ui.state import AppState
 
 
 def _additional_channel_row(

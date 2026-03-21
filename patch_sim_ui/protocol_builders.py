@@ -6,7 +6,7 @@ the Reflex runtime.
 
 import numpy as np
 
-import ap_sim
+import patch_sim
 
 
 def build_current_protocol(
@@ -65,7 +65,7 @@ def build_current_protocol(
         ValueError: If protocol_type is unrecognized or parameters are invalid.
     """
     if protocol_type == "Step":
-        return ap_sim.step_current(
+        return patch_sim.step_current(
             duration=duration,
             current_amplitude=current_amplitude,
             step_start=step_start,
@@ -73,7 +73,7 @@ def build_current_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Ramp":
-        return ap_sim.ramp_current(
+        return patch_sim.ramp_current(
             duration=duration,
             start_current=start_current,
             end_current=end_current,
@@ -82,7 +82,7 @@ def build_current_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Pulse Train":
-        return ap_sim.pulse_train(
+        return patch_sim.pulse_train(
             duration=duration,
             pulse_amplitude=pulse_amplitude,
             pulse_width=pulse_width,
@@ -91,7 +91,7 @@ def build_current_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Sinusoidal":
-        return ap_sim.sinusoidal_current(
+        return patch_sim.sinusoidal_current(
             duration=duration,
             dc_offset=dc_offset,
             amplitude=amplitude,
@@ -99,7 +99,7 @@ def build_current_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Chirp":
-        return ap_sim.chirp_current(
+        return patch_sim.chirp_current(
             duration=duration,
             dc_offset=dc_offset,
             amplitude=amplitude,
@@ -108,7 +108,7 @@ def build_current_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Noise":
-        return ap_sim.noise_current(
+        return patch_sim.noise_current(
             duration=duration,
             mean_current=mean_current,
             std_current=std_current,
@@ -182,7 +182,7 @@ def build_voltage_protocol(
         ValueError: If protocol_type is unrecognized or parameters are invalid.
     """
     if protocol_type == "Step":
-        return ap_sim.step_voltage(
+        return patch_sim.step_voltage(
             duration=duration,
             voltage_amplitude=vc_voltage_amplitude,
             step_start=vc_step_start,
@@ -191,7 +191,7 @@ def build_voltage_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Ramp":
-        return ap_sim.ramp_voltage(
+        return patch_sim.ramp_voltage(
             duration=duration,
             start_voltage=vc_start_voltage,
             end_voltage=vc_end_voltage,
@@ -201,7 +201,7 @@ def build_voltage_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Pulse Train":
-        return ap_sim.pulse_train_voltage(
+        return patch_sim.pulse_train_voltage(
             duration=duration,
             pulse_amplitude=vc_pulse_amplitude,
             pulse_width=vc_pulse_width,
@@ -211,7 +211,7 @@ def build_voltage_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "I-V Curve":
-        return ap_sim.iv_curve_protocol(
+        return patch_sim.iv_curve_protocol(
             step_duration=duration,
             voltage_min=vc_voltage_min,
             voltage_max=vc_voltage_max,
@@ -222,7 +222,7 @@ def build_voltage_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Activation":
-        return ap_sim.activation_protocol(
+        return patch_sim.activation_protocol(
             test_duration=duration,
             prepulse_voltage=vc_prepulse_voltage,
             prepulse_duration=vc_prepulse_duration,

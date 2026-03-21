@@ -1,15 +1,15 @@
-"""Main Reflex app entry point and page layout for the ap_sim web UI."""
+"""Main Reflex app entry point and page layout for the patch_sim web UI."""
 
 import reflex as rx
 
-from ap_sim_ui import presets
-from ap_sim_ui.components.log_panel import log_panel
-from ap_sim_ui.components.neuron_panel import neuron_panel
-from ap_sim_ui.components.protocol_panel import protocol_panel
-from ap_sim_ui.components.sweep_manager import sweep_manager
-from ap_sim_ui.components.trace_display import trace_display
-from ap_sim_ui.log_handler import setup_logging
-from ap_sim_ui.state import AppState
+from patch_sim_ui import presets
+from patch_sim_ui.components.log_panel import log_panel
+from patch_sim_ui.components.neuron_panel import neuron_panel
+from patch_sim_ui.components.protocol_panel import protocol_panel
+from patch_sim_ui.components.sweep_manager import sweep_manager
+from patch_sim_ui.components.trace_display import trace_display
+from patch_sim_ui.log_handler import setup_logging
+from patch_sim_ui.state import AppState
 
 setup_logging()
 
@@ -25,7 +25,7 @@ def _header() -> rx.Component:
             size="2",
         ),
         rx.spacer(),
-        rx.heading("Action Potential Simulator", size="4"),
+        rx.heading("Patch Clamp Simulator", size="4"),
         rx.spacer(),
         rx.cond(
             AppState.is_running,
@@ -139,4 +139,4 @@ app = rx.App(
         radius="medium",
     )
 )
-app.add_page(index, route="/", title="AP Simulator")
+app.add_page(index, route="/", title="Patch Clamp Simulator")

@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pydantic import BaseModel
 
-from ap_sim_ui.constants import (
+from patch_sim_ui.constants import (
     CC_VOLTAGE_COLOR,
     CHANNEL_COLORS,
     GATING_VAR_COLORS,

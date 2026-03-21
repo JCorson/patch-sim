@@ -2,7 +2,7 @@
 
 import reflex as rx
 
-from ap_sim_ui.state import AppState
+from patch_sim_ui.state import AppState
 
 
 def _trace_checkbox(label: str, var: rx.Var, handler) -> rx.Component:

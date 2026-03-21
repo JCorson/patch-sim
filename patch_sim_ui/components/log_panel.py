@@ -1,9 +1,9 @@
-"""Toggleable log viewer panel for the ap_sim web UI."""
+"""Toggleable log viewer panel for the patch_sim web UI."""
 
 import reflex as rx
 
-from ap_sim_ui.log_handler import UILogRecord
-from ap_sim_ui.state import AppState
+from patch_sim_ui.log_handler import UILogRecord
+from patch_sim_ui.state import AppState
 
 _LEVEL_COLORS: dict[str, str] = {
     "DEBUG": "gray",
@@ -23,7 +23,7 @@ def _log_entry(entry: UILogRecord) -> rx.Component:
     by severity.
 
     Args:
-        entry: The :class:`~ap_sim_ui.log_handler.UILogRecord` to display.
+        entry: The :class:`~patch_sim_ui.log_handler.UILogRecord` to display.
 
     Returns:
         An hstack row component.
