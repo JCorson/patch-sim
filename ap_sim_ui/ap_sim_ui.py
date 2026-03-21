@@ -3,11 +3,15 @@
 import reflex as rx
 
 from ap_sim_ui import presets
+from ap_sim_ui.components.log_panel import log_panel
 from ap_sim_ui.components.neuron_panel import neuron_panel
 from ap_sim_ui.components.protocol_panel import protocol_panel
 from ap_sim_ui.components.sweep_manager import sweep_manager
 from ap_sim_ui.components.trace_display import trace_display
+from ap_sim_ui.log_handler import setup_logging
 from ap_sim_ui.state import AppState
+
+setup_logging()
 
 
 def _header() -> rx.Component:
@@ -85,7 +89,7 @@ def _sidebar() -> rx.Component:
 
 
 def _main_content() -> rx.Component:
-    """Center content area with trace plot and sweep controls."""
+    """Center content area with trace plot, log panel, and sweep controls."""
     return rx.vstack(
         _error_banner(),
         rx.box(
@@ -96,6 +100,7 @@ def _main_content() -> rx.Component:
             min_height="0",
             overflow="hidden",
         ),
+        log_panel(),
         rx.box(
             sweep_manager(),
             border_top="1px solid var(--gray-4)",
