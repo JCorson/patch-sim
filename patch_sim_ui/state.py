@@ -785,6 +785,100 @@ class AppState(rx.State):
             return rx.call_script(js)
 
     # ------------------------------------------------------------------ #
+    # Simulation helpers (called while holding the state lock)          #
+    # ------------------------------------------------------------------ #
+    def _build_neuron(self) -> "patch_sim.HodgkinHuxley":
+        """Construct a HodgkinHuxley neuron from current state parameters."""
+        additional_channels = []
+        for enabled_attr, g_max_attr, factory, extra_kwargs in _CHANNEL_REGISTRY:
+            if getattr(self, enabled_attr):
+                kwargs = {k: getattr(self, v) for k, v in extra_kwargs.items()}
+                additional_channels.append(
+                    factory(g_max=getattr(self, g_max_attr), **kwargs)  # type: ignore[operator]
+                )
+        needs_calcium = (
+            self.ikca_enabled
+            or self.ical_enabled
+            or self.icat_enabled
+            or self.ican_enabled
+        )
+        calcium_dynamics = patch_sim.CalciumDynamics() if needs_calcium else None
+        return patch_sim.HodgkinHuxley(
+            g_Na=self.g_Na,
+            g_K=self.g_K,
+            g_L=self.g_L,
+            C_m=self.C_m,
+            v_rest=self.v_rest,
+            Na_out=self.Na_out,
+            Na_in=self.Na_in,
+            K_out=self.K_out,
+            K_in=self.K_in,
+            Cl_out=self.Cl_out,
+            Cl_in=self.Cl_in,
+            Ca_out=self.Ca_out,
+            Ca_in=self.Ca_in,
+            T=self.T,
+            additional_channels=tuple(additional_channels),
+            calcium_dynamics=calcium_dynamics,
+        )
+
+    def _build_protocol(self) -> "np.ndarray":
+        """Build the stimulus array from current protocol state."""
+        fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
+        if self.clamp_mode == "Current Clamp":
+            return build_current_protocol(
+                protocol_type=self.protocol_type,
+                duration=self.duration,
+                sampling_frequency=fs,
+                current_amplitude=self.current_amplitude,
+                step_start=self.step_start,
+                step_duration=self.step_duration,
+                start_current=self.start_current,
+                end_current=self.end_current,
+                ramp_start=self.ramp_start,
+                ramp_duration=self.ramp_duration,
+                pulse_amplitude=self.pulse_amplitude,
+                pulse_width=self.pulse_width,
+                pulse_interval=self.pulse_interval,
+                train_start=self.train_start,
+                dc_offset=self.dc_offset,
+                amplitude=self.amplitude,
+                frequency=self.frequency,
+                start_frequency=self.start_frequency,
+                end_frequency=self.end_frequency,
+                mean_current=self.mean_current,
+                std_current=self.std_current,
+            )
+        else:
+            return build_voltage_protocol(
+                protocol_type=self.protocol_type,
+                duration=self.duration,
+                sampling_frequency=fs,
+                vc_holding_voltage=self.vc_holding_voltage,
+                vc_voltage_amplitude=self.vc_voltage_amplitude,
+                vc_step_start=self.vc_step_start,
+                vc_step_duration=self.vc_step_duration,
+                vc_start_voltage=self.vc_start_voltage,
+                vc_end_voltage=self.vc_end_voltage,
+                vc_ramp_start=self.vc_ramp_start,
+                vc_ramp_duration=self.vc_ramp_duration,
+                vc_pulse_amplitude=self.vc_pulse_amplitude,
+                vc_pulse_width=self.vc_pulse_width,
+                vc_pulse_interval=self.vc_pulse_interval,
+                vc_train_start=self.vc_train_start,
+                vc_voltage_min=self.vc_voltage_min,
+                vc_voltage_max=self.vc_voltage_max,
+                vc_voltage_step=self.vc_voltage_step,
+                vc_pre_pulse_duration=self.vc_pre_pulse_duration,
+                vc_post_pulse_duration=self.vc_post_pulse_duration,
+                vc_prepulse_voltage=self.vc_prepulse_voltage,
+                vc_prepulse_duration=self.vc_prepulse_duration,
+                vc_test_voltage_min=self.vc_test_voltage_min,
+                vc_test_voltage_max=self.vc_test_voltage_max,
+                vc_interpulse_duration=self.vc_interpulse_duration,
+            )
+
+    # ------------------------------------------------------------------ #
     # Continuous simulation mode                                        #
     # ------------------------------------------------------------------ #
     def toggle_continuous_mode(self) -> None:
@@ -817,110 +911,12 @@ class AppState(rx.State):
                         break
 
                     mode = self.clamp_mode
-                    ptype = self.protocol_type
-
-                    # Build neuron params snapshot
-                    additional_channels = []
-                    for (
-                        enabled_attr,
-                        g_max_attr,
-                        factory,
-                        extra_kwargs,
-                    ) in _CHANNEL_REGISTRY:
-                        if getattr(self, enabled_attr):
-                            kwargs = {
-                                k: getattr(self, v) for k, v in extra_kwargs.items()
-                            }
-                            additional_channels.append(
-                                factory(g_max=getattr(self, g_max_attr), **kwargs)  # type: ignore[operator]
-                            )
-                    needs_calcium = (
-                        self.ikca_enabled
-                        or self.ical_enabled
-                        or self.icat_enabled
-                        or self.ican_enabled
-                    )
-                    calcium_dynamics = (
-                        patch_sim.CalciumDynamics() if needs_calcium else None
-                    )
-                    neuron = patch_sim.HodgkinHuxley(
-                        g_Na=self.g_Na,
-                        g_K=self.g_K,
-                        g_L=self.g_L,
-                        C_m=self.C_m,
-                        v_rest=self.v_rest,
-                        Na_out=self.Na_out,
-                        Na_in=self.Na_in,
-                        K_out=self.K_out,
-                        K_in=self.K_in,
-                        Cl_out=self.Cl_out,
-                        Cl_in=self.Cl_in,
-                        Ca_out=self.Ca_out,
-                        Ca_in=self.Ca_in,
-                        T=self.T,
-                        additional_channels=tuple(additional_channels),
-                        calcium_dynamics=calcium_dynamics,
-                    )
-
-                    fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
+                    neuron = self._build_neuron()
+                    stimulus = self._build_protocol()
                     use_prior_state = self._cont_has_state
                     prior_V = self._cont_V
                     prior_gating = dict(self._cont_gating)
                     prior_ca_i = self._cont_ca_i
-
-                    # Build protocol snapshot
-                    if mode == "Current Clamp":
-                        stimulus = build_current_protocol(
-                            protocol_type=ptype,
-                            duration=self.duration,
-                            sampling_frequency=fs,
-                            current_amplitude=self.current_amplitude,
-                            step_start=self.step_start,
-                            step_duration=self.step_duration,
-                            start_current=self.start_current,
-                            end_current=self.end_current,
-                            ramp_start=self.ramp_start,
-                            ramp_duration=self.ramp_duration,
-                            pulse_amplitude=self.pulse_amplitude,
-                            pulse_width=self.pulse_width,
-                            pulse_interval=self.pulse_interval,
-                            train_start=self.train_start,
-                            dc_offset=self.dc_offset,
-                            amplitude=self.amplitude,
-                            frequency=self.frequency,
-                            start_frequency=self.start_frequency,
-                            end_frequency=self.end_frequency,
-                            mean_current=self.mean_current,
-                            std_current=self.std_current,
-                        )
-                    else:
-                        stimulus = build_voltage_protocol(
-                            protocol_type=ptype,
-                            duration=self.duration,
-                            sampling_frequency=fs,
-                            vc_holding_voltage=self.vc_holding_voltage,
-                            vc_voltage_amplitude=self.vc_voltage_amplitude,
-                            vc_step_start=self.vc_step_start,
-                            vc_step_duration=self.vc_step_duration,
-                            vc_start_voltage=self.vc_start_voltage,
-                            vc_end_voltage=self.vc_end_voltage,
-                            vc_ramp_start=self.vc_ramp_start,
-                            vc_ramp_duration=self.vc_ramp_duration,
-                            vc_pulse_amplitude=self.vc_pulse_amplitude,
-                            vc_pulse_width=self.vc_pulse_width,
-                            vc_pulse_interval=self.vc_pulse_interval,
-                            vc_train_start=self.vc_train_start,
-                            vc_voltage_min=self.vc_voltage_min,
-                            vc_voltage_max=self.vc_voltage_max,
-                            vc_voltage_step=self.vc_voltage_step,
-                            vc_pre_pulse_duration=self.vc_pre_pulse_duration,
-                            vc_post_pulse_duration=self.vc_post_pulse_duration,
-                            vc_prepulse_voltage=self.vc_prepulse_voltage,
-                            vc_prepulse_duration=self.vc_prepulse_duration,
-                            vc_test_voltage_min=self.vc_test_voltage_min,
-                            vc_test_voltage_max=self.vc_test_voltage_max,
-                            vc_interpulse_duration=self.vc_interpulse_duration,
-                        )
 
                 # Run simulation outside the state lock in a thread executor.
                 loop = asyncio.get_running_loop()
@@ -1015,67 +1011,13 @@ class AppState(rx.State):
             self.protocol_type,
         )
         try:
-            additional_channels = []
-            for enabled_attr, g_max_attr, factory, extra_kwargs in _CHANNEL_REGISTRY:
-                if getattr(self, enabled_attr):
-                    kwargs = {k: getattr(self, v) for k, v in extra_kwargs.items()}
-                    additional_channels.append(
-                        factory(g_max=getattr(self, g_max_attr), **kwargs)  # type: ignore[operator]
-                    )
-            needs_calcium = (
-                self.ikca_enabled
-                or self.ical_enabled
-                or self.icat_enabled
-                or self.ican_enabled
-            )
-            calcium_dynamics = patch_sim.CalciumDynamics() if needs_calcium else None
-            neuron = patch_sim.HodgkinHuxley(
-                g_Na=self.g_Na,
-                g_K=self.g_K,
-                g_L=self.g_L,
-                C_m=self.C_m,
-                v_rest=self.v_rest,
-                Na_out=self.Na_out,
-                Na_in=self.Na_in,
-                K_out=self.K_out,
-                K_in=self.K_in,
-                Cl_out=self.Cl_out,
-                Cl_in=self.Cl_in,
-                Ca_out=self.Ca_out,
-                Ca_in=self.Ca_in,
-                T=self.T,
-                additional_channels=tuple(additional_channels),
-                calcium_dynamics=calcium_dynamics,
-            )
-
-            fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
+            neuron = self._build_neuron()
             mode = self.clamp_mode
             ptype = self.protocol_type
+            fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
 
             if mode == "Current Clamp":
-                stimulus = build_current_protocol(
-                    protocol_type=ptype,
-                    duration=self.duration,
-                    sampling_frequency=fs,
-                    current_amplitude=self.current_amplitude,
-                    step_start=self.step_start,
-                    step_duration=self.step_duration,
-                    start_current=self.start_current,
-                    end_current=self.end_current,
-                    ramp_start=self.ramp_start,
-                    ramp_duration=self.ramp_duration,
-                    pulse_amplitude=self.pulse_amplitude,
-                    pulse_width=self.pulse_width,
-                    pulse_interval=self.pulse_interval,
-                    train_start=self.train_start,
-                    dc_offset=self.dc_offset,
-                    amplitude=self.amplitude,
-                    frequency=self.frequency,
-                    start_frequency=self.start_frequency,
-                    end_frequency=self.end_frequency,
-                    mean_current=self.mean_current,
-                    std_current=self.std_current,
-                )
+                stimulus = self._build_protocol()
                 for df in patch_sim.simulate_batch(
                     neuron, [stimulus], simulate_fn=patch_sim.simulate_current_clamp
                 ):
@@ -1130,33 +1072,7 @@ class AppState(rx.State):
                         self.current_sweeps = list(new_sweeps)
 
             else:
-                stimulus = build_voltage_protocol(
-                    protocol_type=ptype,
-                    duration=self.duration,
-                    sampling_frequency=fs,
-                    vc_holding_voltage=self.vc_holding_voltage,
-                    vc_voltage_amplitude=self.vc_voltage_amplitude,
-                    vc_step_start=self.vc_step_start,
-                    vc_step_duration=self.vc_step_duration,
-                    vc_start_voltage=self.vc_start_voltage,
-                    vc_end_voltage=self.vc_end_voltage,
-                    vc_ramp_start=self.vc_ramp_start,
-                    vc_ramp_duration=self.vc_ramp_duration,
-                    vc_pulse_amplitude=self.vc_pulse_amplitude,
-                    vc_pulse_width=self.vc_pulse_width,
-                    vc_pulse_interval=self.vc_pulse_interval,
-                    vc_train_start=self.vc_train_start,
-                    vc_voltage_min=self.vc_voltage_min,
-                    vc_voltage_max=self.vc_voltage_max,
-                    vc_voltage_step=self.vc_voltage_step,
-                    vc_pre_pulse_duration=self.vc_pre_pulse_duration,
-                    vc_post_pulse_duration=self.vc_post_pulse_duration,
-                    vc_prepulse_voltage=self.vc_prepulse_voltage,
-                    vc_prepulse_duration=self.vc_prepulse_duration,
-                    vc_test_voltage_min=self.vc_test_voltage_min,
-                    vc_test_voltage_max=self.vc_test_voltage_max,
-                    vc_interpulse_duration=self.vc_interpulse_duration,
-                )
+                stimulus = self._build_protocol()
                 for df in patch_sim.simulate_batch(neuron, [stimulus]):
                     async with self:
                         self.current_sweeps = [
