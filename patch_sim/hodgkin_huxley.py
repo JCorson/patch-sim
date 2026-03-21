@@ -7,8 +7,6 @@ import logging
 from dataclasses import dataclass, field
 from functools import cached_property
 
-logger = logging.getLogger(__name__)
-
 from .calcium import CalciumDynamics
 from .channels import GatingVariable, IonChannel, IonSpecies
 from .constants import (
@@ -28,6 +26,8 @@ from .constants import (
     DEFAULT_V_REST,
 )
 from .core_channels import make_k_channel, make_leak_channel, make_na_channel
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
