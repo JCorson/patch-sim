@@ -47,6 +47,7 @@ class _JitArrays(NamedTuple):
     gate_idx_flat: np.ndarray
     powers_flat: np.ndarray
 
+
 #: Fixed simulation sampling frequency (Hz). dt = 1000 / SIM_SAMPLING_FREQ ms.
 #: 40 kHz (dt = 0.025 ms) is standard for Hodgkin-Huxley models.
 SIM_SAMPLING_FREQ: float = 40_000.0
