@@ -250,6 +250,24 @@ def test_load_preset_clears_saved_sweeps() -> None:
     assert len(s.saved_sweeps) == 0
 
 
+def test_load_preset_clears_stored_traces() -> None:
+    """load_preset resets stored_traces to an empty list."""
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    s.store_trace()
+    assert len(s.stored_traces) == 1
+    s.load_preset("Action Potential")
+    assert len(s.stored_traces) == 0
+
+
+def test_load_preset_resets_cont_has_state() -> None:
+    """load_preset resets _cont_has_state so the next continuous iter starts fresh."""
+    s = _make_state()
+    s._cont_has_state = True
+    s.load_preset("Action Potential")
+    assert s._cont_has_state is False
+
+
 def test_load_preset_unknown_name_is_ignored() -> None:
     """load_preset silently ignores an unknown preset name."""
     s = _make_state()
@@ -321,6 +339,20 @@ def test_has_stored_traces_true_after_store() -> None:
     s.current_sweeps = [_make_sweep()]
     s.store_trace()
     assert s.has_stored_traces is True
+
+
+def test_set_clamp_mode_clears_stored_traces() -> None:
+    """set_clamp_mode clears stored_traces when switching modes.
+
+    Stored traces from the old mode must not persist — they would have
+    incompatible axes alongside new-mode data.
+    """
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    s.store_trace()
+    assert len(s.stored_traces) == 1
+    s.set_clamp_mode("Voltage Clamp")
+    assert len(s.stored_traces) == 0
 
 
 def test_set_clamp_mode_resets_cont_has_state() -> None:

@@ -654,6 +654,7 @@ class AppState(rx.State):
             self.protocol_type = constants.VOLTAGE_PROTOCOLS[0]
         self.current_sweeps = []
         self.saved_sweeps = []
+        self.stored_traces = []
         self._cont_has_state = False
 
     def reset_to_defaults(self) -> None:
@@ -670,6 +671,8 @@ class AppState(rx.State):
             setattr(self, key, value)
         self.current_sweeps = []
         self.saved_sweeps = []
+        self.stored_traces = []
+        self._cont_has_state = False
 
     # ------------------------------------------------------------------ #
     # Numeric field setters                                              #
@@ -920,7 +923,7 @@ class AppState(rx.State):
                         )
 
                 # Run simulation outside the state lock in a thread executor.
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 try:
                     if mode == "Current Clamp":
                         if use_prior_state:
@@ -966,21 +969,8 @@ class AppState(rx.State):
 
                 # Extract terminal state for next iteration.
                 last_V = float(df["voltage"].iloc[-1])
-                gating_cols = [
-                    col
-                    for col in df.columns
-                    if col
-                    not in (
-                        "voltage",
-                        "total_current",
-                        "Na_current",
-                        "K_current",
-                        "leak_current",
-                        "ca_i",
-                    )
-                    and not col.endswith("_current")
-                    and col in {gv.name for gv in neuron.all_gating_variables}
-                ]
+                gating_vars = {gv.name for gv in neuron.all_gating_variables}
+                gating_cols = [col for col in df.columns if col in gating_vars]
                 last_gating = {col: float(df[col].iloc[-1]) for col in gating_cols}
                 last_ca_i = float(df["ca_i"].iloc[-1]) if "ca_i" in df.columns else 0.0
 
