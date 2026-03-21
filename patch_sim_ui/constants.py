@@ -110,6 +110,22 @@ GATING_VAR_COLORS: dict[str, str] = {
     "fn": "#dbdb8d",  # light olive
 }
 
+# Faded amber/orange palette for oscilloscope-style stored traces.  The rgba
+# opacity keeps them visually subdued so they serve as background references
+# without competing with the live current_sweeps or saved_sweeps overlays.
+STORED_TRACE_COLORS: list[str] = [
+    "rgba(255, 140, 0, 0.45)",  # amber
+    "rgba(230, 100, 0, 0.45)",  # dark orange
+    "rgba(255, 165, 0, 0.45)",  # orange
+    "rgba(200, 80, 0, 0.45)",  # burnt orange
+    "rgba(255, 120, 30, 0.45)",  # tangerine
+    "rgba(180, 60, 0, 0.45)",  # deep amber
+    "rgba(255, 180, 50, 0.45)",  # golden
+    "rgba(210, 110, 10, 0.45)",  # ochre
+    "rgba(240, 130, 20, 0.45)",  # saffron
+    "rgba(190, 90, 20, 0.45)",  # copper
+]
+
 # Neutral grey palette for sweep overlays so saved "reference" traces are
 # visually distinct from the coloured channel / gating-variable traces.
 SWEEP_COLORS: list[str] = [
