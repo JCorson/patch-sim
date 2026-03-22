@@ -4,9 +4,13 @@ These functions are extracted from AppState to allow unit testing without
 the Reflex runtime.
 """
 
+import logging
+
 import numpy as np
 
 import patch_sim
+
+logger = logging.getLogger(__name__)
 
 
 def build_current_protocol(
@@ -65,7 +69,7 @@ def build_current_protocol(
         ValueError: If protocol_type is unrecognized or parameters are invalid.
     """
     if protocol_type == "Step":
-        return patch_sim.step_current(
+        protocol = patch_sim.step_current(
             duration=duration,
             current_amplitude=current_amplitude,
             step_start=step_start,
@@ -73,7 +77,7 @@ def build_current_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Ramp":
-        return patch_sim.ramp_current(
+        protocol = patch_sim.ramp_current(
             duration=duration,
             start_current=start_current,
             end_current=end_current,
@@ -82,7 +86,7 @@ def build_current_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Pulse Train":
-        return patch_sim.pulse_train(
+        protocol = patch_sim.pulse_train(
             duration=duration,
             pulse_amplitude=pulse_amplitude,
             pulse_width=pulse_width,
@@ -91,7 +95,7 @@ def build_current_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Sinusoidal":
-        return patch_sim.sinusoidal_current(
+        protocol = patch_sim.sinusoidal_current(
             duration=duration,
             dc_offset=dc_offset,
             amplitude=amplitude,
@@ -99,7 +103,7 @@ def build_current_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Chirp":
-        return patch_sim.chirp_current(
+        protocol = patch_sim.chirp_current(
             duration=duration,
             dc_offset=dc_offset,
             amplitude=amplitude,
@@ -108,7 +112,7 @@ def build_current_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Noise":
-        return patch_sim.noise_current(
+        protocol = patch_sim.noise_current(
             duration=duration,
             mean_current=mean_current,
             std_current=std_current,
@@ -116,6 +120,13 @@ def build_current_protocol(
         )
     else:
         raise ValueError(f"Unknown current protocol type: {protocol_type!r}")
+    logger.debug(
+        "build_current_protocol: type=%r duration=%.1f ms steps=%d",
+        protocol_type,
+        duration,
+        len(protocol),
+    )
+    return protocol
 
 
 def build_voltage_protocol(
@@ -182,7 +193,7 @@ def build_voltage_protocol(
         ValueError: If protocol_type is unrecognized or parameters are invalid.
     """
     if protocol_type == "Step":
-        return patch_sim.step_voltage(
+        protocol = patch_sim.step_voltage(
             duration=duration,
             voltage_amplitude=vc_voltage_amplitude,
             step_start=vc_step_start,
@@ -191,7 +202,7 @@ def build_voltage_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Ramp":
-        return patch_sim.ramp_voltage(
+        protocol = patch_sim.ramp_voltage(
             duration=duration,
             start_voltage=vc_start_voltage,
             end_voltage=vc_end_voltage,
@@ -201,7 +212,7 @@ def build_voltage_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Pulse Train":
-        return patch_sim.pulse_train_voltage(
+        protocol = patch_sim.pulse_train_voltage(
             duration=duration,
             pulse_amplitude=vc_pulse_amplitude,
             pulse_width=vc_pulse_width,
@@ -211,7 +222,7 @@ def build_voltage_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "I-V Curve":
-        return patch_sim.iv_curve_protocol(
+        protocol = patch_sim.iv_curve_protocol(
             step_duration=duration,
             voltage_min=vc_voltage_min,
             voltage_max=vc_voltage_max,
@@ -222,7 +233,7 @@ def build_voltage_protocol(
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Activation":
-        return patch_sim.activation_protocol(
+        protocol = patch_sim.activation_protocol(
             test_duration=duration,
             prepulse_voltage=vc_prepulse_voltage,
             prepulse_duration=vc_prepulse_duration,
@@ -235,3 +246,10 @@ def build_voltage_protocol(
         )
     else:
         raise ValueError(f"Unknown voltage protocol type: {protocol_type!r}")
+    logger.debug(
+        "build_voltage_protocol: type=%r duration=%.1f ms steps=%d",
+        protocol_type,
+        duration,
+        len(protocol),
+    )
+    return protocol

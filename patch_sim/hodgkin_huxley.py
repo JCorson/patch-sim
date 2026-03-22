@@ -3,6 +3,7 @@
 The model includes equations for ion channel dynamics and membrane voltage.
 """
 
+import logging
 from dataclasses import dataclass, field
 from functools import cached_property
 
@@ -25,6 +26,8 @@ from .constants import (
     DEFAULT_V_REST,
 )
 from .core_channels import make_k_channel, make_leak_channel, make_na_channel
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -123,6 +126,17 @@ class HodgkinHuxley:
                     f"Additional channel name '{ch_name}' collides with a built-in "
                     "channel name (Na, K, leak)."
                 )
+        logger.debug(
+            "HodgkinHuxley: g_Na=%.1f g_K=%.1f g_L=%.3f C_m=%.2f T=%.1f K "
+            "additional_channels=%s calcium=%s",
+            self.g_Na,
+            self.g_K,
+            self.g_L,
+            self.C_m,
+            self.T,
+            ch_names if ch_names else "none",
+            "enabled" if self.calcium_dynamics is not None else "disabled",
+        )
 
     @cached_property
     def core_channels(self) -> tuple[IonChannel, ...]:

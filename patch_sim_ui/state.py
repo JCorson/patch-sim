@@ -904,20 +904,38 @@ class AppState(rx.State):
             self.continuous_loop_running = True
             self.error_message = ""
 
+        logger.info(
+            "Continuous simulation started: mode=%s, protocol=%s",
+            self.clamp_mode,
+            self.protocol_type,
+        )
+        _iteration = 0
         try:
             while True:
+                _iter_start = time.monotonic()
                 # Snapshot all state needed for this iteration.
                 async with self:
                     if not self.continuous_mode:
                         break
 
                     mode = self.clamp_mode
+                    ptype = self.protocol_type
                     neuron = self._build_neuron()
                     stimulus = self._build_protocol()
                     use_prior_state = self._cont_has_state
                     prior_V = self._cont_V
                     prior_gating = dict(self._cont_gating)
                     prior_ca_i = self._cont_ca_i
+
+                    _iteration += 1
+                    logger.debug(
+                        "Continuous iteration %d: mode=%s protocol=%s "
+                        "use_prior_state=%s",
+                        _iteration,
+                        mode,
+                        ptype,
+                        use_prior_state,
+                    )
 
                 # Run simulation outside the state lock in a thread executor.
                 loop = asyncio.get_running_loop()
@@ -982,6 +1000,14 @@ class AppState(rx.State):
                     self._cont_ca_i = last_ca_i
                     self._cont_has_state = True
 
+                _iter_elapsed_ms = (time.monotonic() - _iter_start) * 1000
+                if _iter_elapsed_ms > 500:
+                    logger.warning(
+                        "Continuous iteration %d took %.0f ms (>500 ms threshold)",
+                        _iteration,
+                        _iter_elapsed_ms,
+                    )
+
                 # Yield to allow UI events (parameter changes) to be processed.
                 await asyncio.sleep(0)
 
@@ -989,6 +1015,9 @@ class AppState(rx.State):
             async with self:
                 self.continuous_mode = False
                 self.continuous_loop_running = False
+                logger.info(
+                    "Continuous simulation stopped after %d iteration(s)", _iteration
+                )
                 self._refresh_logs()
             js = self._apply_visibility_js()
             if js:
