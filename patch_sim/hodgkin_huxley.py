@@ -216,18 +216,6 @@ class HodgkinHuxley:
         return tuple(result)
 
     @cached_property
-    def _calcium_channel_indices(self) -> tuple[int, ...]:
-        """Indices into ``all_channels`` for calcium-carrying channels.
-
-        Used by the internal simulation loop to sum only the Ca²⁺-carrying
-        channel currents when updating the intracellular Ca²⁺ ODE.
-
-        Returns:
-            Tuple of integer indices into ``all_channels``.
-        """
-        return tuple(i for i, ch in enumerate(self.all_channels) if ch.carries_calcium)
-
-    @cached_property
     def _reversal_potentials(self) -> np.ndarray:
         """Pre-computed reversal potential for each channel.
 

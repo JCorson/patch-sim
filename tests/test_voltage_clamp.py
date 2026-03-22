@@ -376,3 +376,24 @@ def test_simulate_voltage_clamp_custom_channel_python_path() -> None:
     assert "CustomK_current" in result.columns
     assert "c_gate" in result.columns
     assert np.all(np.isfinite(result.to_numpy()))
+
+
+def test_compute_channel_current_no_gating_variables(hh_model) -> None:
+    """_compute_channel_current must handle a channel with no gating variables.
+
+    The leak channel has an empty gating_variables tuple; the current must
+    equal g_max * (V - E_rev) with no gate product.
+    """
+    import patch_sim.clamp_simulations as cs
+
+    # Leak channel is always last of the three core channels (Na, K, leak).
+    leak_idx = 2
+    leak_ch = hh_model.all_channels[leak_idx]
+    assert len(leak_ch.gating_variables) == 0, "expected leak channel with no gates"
+
+    V = -65.0
+    state = np.zeros(len(hh_model.all_gating_variables))
+    current = cs._compute_channel_current(V, state, hh_model, leak_idx)
+
+    expected = leak_ch.g_max * (V - hh_model._reversal_potentials[leak_idx])
+    assert current == pytest.approx(expected)

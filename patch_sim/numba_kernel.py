@@ -83,7 +83,7 @@ def _eval_rate(func_id: int, V: float) -> float:
         return 4.0 * _safe_exp_jit(-(V + 65.0) / 18.0)
     elif func_id == 4:  # alpha_h
         return 0.07 * _safe_exp_jit(-(V + 65.0) / 20.0)
-    else:  # func_id == 5: beta_h
+    else:  # func_id == 5  (beta_h) — only reachable when _use_jit guards are satisfied
         return 1.0 / (1.0 + _safe_exp_jit(-(V + 35.0) / 10.0))
 
 

@@ -87,11 +87,10 @@ def _use_jit(neuron: "HodgkinHuxley") -> bool:
     Returns:
         True if the JIT kernel should be used, False otherwise.
     """
-    ids = neuron._rate_func_ids
     return (
         HAS_NUMBA
         and neuron.calcium_dynamics is None
-        and bool(np.all((ids >= 0) & (ids <= 5)))
+        and bool(np.all(neuron._rate_func_ids >= 0))
     )
 
 
@@ -325,7 +324,7 @@ def _rk4_step_current_clamp(
 def _simulate_voltage_clamp_core(
     neuron: "HodgkinHuxley",
     voltage_protocol: np.ndarray,
-    gating_state: dict[str, float],
+    state0: np.ndarray,
     ca_i: float,
 ) -> pd.DataFrame:
     """Run the voltage clamp simulation loop given pre-initialized state.
@@ -338,8 +337,8 @@ def _simulate_voltage_clamp_core(
         neuron: The Hodgkin-Huxley neuron object to simulate.
         voltage_protocol: Voltage values in mV to clamp the membrane at for each
             time step. Must be non-empty and finite.
-        gating_state: Initial gating variable values, keyed by variable name.
-            Mutated during the simulation; callers should pass a copy if needed.
+        state0: Initial gating state as a 1-D float64 array indexed by
+            ``neuron.gating_index``.
         ca_i: Initial intracellular Ca²⁺ concentration in mM.
 
     Returns:
@@ -444,7 +443,7 @@ def _simulate_current_clamp_core(
     neuron: "HodgkinHuxley",
     current_external: np.ndarray,
     initial_V: float,
-    gating_state: dict[str, float],
+    state0: np.ndarray,
     ca_i: float,
 ) -> pd.DataFrame:
     """Run the current clamp simulation loop given pre-initialized state.
@@ -458,8 +457,8 @@ def _simulate_current_clamp_core(
         current_external: External current in µA/cm² waveform. Must be non-empty
             and finite.
         initial_V: Initial membrane voltage in mV.
-        gating_state: Initial gating variable values, keyed by variable name.
-            Mutated during the simulation; callers should pass a copy if needed.
+        state0: Initial gating state as a 1-D float64 array indexed by
+            ``neuron.gating_index``.
         ca_i: Initial intracellular Ca²⁺ concentration in mM.
 
     Returns:
@@ -605,8 +604,8 @@ def simulate_voltage_clamp(
     ca_i: float = (
         neuron.calcium_dynamics.ca_rest if neuron.calcium_dynamics is not None else 0.0
     )
-    gating_state = _initialize_gating_variables(neuron, voltage_protocol[0], ca_i)
-    return _simulate_voltage_clamp_core(neuron, voltage_protocol, gating_state, ca_i)
+    state0 = _initialize_gating_array(neuron, voltage_protocol[0], ca_i)
+    return _simulate_voltage_clamp_core(neuron, voltage_protocol, state0, ca_i)
 
 
 def simulate_current_clamp(
@@ -650,9 +649,9 @@ def simulate_current_clamp(
     ca_i: float = (
         neuron.calcium_dynamics.ca_rest if neuron.calcium_dynamics is not None else 0.0
     )
-    gating_state = _initialize_gating_variables(neuron, neuron.v_rest, ca_i)
+    state0 = _initialize_gating_array(neuron, neuron.v_rest, ca_i)
     return _simulate_current_clamp_core(
-        neuron, current_external, neuron.v_rest, gating_state, ca_i
+        neuron, current_external, neuron.v_rest, state0, ca_i
     )
 
 
@@ -693,8 +692,12 @@ def simulate_voltage_clamp_from_state(
         duration_ms,
         len(neuron.all_channels),
     )
+    state0 = np.array(
+        [initial_gating_state[gv.name] for gv in neuron.all_gating_variables],
+        dtype=np.float64,
+    )
     result = _simulate_voltage_clamp_core(
-        neuron, voltage_protocol, dict(initial_gating_state), initial_ca_i
+        neuron, voltage_protocol, state0, initial_ca_i
     )
     logger.debug(
         "simulate_voltage_clamp_from_state: complete — %d steps", num_time_steps
@@ -741,8 +744,12 @@ def simulate_current_clamp_from_state(
         duration_ms,
         len(neuron.all_channels),
     )
+    state0 = np.array(
+        [initial_gating_state[gv.name] for gv in neuron.all_gating_variables],
+        dtype=np.float64,
+    )
     result = _simulate_current_clamp_core(
-        neuron, current_external, initial_V, dict(initial_gating_state), initial_ca_i
+        neuron, current_external, initial_V, state0, initial_ca_i
     )
     logger.debug(
         "simulate_current_clamp_from_state: complete — %d steps", num_time_steps

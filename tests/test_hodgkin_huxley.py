@@ -354,3 +354,12 @@ def test_use_jit_default_model(hh_model: HodgkinHuxley) -> None:
         assert _use_jit(hh_model) is True
     else:
         assert _use_jit(hh_model) is False
+
+
+def test_use_jit_false_with_calcium_dynamics() -> None:
+    """_use_jit must return False when calcium_dynamics is configured."""
+    from patch_sim.calcium import CalciumDynamics
+    from patch_sim.clamp_simulations import _use_jit
+
+    neuron = HodgkinHuxley(calcium_dynamics=CalciumDynamics())
+    assert _use_jit(neuron) is False
