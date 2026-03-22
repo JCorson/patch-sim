@@ -2,6 +2,7 @@
 
 import reflex as rx
 
+from patch_sim_ui.constants import CURRENT_CLAMP, VOLTAGE_CLAMP
 from patch_sim_ui.state import AppState
 
 
@@ -327,7 +328,7 @@ def protocol_panel() -> rx.Component:
         rx.separator(),
         rx.text("Mode", size="2", weight="bold"),
         rx.radio_group(
-            ["Current Clamp", "Voltage Clamp"],
+            [CURRENT_CLAMP, VOLTAGE_CLAMP],
             value=AppState.clamp_mode,
             on_change=AppState.set_clamp_mode,
             direction="row",
@@ -341,7 +342,7 @@ def protocol_panel() -> rx.Component:
             width="100%",
         ),
         rx.cond(
-            AppState.clamp_mode == "Current Clamp",
+            AppState.clamp_mode == CURRENT_CLAMP,
             _current_protocol_params(),
             _voltage_protocol_params(),
         ),

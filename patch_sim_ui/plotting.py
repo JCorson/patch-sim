@@ -13,6 +13,8 @@ from pydantic import BaseModel
 from patch_sim_ui.constants import (
     CC_VOLTAGE_COLOR,
     CHANNEL_COLORS,
+    CURRENT_CLAMP,
+    VOLTAGE_CLAMP,
     GATING_VAR_COLORS,
     STIMULUS_COLOR,
     STORED_TRACE_COLORS,
@@ -116,7 +118,7 @@ class Sweep(BaseModel):
         sodium_activation: Gating variable m (dimensionless, 0–1).
         sodium_inactivation: Gating variable h (dimensionless, 0–1).
         stimulus: Stimulus waveform (current µA/cm² or voltage command mV).
-        clamp_mode: "Current Clamp" or "Voltage Clamp".
+        clamp_mode: CURRENT_CLAMP or VOLTAGE_CLAMP.
         additional_currents: Extra channel currents keyed by channel name.
         additional_gating: Extra gating variable traces keyed by variable name.
     """
@@ -157,7 +159,7 @@ class Sweep(BaseModel):
             stimulus: Stimulus array (current or voltage command).
             label: Display name for this sweep in the legend.
             color: Hex colour string; pass empty string to use Plotly default.
-            mode: Clamp mode — "Current Clamp" or "Voltage Clamp".
+            mode: Clamp mode — CURRENT_CLAMP or VOLTAGE_CLAMP.
 
         Returns:
             A fully populated Sweep instance.
@@ -359,7 +361,7 @@ def compute_trace_visibility_map(
     Args:
         current_sweeps: Latest simulation result sweeps.
         saved_sweeps: User-saved sweeps displayed as overlays.
-        clamp_mode: Active UI clamp mode ("Current Clamp" or "Voltage Clamp").
+        clamp_mode: Active UI clamp mode (CURRENT_CLAMP or VOLTAGE_CLAMP).
         additional_current_field_map: Optional mapping from additional-current
             sweep keys (e.g. ``"Ih"``) to ``show_*`` field names
             (e.g. ``"show_ih_current"``).  Keys absent from the map advance
@@ -380,7 +382,7 @@ def compute_trace_visibility_map(
     idx = 0
     add_curr = additional_current_field_map or {}
     add_gating = additional_gating_field_map or {}
-    is_vc = clamp_mode == "Voltage Clamp"
+    is_vc = clamp_mode == VOLTAGE_CLAMP
     is_multi_sweep = len(current_sweeps) > 1
 
     def _map(field: str) -> None:
@@ -395,7 +397,7 @@ def compute_trace_visibility_map(
         idx += 1
 
     for sweep in current_sweeps:
-        if sweep.clamp_mode == "Current Clamp":
+        if sweep.clamp_mode == CURRENT_CLAMP:
             _map("show_voltage")
         else:
             # Voltage Clamp: matches _add_vc_currents insertion order.
@@ -425,7 +427,7 @@ def compute_trace_visibility_map(
 
     for sweep in saved_sweeps:
         # Saved sweeps are always visible; just advance the counter.
-        if sweep.clamp_mode == "Current Clamp":
+        if sweep.clamp_mode == CURRENT_CLAMP:
             _skip()  # voltage
         elif is_vc:
             # _add_vc_currents: 4 classic + additional_currents (no gating).
@@ -439,7 +441,7 @@ def compute_trace_visibility_map(
 
     for sweep in stored_traces or []:
         # Stored traces are always visible; just advance the counter.
-        if sweep.clamp_mode == "Current Clamp":
+        if sweep.clamp_mode == CURRENT_CLAMP:
             _skip()  # voltage
         else:
             _skip()  # total_current
@@ -509,7 +511,7 @@ def build_figure(
             if key not in add_current_keys:
                 add_current_keys.append(key)
 
-    is_vc = clamp_mode == "Voltage Clamp"
+    is_vc = clamp_mode == VOLTAGE_CLAMP
     is_multi_sweep = len(current_sweeps) > 1
 
     # Both modes use a fixed 3-row layout.
@@ -634,10 +636,10 @@ def build_figure(
         sweep_mode = sweep.clamp_mode
         pfx = f"{sweep.label} " if sweep.label else ""
         stim_label = (
-            "Stimulus (µA/cm²)" if sweep_mode == "Current Clamp" else "Command (mV)"
+            "Stimulus (µA/cm²)" if sweep_mode == CURRENT_CLAMP else "Command (mV)"
         )
 
-        if sweep_mode == "Current Clamp":
+        if sweep_mode == CURRENT_CLAMP:
             _scatter(
                 t,
                 sweep.voltage,
@@ -685,7 +687,7 @@ def build_figure(
 
     for sweep in saved_sweeps:
         c = sweep.color
-        if sweep.clamp_mode == "Current Clamp":
+        if sweep.clamp_mode == CURRENT_CLAMP:
             _scatter(sweep.time, sweep.voltage, f"{sweep.label} V", 1, c, hoverinfo=hi)
         elif is_vc:
             # Saved VC sweeps: all currents overlaid on row 1, dashed lines.
@@ -704,7 +706,7 @@ def build_figure(
     for i, sweep in enumerate(stored_traces or []):
         c = STORED_TRACE_COLORS[i % len(STORED_TRACE_COLORS)]
         label = sweep.label or f"Stored {i + 1}"
-        if sweep.clamp_mode == "Current Clamp":
+        if sweep.clamp_mode == CURRENT_CLAMP:
             _scatter(
                 sweep.time,
                 sweep.voltage,

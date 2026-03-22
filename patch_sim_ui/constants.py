@@ -1,5 +1,9 @@
 """UI constants: parameter ranges and colour palettes."""
 
+#: Clamp mode identifier strings used throughout state, plotting, and UI.
+CURRENT_CLAMP: str = "Current Clamp"
+VOLTAGE_CLAMP: str = "Voltage Clamp"
+
 # Slider ranges for neuron parameters
 PARAM_RANGES: dict[str, tuple[float, float, float]] = {
     # name: (min, max, step)

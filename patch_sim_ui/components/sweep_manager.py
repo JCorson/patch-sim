@@ -2,6 +2,7 @@
 
 import reflex as rx
 
+from patch_sim_ui.constants import CURRENT_CLAMP
 from patch_sim_ui.state import AppState
 
 
@@ -78,6 +79,112 @@ def _channel_trace_group(
     )
 
 
+# (header, enabled_var, current_label, current_var, current_handler,
+#  gating_label, gating_var, gating_handler)
+_ADDITIONAL_CHANNEL_TRACE_SPECS = [
+    (
+        "Ih (HCN)",
+        AppState.ih_enabled,
+        "I_Ih",
+        AppState.show_ih_current,
+        AppState.set_show_ih_current,
+        "Ih gating (r)",
+        AppState.show_ih_gating,
+        AppState.set_show_ih_gating,
+    ),
+    (
+        "IKa (A-type K\u207a)",
+        AppState.ika_enabled,
+        "I_IKa",
+        AppState.show_ika_current,
+        AppState.set_show_ika_current,
+        "IKa gating (a, b)",
+        AppState.show_ika_gating,
+        AppState.set_show_ika_gating,
+    ),
+    (
+        "INaP (Persistent Na\u207a)",
+        AppState.inap_enabled,
+        "I_INaP",
+        AppState.show_inap_current,
+        AppState.set_show_inap_current,
+        "INaP gating (p)",
+        AppState.show_inap_gating,
+        AppState.set_show_inap_gating,
+    ),
+    (
+        "INaR (Resurgent Na\u207a)",
+        AppState.inar_enabled,
+        "I_INaR",
+        AppState.show_inar_current,
+        AppState.set_show_inar_current,
+        "INaR gating (s, hr)",
+        AppState.show_inar_gating,
+        AppState.set_show_inar_gating,
+    ),
+    (
+        "IM (Muscarinic K\u207a)",
+        AppState.im_enabled,
+        "I_IM",
+        AppState.show_im_current,
+        AppState.set_show_im_current,
+        "IM gating (w)",
+        AppState.show_im_gating,
+        AppState.set_show_im_gating,
+    ),
+    (
+        "IKir (Inward Rectifier K\u207a)",
+        AppState.ikir_enabled,
+        "I_IKir",
+        AppState.show_ikir_current,
+        AppState.set_show_ikir_current,
+        "IKir gating (kir)",
+        AppState.show_ikir_gating,
+        AppState.set_show_ikir_gating,
+    ),
+    (
+        "IKCa (Ca\u00b2\u207a-activated K\u207a)",
+        AppState.ikca_enabled,
+        "I_IKCa",
+        AppState.show_ikca_current,
+        AppState.set_show_ikca_current,
+        "IKCa gating (q)",
+        AppState.show_ikca_gating,
+        AppState.set_show_ikca_gating,
+    ),
+    (
+        "ICaL (L-type Ca\u00b2\u207a)",
+        AppState.ical_enabled,
+        "I_ICaL",
+        AppState.show_ical_current,
+        AppState.set_show_ical_current,
+        "ICaL gating (d, f)",
+        AppState.show_ical_gating,
+        AppState.set_show_ical_gating,
+    ),
+    (
+        "ICaT (T-type Ca\u00b2\u207a)",
+        AppState.icat_enabled,
+        "I_ICaT",
+        AppState.show_icat_current,
+        AppState.set_show_icat_current,
+        "ICaT gating (dt, ft)",
+        AppState.show_icat_gating,
+        AppState.set_show_icat_gating,
+    ),
+    (
+        "ICaN (N-type Ca\u00b2\u207a)",
+        AppState.ican_enabled,
+        "I_ICaN",
+        AppState.show_ican_current,
+        AppState.set_show_ican_current,
+        "ICaN gating (dn, fn)",
+        AppState.show_ican_gating,
+        AppState.set_show_ican_gating,
+    ),
+]
+
+
 def _additional_channels_section() -> rx.Component:
     """Render conditional trace groups for all 10 additional channels.
 
@@ -87,106 +194,7 @@ def _additional_channels_section() -> rx.Component:
         A fragment containing all additional channel trace groups.
     """
     return rx.fragment(
-        _channel_trace_group(
-            "Ih (HCN)",
-            AppState.ih_enabled,
-            "I_Ih",
-            AppState.show_ih_current,
-            AppState.set_show_ih_current,
-            "Ih gating (r)",
-            AppState.show_ih_gating,
-            AppState.set_show_ih_gating,
-        ),
-        _channel_trace_group(
-            "IKa (A-type K\u207a)",
-            AppState.ika_enabled,
-            "I_IKa",
-            AppState.show_ika_current,
-            AppState.set_show_ika_current,
-            "IKa gating (a, b)",
-            AppState.show_ika_gating,
-            AppState.set_show_ika_gating,
-        ),
-        _channel_trace_group(
-            "INaP (Persistent Na\u207a)",
-            AppState.inap_enabled,
-            "I_INaP",
-            AppState.show_inap_current,
-            AppState.set_show_inap_current,
-            "INaP gating (p)",
-            AppState.show_inap_gating,
-            AppState.set_show_inap_gating,
-        ),
-        _channel_trace_group(
-            "INaR (Resurgent Na\u207a)",
-            AppState.inar_enabled,
-            "I_INaR",
-            AppState.show_inar_current,
-            AppState.set_show_inar_current,
-            "INaR gating (s, hr)",
-            AppState.show_inar_gating,
-            AppState.set_show_inar_gating,
-        ),
-        _channel_trace_group(
-            "IM (Muscarinic K\u207a)",
-            AppState.im_enabled,
-            "I_IM",
-            AppState.show_im_current,
-            AppState.set_show_im_current,
-            "IM gating (w)",
-            AppState.show_im_gating,
-            AppState.set_show_im_gating,
-        ),
-        _channel_trace_group(
-            "IKir (Inward Rectifier K\u207a)",
-            AppState.ikir_enabled,
-            "I_IKir",
-            AppState.show_ikir_current,
-            AppState.set_show_ikir_current,
-            "IKir gating (kir)",
-            AppState.show_ikir_gating,
-            AppState.set_show_ikir_gating,
-        ),
-        _channel_trace_group(
-            "IKCa (Ca\u00b2\u207a-activated K\u207a)",
-            AppState.ikca_enabled,
-            "I_IKCa",
-            AppState.show_ikca_current,
-            AppState.set_show_ikca_current,
-            "IKCa gating (q)",
-            AppState.show_ikca_gating,
-            AppState.set_show_ikca_gating,
-        ),
-        _channel_trace_group(
-            "ICaL (L-type Ca\u00b2\u207a)",
-            AppState.ical_enabled,
-            "I_ICaL",
-            AppState.show_ical_current,
-            AppState.set_show_ical_current,
-            "ICaL gating (d, f)",
-            AppState.show_ical_gating,
-            AppState.set_show_ical_gating,
-        ),
-        _channel_trace_group(
-            "ICaT (T-type Ca\u00b2\u207a)",
-            AppState.icat_enabled,
-            "I_ICaT",
-            AppState.show_icat_current,
-            AppState.set_show_icat_current,
-            "ICaT gating (dt, ft)",
-            AppState.show_icat_gating,
-            AppState.set_show_icat_gating,
-        ),
-        _channel_trace_group(
-            "ICaN (N-type Ca\u00b2\u207a)",
-            AppState.ican_enabled,
-            "I_ICaN",
-            AppState.show_ican_current,
-            AppState.set_show_ican_current,
-            "ICaN gating (dn, fn)",
-            AppState.show_ican_gating,
-            AppState.set_show_ican_gating,
-        ),
+        *[_channel_trace_group(*spec) for spec in _ADDITIONAL_CHANNEL_TRACE_SPECS]
     )
 
 
@@ -300,7 +308,7 @@ def _trace_visibility_popover() -> rx.Component:
         ),
         rx.popover.content(
             rx.cond(
-                AppState.clamp_mode == "Current Clamp",
+                AppState.clamp_mode == CURRENT_CLAMP,
                 _cc_popover_content(),
                 _vc_popover_content(),
             ),
@@ -308,15 +316,18 @@ def _trace_visibility_popover() -> rx.Component:
     )
 
 
-def _sweep_chip(sweep) -> rx.Component:
-    """Render a colour-coded badge for a saved sweep.
+def _chip(sweep, color_scheme: str | None = None) -> rx.Component:
+    """Render a colour-coded badge for a sweep or stored trace.
 
     Args:
-        sweep: A ``Sweep`` instance from the saved sweeps list.
+        sweep: A ``Sweep`` instance.
+        color_scheme: Optional Radix color scheme (e.g. ``"orange"`` for stored
+            traces). Omit for saved sweeps.
 
     Returns:
         A badge component showing the sweep colour dot and label.
     """
+    extra = {"color_scheme": color_scheme} if color_scheme is not None else {}
     return rx.badge(
         rx.box(
             width="10px",
@@ -328,31 +339,18 @@ def _sweep_chip(sweep) -> rx.Component:
         ),
         sweep.label,
         variant="outline",
+        **extra,
     )
+
+
+def _sweep_chip(sweep) -> rx.Component:
+    """Render a badge for a saved sweep (for use with rx.foreach)."""
+    return _chip(sweep)
 
 
 def _stored_chip(sweep) -> rx.Component:
-    """Render a colour-coded badge for an oscilloscope stored trace.
-
-    Args:
-        sweep: A ``Sweep`` instance from the stored traces list.
-
-    Returns:
-        A badge component showing the stored trace colour dot and label.
-    """
-    return rx.badge(
-        rx.box(
-            width="10px",
-            height="10px",
-            border_radius="50%",
-            background_color=sweep.color,
-            display="inline-block",
-            margin_right="4px",
-        ),
-        sweep.label,
-        variant="outline",
-        color_scheme="orange",
-    )
+    """Render an orange badge for a stored trace (for use with rx.foreach)."""
+    return _chip(sweep, color_scheme="orange")
 
 
 def sweep_manager() -> rx.Component:

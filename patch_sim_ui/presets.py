@@ -3,6 +3,7 @@
 from typing import Any
 
 from patch_sim.constants import DEFAULT_NEURON_PARAMS
+from patch_sim_ui.constants import CURRENT_CLAMP, VOLTAGE_CLAMP
 
 # Each preset is a dict of state variable names → values.
 # Keys must match field names in AppState exactly.
@@ -10,7 +11,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     "Action Potential": {
         **DEFAULT_NEURON_PARAMS,
         # Experiment
-        "clamp_mode": "Current Clamp",
+        "clamp_mode": CURRENT_CLAMP,
         # Protocol
         "protocol_type": "Step",
         "duration": 50.0,
@@ -20,7 +21,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     },
     "Subthreshold Response": {
         **DEFAULT_NEURON_PARAMS,
-        "clamp_mode": "Current Clamp",
+        "clamp_mode": CURRENT_CLAMP,
         "protocol_type": "Step",
         "duration": 50.0,
         "current_amplitude": 4.0,
@@ -29,7 +30,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     },
     "Repetitive Firing": {
         **DEFAULT_NEURON_PARAMS,
-        "clamp_mode": "Current Clamp",
+        "clamp_mode": CURRENT_CLAMP,
         "protocol_type": "Step",
         "duration": 200.0,
         "current_amplitude": 15.0,
@@ -38,7 +39,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     },
     "I-V Curve": {
         **DEFAULT_NEURON_PARAMS,
-        "clamp_mode": "Voltage Clamp",
+        "clamp_mode": VOLTAGE_CLAMP,
         "protocol_type": "I-V Curve",
         "duration": 20.0,
         "vc_voltage_min": -100.0,
@@ -51,7 +52,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     "Na+ Channel Activation": {
         **DEFAULT_NEURON_PARAMS,
         "g_K": 0.0,  # override: block K+ channels to isolate Na+ current
-        "clamp_mode": "Voltage Clamp",
+        "clamp_mode": VOLTAGE_CLAMP,
         "protocol_type": "Activation",
         "duration": 20.0,
         "vc_holding_voltage": -70.0,
@@ -64,7 +65,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     },
     "Frequency Response": {
         **DEFAULT_NEURON_PARAMS,
-        "clamp_mode": "Current Clamp",
+        "clamp_mode": CURRENT_CLAMP,
         "protocol_type": "Chirp",
         "duration": 500.0,
         "dc_offset": 8.0,
