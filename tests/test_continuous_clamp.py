@@ -368,11 +368,6 @@ def test_vc_three_iteration_loop_matches_full_run(hh_model):
     full = _make_voltage_steps(15.0, voltage=hold)
 
     df_full = simulate_voltage_clamp(hh_model, full)
-    gating_cols = [
-        col
-        for col in df_full.columns
-        if col in {gv.name for gv in hh_model.all_gating_variables}
-    ]
 
     df1 = simulate_voltage_clamp(hh_model, segment)
     last_gating1 = _extract_terminal_vc_state(df1, hh_model)
@@ -387,7 +382,7 @@ def test_vc_three_iteration_loop_matches_full_run(hh_model):
     )
     last_gating3 = _extract_terminal_vc_state(df3, hh_model)
 
-    for col in gating_cols:
+    for col in last_gating3:
         assert last_gating3[col] == pytest.approx(
             float(df_full[col].iloc[-1]), abs=1e-6
         )
