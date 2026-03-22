@@ -323,23 +323,21 @@ class TestActivationProtocol:
         """Test basic activation sweep generation."""
         test_duration = 10.0  # ms
         test_voltage = 0.0  # mV
-        prepulse_voltage = -120.0  # mV
-        prepulse_duration = 100.0  # ms
+        baseline_duration = 50.0  # ms
         holding_voltage = -70.0  # mV
         sampling_frequency = 10000.0  # Hz
 
         voltage = activation_sweep(
             test_duration=test_duration,
             test_voltage=test_voltage,
-            prepulse_voltage=prepulse_voltage,
-            prepulse_duration=prepulse_duration,
+            baseline_duration=baseline_duration,
             holding_voltage=holding_voltage,
             sampling_frequency=sampling_frequency,
         )
 
-        # Should contain holding voltage, prepulse voltage, and test voltage
+        # Should contain holding voltage and test voltage
         unique_voltages = np.unique(voltage)
-        expected_unique = {holding_voltage, prepulse_voltage, test_voltage}
+        expected_unique = {holding_voltage, test_voltage}
         actual_unique = set()
         for val in unique_voltages:
             for exp_val in expected_unique:
@@ -352,24 +350,25 @@ class TestActivationProtocol:
     def test_activation_sweep_timing(self):
         """Test activation sweep timing structure."""
         test_duration = 5.0  # ms
-        prepulse_duration = 50.0  # ms
+        baseline_duration = 50.0  # ms
         interpulse_duration = 5.0  # ms
         sampling_frequency = 10000.0  # Hz
 
         voltage = activation_sweep(
             test_duration=test_duration,
             test_voltage=-40.0,
-            prepulse_duration=prepulse_duration,
+            baseline_duration=baseline_duration,
             interpulse_duration=interpulse_duration,
             sampling_frequency=sampling_frequency,
         )
 
-        # Expected duration for one sweep
+        # Expected duration for one sweep: baseline + gap + step + gap + baseline
         expected_duration = (
-            prepulse_duration
+            baseline_duration
             + interpulse_duration
             + test_duration
             + interpulse_duration
+            + baseline_duration
         )
 
         # Check total duration

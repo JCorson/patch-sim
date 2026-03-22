@@ -170,8 +170,7 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
         result = patch_sim.activation_sweep(
             test_duration=duration,
             test_voltage=float(config.get("vc_test_voltage_min", -60.0)),
-            prepulse_voltage=float(config.get("vc_prepulse_voltage", -100.0)),
-            prepulse_duration=float(config.get("vc_prepulse_duration", 100.0)),
+            baseline_duration=float(config.get("vc_baseline_duration", 50.0)),
             interpulse_duration=float(config.get("vc_interpulse_duration", 5.0)),
             holding_voltage=float(config.get("vc_holding_voltage", -70.0)),
             sampling_frequency=sampling_frequency,

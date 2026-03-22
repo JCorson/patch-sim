@@ -257,14 +257,9 @@ def _vc_activation_params() -> rx.Component:
     return rx.vstack(
         _num_field("Test duration (ms)", AppState.duration, AppState.set_duration),
         _num_field(
-            "Prepulse voltage (mV)",
-            AppState.vc_prepulse_voltage,
-            AppState.set_vc_prepulse_voltage,
-        ),
-        _num_field(
-            "Prepulse duration (ms)",
-            AppState.vc_prepulse_duration,
-            AppState.set_vc_prepulse_duration,
+            "Baseline duration (ms)",
+            AppState.vc_baseline_duration,
+            AppState.set_vc_baseline_duration,
         ),
         _num_field(
             "Test V min (mV)",

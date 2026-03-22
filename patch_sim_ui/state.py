@@ -188,8 +188,7 @@ _FLOAT_FIELDS: list[str] = [
     "vc_voltage_step",
     "vc_pre_pulse_duration",
     "vc_post_pulse_duration",
-    "vc_prepulse_voltage",
-    "vc_prepulse_duration",
+    "vc_baseline_duration",
     "vc_test_voltage_min",
     "vc_test_voltage_max",
     "vc_interpulse_duration",
@@ -446,8 +445,7 @@ class AppState(rx.State):
     vc_voltage_step: float = 10.0
     vc_pre_pulse_duration: float = 5.0
     vc_post_pulse_duration: float = 5.0
-    vc_prepulse_voltage: float = -100.0
-    vc_prepulse_duration: float = 100.0
+    vc_baseline_duration: float = 50.0
     vc_test_voltage_min: float = -60.0
     vc_test_voltage_max: float = 60.0
     vc_interpulse_duration: float = 5.0
@@ -872,8 +870,7 @@ class AppState(rx.State):
                 vc_voltage_step=self.vc_voltage_step,
                 vc_pre_pulse_duration=self.vc_pre_pulse_duration,
                 vc_post_pulse_duration=self.vc_post_pulse_duration,
-                vc_prepulse_voltage=self.vc_prepulse_voltage,
-                vc_prepulse_duration=self.vc_prepulse_duration,
+                vc_baseline_duration=self.vc_baseline_duration,
                 vc_test_voltage_min=self.vc_test_voltage_min,
                 vc_test_voltage_max=self.vc_test_voltage_max,
                 vc_interpulse_duration=self.vc_interpulse_duration,
@@ -1114,8 +1111,7 @@ class AppState(rx.State):
                     patch_sim.activation_sweep(
                         test_duration=self.duration,
                         test_voltage=float(voltage),
-                        prepulse_voltage=self.vc_prepulse_voltage,
-                        prepulse_duration=self.vc_prepulse_duration,
+                        baseline_duration=self.vc_baseline_duration,
                         interpulse_duration=self.vc_interpulse_duration,
                         holding_voltage=self.vc_holding_voltage,
                         sampling_frequency=fs,

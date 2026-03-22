@@ -190,25 +190,26 @@ def iv_curve_protocol(
 def activation_sweep(
     test_duration: float,
     test_voltage: float,
-    prepulse_voltage: float = -100.0,
-    prepulse_duration: float = 500.0,
+    baseline_duration: float = 50.0,
     interpulse_duration: float = 10.0,
     holding_voltage: float = -70.0,
     sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> np.ndarray:
     """Generate a single sweep of an activation protocol for voltage clamp experiments.
 
-    Creates one sweep consisting of a prepulse followed by a test pulse at the
-    specified voltage, useful for studying channel activation kinetics when
-    combined with independent sweeps at different test voltages.
+    Creates one sweep consisting of a baseline period, a test pulse, and a tail
+    period, all at ``holding_voltage`` except during the test pulse.  Because each
+    sweep is simulated independently (gating variables are reset at the start of
+    every sweep), no separate prepulse is needed to condition the channels.
 
     Args:
         test_duration: Duration of the test pulse in milliseconds.
         test_voltage: Test pulse voltage in mV.
-        prepulse_voltage: Prepulse voltage in mV. Default is -100 mV.
-        prepulse_duration: Duration of prepulse in milliseconds. Default is 500 ms.
-        interpulse_duration: Duration between prepulse and test pulse in milliseconds.
-            Default is 10 ms.
+        baseline_duration: Duration of the baseline period before and after the test
+            pulse in milliseconds. The same value is used for both sides so that the
+            step sits in the middle of the trace. Default is 50 ms.
+        interpulse_duration: Duration of the brief transition gap between baseline and
+            test pulse in milliseconds. Default is 10 ms.
         holding_voltage: Holding voltage in mV. Default is -70.0 mV.
         sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
 
@@ -216,7 +217,11 @@ def activation_sweep(
         Array of voltage values in mV for one sweep.
     """
     total_duration = (
-        prepulse_duration + interpulse_duration + test_duration + interpulse_duration
+        baseline_duration
+        + interpulse_duration
+        + test_duration
+        + interpulse_duration
+        + baseline_duration
     )
 
     num_points, time_array = _calculate_time_parameters(
@@ -226,12 +231,8 @@ def activation_sweep(
     # Initialize voltage array with holding voltage
     voltage_array = np.full(num_points, holding_voltage)
 
-    # Prepulse
-    prepulse_mask = _apply_time_window(time_array, 0.0, prepulse_duration)
-    voltage_array[prepulse_mask] = prepulse_voltage
-
     # Test pulse
-    test_start = prepulse_duration + interpulse_duration
+    test_start = baseline_duration + interpulse_duration
     test_mask = _apply_time_window(time_array, test_start, test_duration)
     voltage_array[test_mask] = test_voltage
 
