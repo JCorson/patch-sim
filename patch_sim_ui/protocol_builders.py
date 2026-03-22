@@ -232,18 +232,6 @@ def build_voltage_protocol(
             holding_voltage=vc_holding_voltage,
             sampling_frequency=sampling_frequency,
         )
-    elif protocol_type == "Activation":
-        protocol = patch_sim.activation_protocol(
-            test_duration=duration,
-            prepulse_voltage=vc_prepulse_voltage,
-            prepulse_duration=vc_prepulse_duration,
-            test_voltage_min=vc_test_voltage_min,
-            test_voltage_max=vc_test_voltage_max,
-            voltage_step=vc_voltage_step,
-            interpulse_duration=vc_interpulse_duration,
-            holding_voltage=vc_holding_voltage,
-            sampling_frequency=sampling_frequency,
-        )
     else:
         raise ValueError(f"Unknown voltage protocol type: {protocol_type!r}")
     logger.debug(

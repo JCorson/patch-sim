@@ -13,7 +13,7 @@ from .current import (
     step_current,
 )
 from .voltage import (
-    activation_protocol,
+    activation_sweep,
     iv_curve_protocol,
     pulse_train_voltage,
     ramp_voltage,
@@ -33,5 +33,5 @@ __all__ = [
     "ramp_voltage",
     "pulse_train_voltage",
     "iv_curve_protocol",
-    "activation_protocol",
+    "activation_sweep",
 ]

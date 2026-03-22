@@ -56,7 +56,7 @@ from .protocols import (
     ramp_voltage,
     pulse_train_voltage,
     iv_curve_protocol,
-    activation_protocol,
+    activation_sweep,
 )
 
 __all__ = [
@@ -105,5 +105,5 @@ __all__ = [
     "ramp_voltage",
     "pulse_train_voltage",
     "iv_curve_protocol",
-    "activation_protocol",
+    "activation_sweep",
 ]

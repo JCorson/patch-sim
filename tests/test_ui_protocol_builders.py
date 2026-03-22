@@ -7,6 +7,7 @@ requiring no Reflex runtime.
 import numpy as np
 import pytest
 
+import patch_sim
 from patch_sim_ui.protocol_builders import (
     build_current_protocol,
     build_voltage_protocol,
@@ -55,7 +56,7 @@ def test_current_protocol_returns_valid_array(protocol_type: str) -> None:
 
 @pytest.mark.parametrize(
     "protocol_type",
-    ["Step", "Ramp", "Pulse Train", "I-V Curve", "Activation"],
+    ["Step", "Ramp", "Pulse Train", "I-V Curve"],
 )
 def test_voltage_protocol_returns_valid_array(protocol_type: str) -> None:
     """Each voltage clamp protocol type returns a non-empty finite array."""
@@ -164,6 +165,16 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
             duration=duration,
             sampling_frequency=sampling_frequency,
             **kwargs,
+        )
+    elif protocol_type == "Activation":
+        result = patch_sim.activation_sweep(
+            test_duration=duration,
+            test_voltage=float(config.get("vc_test_voltage_min", -60.0)),
+            prepulse_voltage=float(config.get("vc_prepulse_voltage", -100.0)),
+            prepulse_duration=float(config.get("vc_prepulse_duration", 100.0)),
+            interpulse_duration=float(config.get("vc_interpulse_duration", 5.0)),
+            holding_voltage=float(config.get("vc_holding_voltage", -70.0)),
+            sampling_frequency=sampling_frequency,
         )
     else:
         kwargs = {

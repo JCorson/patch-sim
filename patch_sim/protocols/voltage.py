@@ -187,47 +187,37 @@ def iv_curve_protocol(
     return voltage_array
 
 
-def activation_protocol(
+def activation_sweep(
     test_duration: float,
+    test_voltage: float,
     prepulse_voltage: float = -100.0,
     prepulse_duration: float = 500.0,
-    test_voltage_min: float = -80.0,
-    test_voltage_max: float = 60.0,
-    voltage_step: float = 10.0,
     interpulse_duration: float = 10.0,
     holding_voltage: float = -70.0,
     sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> np.ndarray:
-    """Generate an activation protocol for voltage clamp experiments.
+    """Generate a single sweep of an activation protocol for voltage clamp experiments.
 
-    Creates a protocol with prepulses followed by test pulses at different
-    voltages, useful for studying channel activation kinetics.
+    Creates one sweep consisting of a prepulse followed by a test pulse at the
+    specified voltage, useful for studying channel activation kinetics when
+    combined with independent sweeps at different test voltages.
 
     Args:
-        test_duration: Duration of each test pulse in milliseconds.
+        test_duration: Duration of the test pulse in milliseconds.
+        test_voltage: Test pulse voltage in mV.
         prepulse_voltage: Prepulse voltage in mV. Default is -100 mV.
         prepulse_duration: Duration of prepulse in milliseconds. Default is 500 ms.
-        test_voltage_min: Minimum test voltage in mV. Default is -80 mV.
-        test_voltage_max: Maximum test voltage in mV. Default is 60 mV.
-        voltage_step: Voltage increment between test steps in mV. Default is 10 mV.
         interpulse_duration: Duration between prepulse and test pulse in milliseconds.
             Default is 10 ms.
         holding_voltage: Holding voltage in mV. Default is -70.0 mV.
         sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
 
     Returns:
-        Array of voltage values in mV for the complete protocol.
+        Array of voltage values in mV for one sweep.
     """
-    # Calculate test voltages
-    test_voltages = np.arange(
-        test_voltage_min, test_voltage_max + voltage_step, voltage_step
-    )
-
-    # Calculate total duration for one sweep
-    sweep_duration = (
+    total_duration = (
         prepulse_duration + interpulse_duration + test_duration + interpulse_duration
     )
-    total_duration = sweep_duration * len(test_voltages)
 
     num_points, time_array = _calculate_time_parameters(
         total_duration, sampling_frequency
@@ -236,20 +226,13 @@ def activation_protocol(
     # Initialize voltage array with holding voltage
     voltage_array = np.full(num_points, holding_voltage)
 
-    # Generate each sweep
-    for i, test_voltage in enumerate(test_voltages):
-        sweep_start = i * sweep_duration
+    # Prepulse
+    prepulse_mask = _apply_time_window(time_array, 0.0, prepulse_duration)
+    voltage_array[prepulse_mask] = prepulse_voltage
 
-        # Prepulse
-        prepulse_start = sweep_start
-        prepulse_mask = _apply_time_window(
-            time_array, prepulse_start, prepulse_duration
-        )
-        voltage_array[prepulse_mask] = prepulse_voltage
-
-        # Test pulse
-        test_start = prepulse_start + prepulse_duration + interpulse_duration
-        test_mask = _apply_time_window(time_array, test_start, test_duration)
-        voltage_array[test_mask] = test_voltage
+    # Test pulse
+    test_start = prepulse_duration + interpulse_duration
+    test_mask = _apply_time_window(time_array, test_start, test_duration)
+    voltage_array[test_mask] = test_voltage
 
     return voltage_array
