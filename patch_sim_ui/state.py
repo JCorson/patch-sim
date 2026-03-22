@@ -1015,10 +1015,10 @@ class AppState(rx.State):
             async with self:
                 self.continuous_mode = False
                 self.continuous_loop_running = False
+                logger.info(
+                    "Continuous simulation stopped after %d iteration(s)", _iteration
+                )
                 self._refresh_logs()
-            logger.info(
-                "Continuous simulation stopped after %d iteration(s)", _iteration
-            )
             js = self._apply_visibility_js()
             if js:
                 yield rx.call_script(js)
