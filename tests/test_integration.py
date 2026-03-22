@@ -303,7 +303,7 @@ def test_activation_sweep_to_simulation(hh_model: HodgkinHuxley) -> None:
     protocol = activation_sweep(
         test_duration=10.0,
         test_voltage=0.0,
-        prepulse_duration=50.0,
+        baseline_duration=50.0,
         sampling_frequency=10000.0,
     )
     result = simulate_voltage_clamp(hh_model, voltage_protocol=protocol)
