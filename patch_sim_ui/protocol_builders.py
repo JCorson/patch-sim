@@ -150,8 +150,7 @@ def build_voltage_protocol(
     vc_voltage_step: float = 10.0,
     vc_pre_pulse_duration: float = 5.0,
     vc_post_pulse_duration: float = 5.0,
-    vc_prepulse_voltage: float = -100.0,
-    vc_prepulse_duration: float = 100.0,
+    vc_baseline_duration: float = 50.0,
     vc_test_voltage_min: float = -60.0,
     vc_test_voltage_max: float = 60.0,
     vc_interpulse_duration: float = 5.0,
@@ -180,8 +179,8 @@ def build_voltage_protocol(
         vc_voltage_step: Voltage step size in mV (I-V curve and Activation).
         vc_pre_pulse_duration: Pre-pulse duration in ms (I-V curve).
         vc_post_pulse_duration: Post-pulse duration in ms (I-V curve).
-        vc_prepulse_voltage: Pre-pulse voltage for Activation in mV.
-        vc_prepulse_duration: Pre-pulse duration for Activation in ms.
+        vc_baseline_duration: Baseline duration before and after the test pulse for
+            Activation in ms.
         vc_test_voltage_min: Minimum test voltage for Activation in mV.
         vc_test_voltage_max: Maximum test voltage for Activation in mV.
         vc_interpulse_duration: Inter-pulse duration for Activation in ms.
@@ -229,18 +228,6 @@ def build_voltage_protocol(
             voltage_step=vc_voltage_step,
             pre_pulse_duration=vc_pre_pulse_duration,
             post_pulse_duration=vc_post_pulse_duration,
-            holding_voltage=vc_holding_voltage,
-            sampling_frequency=sampling_frequency,
-        )
-    elif protocol_type == "Activation":
-        protocol = patch_sim.activation_protocol(
-            test_duration=duration,
-            prepulse_voltage=vc_prepulse_voltage,
-            prepulse_duration=vc_prepulse_duration,
-            test_voltage_min=vc_test_voltage_min,
-            test_voltage_max=vc_test_voltage_max,
-            voltage_step=vc_voltage_step,
-            interpulse_duration=vc_interpulse_duration,
             holding_voltage=vc_holding_voltage,
             sampling_frequency=sampling_frequency,
         )
