@@ -188,10 +188,6 @@ _FLOAT_FIELDS: list[str] = [
     "vc_voltage_step",
     "vc_pre_pulse_duration",
     "vc_post_pulse_duration",
-    "vc_baseline_duration",
-    "vc_test_voltage_min",
-    "vc_test_voltage_max",
-    "vc_interpulse_duration",
     # Additional channel params
     "ih_g_max",
     "ika_g_max",
@@ -445,11 +441,6 @@ class AppState(rx.State):
     vc_voltage_step: float = 10.0
     vc_pre_pulse_duration: float = 5.0
     vc_post_pulse_duration: float = 5.0
-    vc_baseline_duration: float = 50.0
-    vc_test_voltage_min: float = -60.0
-    vc_test_voltage_max: float = 60.0
-    vc_interpulse_duration: float = 5.0
-
     # ------------------------------------------------------------------ #
     # Simulation results                                                  #
     # ------------------------------------------------------------------ #
@@ -565,10 +556,10 @@ class AppState(rx.State):
     def can_run_continuous(self) -> bool:
         """True when the active protocol is compatible with continuous mode.
 
-        Multi-sweep protocols (I-V Curve, Activation) are excluded because
-        each of their sweeps uses independent initial conditions.
+        Multi-sweep protocols (I-V Curve) are excluded because each of their
+        sweeps uses independent initial conditions.
         """
-        return self.protocol_type not in ("I-V Curve", "Activation")
+        return self.protocol_type != "I-V Curve"
 
     @rx.var
     def filtered_log_entries(self) -> list[UILogRecord]:
@@ -871,10 +862,6 @@ class AppState(rx.State):
                 vc_voltage_step=self.vc_voltage_step,
                 vc_pre_pulse_duration=self.vc_pre_pulse_duration,
                 vc_post_pulse_duration=self.vc_post_pulse_duration,
-                vc_baseline_duration=self.vc_baseline_duration,
-                vc_test_voltage_min=self.vc_test_voltage_min,
-                vc_test_voltage_max=self.vc_test_voltage_max,
-                vc_interpulse_duration=self.vc_interpulse_duration,
             )
 
     # ------------------------------------------------------------------ #
@@ -1095,49 +1082,6 @@ class AppState(rx.State):
                 for sweep_df, voltage, protocol in zip(
                     patch_sim.simulate_batch(neuron, protocols),
                     voltages,
-                    protocols,
-                ):
-                    label = f"{voltage:+.0f} mV"
-                    color_index = len(new_sweeps) % len(constants.SWEEP_COLORS)
-                    new_sweeps.append(
-                        Sweep.from_dataframe(
-                            sweep_df,
-                            protocol,
-                            label,
-                            constants.SWEEP_COLORS[color_index],
-                            mode,
-                        )
-                    )
-                    async with self:
-                        if self._cancel_requested:
-                            break
-                async with self:
-                    self.current_sweeps = list(new_sweeps)
-
-            elif ptype == "Activation":
-                # Run each test voltage as an independent sweep so that
-                # gating variables are reset between steps — matching real
-                # patch-clamp activation experiments.
-                test_voltage_range = self.vc_test_voltage_max - self.vc_test_voltage_min
-                n_steps = round(test_voltage_range / self.vc_voltage_step) + 1
-                test_voltages = np.linspace(
-                    self.vc_test_voltage_min, self.vc_test_voltage_max, n_steps
-                )
-                protocols = [
-                    patch_sim.activation_sweep(
-                        test_duration=self.duration,
-                        test_voltage=float(voltage),
-                        baseline_duration=self.vc_baseline_duration,
-                        interpulse_duration=self.vc_interpulse_duration,
-                        holding_voltage=self.vc_holding_voltage,
-                        sampling_frequency=fs,
-                    )
-                    for voltage in test_voltages
-                ]
-                new_sweeps = []
-                for sweep_df, voltage, protocol in zip(
-                    patch_sim.simulate_batch(neuron, protocols),
-                    test_voltages,
                     protocols,
                 ):
                     label = f"{voltage:+.0f} mV"
