@@ -1109,10 +1109,10 @@ class AppState(rx.State):
                         )
                     )
                     async with self:
-                        # Update first so partial results are preserved on cancel.
-                        self.current_sweeps = list(new_sweeps)
                         if self._cancel_requested:
                             break
+                async with self:
+                    self.current_sweeps = list(new_sweeps)
 
             elif ptype == "Activation":
                 # Run each test voltage as an independent sweep so that
@@ -1152,10 +1152,10 @@ class AppState(rx.State):
                         )
                     )
                     async with self:
-                        # Update first so partial results are preserved on cancel.
-                        self.current_sweeps = list(new_sweeps)
                         if self._cancel_requested:
                             break
+                async with self:
+                    self.current_sweeps = list(new_sweeps)
 
             else:
                 stimulus = self._build_protocol()
