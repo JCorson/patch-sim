@@ -258,3 +258,37 @@ def test_batch_with_current_clamp() -> None:
     assert len(results) == 1
     expected = simulate_current_clamp(neuron, stimulus)
     pd.testing.assert_frame_equal(results[0], expected)
+
+
+def test_batch_single_protocol_skips_pool() -> None:
+    """Single-protocol batch uses the fast-path and matches direct simulation."""
+    neuron = patch_sim.HodgkinHuxley()
+    _voltages, protocols = _make_iv_protocols(
+        voltage_min=0.0,
+        voltage_max=0.0,
+        voltage_step=10.0,
+    )
+    assert len(protocols) == 1
+    # Do NOT pass max_workers — fast-path must work without it.
+    results = list(patch_sim.simulate_batch(neuron, protocols))
+    expected = simulate_voltage_clamp(neuron, protocols[0])
+    pd.testing.assert_frame_equal(results[0], expected)
+
+
+def test_batch_multi_sweep_matches_sequential() -> None:
+    """Multi-sweep simulate_batch matches sequential simulate_voltage_clamp calls.
+
+    Exercises whichever execution path simulate_batch selects (JIT sequential or
+    process pool) and verifies numerically identical output.
+    """
+    neuron = patch_sim.HodgkinHuxley()
+    _voltages, protocols = _make_iv_protocols(
+        voltage_min=-60.0,
+        voltage_max=0.0,
+        voltage_step=20.0,
+    )
+    sequential = [simulate_voltage_clamp(neuron, p) for p in protocols]
+    batch = list(patch_sim.simulate_batch(neuron, protocols))
+    assert len(batch) == len(sequential)
+    for seq_df, batch_df in zip(sequential, batch):
+        pd.testing.assert_frame_equal(seq_df, batch_df)

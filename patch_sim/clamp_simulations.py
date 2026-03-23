@@ -389,11 +389,6 @@ def _simulate_voltage_clamp_core(
         ca_arr = (
             np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
         )
-        ca_i: float = (
-            neuron.calcium_dynamics.ca_rest
-            if neuron.calcium_dynamics is not None
-            else 0.0
-        )
 
         state = _initialize_gating_array(neuron, voltage_protocol[0], ca_i)
         gating_arr[0, :] = state
@@ -481,11 +476,10 @@ def _simulate_current_clamp_core(
     if _use_jit(neuron):
         # --- Numba JIT path ---
         ja = _jit_arrays(neuron)
-        state0 = _initialize_gating_array(neuron, neuron.v_rest)
         V_arr, gating_arr, ch_current_arrs = _jit_rk4_cc_loop(  # type: ignore[name-defined]
             current_external,
             time_step,
-            neuron.v_rest,
+            initial_V,
             state0,
             neuron.C_m,
             ja.func_ids,
@@ -508,21 +502,16 @@ def _simulate_current_clamp_core(
         ca_arr = (
             np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
         )
-        ca_i: float = (
-            neuron.calcium_dynamics.ca_rest
-            if neuron.calcium_dynamics is not None
-            else 0.0
-        )
 
-        V_arr[0] = neuron.v_rest
-        state = _initialize_gating_array(neuron, neuron.v_rest, ca_i)
+        V_arr[0] = initial_V
+        state = state0.copy()
         gating_arr[0, :] = state
 
         if ca_arr is not None:
             ca_arr[0] = ca_i
 
         ch_currents_0 = [
-            _compute_channel_current(neuron.v_rest, state, neuron, j)
+            _compute_channel_current(initial_V, state, neuron, j)
             for j in range(n_channels)
         ]
         ch_current_arrs[0, :] = ch_currents_0
@@ -765,15 +754,24 @@ def simulate_batch(
     ] = simulate_voltage_clamp,
     max_workers: int | None = None,
 ) -> Iterator[pd.DataFrame]:
-    """Run multiple simulation protocols in parallel and yield results in order.
+    """Run multiple simulation protocols and yield results in order.
 
-    Each protocol is submitted to a process pool and executed independently
-    (fresh initial conditions per protocol).  Results are yielded in submission
-    order so callers can process them progressively as simulations complete.
+    Chooses between three execution strategies based on protocol count and
+    whether the Numba JIT path is available:
 
-    An empty *protocols* sequence yields nothing.  A single-element sequence
-    is equivalent to calling *simulate_fn* directly, but still routed through
-    the pool.
+    - **Single protocol**: runs directly in the calling process — a process
+      pool adds pure overhead for one sweep.
+    - **JIT sequential** (numba installed, standard HH neuron, no Ca²⁺
+      dynamics): runs all protocols sequentially in the calling process.
+      The JIT kernel is fast enough that per-sweep serialization overhead of
+      a ``ProcessPoolExecutor`` exceeds the compute time.
+    - **Parallel pool**: falls back to :class:`~concurrent.futures.ProcessPoolExecutor`
+      when the above conditions are not met, parallelising across CPU cores.
+
+    Each protocol is executed independently with fresh initial conditions.
+    Results are yielded in submission order.
+
+    An empty *protocols* sequence yields nothing.
 
     Args:
         neuron: The Hodgkin-Huxley neuron model to simulate.
@@ -782,8 +780,9 @@ def simulate_batch(
         simulate_fn: The simulation function to apply to each protocol.
             Defaults to :func:`simulate_voltage_clamp`; pass
             :func:`simulate_current_clamp` for current-clamp batch runs.
-        max_workers: Maximum number of worker processes.  ``None`` (default)
-            uses the CPU count.
+        max_workers: Maximum number of worker processes used by the parallel
+            pool path.  ``None`` (default) uses the CPU count.  Ignored when
+            the single-protocol or JIT sequential path is taken.
 
     Yields:
         DataFrames in the same order as *protocols*, one per protocol.
@@ -791,6 +790,23 @@ def simulate_batch(
     if not protocols:
         return
 
+    if len(protocols) == 1:
+        logger.debug("simulate_batch: single-protocol fast-path (1 sweep)")
+        yield simulate_fn(neuron, protocols[0])
+        return
+
+    _jit_fns = (simulate_voltage_clamp, simulate_current_clamp)
+    if simulate_fn in _jit_fns and _use_jit(neuron):
+        logger.debug("simulate_batch: JIT sequential path (%d sweeps)", len(protocols))
+        for protocol in protocols:
+            yield simulate_fn(neuron, protocol)
+        return
+
+    logger.debug(
+        "simulate_batch: process pool path (%d sweeps, max_workers=%s)",
+        len(protocols),
+        max_workers,
+    )
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = [
             executor.submit(simulate_fn, neuron, protocol) for protocol in protocols

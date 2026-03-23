@@ -9,7 +9,6 @@ import pytest
 
 from patch_sim.clamp_simulations import (
     SIM_SAMPLING_FREQ,
-    _initialize_gating_variables,
     simulate_current_clamp,
     simulate_current_clamp_from_state,
     simulate_voltage_clamp,
@@ -148,7 +147,7 @@ def test_cc_from_state_empty_raises(hh_model):
     Ensures that the same input validation as simulate_current_clamp is
     preserved in the _from_state variant.
     """
-    gating = _initialize_gating_variables(hh_model, hh_model.v_rest)
+    gating = {gv.name: 0.5 for gv in hh_model.all_gating_variables}
     with pytest.raises(ValueError, match="must not be empty"):
         simulate_current_clamp_from_state(
             hh_model,
@@ -225,7 +224,7 @@ def test_vc_from_state_empty_raises(hh_model):
     Ensures that the same input validation as simulate_voltage_clamp is
     preserved in the _from_state variant.
     """
-    gating = _initialize_gating_variables(hh_model, hh_model.v_rest)
+    gating = {gv.name: 0.5 for gv in hh_model.all_gating_variables}
     with pytest.raises(ValueError, match="must not be empty"):
         simulate_voltage_clamp_from_state(
             hh_model,
