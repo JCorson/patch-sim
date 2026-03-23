@@ -229,11 +229,14 @@ def _build_hover_tables(
         HTML strings, one per downsampled time point.
     """
     time_vals = current_sweeps[0].time
-    indices = list(range(0, len(time_vals), stride))
+    indices = np.arange(0, len(time_vals), stride)
     n_pts = len(indices)
     col_w = _HOVER_COL_WIDTH
     label_w = max((len(s.label) for s in current_sweeps), default=6)
     mono_style = _HOVER_MONO_STYLE
+    n_sweeps = len(current_sweeps)
+    # Pre-compute padded labels once — reused across all subplots.
+    labels = [f"{s.label:<{label_w}}" for s in current_sweeps]
 
     def _fmt_table(header: str, row_groups: list[list[str]]) -> list[str]:
         """Format a list of HTML table strings from per-time-point row groups.
@@ -245,11 +248,10 @@ def _build_hover_tables(
         Returns:
             List of HTML strings, one per time point.
         """
-        out = []
-        for sweep_rows in row_groups:
-            body = "<br>".join(sweep_rows)
-            out.append(f'<span style="{mono_style}">{header}<br>{body}</span>')
-        return out
+        return [
+            f'<span style="{mono_style}">{header}<br>{"<br>".join(rows)}</span>'
+            for rows in row_groups
+        ]
 
     def _build_rows_html(
         cols: list[tuple[str, str, str]],
@@ -258,8 +260,12 @@ def _build_hover_tables(
     ) -> list[str]:
         """Build per-time-point HTML for one subplot given column specs.
 
+        Pre-extracts all column data into a numpy array and downsamples once
+        with fancy indexing, eliminating per-element ``getattr`` and
+        ``dict.get`` calls from the inner loop.
+
         Closes over ``indices``, ``current_sweeps``, ``col_w``, ``label_w``,
-        ``n_pts``, and ``_fmt_table``.
+        ``n_pts``, ``n_sweeps``, ``labels``, and ``_fmt_table``.
 
         Args:
             cols: Column spec triples ``(header_label, source, data_key)``.
@@ -277,20 +283,34 @@ def _build_hover_tables(
         if not cols:
             return [""] * n_pts
         header = " " * label_w + "".join(f"{c[0]:>{col_w}}" for c in cols)
-        row_groups: list[list[str]] = []
-        for idx in indices:
-            sweep_rows: list[str] = []
-            for sweep in current_sweeps:
-                vals: list[str] = []
-                for _, src, key in cols:
-                    if src == "classic":
-                        col_data: list[float] = getattr(sweep, key)
-                    else:
-                        col_data = getattr(sweep, additional_attr).get(key, [])
-                    v = col_data[idx] if idx < len(col_data) else float("nan")
-                    vals.append(f"{v:>{col_w}{fmt_spec}}")
-                sweep_rows.append(f"{sweep.label:<{label_w}}" + "".join(vals))
-            row_groups.append(sweep_rows)
+        # Pre-extract every column into a (n_sweeps, n_hover_pts) array.
+        # Downsampling via fancy indexing is done once per column rather than
+        # per time-point, eliminating getattr/dict.get from the inner loop.
+        col_arrays: list[np.ndarray] = []
+        for _, src, key in cols:
+            if src == "classic":
+                raw = np.array([getattr(s, key) for s in current_sweeps], dtype=float)
+            else:
+                raw = np.array(
+                    [getattr(s, additional_attr).get(key, []) for s in current_sweeps],
+                    dtype=float,
+                )
+            col_arrays.append(raw[:, indices])  # (n_sweeps, n_hover_pts)
+        # Stack and transpose to (n_hover_pts, n_sweeps, n_cols) for time-first
+        # iteration — each slice data_t[t] is (n_sweeps, n_cols).
+        # Convert to a nested Python list via .tolist() so that inner
+        # iteration works on Python floats rather than numpy scalars,
+        # avoiding per-element boxing overhead.
+        data_py: list[list[list[float]]] = (
+            np.stack(col_arrays).transpose(2, 1, 0).tolist()
+        )
+        row_groups = [
+            [
+                labels[s] + "".join(f"{v:>{col_w}{fmt_spec}}" for v in data_py[t][s])
+                for s in range(n_sweeps)
+            ]
+            for t in range(n_pts)
+        ]
         return _fmt_table(header, row_groups)
 
     # --- Response subplot (row 1) ---
@@ -330,14 +350,14 @@ def _build_hover_tables(
     # --- Stimulus subplot (row 3) ---
     stim_col_label = "Cmd (mV)" if is_vc else "Stim"
     stim_header = " " * label_w + f"{stim_col_label:>{col_w}}"
-    stim_row_groups: list[list[str]] = []
-    for idx in indices:
-        sweep_rows = []
-        for sweep in current_sweeps:
-            stim_data = sweep.stimulus
-            v = stim_data[idx] if idx < len(stim_data) else float("nan")
-            sweep_rows.append(f"{sweep.label:<{label_w}}{v:>{col_w}.2f}")
-        stim_row_groups.append(sweep_rows)
+    # Pre-extract stimulus arrays and downsample once: (n_sweeps, n_hover_pts).
+    # .tolist() converts to Python floats before the formatting loop.
+    stim_raw = np.array([s.stimulus for s in current_sweeps], dtype=float)
+    stim_py: list[list[float]] = stim_raw[:, indices].T.tolist()
+    stim_row_groups = [
+        [labels[s] + f"{stim_py[t][s]:>{col_w}.2f}" for s in range(n_sweeps)]
+        for t in range(n_pts)
+    ]
     stim_html = _fmt_table(stim_header, stim_row_groups)
 
     return resp_html, gating_html, stim_html
