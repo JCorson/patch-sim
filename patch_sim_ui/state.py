@@ -1102,13 +1102,8 @@ class AppState(rx.State):
                 # Run each test voltage as an independent sweep so that
                 # gating variables are reset between steps — matching real
                 # patch-clamp activation experiments.
-                n_steps = (
-                    round(
-                        (self.vc_test_voltage_max - self.vc_test_voltage_min)
-                        / self.vc_voltage_step
-                    )
-                    + 1
-                )
+                test_voltage_range = self.vc_test_voltage_max - self.vc_test_voltage_min
+                n_steps = round(test_voltage_range / self.vc_voltage_step) + 1
                 test_voltages = np.linspace(
                     self.vc_test_voltage_min, self.vc_test_voltage_max, n_steps
                 )
