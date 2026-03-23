@@ -430,13 +430,6 @@ def test_can_run_continuous_false_for_iv_curve() -> None:
     assert s.can_run_continuous is False
 
 
-def test_can_run_continuous_false_for_activation() -> None:
-    """can_run_continuous is False for the Activation protocol."""
-    s = _make_state()
-    s.protocol_type = "Activation"
-    assert s.can_run_continuous is False
-
-
 # ---------------------------------------------------------------------------
 # continuous_active computed var
 # ---------------------------------------------------------------------------

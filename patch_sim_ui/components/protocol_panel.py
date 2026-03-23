@@ -252,45 +252,6 @@ def _vc_iv_params() -> rx.Component:
     )
 
 
-def _vc_activation_params() -> rx.Component:
-    """Parameter fields for the voltage clamp Activation protocol."""
-    return rx.vstack(
-        _num_field("Test duration (ms)", AppState.duration, AppState.set_duration),
-        _num_field(
-            "Baseline duration (ms)",
-            AppState.vc_baseline_duration,
-            AppState.set_vc_baseline_duration,
-        ),
-        _num_field(
-            "Test V min (mV)",
-            AppState.vc_test_voltage_min,
-            AppState.set_vc_test_voltage_min,
-        ),
-        _num_field(
-            "Test V max (mV)",
-            AppState.vc_test_voltage_max,
-            AppState.set_vc_test_voltage_max,
-        ),
-        _num_field(
-            "Voltage step (mV)",
-            AppState.vc_voltage_step,
-            AppState.set_vc_voltage_step,
-        ),
-        _num_field(
-            "Interpulse (ms)",
-            AppState.vc_interpulse_duration,
-            AppState.set_vc_interpulse_duration,
-        ),
-        _num_field(
-            "Holding voltage (mV)",
-            AppState.vc_holding_voltage,
-            AppState.set_vc_holding_voltage,
-        ),
-        spacing="2",
-        width="100%",
-    )
-
-
 def _current_protocol_params() -> rx.Component:
     """Dynamic parameter form for the selected current clamp protocol."""
     return rx.match(
@@ -312,7 +273,7 @@ def _voltage_protocol_params() -> rx.Component:
         ("Ramp", _vc_ramp_params()),
         ("Pulse Train", _vc_pulse_params()),
         ("I-V Curve", _vc_iv_params()),
-        _vc_activation_params(),  # default: Activation
+        rx.fragment(),
     )
 
 

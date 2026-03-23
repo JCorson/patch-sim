@@ -50,7 +50,6 @@ VOLTAGE_PROTOCOLS: list[str] = [
     "Ramp",
     "Pulse Train",
     "I-V Curve",
-    "Activation",
 ]
 
 # Fixed colour for the Current Clamp voltage trace.  Matches the blue used for

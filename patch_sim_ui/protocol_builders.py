@@ -150,17 +150,12 @@ def build_voltage_protocol(
     vc_voltage_step: float = 10.0,
     vc_pre_pulse_duration: float = 5.0,
     vc_post_pulse_duration: float = 5.0,
-    vc_baseline_duration: float = 50.0,
-    vc_test_voltage_min: float = -60.0,
-    vc_test_voltage_max: float = 60.0,
-    vc_interpulse_duration: float = 5.0,
 ) -> np.ndarray:
     """Build a voltage clamp protocol array from explicit parameters.
 
     Args:
-        protocol_type: One of "Step", "Ramp", "Pulse Train", "I-V Curve",
-            or "Activation".
-        duration: Total duration in ms (or step duration for I-V / Activation).
+        protocol_type: One of "Step", "Ramp", "Pulse Train", or "I-V Curve".
+        duration: Total duration in ms (or step duration for I-V).
         sampling_frequency: Sampling frequency in Hz.
         vc_holding_voltage: Holding voltage in mV.
         vc_voltage_amplitude: Step voltage amplitude in mV.
@@ -176,14 +171,9 @@ def build_voltage_protocol(
         vc_train_start: Train onset time in ms.
         vc_voltage_min: Minimum voltage for I-V curve in mV.
         vc_voltage_max: Maximum voltage for I-V curve in mV.
-        vc_voltage_step: Voltage step size in mV (I-V curve and Activation).
+        vc_voltage_step: Voltage step size in mV (I-V curve).
         vc_pre_pulse_duration: Pre-pulse duration in ms (I-V curve).
         vc_post_pulse_duration: Post-pulse duration in ms (I-V curve).
-        vc_baseline_duration: Baseline duration before and after the test pulse for
-            Activation in ms.
-        vc_test_voltage_min: Minimum test voltage for Activation in mV.
-        vc_test_voltage_max: Maximum test voltage for Activation in mV.
-        vc_interpulse_duration: Inter-pulse duration for Activation in ms.
 
     Returns:
         Protocol array in mV.
