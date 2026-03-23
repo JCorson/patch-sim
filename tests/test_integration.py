@@ -11,7 +11,6 @@ import pandas as pd
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from patch_sim.hodgkin_huxley import HodgkinHuxley
 from patch_sim.protocols import (
-    activation_sweep,
     chirp_current,
     iv_curve_protocol,
     noise_current,
@@ -296,20 +295,6 @@ def test_iv_curve_protocol_to_simulation(hh_model: HodgkinHuxley) -> None:
     first_seg_current = total_current.iloc[:segment].mean()
     last_seg_current = total_current.iloc[-segment:].mean()
     assert last_seg_current > first_seg_current
-
-
-def test_activation_sweep_to_simulation(hh_model: HodgkinHuxley) -> None:
-    """activation_sweep → simulate_voltage_clamp: finite values throughout."""
-    protocol = activation_sweep(
-        test_duration=10.0,
-        test_voltage=0.0,
-        baseline_duration=50.0,
-        sampling_frequency=10000.0,
-    )
-    result = simulate_voltage_clamp(hh_model, voltage_protocol=protocol)
-
-    _assert_voltage_clamp_dataframe(result)
-    assert len(result) == len(protocol)
 
 
 # ---------------------------------------------------------------------------

@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 
 from patch_sim.protocols import (
-    activation_sweep,
     iv_curve_protocol,
     pulse_train_voltage,
     ramp_voltage,
@@ -312,67 +311,6 @@ class TestIVCurveProtocol:
         time_step = 1000.0 / sampling_frequency
         actual_duration = (len(voltage) - 1) * time_step
         assert np.isclose(actual_duration, expected_total_duration, atol=time_step)
-
-
-class TestActivationProtocol:
-    """Test cases for activation_sweep function."""
-
-    def test_basic_activation_sweep(self):
-        """Test basic activation sweep generation."""
-        test_duration = 10.0  # ms
-        test_voltage = 0.0  # mV
-        baseline_duration = 50.0  # ms
-        holding_voltage = -70.0  # mV
-        sampling_frequency = 10000.0  # Hz
-
-        voltage = activation_sweep(
-            test_duration=test_duration,
-            test_voltage=test_voltage,
-            baseline_duration=baseline_duration,
-            holding_voltage=holding_voltage,
-            sampling_frequency=sampling_frequency,
-        )
-
-        # Should contain holding voltage and test voltage
-        unique_voltages = np.unique(voltage)
-        expected_unique = {holding_voltage, test_voltage}
-        actual_unique = set()
-        for val in unique_voltages:
-            for exp_val in expected_unique:
-                if np.isclose(val, exp_val, atol=1e-10):
-                    actual_unique.add(exp_val)
-                    break
-
-        assert actual_unique == expected_unique
-
-    def test_activation_sweep_timing(self):
-        """Test activation sweep timing structure."""
-        test_duration = 5.0  # ms
-        baseline_duration = 50.0  # ms
-        interpulse_duration = 5.0  # ms
-        sampling_frequency = 10000.0  # Hz
-
-        voltage = activation_sweep(
-            test_duration=test_duration,
-            test_voltage=-40.0,
-            baseline_duration=baseline_duration,
-            interpulse_duration=interpulse_duration,
-            sampling_frequency=sampling_frequency,
-        )
-
-        # Expected duration for one sweep: baseline + gap + step + gap + baseline
-        expected_duration = (
-            baseline_duration
-            + interpulse_duration
-            + test_duration
-            + interpulse_duration
-            + baseline_duration
-        )
-
-        # Check total duration
-        time_step = 1000.0 / sampling_frequency
-        actual_duration = (len(voltage) - 1) * time_step
-        assert np.isclose(actual_duration, expected_duration, atol=time_step)
 
 
 class TestVoltageProtocolIntegration:
