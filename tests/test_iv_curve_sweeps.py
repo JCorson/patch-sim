@@ -45,7 +45,8 @@ def _make_iv_protocols(
         Tuple of (voltages array, list of protocol arrays), one protocol per voltage.
     """
     sweep_duration = pre_pulse_duration + step_duration + post_pulse_duration
-    voltages = np.arange(voltage_min, voltage_max + voltage_step, voltage_step)
+    n_steps = round((voltage_max - voltage_min) / voltage_step) + 1
+    voltages = np.linspace(voltage_min, voltage_max, n_steps)
     protocols = [
         patch_sim.step_voltage(
             duration=sweep_duration,
@@ -85,7 +86,8 @@ def _make_iv_sweeps(
     """
     neuron = patch_sim.HodgkinHuxley()
     sweep_duration = pre_pulse_duration + step_duration + post_pulse_duration
-    voltages = np.arange(voltage_min, voltage_max + voltage_step, voltage_step)
+    n_steps = round((voltage_max - voltage_min) / voltage_step) + 1
+    voltages = np.linspace(voltage_min, voltage_max, n_steps)
     results: list[tuple[np.ndarray, pd.DataFrame]] = []
     for voltage in voltages:
         protocol = patch_sim.step_voltage(
@@ -111,9 +113,7 @@ def test_iv_curve_produces_correct_sweep_count() -> None:
     voltage_min = -100.0
     voltage_max = 60.0
     voltage_step = 10.0
-    expected_count = len(
-        np.arange(voltage_min, voltage_max + voltage_step, voltage_step)
-    )
+    expected_count = round((voltage_max - voltage_min) / voltage_step) + 1
     sweeps = _make_iv_sweeps(
         voltage_min=voltage_min,
         voltage_max=voltage_max,
@@ -163,7 +163,8 @@ def test_iv_curve_protocol_peak_voltage_matches_step_voltage() -> None:
     voltage_max = 40.0
     voltage_step = 20.0
     holding_voltage = -70.0
-    expected_voltages = np.arange(voltage_min, voltage_max + voltage_step, voltage_step)
+    n_steps = round((voltage_max - voltage_min) / voltage_step) + 1
+    expected_voltages = np.linspace(voltage_min, voltage_max, n_steps)
     sweeps = _make_iv_sweeps(
         voltage_min=voltage_min,
         voltage_max=voltage_max,

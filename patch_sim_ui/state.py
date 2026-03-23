@@ -1062,10 +1062,10 @@ class AppState(rx.State):
                     + self.duration
                     + self.vc_post_pulse_duration
                 )
-                voltages = np.arange(
-                    self.vc_voltage_min,
-                    self.vc_voltage_max + self.vc_voltage_step,
-                    self.vc_voltage_step,
+                voltage_range = self.vc_voltage_max - self.vc_voltage_min
+                n_steps = round(voltage_range / self.vc_voltage_step) + 1
+                voltages = np.linspace(
+                    self.vc_voltage_min, self.vc_voltage_max, n_steps
                 )
                 protocols = [
                     patch_sim.step_voltage(
@@ -1102,10 +1102,10 @@ class AppState(rx.State):
                 # Run each test voltage as an independent sweep so that
                 # gating variables are reset between steps — matching real
                 # patch-clamp activation experiments.
-                test_voltages = np.arange(
-                    self.vc_test_voltage_min,
-                    self.vc_test_voltage_max + self.vc_voltage_step,
-                    self.vc_voltage_step,
+                test_voltage_range = self.vc_test_voltage_max - self.vc_test_voltage_min
+                n_steps = round(test_voltage_range / self.vc_voltage_step) + 1
+                test_voltages = np.linspace(
+                    self.vc_test_voltage_min, self.vc_test_voltage_max, n_steps
                 )
                 protocols = [
                     patch_sim.activation_sweep(

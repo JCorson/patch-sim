@@ -163,7 +163,8 @@ def iv_curve_protocol(
         Array of voltage values in mV for the complete protocol.
     """
     # Calculate voltage steps
-    voltages = np.arange(voltage_min, voltage_max + voltage_step, voltage_step)
+    n_steps = round((voltage_max - voltage_min) / voltage_step) + 1
+    voltages = np.linspace(voltage_min, voltage_max, n_steps)
 
     # Calculate total duration for one sweep
     sweep_duration = pre_pulse_duration + step_duration + post_pulse_duration
