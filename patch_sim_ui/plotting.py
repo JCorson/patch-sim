@@ -6,6 +6,7 @@ Follows the same separation as protocol_builders.py.
 
 from dataclasses import dataclass, field
 
+import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pydantic import BaseModel
@@ -564,7 +565,13 @@ def build_figure(
             kwargs["hoverinfo"] = hoverinfo
         fig.add_trace(
             go.Scattergl(
-                x=x, y=y, name=name, mode="lines", line=line, visible=visible, **kwargs
+                x=np.asarray(x),
+                y=np.asarray(y),
+                name=name,
+                mode="lines",
+                line=line,
+                visible=visible,
+                **kwargs,
             ),
             row=row,
             col=1,
@@ -744,8 +751,8 @@ def build_figure(
         time_vals = first.time
         n_t = len(time_vals)
         stride = max(1, n_t // _MAX_HOVER_POINTS)
-        indices = list(range(0, n_t, stride))
-        carrier_x = [time_vals[i] for i in indices]
+        indices = np.arange(0, n_t, stride)
+        carrier_x = np.asarray(time_vals)[indices]
 
         resp_html, gating_html, stim_html = _build_hover_tables(
             current_sweeps=current_sweeps,
@@ -758,11 +765,11 @@ def build_figure(
 
         # Carrier y values mirror the first sweep so autorange is unaffected.
         if is_vc:
-            carrier_y1 = [first.total_current[i] for i in indices]
+            carrier_y1 = np.asarray(first.total_current)[indices]
         else:
-            carrier_y1 = [first.voltage[i] for i in indices]
-        carrier_y_gating = [first.potassium_activation[i] for i in indices]
-        carrier_y_stim = [first.stimulus[i] for i in indices]
+            carrier_y1 = np.asarray(first.voltage)[indices]
+        carrier_y_gating = np.asarray(first.potassium_activation)[indices]
+        carrier_y_stim = np.asarray(first.stimulus)[indices]
 
         transparent = dict(color="rgba(0,0,0,0)")
         for carrier_y, html_strings, sub_row in (
