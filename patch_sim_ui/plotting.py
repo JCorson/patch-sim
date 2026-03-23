@@ -298,10 +298,15 @@ def _build_hover_tables(
             col_arrays.append(raw[:, indices])  # (n_sweeps, n_hover_pts)
         # Stack and transpose to (n_hover_pts, n_sweeps, n_cols) for time-first
         # iteration — each slice data_t[t] is (n_sweeps, n_cols).
-        data_t = np.stack(col_arrays).transpose(2, 1, 0)
+        # Convert to a nested Python list via .tolist() so that inner
+        # iteration works on Python floats rather than numpy scalars,
+        # avoiding per-element boxing overhead.
+        data_py: list[list[list[float]]] = (
+            np.stack(col_arrays).transpose(2, 1, 0).tolist()
+        )
         row_groups = [
             [
-                labels[s] + "".join(f"{v:>{col_w}{fmt_spec}}" for v in data_t[t, s])
+                labels[s] + "".join(f"{v:>{col_w}{fmt_spec}}" for v in data_py[t][s])
                 for s in range(n_sweeps)
             ]
             for t in range(n_pts)
@@ -346,10 +351,11 @@ def _build_hover_tables(
     stim_col_label = "Cmd (mV)" if is_vc else "Stim"
     stim_header = " " * label_w + f"{stim_col_label:>{col_w}}"
     # Pre-extract stimulus arrays and downsample once: (n_sweeps, n_hover_pts).
+    # .tolist() converts to Python floats before the formatting loop.
     stim_raw = np.array([s.stimulus for s in current_sweeps], dtype=float)
-    stim_vals = stim_raw[:, indices].T  # transpose to (n_hover_pts, n_sweeps)
+    stim_py: list[list[float]] = stim_raw[:, indices].T.tolist()
     stim_row_groups = [
-        [labels[s] + f"{stim_vals[t, s]:>{col_w}.2f}" for s in range(n_sweeps)]
+        [labels[s] + f"{stim_py[t][s]:>{col_w}.2f}" for s in range(n_sweeps)]
         for t in range(n_pts)
     ]
     stim_html = _fmt_table(stim_header, stim_row_groups)
