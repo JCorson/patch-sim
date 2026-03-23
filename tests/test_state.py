@@ -567,3 +567,21 @@ def test_filtered_log_entries_empty_when_no_entries() -> None:
     """filtered_log_entries returns an empty list when log_entries is empty."""
     s = _make_state()
     assert s.filtered_log_entries == []
+
+
+# ---------------------------------------------------------------------------
+# cancel_simulation
+# ---------------------------------------------------------------------------
+
+
+def test_cancel_requested_default_is_false() -> None:
+    """_cancel_requested is False by default."""
+    s = _make_state()
+    assert s._cancel_requested is False
+
+
+def test_cancel_simulation_sets_flag() -> None:
+    """cancel_simulation sets _cancel_requested to True."""
+    s = _make_state()
+    s.cancel_simulation()
+    assert s._cancel_requested is True

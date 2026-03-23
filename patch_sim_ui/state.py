@@ -506,6 +506,7 @@ class AppState(rx.State):
     # UI state                                                           #
     # ------------------------------------------------------------------ #
     is_running: bool = False
+    _cancel_requested: bool = False
     error_message: str = ""
 
     # ------------------------------------------------------------------ #
@@ -877,6 +878,13 @@ class AppState(rx.State):
             )
 
     # ------------------------------------------------------------------ #
+    # Single-shot simulation cancellation                               #
+    # ------------------------------------------------------------------ #
+    def cancel_simulation(self) -> None:
+        """Request cancellation of the current single-shot simulation."""
+        self._cancel_requested = True
+
+    # ------------------------------------------------------------------ #
     # Continuous simulation mode                                        #
     # ------------------------------------------------------------------ #
     def toggle_continuous_mode(self) -> None:
@@ -1029,6 +1037,7 @@ class AppState(rx.State):
         """
         async with self:
             self.is_running = True
+            self._cancel_requested = False
             self.error_message = ""
 
         _start_ms = time.monotonic() * 1000
@@ -1049,6 +1058,8 @@ class AppState(rx.State):
                     neuron, [stimulus], simulate_fn=patch_sim.simulate_current_clamp
                 ):
                     async with self:
+                        if self._cancel_requested:
+                            break
                         self.current_sweeps = [
                             Sweep.from_dataframe(df, stimulus, "", "", mode)
                         ]
@@ -1097,6 +1108,8 @@ class AppState(rx.State):
                     )
                     async with self:
                         self.current_sweeps = list(new_sweeps)
+                        if self._cancel_requested:
+                            break
 
             elif ptype == "Activation":
                 # Run each test voltage as an independent sweep so that
@@ -1137,11 +1150,15 @@ class AppState(rx.State):
                     )
                     async with self:
                         self.current_sweeps = list(new_sweeps)
+                        if self._cancel_requested:
+                            break
 
             else:
                 stimulus = self._build_protocol()
                 for df in patch_sim.simulate_batch(neuron, [stimulus]):
                     async with self:
+                        if self._cancel_requested:
+                            break
                         self.current_sweeps = [
                             Sweep.from_dataframe(df, stimulus, "", "", mode)
                         ]
@@ -1156,6 +1173,7 @@ class AppState(rx.State):
         finally:
             async with self:
                 self.is_running = False
+                self._cancel_requested = False
                 self._refresh_logs()
             js = self._apply_visibility_js()
             if js:
