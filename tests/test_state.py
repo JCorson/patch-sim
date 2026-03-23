@@ -582,6 +582,8 @@ def test_cancel_requested_default_is_false() -> None:
 
 def test_cancel_simulation_sets_flag() -> None:
     """cancel_simulation sets _cancel_requested to True."""
+    import asyncio
+
     s = _make_state()
-    s.cancel_simulation()
+    asyncio.run(s.cancel_simulation())
     assert s._cancel_requested is True

@@ -880,9 +880,10 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     # Single-shot simulation cancellation                               #
     # ------------------------------------------------------------------ #
-    def cancel_simulation(self) -> None:
+    async def cancel_simulation(self) -> None:
         """Request cancellation of the current single-shot simulation."""
-        self._cancel_requested = True
+        async with self:
+            self._cancel_requested = True
 
     # ------------------------------------------------------------------ #
     # Continuous simulation mode                                        #
@@ -1058,6 +1059,7 @@ class AppState(rx.State):
                     neuron, [stimulus], simulate_fn=patch_sim.simulate_current_clamp
                 ):
                     async with self:
+                        # Check before updating so the result is discarded on cancel.
                         if self._cancel_requested:
                             break
                         self.current_sweeps = [
@@ -1107,6 +1109,7 @@ class AppState(rx.State):
                         )
                     )
                     async with self:
+                        # Update first so partial results are preserved on cancel.
                         self.current_sweeps = list(new_sweeps)
                         if self._cancel_requested:
                             break
@@ -1149,6 +1152,7 @@ class AppState(rx.State):
                         )
                     )
                     async with self:
+                        # Update first so partial results are preserved on cancel.
                         self.current_sweeps = list(new_sweeps)
                         if self._cancel_requested:
                             break
@@ -1157,6 +1161,7 @@ class AppState(rx.State):
                 stimulus = self._build_protocol()
                 for df in patch_sim.simulate_batch(neuron, [stimulus]):
                     async with self:
+                        # Check before updating so the result is discarded on cancel.
                         if self._cancel_requested:
                             break
                         self.current_sweeps = [
