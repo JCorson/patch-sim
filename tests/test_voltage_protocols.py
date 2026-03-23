@@ -265,9 +265,8 @@ class TestIVCurveProtocol:
         )
 
         # Check that protocol contains expected voltage levels
-        expected_voltages = np.arange(
-            voltage_min, voltage_max + voltage_step, voltage_step
-        )
+        n_steps = round((voltage_max - voltage_min) / voltage_step) + 1
+        expected_voltages = np.linspace(voltage_min, voltage_max, n_steps)
         unique_voltages = np.unique(voltage)
 
         # Should contain holding voltage and all test voltages
@@ -304,9 +303,8 @@ class TestIVCurveProtocol:
         )
 
         # Calculate expected duration
-        expected_voltages = np.arange(
-            voltage_min, voltage_max + voltage_step, voltage_step
-        )
+        n_steps = round((voltage_max - voltage_min) / voltage_step) + 1
+        expected_voltages = np.linspace(voltage_min, voltage_max, n_steps)
         sweep_duration = pre_pulse_duration + step_duration + post_pulse_duration
         expected_total_duration = sweep_duration * len(expected_voltages)
 
