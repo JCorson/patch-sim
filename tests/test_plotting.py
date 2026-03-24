@@ -780,3 +780,123 @@ def test_compute_trace_visibility_map_with_stored_traces_advances_counter() -> N
 
     # The recorded show_* indices must be identical regardless of stored traces.
     assert result_without == result_with
+
+
+# ---------------------------------------------------------------------------
+# build_figure — legend visibility
+# ---------------------------------------------------------------------------
+
+
+def test_build_figure_cc_single_sweep_stimulus_not_in_legend() -> None:
+    """Current Clamp single sweep: stimulus trace is excluded from the legend."""
+    sweep = _make_sweep(mode="Current Clamp")
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+    )
+    stim_traces = [t for t in fig.data if "Stimulus" in (t.name or "")]
+    assert all(t.showlegend is False for t in stim_traces), (
+        "Stimulus traces must not appear in the legend"
+    )
+
+
+def test_build_figure_vc_single_sweep_command_not_in_legend() -> None:
+    """Voltage Clamp single sweep: command trace is excluded from the legend."""
+    sweep = _make_sweep(mode="Voltage Clamp")
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
+    cmd_traces = [t for t in fig.data if "Command" in (t.name or "")]
+    assert all(t.showlegend is False for t in cmd_traces), (
+        "Command traces must not appear in the legend"
+    )
+
+
+def test_build_figure_cc_single_sweep_only_gating_in_legend() -> None:
+    """Current Clamp single sweep: voltage is suppressed (sole trace); gating shown."""
+    sweep = _make_sweep(label="", mode="Current Clamp")
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+    )
+    legend_names = {t.name for t in fig.data if t.showlegend is not False}
+    # Row 1 has only Voltage — suppressed because sole entry.
+    assert "Voltage (mV)" not in legend_names
+    # Gating row has 3 entries so all three are shown.
+    assert "n" in legend_names
+    assert "m" in legend_names
+    assert "h" in legend_names
+
+
+def test_build_figure_vc_single_sweep_currents_and_gating_in_legend() -> None:
+    """Voltage Clamp single sweep: current and gating traces appear in the legend."""
+    sweep = _make_sweep(label="", mode="Voltage Clamp")
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
+    legend_traces = [t for t in fig.data if t.showlegend is not False]
+    names = {t.name for t in legend_traces}
+    assert "I_total" in names
+    assert "I_Na" in names
+    assert "I_K" in names
+    assert "I_L" in names
+    assert "n" in names
+    assert "m" in names
+    assert "h" in names
+
+
+def test_build_figure_multi_sweep_only_first_sweep_in_legend() -> None:
+    """Multi-sweep mode: only the first sweep's traces appear in the legend."""
+    sweeps = [_make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40]]
+    fig = build_figure(
+        sweeps, [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
+    legend_names = {t.name for t in fig.data if t.showlegend is not False}
+    # Traces from the second sweep must not appear.
+    assert not any(n.startswith("-40 mV ") for n in legend_names), (
+        "Second sweep traces must not appear in the legend"
+    )
+
+
+def test_build_figure_multi_sweep_legend_names_have_no_voltage_prefix() -> None:
+    """Multi-sweep legends use bare names — no command level on currents or gating."""
+    sweeps = [_make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40]]
+    fig = build_figure(
+        sweeps, [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
+    legend_names = {t.name for t in fig.data if t.showlegend is not False}
+    # Current traces must use bare channel labels, not "-60 mV I_total" etc.
+    assert "I_total" in legend_names
+    assert "I_Na" in legend_names
+    assert "I_K" in legend_names
+    assert "I_L" in legend_names
+    # Gating traces must use bare variable names, not "-60 mV n" etc.
+    assert "n" in legend_names
+    assert "m" in legend_names
+    assert "h" in legend_names
+    assert not any("mV" in n for n in legend_names)
+
+
+def test_build_figure_saved_sweep_stimulus_not_in_legend() -> None:
+    """Saved sweep stimulus traces are excluded from the legend."""
+    current = _make_sweep(mode="Current Clamp")
+    saved = _make_sweep(label="saved", color="#aabbcc", mode="Current Clamp")
+    fig = build_figure(
+        [current], [saved], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+    )
+    # The saved sweep's stimulus trace uses sweep.label ("saved") as its name.
+    saved_stim = [t for t in fig.data if t.name == "saved" and t.showlegend is False]
+    assert len(saved_stim) >= 1, "Saved sweep stimulus must be excluded from the legend"
+
+
+def test_build_figure_stored_trace_stimulus_not_in_legend() -> None:
+    """Stored trace stimulus traces are excluded from the legend."""
+    sweep = _make_sweep(mode="Current Clamp")
+    stored = _make_sweep(mode="Current Clamp")
+    stored = stored.model_copy(update={"label": "Ref"})
+    fig = build_figure(
+        [sweep], [], TraceVisibility(), "Current Clamp", stored_traces=[stored]
+    )
+    # Stored traces add two traces named "Ref": one on row 1, one on stimulus row.
+    ref_traces = [t for t in fig.data if t.name == "Ref"]
+    assert len(ref_traces) == 2  # noqa: PLR2004
+    stimulus_ref = [t for t in ref_traces if t.showlegend is False]
+    assert len(stimulus_ref) == 1, "Stored trace stimulus must be excluded from legend"

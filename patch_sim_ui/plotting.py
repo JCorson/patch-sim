@@ -554,6 +554,11 @@ def build_figure(
         vertical_spacing=vert_spacing,
     )
 
+    # legend_entries[row] accumulates trace indices for traces shown in the
+    # legend.  After all traces are added we suppress the legend for any row
+    # that ended up with only one entry (y-axis label is sufficient there).
+    legend_entries: dict[int, list[int]] = {1: [], gating_row: []}
+
     def _scatter(
         x,
         y,
@@ -564,6 +569,8 @@ def build_figure(
         dash=None,
         width=None,
         hoverinfo=None,
+        showlegend=True,
+        legend_ref: str = "legend",
     ):
         """Add a Scattergl trace to the figure.
 
@@ -578,6 +585,10 @@ def build_figure(
             width: Line width in pixels; ``None`` uses the default.
             hoverinfo: Plotly hoverinfo value (e.g. ``"skip"``); ``None``
                 uses the default.
+            showlegend: Whether this trace appears in the legend.
+            legend_ref: Which Plotly legend object this trace belongs to
+                (``"legend"`` for the response row, ``"legend2"`` for the
+                gating row).
         """
         line: dict = {"color": color} if color is not None else {}
         if dash is not None:
@@ -587,6 +598,9 @@ def build_figure(
         kwargs: dict = {}
         if hoverinfo is not None:
             kwargs["hoverinfo"] = hoverinfo
+        trace_idx = len(fig.data)
+        if showlegend and row in legend_entries:
+            legend_entries[row].append(trace_idx)
         fig.add_trace(
             go.Scattergl(
                 x=np.asarray(x),
@@ -595,6 +609,8 @@ def build_figure(
                 mode="lines",
                 line=line,
                 visible=visible,
+                showlegend=showlegend,
+                legend=legend_ref,
                 **kwargs,
             ),
             row=row,
@@ -607,6 +623,8 @@ def build_figure(
         dash: str | None = None,
         hoverinfo: str | None = None,
         visibility: TraceVisibility | None = None,
+        showlegend: bool = True,
+        legend_ref: str = "legend",
     ) -> None:
         """Add Voltage Clamp current traces for one sweep to the figure.
 
@@ -620,6 +638,8 @@ def build_figure(
             hoverinfo: Plotly hoverinfo value; ``None`` uses the default.
             visibility: Trace visibility flags; ``None`` treats every trace
                 as visible.
+            showlegend: Whether these traces appear in the legend.
+            legend_ref: Which Plotly legend object these traces belong to.
         """
         classic_defs: list[tuple[str, str, int | None]] = [
             ("total_current", "I_total", _TOTAL_CURRENT_LINE_WIDTH),
@@ -639,6 +659,8 @@ def build_figure(
                 width=width,
                 dash=dash,
                 hoverinfo=hoverinfo,
+                showlegend=showlegend,
+                legend_ref=legend_ref,
             )
         for ch_name, vals in sweep.additional_currents.items():
             vis = (
@@ -655,13 +677,15 @@ def build_figure(
                 visible=vis,
                 dash=dash,
                 hoverinfo=hoverinfo,
+                showlegend=showlegend,
+                legend_ref=legend_ref,
             )
 
     # In multi-sweep mode all real traces suppress hover; carrier traces
     # deliver the table tooltips instead.
     hi = "skip" if is_multi_sweep else None
 
-    for sweep in current_sweeps:
+    for sweep_idx, sweep in enumerate(current_sweeps):
         c = sweep.color if sweep.color else None
         t = sweep.time
         sweep_mode = sweep.clamp_mode
@@ -669,6 +693,9 @@ def build_figure(
         stim_label = (
             "Stimulus (µA/cm²)" if sweep_mode == CURRENT_CLAMP else "Command (mV)"
         )
+        # Show legend only for the first sweep; subsequent sweeps share the
+        # same colours so their legend entries would be duplicates.
+        sl = sweep_idx == 0
 
         if sweep_mode == CURRENT_CLAMP:
             _scatter(
@@ -679,13 +706,24 @@ def build_figure(
                 CC_VOLTAGE_COLOR,
                 visible=visibility.voltage,
                 hoverinfo=hi,
+                showlegend=sl,
             )
         else:
             # Voltage Clamp: all currents overlaid on row 1 with channel colours.
-            _add_vc_currents(sweep, pfx, hoverinfo=hi, visibility=visibility)
+            # Legend-eligible traces (first sweep) use an empty prefix so the
+            # voltage-clamp command level doesn't appear in the legend label
+            # (e.g. "I_total" not "100 mV I_total").  Individual hover is
+            # suppressed in multi-sweep mode anyway, so the name is legend-only.
+            vc_pfx = "" if sl else pfx
+            _add_vc_currents(
+                sweep, vc_pfx, hoverinfo=hi, visibility=visibility, showlegend=sl
+            )
 
         # Gating row is always present; traces are always added with their
         # visibility flags so the layout never changes on toggle.
+        # Legend-eligible traces (first sweep) use bare variable names so the
+        # command level doesn't appear in the legend (e.g. "n" not "-60 mV n").
+        gating_pfx = "" if sl else pfx
         for gv_attr, gv_label in [
             ("potassium_activation", "n"),
             ("sodium_activation", "m"),
@@ -694,32 +732,49 @@ def build_figure(
             _scatter(
                 t,
                 getattr(sweep, gv_attr),
-                f"{pfx}{gv_label}",
+                f"{gating_pfx}{gv_label}",
                 gating_row,
                 GATING_VAR_COLORS.get(gv_label),
                 visible=getattr(visibility, gv_attr),
                 hoverinfo=hi,
+                showlegend=sl,
+                legend_ref="legend2",
             )
         for gv_name, gv_vals in sweep.additional_gating.items():
             vis = visibility.additional_gating.get(gv_name, True)
             _scatter(
                 t,
                 gv_vals,
-                f"{pfx}{gv_name}",
+                f"{gating_pfx}{gv_name}",
                 gating_row,
                 GATING_VAR_COLORS.get(gv_name),
                 visible=vis,
                 hoverinfo=hi,
+                showlegend=sl,
+                legend_ref="legend2",
             )
 
         _scatter(
-            t, sweep.stimulus, stim_label, stimulus_row, STIMULUS_COLOR, hoverinfo=hi
+            t,
+            sweep.stimulus,
+            stim_label,
+            stimulus_row,
+            STIMULUS_COLOR,
+            hoverinfo=hi,
+            showlegend=False,
         )
 
     for sweep in saved_sweeps:
         c = sweep.color
         if sweep.clamp_mode == CURRENT_CLAMP:
-            _scatter(sweep.time, sweep.voltage, f"{sweep.label} V", 1, c, hoverinfo=hi)
+            _scatter(
+                sweep.time,
+                sweep.voltage,
+                f"{sweep.label} V",
+                1,
+                c,
+                hoverinfo=hi,
+            )
         elif is_vc:
             # Saved VC sweeps: all currents overlaid on row 1, dashed lines.
             _add_vc_currents(sweep, f"{sweep.label} ", dash="dash", hoverinfo=hi)
@@ -732,7 +787,15 @@ def build_figure(
                 c,
                 hoverinfo=hi,
             )
-        _scatter(sweep.time, sweep.stimulus, sweep.label, stimulus_row, c, hoverinfo=hi)
+        _scatter(
+            sweep.time,
+            sweep.stimulus,
+            sweep.label,
+            stimulus_row,
+            c,
+            hoverinfo=hi,
+            showlegend=False,
+        )
 
     for i, sweep in enumerate(stored_traces or []):
         c = STORED_TRACE_COLORS[i % len(STORED_TRACE_COLORS)]
@@ -765,6 +828,7 @@ def build_figure(
             c,
             dash="dash",
             hoverinfo="skip",
+            showlegend=False,
         )
 
     # Add invisible hover carrier traces for multi-sweep (I-V Curve) mode.
@@ -816,6 +880,13 @@ def build_figure(
                 col=1,
             )
 
+    # Suppress legend for any subplot row that has only one entry — the
+    # y-axis label is sufficient in that case.
+    for row_traces in legend_entries.values():
+        if len(row_traces) <= 1:
+            for idx in row_traces:
+                fig.data[idx].showlegend = False
+
     # Y-axis labels.
     if is_vc:
         fig.update_yaxes(title_text="Current (µA/cm²)", row=1, col=1)
@@ -829,6 +900,20 @@ def build_figure(
 
     fig.update_xaxes(title_text="Time (ms)", row=stimulus_row, col=1)
 
+    # Compute paper-coordinate y of the top of each subplot row so each
+    # legend can be anchored inside its own subplot.
+    _scale = (1.0 - (rows - 1) * vert_spacing) / sum(_SUBPLOT_ROW_HEIGHTS)
+    _row1_top = 1.0
+    _row2_top = _row1_top - _SUBPLOT_ROW_HEIGHTS[0] * _scale - vert_spacing
+
+    _legend_common = dict(
+        orientation="v",
+        x=0.99,
+        xanchor="right",
+        bgcolor="rgba(255,255,255,0.7)",
+        borderwidth=0,
+    )
+
     hovermode: str | bool = (
         ("x" if is_multi_sweep else "x unified") if show_hover else False
     )
@@ -837,6 +922,8 @@ def build_figure(
         margin=_PLOT_MARGIN,
         template="plotly_white",
         hovermode=hovermode,
-        showlegend=False,
+        showlegend=True,
+        legend=dict(**_legend_common, y=_row1_top, yanchor="top"),
+        legend2=dict(**_legend_common, y=_row2_top, yanchor="top"),
     )
     return fig
