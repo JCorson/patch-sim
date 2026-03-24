@@ -240,6 +240,47 @@ def test_batch_preserves_order() -> None:
         assert peak == pytest.approx(float(voltage), abs=1e-6)
 
 
+def test_batch_with_calcium_channels() -> None:
+    """simulate_batch works with channels using boltzmann_cosh_rates (issue #105).
+
+    ICaL uses rate functions produced by boltzmann_cosh_rates. Before the fix,
+    these were unpicklable closures that caused simulate_batch (which relies on
+    ProcessPoolExecutor) to raise AttributeError. This test runs an IV curve
+    simulation with ICaL to verify the fix.
+    """
+    ical = patch_sim.make_ical_channel()
+    cd = patch_sim.CalciumDynamics()
+    neuron = patch_sim.HodgkinHuxley(
+        additional_channels=(ical,),
+        calcium_dynamics=cd,
+    )
+    voltages = [-40.0, 0.0, 40.0]
+    protocols = [
+        patch_sim.step_voltage(
+            duration=30.0,
+            voltage_amplitude=float(v),
+            step_start=5.0,
+            step_duration=20.0,
+            holding_voltage=-70.0,
+            sampling_frequency=_FS,
+        )
+        for v in voltages
+    ]
+
+    results = list(patch_sim.simulate_batch(neuron, protocols, max_workers=2))
+
+    assert len(results) == len(voltages)
+    for df in results:
+        assert "ICaL_current" in df.columns
+        assert "ca_i" in df.columns
+        assert "d" in df.columns
+        assert "f" in df.columns
+    # Calcium should accumulate above resting level during the depolarising
+    # step (ICaL activates with depolarisation).
+    ca_rest = cd.ca_rest
+    assert any(float(df["ca_i"].max()) > ca_rest for df in results)
+
+
 def test_batch_with_current_clamp() -> None:
     """simulate_batch with simulate_fn=simulate_current_clamp works correctly."""
     neuron = patch_sim.HodgkinHuxley()
