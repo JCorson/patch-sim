@@ -560,3 +560,46 @@ def test_filtered_log_entries_empty_when_no_entries() -> None:
     """filtered_log_entries returns an empty list when log_entries is empty."""
     s = _make_state()
     assert s.filtered_log_entries == []
+
+
+# ---------------------------------------------------------------------------
+# toggle_hover
+# ---------------------------------------------------------------------------
+
+
+def test_show_hover_defaults_to_true() -> None:
+    """show_hover is True on a freshly created AppState."""
+    s = _make_state()
+    assert s.show_hover is True
+
+
+def test_toggle_hover_disables_when_on() -> None:
+    """toggle_hover sets show_hover to False when it was True."""
+    s = _make_state()
+    assert s.show_hover is True
+    s.toggle_hover()
+    assert s.show_hover is False
+
+
+def test_toggle_hover_enables_when_off() -> None:
+    """toggle_hover sets show_hover to True when it was False."""
+    s = _make_state()
+    s.show_hover = False
+    s.toggle_hover()
+    assert s.show_hover is True
+
+
+def test_toggle_hover_returns_call_script() -> None:
+    """toggle_hover returns a non-None value (the rx.call_script event)."""
+    s = _make_state()
+    result = s.toggle_hover()
+    assert result is not None
+
+
+def test_toggle_hover_twice_restores_original_state() -> None:
+    """Calling toggle_hover twice leaves show_hover unchanged."""
+    s = _make_state()
+    original = s.show_hover
+    s.toggle_hover()
+    s.toggle_hover()
+    assert s.show_hover is original
