@@ -856,8 +856,8 @@ def test_build_figure_multi_sweep_only_first_sweep_in_legend() -> None:
     )
 
 
-def test_build_figure_vc_multi_sweep_legend_names_have_no_voltage_prefix() -> None:
-    """VC multi-sweep: legend entries use bare channel names, no command level."""
+def test_build_figure_multi_sweep_legend_names_have_no_voltage_prefix() -> None:
+    """Multi-sweep legends use bare names — no command level on currents or gating."""
     sweeps = [_make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40]]
     fig = build_figure(
         sweeps, [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
@@ -868,8 +868,11 @@ def test_build_figure_vc_multi_sweep_legend_names_have_no_voltage_prefix() -> No
     assert "I_Na" in legend_names
     assert "I_K" in legend_names
     assert "I_L" in legend_names
-    channel_names = {"I_total", "I_Na", "I_K", "I_L"}
-    assert not any("mV" in n for n in legend_names if n in channel_names)
+    # Gating traces must use bare variable names, not "-60 mV n" etc.
+    assert "n" in legend_names
+    assert "m" in legend_names
+    assert "h" in legend_names
+    assert not any("mV" in n for n in legend_names)
 
 
 def test_build_figure_saved_sweep_stimulus_not_in_legend() -> None:
