@@ -5,6 +5,7 @@ This module contains shared utility functions used across different modules.
 
 import math
 from collections.abc import Callable
+from dataclasses import dataclass
 
 # Clipping bounds for safe_exp: chosen so that exp(100) ≈ 2.7e43, well below
 # float64 overflow (~e308), while still covering all physiologically relevant
@@ -36,6 +37,60 @@ def safe_exp(x: float) -> float:
     return math.exp(x)
 
 
+@dataclass(frozen=True)
+class BoltzmannCoshRate:
+    """Picklable callable implementing a single Boltzmann/cosh rate function.
+
+    Stores all kinetic parameters and computes either the alpha or beta rate
+    on each call.  Being a frozen dataclass with only plain numeric fields,
+    instances are fully picklable and safe to pass to worker processes via
+    :class:`concurrent.futures.ProcessPoolExecutor`.
+
+    Attributes:
+        half: Half-activation voltage in mV.
+        slope: Activation slope in mV.
+        tau_scale: Numerator of the time-constant expression in ms.
+        tau_floor: Minimum allowed time constant in ms.
+        inverted: If True the Boltzmann curve is inverted (gate open at
+            hyperpolarised potentials).
+        cosh_scale: Voltage scale in the cosh denominator in mV.
+        tau_rate: Extra multiplier in the tau denominator.
+        is_alpha: If True, computes alpha = inf / tau; otherwise beta =
+            (1 - inf) / tau.
+    """
+
+    half: float
+    slope: float
+    tau_scale: float
+    tau_floor: float
+    inverted: bool
+    cosh_scale: float
+    tau_rate: float
+    is_alpha: bool
+
+    def __call__(self, V: float, ca_i: float) -> float:
+        """Compute the rate at voltage V.
+
+        Args:
+            V: Membrane voltage in mV.
+            ca_i: Intracellular calcium concentration in mM (ignored).
+
+        Returns:
+            The rate (alpha or beta) in 1/ms.
+        """
+        if self.inverted:
+            inf = 1.0 / (1.0 + safe_exp((V - self.half) / self.slope))
+        else:
+            inf = 1.0 / (1.0 + safe_exp(-(V - self.half) / self.slope))
+        tau = self.tau_scale / (
+            self.tau_rate * math.cosh((V - self.half) / self.cosh_scale)
+        )
+        tau = max(tau, self.tau_floor)
+        if self.is_alpha:
+            return inf / tau
+        return (1.0 - inf) / tau
+
+
 def boltzmann_cosh_rates(
     half: float,
     slope: float,
@@ -61,6 +116,10 @@ def boltzmann_cosh_rates(
     accepted but ignored, keeping the signature consistent with
     :class:`~patch_sim.channels.GatingVariable` rate functions.
 
+    The returned objects are :class:`BoltzmannCoshRate` instances, which are
+    fully picklable and safe to use with
+    :func:`~patch_sim.clamp_simulations.simulate_batch`.
+
     Args:
         half: Half-activation voltage in mV.
         slope: Activation slope in mV (positive).
@@ -79,35 +138,25 @@ def boltzmann_cosh_rates(
         rate in 1/ms.
     """
     cosh_scale: float = tau_cosh_scale if tau_cosh_scale is not None else 2.0 * slope
-
-    def _inf(V: float) -> float:
-        """Steady-state open probability at voltage V."""
-        if inverted:
-            return 1.0 / (1.0 + safe_exp((V - half) / slope))
-        return 1.0 / (1.0 + safe_exp(-(V - half) / slope))
-
-    def _tau(V: float) -> float:
-        """Voltage-dependent time constant in ms, floored at tau_floor."""
-        tau = tau_scale / (tau_rate * math.cosh((V - half) / cosh_scale))
-        return max(tau, tau_floor)
-
-    # Single-slot cache: stores (V, inf_val, tau_val) so that alpha and beta
-    # called with the same V in the same RK4 sub-step share one evaluation.
-    _last: list[tuple[float, float, float]] = [(float("nan"), 0.0, 0.0)]
-
-    def _ensure(V: float) -> None:
-        """Populate _last if V differs from the cached voltage."""
-        if V != _last[0][0]:
-            _last[0] = (V, _inf(V), _tau(V))
-
-    def alpha(V: float, ca_i: float) -> float:
-        """Forward rate alpha = inf(V) / tau(V) in 1/ms."""
-        _ensure(V)
-        return _last[0][1] / _last[0][2]
-
-    def beta(V: float, ca_i: float) -> float:
-        """Backward rate beta = (1 - inf(V)) / tau(V) in 1/ms."""
-        _ensure(V)
-        return (1.0 - _last[0][1]) / _last[0][2]
-
-    return alpha, beta
+    return (
+        BoltzmannCoshRate(
+            half=half,
+            slope=slope,
+            tau_scale=tau_scale,
+            tau_floor=tau_floor,
+            inverted=inverted,
+            cosh_scale=cosh_scale,
+            tau_rate=tau_rate,
+            is_alpha=True,
+        ),
+        BoltzmannCoshRate(
+            half=half,
+            slope=slope,
+            tau_scale=tau_scale,
+            tau_floor=tau_floor,
+            inverted=inverted,
+            cosh_scale=cosh_scale,
+            tau_rate=tau_rate,
+            is_alpha=False,
+        ),
+    )
