@@ -143,3 +143,13 @@ SWEEP_COLORS: list[str] = [
     "#9e9e9e",
     "#707070",
 ]
+
+# Sweep highlight / dim styling for the interactive sweep-selection feature.
+HIGHLIGHT_DIM_OPACITY: float = 0.15
+"""Opacity applied to non-selected sweeps after a click selection."""
+
+HIGHLIGHT_PREVIEW_OPACITY: float = 0.3
+"""Opacity applied to non-hovered sweeps during a hover preview."""
+
+HIGHLIGHT_DIM_WIDTH: float = 0.5
+"""Line width (px) applied to dimmed (non-selected) sweep traces."""
