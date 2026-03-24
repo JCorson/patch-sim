@@ -811,18 +811,19 @@ def test_build_figure_vc_single_sweep_command_not_in_legend() -> None:
     )
 
 
-def test_build_figure_cc_single_sweep_response_and_gating_in_legend() -> None:
-    """Current Clamp single sweep: voltage and gating traces appear in the legend."""
+def test_build_figure_cc_single_sweep_only_gating_in_legend() -> None:
+    """Current Clamp single sweep: voltage is suppressed (sole trace); gating shown."""
     sweep = _make_sweep(label="", mode="Current Clamp")
     fig = build_figure(
         [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
     )
-    legend_traces = [t for t in fig.data if t.showlegend is not False]
-    names = {t.name for t in legend_traces}
-    assert "Voltage (mV)" in names
-    assert "n" in names
-    assert "m" in names
-    assert "h" in names
+    legend_names = {t.name for t in fig.data if t.showlegend is not False}
+    # Row 1 has only Voltage — suppressed because sole entry.
+    assert "Voltage (mV)" not in legend_names
+    # Gating row has 3 entries so all three are shown.
+    assert "n" in legend_names
+    assert "m" in legend_names
+    assert "h" in legend_names
 
 
 def test_build_figure_vc_single_sweep_currents_and_gating_in_legend() -> None:
