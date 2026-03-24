@@ -208,23 +208,81 @@ def neuron_panel() -> rx.Component:
     return rx.vstack(
         rx.heading("Neuron Parameters", size="3"),
         rx.separator(),
-        rx.text("Conductances (mS/cm²)", size="2", weight="bold"),
-        rx.vstack(
-            _param_row("g_Na", AppState.g_Na, AppState.set_g_Na, *PARAM_RANGES["g_Na"]),
-            _param_row("g_K", AppState.g_K, AppState.set_g_K, *PARAM_RANGES["g_K"]),
-            _param_row("g_L", AppState.g_L, AppState.set_g_L, *PARAM_RANGES["g_L"]),
-            spacing="1",
+        rx.accordion.root(
+            rx.accordion.item(
+                header=rx.text(
+                    "Conductances (mS/cm²)",
+                    size="2",
+                    weight="bold",
+                    color="var(--gray-12)",
+                ),
+                content=rx.vstack(
+                    _param_row(
+                        "g_Na",
+                        AppState.g_Na,
+                        AppState.set_g_Na,
+                        *PARAM_RANGES["g_Na"],
+                    ),
+                    _param_row(
+                        "g_K",
+                        AppState.g_K,
+                        AppState.set_g_K,
+                        *PARAM_RANGES["g_K"],
+                    ),
+                    _param_row(
+                        "g_L",
+                        AppState.g_L,
+                        AppState.set_g_L,
+                        *PARAM_RANGES["g_L"],
+                    ),
+                    spacing="1",
+                    width="100%",
+                ),
+                value="conductances",
+            ),
+            collapsible=True,
+            default_value="conductances",
+            variant="ghost",
             width="100%",
         ),
         rx.separator(),
-        rx.text("Membrane Properties", size="2", weight="bold"),
-        _param_row(
-            "C_m (µF/cm²)", AppState.C_m, AppState.set_C_m, *PARAM_RANGES["C_m"]
+        rx.accordion.root(
+            rx.accordion.item(
+                header=rx.text(
+                    "Membrane Properties",
+                    size="2",
+                    weight="bold",
+                    color="var(--gray-12)",
+                ),
+                content=rx.vstack(
+                    _param_row(
+                        "C_m (µF/cm²)",
+                        AppState.C_m,
+                        AppState.set_C_m,
+                        *PARAM_RANGES["C_m"],
+                    ),
+                    _param_row(
+                        "v_rest (mV)",
+                        AppState.v_rest,
+                        AppState.set_v_rest,
+                        *PARAM_RANGES["v_rest"],
+                    ),
+                    _param_row(
+                        "T (K)",
+                        AppState.T,
+                        AppState.set_T,
+                        *PARAM_RANGES["T"],
+                    ),
+                    spacing="1",
+                    width="100%",
+                ),
+                value="membrane-properties",
+            ),
+            collapsible=True,
+            default_value="membrane-properties",
+            variant="ghost",
+            width="100%",
         ),
-        _param_row(
-            "v_rest (mV)", AppState.v_rest, AppState.set_v_rest, *PARAM_RANGES["v_rest"]
-        ),
-        _param_row("T (K)", AppState.T, AppState.set_T, *PARAM_RANGES["T"]),
         rx.separator(),
         rx.accordion.root(
             rx.accordion.item(
