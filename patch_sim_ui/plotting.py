@@ -482,6 +482,7 @@ def build_figure(
     visibility: TraceVisibility,
     clamp_mode: str,
     stored_traces: list[Sweep] | None = None,
+    show_hover: bool = True,
 ) -> go.Figure:
     """Build a Plotly figure from current and saved sweeps.
 
@@ -517,6 +518,9 @@ def build_figure(
         clamp_mode: Active UI clamp mode, used for layout and axis labels.
         stored_traces: Oscilloscope-style stored reference traces; rendered as
             faded dashed lines behind the live traces.
+        show_hover: When ``True`` (default) the figure's ``hovermode`` is set
+            to ``"x"`` (multi-sweep) or ``"x unified"`` (single-sweep).  When
+            ``False``, ``hovermode`` is set to ``False`` to suppress tooltips.
 
     Returns:
         A Plotly Figure with response, gating, and stimulus subplots.
@@ -825,7 +829,9 @@ def build_figure(
 
     fig.update_xaxes(title_text="Time (ms)", row=stimulus_row, col=1)
 
-    hovermode = "x" if is_multi_sweep else "x unified"
+    hovermode: str | bool = (
+        ("x" if is_multi_sweep else "x unified") if show_hover else False
+    )
     fig.update_layout(
         autosize=True,
         margin=_PLOT_MARGIN,

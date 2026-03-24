@@ -363,6 +363,21 @@ def sweep_manager() -> rx.Component:
     return rx.vstack(
         rx.hstack(
             _trace_visibility_popover(),
+            rx.tooltip(
+                rx.icon_button(
+                    rx.icon("crosshair"),
+                    on_click=AppState.toggle_hover,
+                    size="1",
+                    variant=rx.cond(AppState.show_hover, "soft", "outline"),
+                    color_scheme=rx.cond(AppState.show_hover, "gray", "gray"),
+                    aria_label="Toggle hover tooltips",
+                ),
+                content=rx.cond(
+                    AppState.show_hover,
+                    "Hide hover tooltips",
+                    "Show hover tooltips",
+                ),
+            ),
             rx.separator(orientation="vertical"),
             rx.button(
                 rx.icon("scroll-text"),

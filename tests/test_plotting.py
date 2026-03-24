@@ -350,6 +350,32 @@ def test_build_figure_multi_sweep_hovermode_x() -> None:
     assert fig.layout.hovermode == "x"
 
 
+def test_build_figure_show_hover_false_disables_hovermode() -> None:
+    """When show_hover is False the figure hovermode is set to False."""
+    sweep = _make_sweep()
+    fig = build_figure(
+        [sweep],
+        [],
+        visibility=_all_flags_true(),
+        clamp_mode="Current Clamp",
+        show_hover=False,
+    )
+    assert fig.layout.hovermode is False
+
+
+def test_build_figure_show_hover_false_multi_sweep() -> None:
+    """When show_hover is False multi-sweep figures also disable hovermode."""
+    sweeps = [_make_sweep(label=f"{v} mV") for v in [-60, -40, -20]]
+    fig = build_figure(
+        sweeps,
+        [],
+        visibility=_all_flags_true(),
+        clamp_mode="Voltage Clamp",
+        show_hover=False,
+    )
+    assert fig.layout.hovermode is False
+
+
 # ---------------------------------------------------------------------------
 # build_figure — multi-sweep carrier traces
 # ---------------------------------------------------------------------------

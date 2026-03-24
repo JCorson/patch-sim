@@ -498,6 +498,7 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     is_running: bool = False
     error_message: str = ""
+    show_hover: bool = True  # Whether plot hover tooltips are visible
 
     # ------------------------------------------------------------------ #
     # Log panel state                                                    #
@@ -580,11 +581,13 @@ class AppState(rx.State):
 
     @rx.var
     def figure_data(self) -> go.Figure:
-        """Plotly figure rebuilt when sweeps or clamp mode change.
+        """Plotly figure rebuilt when sweeps, clamp mode, or hover state change.
 
         All traces are built with full visibility; toggling show_* flags is
         handled client-side via Plotly.restyle so that figure rebuilds are not
-        triggered by visibility changes.
+        triggered by visibility changes.  The ``show_hover`` flag is respected
+        here so that hovermode is baked into the figure data and takes effect
+        immediately, even without a client-side relayout.
         """
         return build_figure(
             current_sweeps=self.current_sweeps,
@@ -592,6 +595,7 @@ class AppState(rx.State):
             visibility=TraceVisibility(),  # all visible; toggling handled client-side
             clamp_mode=self.clamp_mode,
             stored_traces=self.stored_traces,
+            show_hover=self.show_hover,
         )
 
     # ------------------------------------------------------------------ #
@@ -651,6 +655,30 @@ class AppState(rx.State):
         """Reset all parameters and sweeps to their class-level defaults."""
         self.reset()
 
+    def toggle_hover(self):
+        """Toggle plot hover tooltips on or off.
+
+        Flips ``show_hover`` and issues a client-side ``Plotly.relayout`` call
+        to update the figure's ``hovermode`` without triggering a full rebuild.
+        When hover is disabled, ``hovermode`` is set to ``false``.  When
+        re-enabled it is restored to ``"x unified"`` for single-sweep traces or
+        ``"x"`` for multi-sweep (I-V Curve) results.
+
+        Returns:
+            A ``rx.call_script`` event that applies the relayout in-browser.
+        """
+        self.show_hover = not self.show_hover
+        if self.show_hover:
+            hovermode = "x" if len(self.current_sweeps) > 1 else "x unified"
+            hovermode_js = f'"{hovermode}"'
+        else:
+            hovermode_js = "false"
+        js = (
+            f"{_PLOTLY_GD_JS}"
+            f"if(gd&&gd.layout)Plotly.relayout(gd,{{hovermode:{hovermode_js}}})"
+        )
+        return rx.call_script(js)
+
     def load_preset(self, name: str) -> None:
         """Load a named preset configuration."""
         if name not in presets.PRESETS:
@@ -697,15 +725,16 @@ class AppState(rx.State):
     # Sweep management                                                   #
     # ------------------------------------------------------------------ #
     def _apply_visibility_js(self) -> str | None:
-        """Build a JS snippet to re-apply hidden traces after a figure rebuild.
+        """Build a JS snippet to re-apply trace visibility and hover state.
 
         Called after any operation that triggers a full figure rebuild (run
         simulation, add sweep, clear sweeps) so that traces the user has
-        toggled off are correctly hidden again.
+        toggled off are correctly hidden again, and the hover mode matches the
+        current ``show_hover`` flag.
 
         Returns:
-            A ``Plotly.restyle`` JS string targeting all currently-hidden
-            trace indices, or ``None`` when every trace is visible.
+            A JS string that re-applies trace visibility and hover mode, or
+            ``None`` when every trace is visible and hover tooltips are enabled.
         """
         trace_map = compute_trace_visibility_map(
             current_sweeps=self.current_sweeps,
@@ -719,12 +748,24 @@ class AppState(rx.State):
         for field_name, indices in trace_map.items():
             if not getattr(self, field_name):
                 hidden.extend(indices)
-        if not hidden:
+
+        parts: list[str] = []
+        if hidden:
+            parts.append(
+                f"if(gd&&gd.data)Plotly.restyle(gd,"
+                f"{{visible:false}},{json.dumps(hidden)});"
+            )
+        if not self.show_hover:
+            parts.append("if(gd&&gd.layout)Plotly.relayout(gd,{hovermode:false});")
+
+        if not parts:
             return None
+        body = "".join(parts)
         return (
-            f"setTimeout(function(){{var gd=document.querySelector('.js-plotly-plot');"
-            f"if(gd&&gd.data)Plotly.restyle(gd,"
-            f"{{visible:false}},{json.dumps(hidden)})}},0)"
+            f"setTimeout(function(){{"
+            f"var gd=document.querySelector('.js-plotly-plot');"
+            f"{body}"
+            f"}},0)"
         )
 
     def add_sweep(self):
