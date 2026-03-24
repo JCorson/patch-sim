@@ -581,11 +581,13 @@ class AppState(rx.State):
 
     @rx.var
     def figure_data(self) -> go.Figure:
-        """Plotly figure rebuilt when sweeps or clamp mode change.
+        """Plotly figure rebuilt when sweeps, clamp mode, or hover state change.
 
         All traces are built with full visibility; toggling show_* flags is
         handled client-side via Plotly.restyle so that figure rebuilds are not
-        triggered by visibility changes.
+        triggered by visibility changes.  The ``show_hover`` flag is respected
+        here so that hovermode is baked into the figure data and takes effect
+        immediately, even without a client-side relayout.
         """
         return build_figure(
             current_sweeps=self.current_sweeps,
@@ -593,6 +595,7 @@ class AppState(rx.State):
             visibility=TraceVisibility(),  # all visible; toggling handled client-side
             clamp_mode=self.clamp_mode,
             stored_traces=self.stored_traces,
+            show_hover=self.show_hover,
         )
 
     # ------------------------------------------------------------------ #
