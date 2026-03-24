@@ -263,6 +263,158 @@ _LOG_SCROLL_JS = (
     "if(vp)vp.scrollTop=0;"
 )
 
+# Client-side sweep highlight / selection module.  Injected via
+# rx.call_script() after every figure render in multi-sweep mode.
+_SWEEP_HIGHLIGHT_JS = """
+(function() {
+  var gd = document.querySelector('.js-plotly-plot');
+  if (!gd || !gd.data) return;
+
+  // State object persists across re-inits.
+  if (!window._psSweep) window._psSweep = {};
+  var S = window._psSweep;
+
+  // Build sweep-to-trace index map from meta.sweep.
+  var sweepMap = {};   // sweepIdx -> [traceIdx, ...]
+  var maxSweep = -1;
+  var origOpacity = [];
+  var origWidth = [];
+  for (var i = 0; i < gd.data.length; i++) {
+    var m = gd.data[i].meta;
+    var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
+    origOpacity[i] = (gd.data[i].opacity != null) ? gd.data[i].opacity : 1;
+    origWidth[i] = (gd.data[i].line && gd.data[i].line.width != null)
+                   ? gd.data[i].line.width : 2;
+    if (si >= 0) {
+      if (!sweepMap[si]) sweepMap[si] = [];
+      sweepMap[si].push(i);
+      if (si > maxSweep) maxSweep = si;
+    }
+  }
+  S.sweepMap = sweepMap;
+  S.nSweeps = maxSweep + 1;
+  S.origOpacity = origOpacity;
+  S.origWidth = origWidth;
+  S.selectedSweep = /*SELECTED_SWEEP*/;
+
+  if (S.nSweeps <= 1) {
+    // Single-sweep mode — remove listeners and bail.
+    if (S._cleanup) { S._cleanup(); S._cleanup = null; }
+    return;
+  }
+
+  function _applySweepStyle(activeSweep, dimOpacity) {
+    if (S.nSweeps <= 1) return;
+    var opacities = new Array(gd.data.length);
+    var widths = new Array(gd.data.length);
+    for (var i = 0; i < gd.data.length; i++) {
+      var m = gd.data[i].meta;
+      var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
+      if (si < 0 || gd.data[i].visible === false) {
+        opacities[i] = S.origOpacity[i];
+        widths[i] = S.origWidth[i];
+      } else if (si === activeSweep) {
+        opacities[i] = 1;
+        widths[i] = S.origWidth[i];
+      } else {
+        opacities[i] = dimOpacity;
+        widths[i] = /*DIM_WIDTH*/;
+      }
+    }
+    var indices = [];
+    for (var i = 0; i < gd.data.length; i++) indices.push(i);
+    Plotly.restyle(gd, {'opacity': opacities, 'line.width': widths}, indices);
+  }
+
+  function _clearStyle() {
+    var opacities = [];
+    var widths = [];
+    for (var i = 0; i < gd.data.length; i++) {
+      opacities.push(S.origOpacity[i]);
+      widths.push(S.origWidth[i]);
+    }
+    var indices = [];
+    for (var i = 0; i < gd.data.length; i++) indices.push(i);
+    Plotly.restyle(gd, {'opacity': opacities, 'line.width': widths}, indices);
+  }
+
+  function _selectSweep(idx) {
+    S.selectedSweep = idx;
+    _applySweepStyle(idx, /*DIM_OPACITY*/);
+  }
+
+  function _deselect() {
+    S.selectedSweep = -1;
+    _clearStyle();
+  }
+
+  // Re-apply if a sweep was already selected (e.g. after figure rebuild).
+  if (S.selectedSweep >= 0 && S.selectedSweep < S.nSweeps) {
+    _applySweepStyle(S.selectedSweep, DIM_OPACITY);
+  }
+
+  // Remove old listeners before attaching new ones.
+  if (S._cleanup) { S._cleanup(); S._cleanup = null; }
+
+  function onClick(evt) {
+    if (!evt || !evt.points || !evt.points.length) { _deselect(); return; }
+    var cn = evt.points[0].curveNumber;
+    var m = gd.data[cn] && gd.data[cn].meta;
+    var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
+    if (si >= 0) {
+      if (S.selectedSweep === si) { _deselect(); }
+      else { _selectSweep(si); }
+    } else {
+      _deselect();
+    }
+  }
+
+  function onHover(evt) {
+    if (S.selectedSweep >= 0) return;  // locked selection, ignore hover
+    if (!evt || !evt.points || !evt.points.length) return;
+    var cn = evt.points[0].curveNumber;
+    var m = gd.data[cn] && gd.data[cn].meta;
+    var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
+    if (si >= 0) { _applySweepStyle(si, /*PREVIEW_OPACITY*/); }
+  }
+
+  function onUnhover() {
+    if (S.selectedSweep >= 0) return;
+    _clearStyle();
+  }
+
+  function onKeydown(evt) {
+    if (S.nSweeps <= 1) return;
+    if (!document.querySelector('.js-plotly-plot')) return;
+    if (evt.key === 'Escape') {
+      _deselect();
+    } else if (evt.key === 'ArrowDown') {
+      evt.preventDefault();
+      var next = (S.selectedSweep < 0) ? 0 : (S.selectedSweep + 1) % S.nSweeps;
+      _selectSweep(next);
+    } else if (evt.key === 'ArrowUp') {
+      evt.preventDefault();
+      var prev = (S.selectedSweep < 0)
+        ? S.nSweeps - 1
+        : (S.selectedSweep - 1 + S.nSweeps) % S.nSweeps;
+      _selectSweep(prev);
+    }
+  }
+
+  gd.on('plotly_click', onClick);
+  gd.on('plotly_hover', onHover);
+  gd.on('plotly_unhover', onUnhover);
+  document.addEventListener('keydown', onKeydown);
+
+  S._cleanup = function() {
+    gd.removeAllListeners('plotly_click');
+    gd.removeAllListeners('plotly_hover');
+    gd.removeAllListeners('plotly_unhover');
+    document.removeEventListener('keydown', onKeydown);
+  };
+})();
+"""
+
 
 def _make_bool_setter(field_name: str):
     """Factory returning a bool event handler for ``field_name``.
@@ -499,6 +651,7 @@ class AppState(rx.State):
     is_running: bool = False
     error_message: str = ""
     show_hover: bool = True  # Whether plot hover tooltips are visible
+    selected_sweep: int = -1  # Index of click-selected sweep (-1 = none)
 
     # ------------------------------------------------------------------ #
     # Log panel state                                                    #
@@ -650,6 +803,7 @@ class AppState(rx.State):
         self.saved_sweeps = []
         self.stored_traces = []
         self._cont_has_state = False
+        self.selected_sweep = -1
 
     def reset_to_defaults(self) -> None:
         """Reset all parameters and sweeps to their class-level defaults."""
@@ -678,6 +832,14 @@ class AppState(rx.State):
             f"if(gd&&gd.layout)Plotly.relayout(gd,{{hovermode:{hovermode_js}}})"
         )
         return rx.call_script(js)
+
+    def set_selected_sweep(self, index: int) -> None:
+        """Sync the selected sweep index from a client-side event.
+
+        Args:
+            index: Sweep index, or ``-1`` to deselect.
+        """
+        self.selected_sweep = index
 
     def load_preset(self, name: str) -> None:
         """Load a named preset configuration."""
@@ -725,16 +887,17 @@ class AppState(rx.State):
     # Sweep management                                                   #
     # ------------------------------------------------------------------ #
     def _apply_visibility_js(self) -> str | None:
-        """Build a JS snippet to re-apply trace visibility and hover state.
+        """Build a JS snippet to re-apply trace visibility, hover, and sweep highlight.
 
         Called after any operation that triggers a full figure rebuild (run
         simulation, add sweep, clear sweeps) so that traces the user has
-        toggled off are correctly hidden again, and the hover mode matches the
-        current ``show_hover`` flag.
+        toggled off are correctly hidden again, the hover mode matches the
+        current ``show_hover`` flag, and sweep highlight listeners are
+        (re-)attached in multi-sweep mode.
 
         Returns:
-            A JS string that re-applies trace visibility and hover mode, or
-            ``None`` when every trace is visible and hover tooltips are enabled.
+            A JS string that re-applies trace visibility, hover mode, and
+            sweep highlight, or ``None`` when nothing needs to be applied.
         """
         trace_map = compute_trace_visibility_map(
             current_sweeps=self.current_sweeps,
@@ -758,6 +921,11 @@ class AppState(rx.State):
         if not self.show_hover:
             parts.append("if(gd&&gd.layout)Plotly.relayout(gd,{hovermode:false});")
 
+        # Inject sweep highlight listeners in multi-sweep mode.
+        is_multi = len(self.current_sweeps) > 1
+        if is_multi:
+            parts.append(self._sweep_highlight_js())
+
         if not parts:
             return None
         body = "".join(parts)
@@ -766,6 +934,21 @@ class AppState(rx.State):
             f"var gd=document.querySelector('.js-plotly-plot');"
             f"{body}"
             f"}},0)"
+        )
+
+    def _sweep_highlight_js(self) -> str:
+        """Return the sweep highlight JS with styling constants substituted.
+
+        Returns:
+            A self-executing JS function string.
+        """
+        return (
+            _SWEEP_HIGHLIGHT_JS.replace(
+                "/*DIM_OPACITY*/", str(constants.HIGHLIGHT_DIM_OPACITY)
+            )
+            .replace("/*PREVIEW_OPACITY*/", str(constants.HIGHLIGHT_PREVIEW_OPACITY))
+            .replace("/*DIM_WIDTH*/", str(constants.HIGHLIGHT_DIM_WIDTH))
+            .replace("/*SELECTED_SWEEP*/", str(self.selected_sweep))
         )
 
     def add_sweep(self):
@@ -1058,6 +1241,7 @@ class AppState(rx.State):
         async with self:
             self.is_running = True
             self.error_message = ""
+            self.selected_sweep = -1
 
         _start_ms = time.monotonic() * 1000
         logger.info(
