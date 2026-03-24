@@ -38,13 +38,11 @@ def _header() -> rx.Component:
         rx.hstack(
             rx.cond(
                 AppState.is_running,
-                rx.button(
-                    rx.icon("square"),
-                    "Stop",
-                    on_click=AppState.cancel_simulation,
-                    color_scheme="red",
-                    variant="soft",
-                    size="2",
+                rx.hstack(
+                    rx.spinner(size="2"),
+                    rx.text("Running…", size="2", color="gray"),
+                    spacing="2",
+                    align="center",
                 ),
                 rx.button(
                     rx.icon("play"),
