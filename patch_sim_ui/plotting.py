@@ -710,8 +710,13 @@ def build_figure(
             )
         else:
             # Voltage Clamp: all currents overlaid on row 1 with channel colours.
+            # Legend-eligible traces (first sweep) use an empty prefix so the
+            # voltage-clamp command level doesn't appear in the legend label
+            # (e.g. "I_total" not "100 mV I_total").  Individual hover is
+            # suppressed in multi-sweep mode anyway, so the name is legend-only.
+            vc_pfx = "" if sl else pfx
             _add_vc_currents(
-                sweep, pfx, hoverinfo=hi, visibility=visibility, showlegend=sl
+                sweep, vc_pfx, hoverinfo=hi, visibility=visibility, showlegend=sl
             )
 
         # Gating row is always present; traces are always added with their

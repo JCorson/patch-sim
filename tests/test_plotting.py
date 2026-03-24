@@ -849,13 +849,27 @@ def test_build_figure_multi_sweep_only_first_sweep_in_legend() -> None:
     fig = build_figure(
         sweeps, [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
     )
-    # First sweep has no prefix label stripped; second sweep label is "-40 mV "
     legend_names = {t.name for t in fig.data if t.showlegend is not False}
-    # Traces from the second sweep use its label as prefix; they must not appear.
-    second_prefix = "-40 mV "
-    assert not any(n.startswith(second_prefix) for n in legend_names), (
+    # Traces from the second sweep must not appear.
+    assert not any(n.startswith("-40 mV ") for n in legend_names), (
         "Second sweep traces must not appear in the legend"
     )
+
+
+def test_build_figure_vc_multi_sweep_legend_names_have_no_voltage_prefix() -> None:
+    """VC multi-sweep: legend entries use bare channel names, no command level."""
+    sweeps = [_make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40]]
+    fig = build_figure(
+        sweeps, [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
+    legend_names = {t.name for t in fig.data if t.showlegend is not False}
+    # Current traces must use bare channel labels, not "-60 mV I_total" etc.
+    assert "I_total" in legend_names
+    assert "I_Na" in legend_names
+    assert "I_K" in legend_names
+    assert "I_L" in legend_names
+    channel_names = {"I_total", "I_Na", "I_K", "I_L"}
+    assert not any("mV" in n for n in legend_names if n in channel_names)
 
 
 def test_build_figure_saved_sweep_stimulus_not_in_legend() -> None:
