@@ -900,3 +900,92 @@ def test_build_figure_stored_trace_stimulus_not_in_legend() -> None:
     assert len(ref_traces) == 2  # noqa: PLR2004
     stimulus_ref = [t for t in ref_traces if t.showlegend is False]
     assert len(stimulus_ref) == 1, "Stored trace stimulus must be excluded from legend"
+
+
+# ---------------------------------------------------------------------------
+# Sweep metadata (meta.sweep) embedding
+# ---------------------------------------------------------------------------
+
+
+def test_sweep_meta_vc_multi_sweep() -> None:
+    """Multi-sweep VC figure embeds correct sweep index in trace meta."""
+    sweeps = [
+        _make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40, -20]
+    ]
+    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+    for trace in fig.data:
+        meta = trace.meta
+        assert meta is not None, "Every trace must have meta"
+        assert "sweep" in meta, "Every trace meta must contain 'sweep' key"
+    # Each VC sweep without additional channels: 4 currents + 3 gating + 1 stim = 8
+    traces_per_sweep = 8
+    for sweep_idx in range(3):
+        start = sweep_idx * traces_per_sweep
+        for i in range(start, start + traces_per_sweep):
+            assert fig.data[i].meta["sweep"] == sweep_idx, (
+                f"Trace {i} should belong to sweep {sweep_idx}"
+            )
+
+
+def test_sweep_meta_cc_multi_sweep() -> None:
+    """Multi-sweep CC figure embeds correct sweep index in trace meta."""
+    sweeps = [_make_sweep(label=f"s{i}", mode="Current Clamp") for i in range(2)]
+    fig = build_figure(sweeps, [], TraceVisibility(), "Current Clamp")
+    # Each CC sweep: 1 voltage + 3 gating + 1 stim = 5
+    traces_per_sweep = 5
+    for sweep_idx in range(2):
+        start = sweep_idx * traces_per_sweep
+        for i in range(start, start + traces_per_sweep):
+            assert fig.data[i].meta["sweep"] == sweep_idx
+
+
+def test_sweep_meta_negative_for_saved_sweeps() -> None:
+    """Saved sweep traces have meta.sweep == -1."""
+    current = [_make_sweep(label="cur", mode="Current Clamp")]
+    saved = [_make_sweep(label="saved", color="#aaa", mode="Current Clamp")]
+    fig = build_figure(current, saved, TraceVisibility(), "Current Clamp")
+    # Current sweep: 5 traces (indices 0-4); saved: 2 traces (row1 + stim)
+    for i in range(5, len(fig.data)):
+        assert fig.data[i].meta["sweep"] == -1, (
+            f"Saved/carrier trace {i} should have sweep=-1"
+        )
+
+
+def test_sweep_meta_negative_for_stored_traces() -> None:
+    """Stored traces have meta.sweep == -1."""
+    current = [_make_sweep(mode="Current Clamp")]
+    stored = [_make_sweep(mode="Current Clamp")]
+    stored[0] = stored[0].model_copy(update={"label": "Ref"})
+    fig = build_figure(
+        current, [], TraceVisibility(), "Current Clamp", stored_traces=stored
+    )
+    # Current sweep: 5 traces; stored: 2 traces
+    for i in range(5, len(fig.data)):
+        assert fig.data[i].meta["sweep"] == -1
+
+
+def test_sweep_meta_negative_for_carrier_traces() -> None:
+    """Carrier traces in multi-sweep mode have meta.sweep == -1."""
+    sweeps = [_make_sweep(label=f"s{i}", mode="Voltage Clamp") for i in range(3)]
+    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+    # Last 3 traces are carriers
+    for i in range(len(fig.data) - 3, len(fig.data)):
+        assert fig.data[i].meta["sweep"] == -1, (
+            f"Carrier trace {i} should have sweep=-1"
+        )
+
+
+def test_sweep_meta_with_additional_channels() -> None:
+    """Additional current/gating traces carry the correct sweep index."""
+    extra = {"ih_current": list(np.ones(_N) * 0.5)}
+    sweeps = [
+        _make_sweep(label="s0", mode="Voltage Clamp", extra_cols=extra),
+        _make_sweep(label="s1", mode="Voltage Clamp", extra_cols=extra),
+    ]
+    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+    # VC + ih_current: 4 classic + 1 additional current + 3 gating + 1 stim = 9
+    traces_per_sweep = 9
+    for sweep_idx in range(2):
+        start = sweep_idx * traces_per_sweep
+        for i in range(start, start + traces_per_sweep):
+            assert fig.data[i].meta["sweep"] == sweep_idx
