@@ -120,3 +120,9 @@ uv tool run ruff format --check .
 ```
 uv run --frozen -m mypy .
 ```
+
+---
+
+## License
+
+This project is licensed under the [GNU General Public License v3.0 or later](LICENSE).

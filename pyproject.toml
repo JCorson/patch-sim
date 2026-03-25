@@ -3,6 +3,7 @@ name = "patch_sim"
 version = "0.1.0"
 description = "Patch clamp experiment simulator implementing the Hodgkin-Huxley model for neuronal electrophysiology"
 readme = "README.md"
+license = "GPL-3.0-or-later"
 requires-python = ">=3.11"
 dependencies = [
     "numpy",
