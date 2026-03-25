@@ -307,20 +307,6 @@ _SWEEP_HIGHLIGHT_JS = """
     S.origWidth = origWidth;
     S.selectedSweep = /*SELECTED_SWEEP*/;
 
-    // Build sweep→yaxis→traceIndex lookup for carrier-click resolution.
-    // Each carrier trace has meta.sweep=-1 and intercepts all hover/click
-    // events.  When that happens _resolveSweepFromMouse() uses this map to
-    // find the real sweep by comparing mouse data-Y with each sweep's trace.
-    S.sweepAxisTrace = {};
-    for (var _si in sweepMap) {
-      S.sweepAxisTrace[_si] = {};
-      for (var _t = 0; _t < sweepMap[_si].length; _t++) {
-        var _ti = sweepMap[_si][_t];
-        var _ya = gd.data[_ti].yaxis || 'y';
-        if (!S.sweepAxisTrace[_si][_ya]) S.sweepAxisTrace[_si][_ya] = _ti;
-      }
-    }
-
     if (S.nSweeps <= 1) {
       // Single-sweep mode — remove listeners and bail.
       if (S._cleanup) { S._cleanup(); S._cleanup = null; }
@@ -372,17 +358,21 @@ _SWEEP_HIGHLIGHT_JS = """
       _clearStyle();
     }
 
-    // Resolve which sweep the user intended when a carrier trace (sweep=-1)
-    // received the event.  Converts the raw MouseEvent pixel position to data
-    // coordinates and returns the sweep index whose trace is closest in Y.
+    // Resolve which sweep is nearest to the mouse cursor.
+    // Converts the raw MouseEvent pixel position to data coordinates using
+    // Plotly's internal axis layout, then finds the sweep whose trace value
+    // at that x-position is closest to the cursor's y-position.
+    // Note: gd.data[i].x holds a Plotly v3 binary descriptor {dtype,bdata};
+    // decoded typed arrays live in gd._fullData[i].x.
     function _resolveSweepFromMouse(evt) {
       if (!evt || !evt.event || !gd._fullLayout) return -1;
       var fl = gd._fullLayout;
       if (!fl._size) return -1;
       var rect = gd.getBoundingClientRect();
-      // Pixel coords relative to the plot area origin (inside the margins).
+      // ya._offset is measured from the figure div top, so py must be too.
+      // px is relative to plot area (after left margin) because xa._offset=0.
       var px = evt.event.clientX - rect.left - fl._size.l;
-      var py = evt.event.clientY - rect.top  - fl._size.t;
+      var py = evt.event.clientY - rect.top;
 
       // Identify which subplot row contains the cursor.
       var matchedYa = null;
@@ -414,26 +404,32 @@ _SWEEP_HIGHLIGHT_JS = """
         * (matchedYa.range[1] - matchedYa.range[0]);
 
       // Find the sweep whose trace at dataX is closest to dataY.
+      // Search only in the matched subplot axis — cross-axis comparison is
+      // invalid because each subplot has different units and scale.
       var bestSweep = -1;
       var bestDist = Infinity;
-      for (var _si in S.sweepAxisTrace) {
-        var _ti = S.sweepAxisTrace[_si][matchedYaKey];
-        if (_ti == null) continue;
-        var trace = gd.data[_ti];
-        if (!trace || trace.visible === false) continue;
-        var xArr = trace.x;
-        var yArr = trace.y;
+      for (var _i = 0; _i < gd.data.length; _i++) {
+        var _td = gd.data[_i];
+        var _tm = _td.meta;
+        var _tsi = (_tm && typeof _tm.sweep === 'number') ? _tm.sweep : -1;
+        if (_tsi < 0) continue;
+        var _tya = _td.yaxis || 'y';
+        if (_tya !== matchedYaKey) continue;
+        // Include hidden traces — we resolve by data proximity, not visibility.
+        var _fd = gd._fullData[_i];
+        var xArr = _fd && _fd.x;
+        var yArr = _fd && _fd.y;
         if (!xArr || !yArr || !xArr.length) continue;
-        // Binary search for the index of the closest x value.
+        // Binary search for the nearest x index.
         var lo = 0, hi = xArr.length - 1;
         while (lo < hi) {
           var mid = (lo + hi) >> 1;
           if (xArr[mid] < dataX) lo = mid + 1; else hi = mid;
         }
         var traceY = yArr[lo];
-        if (traceY == null) continue;
+        if (traceY == null || traceY !== traceY) continue;  // null or NaN
         var dist = Math.abs(traceY - dataY);
-        if (dist < bestDist) { bestDist = dist; bestSweep = parseInt(_si, 10); }
+        if (dist < bestDist) { bestDist = dist; bestSweep = _tsi; }
       }
       return bestSweep;
     }
@@ -446,12 +442,8 @@ _SWEEP_HIGHLIGHT_JS = """
     // Remove old listeners before attaching new ones.
     if (S._cleanup) { S._cleanup(); S._cleanup = null; }
 
-    function onClick(evt) {
-      if (!evt || !evt.points || !evt.points.length) { _deselect(); return; }
-      var cn = evt.points[0].curveNumber;
-      var m = gd.data[cn] && gd.data[cn].meta;
-      var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
-      if (si < 0) { si = _resolveSweepFromMouse(evt); }
+    function onNativeClick(nativeEvt) {
+      var si = _resolveSweepFromMouse({event: nativeEvt});
       if (si >= 0) {
         if (S.selectedSweep === si) { _deselect(); }
         else { _selectSweep(si); }
@@ -460,17 +452,14 @@ _SWEEP_HIGHLIGHT_JS = """
       }
     }
 
-    function onHover(evt) {
-      if (S.selectedSweep >= 0) return;  // locked selection, ignore hover
-      if (!evt || !evt.points || !evt.points.length) return;
-      var cn = evt.points[0].curveNumber;
-      var m = gd.data[cn] && gd.data[cn].meta;
-      var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
-      if (si < 0) { si = _resolveSweepFromMouse(evt); }
+    function onNativeMousemove(nativeEvt) {
+      if (S.selectedSweep >= 0) return;
+      var si = _resolveSweepFromMouse({event: nativeEvt});
       if (si >= 0) { _applySweepStyle(si, /*PREVIEW_OPACITY*/); }
+      else { _clearStyle(); }
     }
 
-    function onUnhover() {
+    function onNativeMouseleave() {
       if (S.selectedSweep >= 0) return;
       _clearStyle();
     }
@@ -480,11 +469,11 @@ _SWEEP_HIGHLIGHT_JS = """
       if (!document.querySelector('.js-plotly-plot')) return;
       if (evt.key === 'Escape') {
         _deselect();
-      } else if (evt.key === 'ArrowDown') {
+      } else if (evt.key === 'ArrowUp') {
         evt.preventDefault();
         var next = (S.selectedSweep < 0) ? 0 : (S.selectedSweep + 1) % S.nSweeps;
         _selectSweep(next);
-      } else if (evt.key === 'ArrowUp') {
+      } else if (evt.key === 'ArrowDown') {
         evt.preventDefault();
         var prev = (S.selectedSweep < 0)
           ? S.nSweeps - 1
@@ -493,15 +482,15 @@ _SWEEP_HIGHLIGHT_JS = """
       }
     }
 
-    gd.on('plotly_click', onClick);
-    gd.on('plotly_hover', onHover);
-    gd.on('plotly_unhover', onUnhover);
+    gd.addEventListener('click', onNativeClick);
+    gd.addEventListener('mousemove', onNativeMousemove);
+    gd.addEventListener('mouseleave', onNativeMouseleave);
     document.addEventListener('keydown', onKeydown);
 
     S._cleanup = function() {
-      gd.removeAllListeners('plotly_click');
-      gd.removeAllListeners('plotly_hover');
-      gd.removeAllListeners('plotly_unhover');
+      gd.removeEventListener('click', onNativeClick);
+      gd.removeEventListener('mousemove', onNativeMousemove);
+      gd.removeEventListener('mouseleave', onNativeMouseleave);
       document.removeEventListener('keydown', onKeydown);
     };
   }
