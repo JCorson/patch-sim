@@ -267,151 +267,164 @@ _LOG_SCROLL_JS = (
 # rx.call_script() after every figure render in multi-sweep mode.
 _SWEEP_HIGHLIGHT_JS = """
 (function() {
-  var gd = document.querySelector('.js-plotly-plot');
-  if (!gd || !gd.data) return;
-
-  // State object persists across re-inits.
+  // State object persists across re-inits and retries.
   if (!window._psSweep) window._psSweep = {};
   var S = window._psSweep;
 
-  // Build sweep-to-trace index map from meta.sweep.
-  var sweepMap = {};   // sweepIdx -> [traceIdx, ...]
-  var maxSweep = -1;
-  var origOpacity = [];
-  var origWidth = [];
-  for (var i = 0; i < gd.data.length; i++) {
-    var m = gd.data[i].meta;
-    var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
-    origOpacity[i] = (gd.data[i].opacity != null) ? gd.data[i].opacity : 1;
-    origWidth[i] = (gd.data[i].line && gd.data[i].line.width != null)
-                   ? gd.data[i].line.width : 2;
-    if (si >= 0) {
-      if (!sweepMap[si]) sweepMap[si] = [];
-      sweepMap[si].push(i);
-      if (si > maxSweep) maxSweep = si;
+  // Cancel any pending retry so we don't get duplicate inits.
+  if (S._initTimer) { clearTimeout(S._initTimer); S._initTimer = null; }
+
+  function setup(retries) {
+    var gd = document.querySelector('.js-plotly-plot');
+    // Plotly may not have rendered yet; retry up to 10 times (1 s total).
+    if (!gd || !gd.data || !gd.data.length) {
+      if (retries > 0) {
+        S._initTimer = setTimeout(function() { setup(retries - 1); }, 100);
+      }
+      return;
     }
-  }
-  S.sweepMap = sweepMap;
-  S.nSweeps = maxSweep + 1;
-  S.origOpacity = origOpacity;
-  S.origWidth = origWidth;
-  S.selectedSweep = /*SELECTED_SWEEP*/;
 
-  if (S.nSweeps <= 1) {
-    // Single-sweep mode — remove listeners and bail.
-    if (S._cleanup) { S._cleanup(); S._cleanup = null; }
-    return;
-  }
-
-  function _applySweepStyle(activeSweep, dimOpacity) {
-    if (S.nSweeps <= 1) return;
-    var opacities = new Array(gd.data.length);
-    var widths = new Array(gd.data.length);
+    // Build sweep-to-trace index map from meta.sweep.
+    var sweepMap = {};   // sweepIdx -> [traceIdx, ...]
+    var maxSweep = -1;
+    var origOpacity = [];
+    var origWidth = [];
     for (var i = 0; i < gd.data.length; i++) {
       var m = gd.data[i].meta;
       var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
-      if (si < 0 || gd.data[i].visible === false) {
-        opacities[i] = S.origOpacity[i];
-        widths[i] = S.origWidth[i];
-      } else if (si === activeSweep) {
-        opacities[i] = 1;
-        widths[i] = S.origWidth[i];
-      } else {
-        opacities[i] = dimOpacity;
-        widths[i] = /*DIM_WIDTH*/;
+      origOpacity[i] = (gd.data[i].opacity != null) ? gd.data[i].opacity : 1;
+      origWidth[i] = (gd.data[i].line && gd.data[i].line.width != null)
+                     ? gd.data[i].line.width : 2;
+      if (si >= 0) {
+        if (!sweepMap[si]) sweepMap[si] = [];
+        sweepMap[si].push(i);
+        if (si > maxSweep) maxSweep = si;
       }
     }
-    var indices = [];
-    for (var i = 0; i < gd.data.length; i++) indices.push(i);
-    Plotly.restyle(gd, {'opacity': opacities, 'line.width': widths}, indices);
-  }
+    S.sweepMap = sweepMap;
+    S.nSweeps = maxSweep + 1;
+    S.origOpacity = origOpacity;
+    S.origWidth = origWidth;
+    S.selectedSweep = /*SELECTED_SWEEP*/;
 
-  function _clearStyle() {
-    var opacities = [];
-    var widths = [];
-    for (var i = 0; i < gd.data.length; i++) {
-      opacities.push(S.origOpacity[i]);
-      widths.push(S.origWidth[i]);
+    if (S.nSweeps <= 1) {
+      // Single-sweep mode — remove listeners and bail.
+      if (S._cleanup) { S._cleanup(); S._cleanup = null; }
+      return;
     }
-    var indices = [];
-    for (var i = 0; i < gd.data.length; i++) indices.push(i);
-    Plotly.restyle(gd, {'opacity': opacities, 'line.width': widths}, indices);
-  }
 
-  function _selectSweep(idx) {
-    S.selectedSweep = idx;
-    _applySweepStyle(idx, /*DIM_OPACITY*/);
-  }
-
-  function _deselect() {
-    S.selectedSweep = -1;
-    _clearStyle();
-  }
-
-  // Re-apply if a sweep was already selected (e.g. after figure rebuild).
-  if (S.selectedSweep >= 0 && S.selectedSweep < S.nSweeps) {
-    _applySweepStyle(S.selectedSweep, DIM_OPACITY);
-  }
-
-  // Remove old listeners before attaching new ones.
-  if (S._cleanup) { S._cleanup(); S._cleanup = null; }
-
-  function onClick(evt) {
-    if (!evt || !evt.points || !evt.points.length) { _deselect(); return; }
-    var cn = evt.points[0].curveNumber;
-    var m = gd.data[cn] && gd.data[cn].meta;
-    var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
-    if (si >= 0) {
-      if (S.selectedSweep === si) { _deselect(); }
-      else { _selectSweep(si); }
-    } else {
-      _deselect();
+    function _applySweepStyle(activeSweep, dimOpacity) {
+      if (S.nSweeps <= 1) return;
+      var opacities = new Array(gd.data.length);
+      var widths = new Array(gd.data.length);
+      for (var i = 0; i < gd.data.length; i++) {
+        var m = gd.data[i].meta;
+        var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
+        if (si < 0 || gd.data[i].visible === false) {
+          opacities[i] = S.origOpacity[i];
+          widths[i] = S.origWidth[i];
+        } else if (si === activeSweep) {
+          opacities[i] = 1;
+          widths[i] = S.origWidth[i];
+        } else {
+          opacities[i] = dimOpacity;
+          widths[i] = /*DIM_WIDTH*/;
+        }
+      }
+      var indices = [];
+      for (var i = 0; i < gd.data.length; i++) indices.push(i);
+      Plotly.restyle(gd, {'opacity': opacities, 'line.width': widths}, indices);
     }
-  }
 
-  function onHover(evt) {
-    if (S.selectedSweep >= 0) return;  // locked selection, ignore hover
-    if (!evt || !evt.points || !evt.points.length) return;
-    var cn = evt.points[0].curveNumber;
-    var m = gd.data[cn] && gd.data[cn].meta;
-    var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
-    if (si >= 0) { _applySweepStyle(si, /*PREVIEW_OPACITY*/); }
-  }
-
-  function onUnhover() {
-    if (S.selectedSweep >= 0) return;
-    _clearStyle();
-  }
-
-  function onKeydown(evt) {
-    if (S.nSweeps <= 1) return;
-    if (!document.querySelector('.js-plotly-plot')) return;
-    if (evt.key === 'Escape') {
-      _deselect();
-    } else if (evt.key === 'ArrowDown') {
-      evt.preventDefault();
-      var next = (S.selectedSweep < 0) ? 0 : (S.selectedSweep + 1) % S.nSweeps;
-      _selectSweep(next);
-    } else if (evt.key === 'ArrowUp') {
-      evt.preventDefault();
-      var prev = (S.selectedSweep < 0)
-        ? S.nSweeps - 1
-        : (S.selectedSweep - 1 + S.nSweeps) % S.nSweeps;
-      _selectSweep(prev);
+    function _clearStyle() {
+      var opacities = [];
+      var widths = [];
+      for (var i = 0; i < gd.data.length; i++) {
+        opacities.push(S.origOpacity[i]);
+        widths.push(S.origWidth[i]);
+      }
+      var indices = [];
+      for (var i = 0; i < gd.data.length; i++) indices.push(i);
+      Plotly.restyle(gd, {'opacity': opacities, 'line.width': widths}, indices);
     }
+
+    function _selectSweep(idx) {
+      S.selectedSweep = idx;
+      _applySweepStyle(idx, /*DIM_OPACITY*/);
+    }
+
+    function _deselect() {
+      S.selectedSweep = -1;
+      _clearStyle();
+    }
+
+    // Re-apply if a sweep was already selected (e.g. after figure rebuild).
+    if (S.selectedSweep >= 0 && S.selectedSweep < S.nSweeps) {
+      _applySweepStyle(S.selectedSweep, /*DIM_OPACITY*/);
+    }
+
+    // Remove old listeners before attaching new ones.
+    if (S._cleanup) { S._cleanup(); S._cleanup = null; }
+
+    function onClick(evt) {
+      if (!evt || !evt.points || !evt.points.length) { _deselect(); return; }
+      var cn = evt.points[0].curveNumber;
+      var m = gd.data[cn] && gd.data[cn].meta;
+      var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
+      if (si >= 0) {
+        if (S.selectedSweep === si) { _deselect(); }
+        else { _selectSweep(si); }
+      } else {
+        _deselect();
+      }
+    }
+
+    function onHover(evt) {
+      if (S.selectedSweep >= 0) return;  // locked selection, ignore hover
+      if (!evt || !evt.points || !evt.points.length) return;
+      var cn = evt.points[0].curveNumber;
+      var m = gd.data[cn] && gd.data[cn].meta;
+      var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
+      if (si >= 0) { _applySweepStyle(si, /*PREVIEW_OPACITY*/); }
+    }
+
+    function onUnhover() {
+      if (S.selectedSweep >= 0) return;
+      _clearStyle();
+    }
+
+    function onKeydown(evt) {
+      if (S.nSweeps <= 1) return;
+      if (!document.querySelector('.js-plotly-plot')) return;
+      if (evt.key === 'Escape') {
+        _deselect();
+      } else if (evt.key === 'ArrowDown') {
+        evt.preventDefault();
+        var next = (S.selectedSweep < 0) ? 0 : (S.selectedSweep + 1) % S.nSweeps;
+        _selectSweep(next);
+      } else if (evt.key === 'ArrowUp') {
+        evt.preventDefault();
+        var prev = (S.selectedSweep < 0)
+          ? S.nSweeps - 1
+          : (S.selectedSweep - 1 + S.nSweeps) % S.nSweeps;
+        _selectSweep(prev);
+      }
+    }
+
+    gd.on('plotly_click', onClick);
+    gd.on('plotly_hover', onHover);
+    gd.on('plotly_unhover', onUnhover);
+    document.addEventListener('keydown', onKeydown);
+
+    S._cleanup = function() {
+      gd.removeAllListeners('plotly_click');
+      gd.removeAllListeners('plotly_hover');
+      gd.removeAllListeners('plotly_unhover');
+      document.removeEventListener('keydown', onKeydown);
+    };
   }
 
-  gd.on('plotly_click', onClick);
-  gd.on('plotly_hover', onHover);
-  gd.on('plotly_unhover', onUnhover);
-  document.addEventListener('keydown', onKeydown);
-
-  S._cleanup = function() {
-    gd.removeAllListeners('plotly_click');
-    gd.removeAllListeners('plotly_hover');
-    gd.removeAllListeners('plotly_unhover');
-    document.removeEventListener('keydown', onKeydown);
-  };
+  setup(10);
 })();
 """
 
