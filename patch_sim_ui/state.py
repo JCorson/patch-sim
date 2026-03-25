@@ -289,12 +289,14 @@ _SWEEP_HIGHLIGHT_JS = """
     var maxSweep = -1;
     var origOpacity = [];
     var origWidth = [];
+    var origShowlegend = [];  // original showlegend for each trace
     for (var i = 0; i < gd.data.length; i++) {
       var m = gd.data[i].meta;
       var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
       origOpacity[i] = (gd.data[i].opacity != null) ? gd.data[i].opacity : 1;
       origWidth[i] = (gd.data[i].line && gd.data[i].line.width != null)
                      ? gd.data[i].line.width : 2;
+      origShowlegend[i] = gd.data[i].showlegend === true;
       if (si >= 0) {
         if (!sweepMap[si]) sweepMap[si] = [];
         sweepMap[si].push(i);
@@ -305,6 +307,16 @@ _SWEEP_HIGHLIGHT_JS = """
     S.nSweeps = maxSweep + 1;
     S.origOpacity = origOpacity;
     S.origWidth = origWidth;
+    S.origShowlegend = origShowlegend;
+    // legendPositions[p] = true means position p within a sweep's trace list
+    // originally had showlegend=true (based on sweep 0).
+    var legendPositions = {};
+    if (sweepMap[0]) {
+      for (var p = 0; p < sweepMap[0].length; p++) {
+        if (origShowlegend[sweepMap[0][p]]) legendPositions[p] = true;
+      }
+    }
+    S.legendPositions = legendPositions;
     S.selectedSweep = /*SELECTED_SWEEP*/;
 
     if (S.nSweeps <= 1) {
@@ -317,35 +329,49 @@ _SWEEP_HIGHLIGHT_JS = """
       if (S.nSweeps <= 1) return;
       var opacities = new Array(gd.data.length);
       var widths = new Array(gd.data.length);
+      var showlegends = new Array(gd.data.length);
       for (var i = 0; i < gd.data.length; i++) {
         var m = gd.data[i].meta;
         var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
         if (si < 0 || gd.data[i].visible === false) {
           opacities[i] = S.origOpacity[i];
           widths[i] = S.origWidth[i];
+          showlegends[i] = S.origShowlegend[i];
         } else if (si === activeSweep) {
           opacities[i] = 1;
           widths[i] = S.origWidth[i];
+          // Show legend entry for this trace if it occupies a legend position.
+          var pos = S.sweepMap[si] ? S.sweepMap[si].indexOf(i) : -1;
+          showlegends[i] = pos >= 0 && S.legendPositions[pos] === true;
         } else {
           opacities[i] = dimOpacity;
           widths[i] = /*DIM_WIDTH*/;
+          showlegends[i] = false;
         }
       }
       var indices = [];
       for (var i = 0; i < gd.data.length; i++) indices.push(i);
-      Plotly.restyle(gd, {'opacity': opacities, 'line.width': widths}, indices);
+      var styleUpdate = {
+        'opacity': opacities, 'line.width': widths, 'showlegend': showlegends
+      };
+      Plotly.restyle(gd, styleUpdate, indices);
     }
 
     function _clearStyle() {
       var opacities = [];
       var widths = [];
+      var showlegends = [];
       for (var i = 0; i < gd.data.length; i++) {
         opacities.push(S.origOpacity[i]);
         widths.push(S.origWidth[i]);
+        showlegends.push(S.origShowlegend[i]);
       }
       var indices = [];
       for (var i = 0; i < gd.data.length; i++) indices.push(i);
-      Plotly.restyle(gd, {'opacity': opacities, 'line.width': widths}, indices);
+      var styleUpdate = {
+        'opacity': opacities, 'line.width': widths, 'showlegend': showlegends
+      };
+      Plotly.restyle(gd, styleUpdate, indices);
     }
 
     function _selectSweep(idx) {
