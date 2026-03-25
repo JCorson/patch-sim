@@ -989,3 +989,31 @@ def test_sweep_meta_with_additional_channels() -> None:
         start = sweep_idx * traces_per_sweep
         for i in range(start, start + traces_per_sweep):
             assert fig.data[i].meta["sweep"] == sweep_idx
+
+
+def test_sweep_traces_have_correct_yaxis_assignments() -> None:
+    """Sweep traces are assigned to the correct subplot yaxis.
+
+    The client-side sweep-highlight JS uses gd.data[i].yaxis to group traces
+    by subplot row when resolving which sweep the user clicked.  This test
+    verifies the contract: response traces use 'y', gating traces use 'y2',
+    and stimulus traces use 'y3'.
+    """
+    sweeps = [
+        _make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40, -20]
+    ]
+    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+
+    # Standard VC: 4 currents (y) + 3 gating (y2) + 1 stim (y3) = 8 per sweep.
+    # Carrier traces at the end are not sweep traces and are excluded.
+    n_sweep_traces = 8 * len(sweeps)
+    sweep_traces = [t for t in fig.data[:n_sweep_traces]]
+
+    yaxis_values = {t.yaxis for t in sweep_traces}
+    assert "y" in yaxis_values, "Response traces must use yaxis='y'"
+    assert "y2" in yaxis_values, "Gating traces must use yaxis='y2'"
+    assert "y3" in yaxis_values, "Stimulus traces must use yaxis='y3'"
+
+    # Every sweep trace must have a non-None yaxis.
+    for i, t in enumerate(sweep_traces):
+        assert t.yaxis is not None, f"Trace {i} must have a yaxis assignment"

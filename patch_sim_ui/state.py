@@ -307,6 +307,20 @@ _SWEEP_HIGHLIGHT_JS = """
     S.origWidth = origWidth;
     S.selectedSweep = /*SELECTED_SWEEP*/;
 
+    // Build sweep→yaxis→traceIndex lookup for carrier-click resolution.
+    // Each carrier trace has meta.sweep=-1 and intercepts all hover/click
+    // events.  When that happens _resolveSweepFromMouse() uses this map to
+    // find the real sweep by comparing mouse data-Y with each sweep's trace.
+    S.sweepAxisTrace = {};
+    for (var _si in sweepMap) {
+      S.sweepAxisTrace[_si] = {};
+      for (var _t = 0; _t < sweepMap[_si].length; _t++) {
+        var _ti = sweepMap[_si][_t];
+        var _ya = gd.data[_ti].yaxis || 'y';
+        if (!S.sweepAxisTrace[_si][_ya]) S.sweepAxisTrace[_si][_ya] = _ti;
+      }
+    }
+
     if (S.nSweeps <= 1) {
       // Single-sweep mode — remove listeners and bail.
       if (S._cleanup) { S._cleanup(); S._cleanup = null; }
@@ -358,6 +372,72 @@ _SWEEP_HIGHLIGHT_JS = """
       _clearStyle();
     }
 
+    // Resolve which sweep the user intended when a carrier trace (sweep=-1)
+    // received the event.  Converts the raw MouseEvent pixel position to data
+    // coordinates and returns the sweep index whose trace is closest in Y.
+    function _resolveSweepFromMouse(evt) {
+      if (!evt || !evt.event || !gd._fullLayout) return -1;
+      var fl = gd._fullLayout;
+      if (!fl._size) return -1;
+      var rect = gd.getBoundingClientRect();
+      // Pixel coords relative to the plot area origin (inside the margins).
+      var px = evt.event.clientX - rect.left - fl._size.l;
+      var py = evt.event.clientY - rect.top  - fl._size.t;
+
+      // Identify which subplot row contains the cursor.
+      var matchedYa = null;
+      var matchedYaKey = null;
+      var yAxisKeys = ['yaxis', 'yaxis2', 'yaxis3'];
+      for (var k = 0; k < yAxisKeys.length; k++) {
+        var ya = fl[yAxisKeys[k]];
+        if (!ya || ya._length == null) continue;
+        if (py >= ya._offset && py <= ya._offset + ya._length) {
+          matchedYa = ya;
+          matchedYaKey = (yAxisKeys[k] === 'yaxis')
+            ? 'y' : yAxisKeys[k].replace('yaxis', 'y');
+          break;
+        }
+      }
+      if (!matchedYa) return -1;
+
+      // Convert pixel X to data X using the shared primary xaxis.
+      var xa = fl.xaxis;
+      if (!xa || !xa._length) return -1;
+      var dataX = xa.range[0]
+        + ((px - (xa._offset || 0)) / xa._length)
+        * (xa.range[1] - xa.range[0]);
+
+      // Convert pixel Y to data Y (screen top = data max).
+      var pyInAxis = py - matchedYa._offset;
+      var dataY = matchedYa.range[1]
+        - (pyInAxis / matchedYa._length)
+        * (matchedYa.range[1] - matchedYa.range[0]);
+
+      // Find the sweep whose trace at dataX is closest to dataY.
+      var bestSweep = -1;
+      var bestDist = Infinity;
+      for (var _si in S.sweepAxisTrace) {
+        var _ti = S.sweepAxisTrace[_si][matchedYaKey];
+        if (_ti == null) continue;
+        var trace = gd.data[_ti];
+        if (!trace || trace.visible === false) continue;
+        var xArr = trace.x;
+        var yArr = trace.y;
+        if (!xArr || !yArr || !xArr.length) continue;
+        // Binary search for the index of the closest x value.
+        var lo = 0, hi = xArr.length - 1;
+        while (lo < hi) {
+          var mid = (lo + hi) >> 1;
+          if (xArr[mid] < dataX) lo = mid + 1; else hi = mid;
+        }
+        var traceY = yArr[lo];
+        if (traceY == null) continue;
+        var dist = Math.abs(traceY - dataY);
+        if (dist < bestDist) { bestDist = dist; bestSweep = parseInt(_si, 10); }
+      }
+      return bestSweep;
+    }
+
     // Re-apply if a sweep was already selected (e.g. after figure rebuild).
     if (S.selectedSweep >= 0 && S.selectedSweep < S.nSweeps) {
       _applySweepStyle(S.selectedSweep, /*DIM_OPACITY*/);
@@ -371,6 +451,7 @@ _SWEEP_HIGHLIGHT_JS = """
       var cn = evt.points[0].curveNumber;
       var m = gd.data[cn] && gd.data[cn].meta;
       var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
+      if (si < 0) { si = _resolveSweepFromMouse(evt); }
       if (si >= 0) {
         if (S.selectedSweep === si) { _deselect(); }
         else { _selectSweep(si); }
@@ -385,6 +466,7 @@ _SWEEP_HIGHLIGHT_JS = """
       var cn = evt.points[0].curveNumber;
       var m = gd.data[cn] && gd.data[cn].meta;
       var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
+      if (si < 0) { si = _resolveSweepFromMouse(evt); }
       if (si >= 0) { _applySweepStyle(si, /*PREVIEW_OPACITY*/); }
     }
 
