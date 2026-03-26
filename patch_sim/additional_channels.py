@@ -27,7 +27,8 @@ from .constants import (
     DEFAULT_G_NAR,
     DEFAULT_IH_P_NA,
 )
-from .utils import boltzmann_cosh_rates, safe_exp
+from .electrochemistry import boltzmann_cosh_rates
+from .utils import safe_exp
 
 
 def _alpha_r(V: float, ca_i: float) -> float:
