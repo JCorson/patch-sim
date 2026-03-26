@@ -483,6 +483,7 @@ def build_figure(
     clamp_mode: str,
     stored_traces: list[Sweep] | None = None,
     show_hover: bool = True,
+    dark_mode: bool = False,
 ) -> go.Figure:
     """Build a Plotly figure from current and saved sweeps.
 
@@ -521,6 +522,8 @@ def build_figure(
         show_hover: When ``True`` (default) the figure's ``hovermode`` is set
             to ``"x"`` (multi-sweep) or ``"x unified"`` (single-sweep).  When
             ``False``, ``hovermode`` is set to ``False`` to suppress tooltips.
+        dark_mode: When ``True``, uses the ``plotly_dark`` template and a dark
+            legend background.  When ``False`` (default), uses ``plotly_white``.
 
     Returns:
         A Plotly Figure with response, gating, and stimulus subplots.
@@ -906,24 +909,32 @@ def build_figure(
     _row1_top = 1.0
     _row2_top = _row1_top - _SUBPLOT_ROW_HEIGHTS[0] * _scale - vert_spacing
 
+    _legend_bgcolor = "rgba(0,0,0,0.5)" if dark_mode else "rgba(255,255,255,0.7)"
     _legend_common = dict(
         orientation="v",
         x=0.99,
         xanchor="right",
-        bgcolor="rgba(255,255,255,0.7)",
+        bgcolor=_legend_bgcolor,
         borderwidth=0,
     )
 
     hovermode: str | bool = (
         ("x" if is_multi_sweep else "x unified") if show_hover else False
     )
+    _template = "plotly_dark" if dark_mode else "plotly_white"
+    _extra_bg = (
+        dict(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+        if dark_mode
+        else {}
+    )
     fig.update_layout(
         autosize=True,
         margin=_PLOT_MARGIN,
-        template="plotly_white",
+        template=_template,
         hovermode=hovermode,
         showlegend=True,
         legend=dict(**_legend_common, y=_row1_top, yanchor="top"),
         legend2=dict(**_legend_common, y=_row2_top, yanchor="top"),
+        **_extra_bg,
     )
     return fig

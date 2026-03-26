@@ -9,6 +9,7 @@ import math
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.io as pio
 import pytest
 
 from patch_sim_ui.constants import CC_VOLTAGE_COLOR, STIMULUS_COLOR
@@ -900,3 +901,41 @@ def test_build_figure_stored_trace_stimulus_not_in_legend() -> None:
     assert len(ref_traces) == 2  # noqa: PLR2004
     stimulus_ref = [t for t in ref_traces if t.showlegend is False]
     assert len(stimulus_ref) == 1, "Stored trace stimulus must be excluded from legend"
+
+
+# ---------------------------------------------------------------------------
+# Dark mode
+# ---------------------------------------------------------------------------
+
+
+def test_build_figure_default_uses_light_template() -> None:
+    """build_figure uses plotly_white template by default."""
+    sweep = _make_sweep(mode="Current Clamp")
+    fig = build_figure([sweep], [], TraceVisibility(), "Current Clamp")
+    assert fig.layout.template == pio.templates["plotly_white"]
+
+
+def test_build_figure_dark_mode_uses_dark_template() -> None:
+    """build_figure uses plotly_dark template when dark_mode=True."""
+    sweep = _make_sweep(mode="Current Clamp")
+    fig = build_figure([sweep], [], TraceVisibility(), "Current Clamp", dark_mode=True)
+    assert fig.layout.template == pio.templates["plotly_dark"]
+
+
+def test_build_figure_dark_mode_legend_bgcolor() -> None:
+    """Legend background uses dark colour in dark mode, light colour otherwise."""
+    sweep = _make_sweep(mode="Current Clamp")
+    light_fig = build_figure([sweep], [], TraceVisibility(), "Current Clamp")
+    dark_fig = build_figure(
+        [sweep], [], TraceVisibility(), "Current Clamp", dark_mode=True
+    )
+    assert light_fig.layout.legend.bgcolor == "rgba(255,255,255,0.7)"
+    assert dark_fig.layout.legend.bgcolor == "rgba(0,0,0,0.5)"
+
+
+def test_build_figure_dark_mode_transparent_background() -> None:
+    """In dark mode paper_bgcolor and plot_bgcolor are transparent."""
+    sweep = _make_sweep(mode="Current Clamp")
+    fig = build_figure([sweep], [], TraceVisibility(), "Current Clamp", dark_mode=True)
+    assert fig.layout.paper_bgcolor == "rgba(0,0,0,0)"
+    assert fig.layout.plot_bgcolor == "rgba(0,0,0,0)"
