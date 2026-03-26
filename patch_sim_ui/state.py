@@ -374,6 +374,23 @@ _SWEEP_HIGHLIGHT_JS = """
       Plotly.restyle(gd, styleUpdate, indices);
     }
 
+    function _applyHoverHighlight(activeSweep) {
+      if (S.nSweeps <= 1) return;
+      var widths = new Array(gd.data.length);
+      for (var i = 0; i < gd.data.length; i++) {
+        var m = gd.data[i].meta;
+        var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
+        if (si === activeSweep) {
+          widths[i] = /*HOVER_WIDTH*/;
+        } else {
+          widths[i] = S.origWidth[i];
+        }
+      }
+      var indices = [];
+      for (var i = 0; i < gd.data.length; i++) indices.push(i);
+      Plotly.restyle(gd, {'line.width': widths}, indices);
+    }
+
     function _selectSweep(idx) {
       S.selectedSweep = idx;
       _applySweepStyle(idx, /*DIM_OPACITY*/);
@@ -481,7 +498,7 @@ _SWEEP_HIGHLIGHT_JS = """
     function onNativeMousemove(nativeEvt) {
       if (S.selectedSweep >= 0) return;
       var si = _resolveSweepFromMouse({event: nativeEvt});
-      if (si >= 0) { _applySweepStyle(si, /*PREVIEW_OPACITY*/); }
+      if (si >= 0) { _applyHoverHighlight(si); }
       else { _clearStyle(); }
     }
 
@@ -1056,7 +1073,7 @@ class AppState(rx.State):
             _SWEEP_HIGHLIGHT_JS.replace(
                 "/*DIM_OPACITY*/", str(constants.HIGHLIGHT_DIM_OPACITY)
             )
-            .replace("/*PREVIEW_OPACITY*/", str(constants.HIGHLIGHT_PREVIEW_OPACITY))
+            .replace("/*HOVER_WIDTH*/", str(constants.HIGHLIGHT_HOVER_WIDTH))
             .replace("/*DIM_WIDTH*/", str(constants.HIGHLIGHT_DIM_WIDTH))
             .replace("/*SELECTED_SWEEP*/", str(self.selected_sweep))
         )

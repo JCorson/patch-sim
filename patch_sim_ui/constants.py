@@ -148,8 +148,8 @@ SWEEP_COLORS: list[str] = [
 HIGHLIGHT_DIM_OPACITY: float = 0.15
 """Opacity applied to non-selected sweeps after a click selection."""
 
-HIGHLIGHT_PREVIEW_OPACITY: float = 0.3
-"""Opacity applied to non-hovered sweeps during a hover preview."""
+HIGHLIGHT_HOVER_WIDTH: float = 4.0
+"""Line width (px) applied to the hovered sweep during a hover preview."""
 
 HIGHLIGHT_DIM_WIDTH: float = 0.5
 """Line width (px) applied to dimmed (non-selected) sweep traces."""
