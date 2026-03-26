@@ -36,7 +36,6 @@ def _header() -> rx.Component:
         rx.heading("Patch Clamp Simulator", size="4"),
         rx.spacer(),
         rx.hstack(
-            rx.color_mode.button(allow_system=True, variant="ghost", size="2"),
             rx.cond(
                 AppState.is_running,
                 rx.hstack(
@@ -77,6 +76,7 @@ def _header() -> rx.Component:
             spacing="2",
             align="center",
         ),
+        rx.color_mode.button(allow_system=True, variant="ghost", size="2"),
         width="100%",
         padding_x="4",
         padding_y="3",
