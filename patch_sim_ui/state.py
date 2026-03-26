@@ -499,6 +499,7 @@ class AppState(rx.State):
     is_running: bool = False
     error_message: str = ""
     show_hover: bool = True  # Whether plot hover tooltips are visible
+    dark_mode: bool = False  # Whether the UI is in dark mode
 
     # ------------------------------------------------------------------ #
     # Log panel state                                                    #
@@ -596,6 +597,7 @@ class AppState(rx.State):
             clamp_mode=self.clamp_mode,
             stored_traces=self.stored_traces,
             show_hover=self.show_hover,
+            dark_mode=self.dark_mode,
         )
 
     # ------------------------------------------------------------------ #
@@ -678,6 +680,20 @@ class AppState(rx.State):
             f"if(gd&&gd.layout)Plotly.relayout(gd,{{hovermode:{hovermode_js}}})"
         )
         return rx.call_script(js)
+
+    def toggle_dark_mode(self):
+        """Toggle dark mode on or off, syncing the Reflex colour-mode state.
+
+        Flips ``dark_mode`` so that the Plotly figure computed var re-renders
+        with the appropriate template, and yields ``rx.toggle_color_mode`` so
+        that the Radix theme (and all Radix CSS variables) switch in the browser.
+
+        Returns:
+            A ``rx.toggle_color_mode`` event that updates the browser's colour
+            mode preference.
+        """
+        self.dark_mode = not self.dark_mode
+        return rx.toggle_color_mode
 
     def load_preset(self, name: str) -> None:
         """Load a named preset configuration."""
