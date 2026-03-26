@@ -499,7 +499,6 @@ class AppState(rx.State):
     is_running: bool = False
     error_message: str = ""
     show_hover: bool = True  # Whether plot hover tooltips are visible
-    dark_mode: bool = False  # Whether the UI is in dark mode
 
     # ------------------------------------------------------------------ #
     # Log panel state                                                    #
@@ -580,15 +579,23 @@ class AppState(rx.State):
             if logging.getLevelName(e.level) >= min_level
         ]
 
-    @rx.var
-    def figure_data(self) -> go.Figure:
-        """Plotly figure rebuilt when sweeps, clamp mode, or hover state change.
+    def _build_figure(self, dark_mode: bool) -> go.Figure:
+        """Build a Plotly figure for a given colour mode.
 
-        All traces are built with full visibility; toggling show_* flags is
-        handled client-side via Plotly.restyle so that figure rebuilds are not
-        triggered by visibility changes.  The ``show_hover`` flag is respected
-        here so that hovermode is baked into the figure data and takes effect
-        immediately, even without a client-side relayout.
+        Shared implementation used by the ``figure_data_light`` and
+        ``figure_data_dark`` computed vars.  All traces are built with full
+        visibility; toggling show_* flags is handled client-side via
+        ``Plotly.restyle`` so that figure rebuilds are not triggered by
+        visibility changes.  The ``show_hover`` flag is respected here so that
+        hovermode is baked into the figure data and takes effect immediately,
+        even without a client-side relayout.
+
+        Args:
+            dark_mode: When ``True``, uses the dark Plotly template; otherwise
+                uses the light template.
+
+        Returns:
+            A Plotly Figure with response, gating, and stimulus subplots.
         """
         return build_figure(
             current_sweeps=self.current_sweeps,
@@ -597,8 +604,18 @@ class AppState(rx.State):
             clamp_mode=self.clamp_mode,
             stored_traces=self.stored_traces,
             show_hover=self.show_hover,
-            dark_mode=self.dark_mode,
+            dark_mode=dark_mode,
         )
+
+    @rx.var
+    def figure_data_light(self) -> go.Figure:
+        """Plotly figure using the light template, rebuilt on simulation changes."""
+        return self._build_figure(dark_mode=False)
+
+    @rx.var
+    def figure_data_dark(self) -> go.Figure:
+        """Plotly figure using the dark template, rebuilt on simulation changes."""
+        return self._build_figure(dark_mode=True)
 
     # ------------------------------------------------------------------ #
     # Log panel event handlers                                          #
@@ -680,20 +697,6 @@ class AppState(rx.State):
             f"if(gd&&gd.layout)Plotly.relayout(gd,{{hovermode:{hovermode_js}}})"
         )
         return rx.call_script(js)
-
-    def toggle_dark_mode(self):
-        """Toggle dark mode on or off, syncing the Reflex colour-mode state.
-
-        Flips ``dark_mode`` so that the Plotly figure computed var re-renders
-        with the appropriate template, and yields ``rx.toggle_color_mode`` so
-        that the Radix theme (and all Radix CSS variables) switch in the browser.
-
-        Returns:
-            A ``rx.toggle_color_mode`` event that updates the browser's colour
-            mode preference.
-        """
-        self.dark_mode = not self.dark_mode
-        return rx.toggle_color_mode
 
     def load_preset(self, name: str) -> None:
         """Load a named preset configuration."""
