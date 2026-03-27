@@ -1395,8 +1395,8 @@ class AppState(rx.State):
             mode = self.clamp_mode
             ptype = self.protocol_type
             fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
-            stimulus = self._build_protocol()
             if ptype == "I-V Curve":
+                stimulus = None
                 sweep_duration = (
                     self.vc_pre_pulse_duration
                     + self.duration
@@ -1419,6 +1419,7 @@ class AppState(rx.State):
                     for voltage in voltages
                 ]
             else:
+                stimulus = self._build_protocol()
                 voltages = np.array([])
                 iv_protocols = []
 
@@ -1466,7 +1467,7 @@ class AppState(rx.State):
 
                 new_sweeps = await loop.run_in_executor(None, _run_iv_batch)
                 async with self:
-                    self.current_sweeps = list(new_sweeps)
+                    self.current_sweeps = new_sweeps
 
             else:
                 df = await loop.run_in_executor(
