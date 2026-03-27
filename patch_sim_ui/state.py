@@ -584,10 +584,14 @@ class AppState(rx.State):
         """Plotly figure rebuilt when sweeps, clamp mode, or hover state change.
 
         All traces are built with full visibility; toggling show_* flags is
-        handled client-side via Plotly.restyle so that figure rebuilds are not
-        triggered by visibility changes.  The ``show_hover`` flag is respected
-        here so that hovermode is baked into the figure data and takes effect
-        immediately, even without a client-side relayout.
+        handled client-side via ``Plotly.restyle`` so that figure rebuilds are
+        not triggered by visibility changes.  The ``show_hover`` flag is
+        respected here so that hovermode is baked into the figure data and takes
+        effect immediately, even without a client-side relayout.
+
+        Dark/light theming is applied client-side by the ``rx.plotly``
+        component via its ``layout`` and ``template`` props, so no server-side
+        colour mode state is needed.
         """
         return build_figure(
             current_sweeps=self.current_sweeps,
