@@ -930,7 +930,7 @@ def test_build_figure_dark_mode_legend_bgcolor() -> None:
         [sweep], [], TraceVisibility(), "Current Clamp", dark_mode=True
     )
     assert light_fig.layout.legend.bgcolor == "rgba(255,255,255,0.7)"
-    assert dark_fig.layout.legend.bgcolor == "rgba(0,0,0,0.5)"
+    assert dark_fig.layout.legend.bgcolor == "rgba(40,40,40,0.9)"
 
 
 def test_build_figure_dark_mode_transparent_background() -> None:

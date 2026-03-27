@@ -909,7 +909,7 @@ def build_figure(
     _row1_top = 1.0
     _row2_top = _row1_top - _SUBPLOT_ROW_HEIGHTS[0] * _scale - vert_spacing
 
-    _legend_bgcolor = "rgba(0,0,0,0.5)" if dark_mode else "rgba(255,255,255,0.7)"
+    _legend_bgcolor = "rgba(40,40,40,0.9)" if dark_mode else "rgba(255,255,255,0.7)"
     _legend_common = dict(
         orientation="v",
         x=0.99,
