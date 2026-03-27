@@ -76,7 +76,32 @@ def _header() -> rx.Component:
             spacing="2",
             align="center",
         ),
-        rx.color_mode.button(allow_system=True, variant="ghost", size="2"),
+        rx.menu.root(
+            rx.menu.trigger(
+                rx.icon_button(
+                    rx.icon("sun-moon"),
+                    variant="ghost",
+                    size="2",
+                ),
+            ),
+            rx.menu.content(
+                rx.menu.item(
+                    rx.icon("sun", size=14),
+                    "Light",
+                    on_click=AppState.set_color_mode_and_sync("light"),
+                ),
+                rx.menu.item(
+                    rx.icon("moon", size=14),
+                    "Dark",
+                    on_click=AppState.set_color_mode_and_sync("dark"),
+                ),
+                rx.menu.item(
+                    rx.icon("monitor", size=14),
+                    "System",
+                    on_click=AppState.set_color_mode_and_sync("system"),
+                ),
+            ),
+        ),
         width="100%",
         padding_x="4",
         padding_y="3",
@@ -173,4 +198,9 @@ app = rx.App(
         radius="medium",
     )
 )
-app.add_page(index, route="/", title="Patch Clamp Simulator")
+app.add_page(
+    index,
+    route="/",
+    title="Patch Clamp Simulator",
+    on_load=AppState.sync_initial_color_mode,
+)

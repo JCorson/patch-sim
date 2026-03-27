@@ -499,6 +499,7 @@ class AppState(rx.State):
     is_running: bool = False
     error_message: str = ""
     show_hover: bool = True  # Whether plot hover tooltips are visible
+    is_dark_mode: bool = False  # Synced from the client's resolved colour mode
 
     # ------------------------------------------------------------------ #
     # Log panel state                                                    #
@@ -579,23 +580,15 @@ class AppState(rx.State):
             if logging.getLevelName(e.level) >= min_level
         ]
 
-    def _build_figure(self, dark_mode: bool) -> go.Figure:
-        """Build a Plotly figure for a given colour mode.
+    @rx.var
+    def figure_data(self) -> go.Figure:
+        """Plotly figure themed to match the active colour mode.
 
-        Shared implementation used by the ``figure_data_light`` and
-        ``figure_data_dark`` computed vars.  All traces are built with full
-        visibility; toggling show_* flags is handled client-side via
-        ``Plotly.restyle`` so that figure rebuilds are not triggered by
-        visibility changes.  The ``show_hover`` flag is respected here so that
-        hovermode is baked into the figure data and takes effect immediately,
-        even without a client-side relayout.
-
-        Args:
-            dark_mode: When ``True``, uses the dark Plotly template; otherwise
-                uses the light template.
-
-        Returns:
-            A Plotly Figure with response, gating, and stimulus subplots.
+        All traces are built with full visibility; toggling show_* flags is
+        handled client-side via ``Plotly.restyle`` so that figure rebuilds are
+        not triggered by visibility changes.  The ``show_hover`` flag is
+        respected here so that hovermode is baked into the figure data and takes
+        effect immediately, even without a client-side relayout.
         """
         return build_figure(
             current_sweeps=self.current_sweeps,
@@ -604,18 +597,48 @@ class AppState(rx.State):
             clamp_mode=self.clamp_mode,
             stored_traces=self.stored_traces,
             show_hover=self.show_hover,
-            dark_mode=dark_mode,
+            dark_mode=self.is_dark_mode,
         )
 
-    @rx.var
-    def figure_data_light(self) -> go.Figure:
-        """Plotly figure using the light template, rebuilt on simulation changes."""
-        return self._build_figure(dark_mode=False)
+    def _sync_color_mode(self, resolved: str) -> None:
+        """Update server-side dark mode flag from the client's resolved colour mode.
 
-    @rx.var
-    def figure_data_dark(self) -> go.Figure:
-        """Plotly figure using the dark template, rebuilt on simulation changes."""
-        return self._build_figure(dark_mode=True)
+        Args:
+            resolved: The resolved colour mode string, either ``"light"`` or
+                ``"dark"``.
+        """
+        self.is_dark_mode = resolved == "dark"
+
+    def set_color_mode_and_sync(self, mode: str):
+        """Set Radix colour mode client-side and sync resolved mode to server.
+
+        Yields a client-side ``setColorMode`` call followed by a
+        ``call_script`` that reads the resolved DOM class after a short delay
+        and calls back to :meth:`_sync_color_mode`.
+
+        Args:
+            mode: One of ``"light"``, ``"dark"``, or ``"system"``.
+        """
+        yield rx.set_color_mode(mode)
+        yield rx.call_script(
+            "setTimeout(function(){"
+            "var cl=document.documentElement.classList;"
+            "return cl.contains('dark')?'dark':'light';"
+            "},100)",
+            callback=type(self)._sync_color_mode,
+        )
+
+    def sync_initial_color_mode(self):
+        """Read the browser's resolved colour mode on first page load.
+
+        Returns:
+            A ``call_script`` EventSpec that reads the DOM class and calls
+            :meth:`_sync_color_mode` with the result.
+        """
+        return rx.call_script(
+            "document.documentElement.classList.contains('dark')?'dark':'light'",
+            callback=type(self)._sync_color_mode,
+        )
 
     # ------------------------------------------------------------------ #
     # Log panel event handlers                                          #
