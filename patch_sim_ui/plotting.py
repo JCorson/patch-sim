@@ -571,6 +571,7 @@ def build_figure(
         hoverinfo=None,
         showlegend=True,
         legend_ref: str = "legend",
+        sweep_index: int = -1,
     ):
         """Add a Scattergl trace to the figure.
 
@@ -589,6 +590,8 @@ def build_figure(
             legend_ref: Which Plotly legend object this trace belongs to
                 (``"legend"`` for the response row, ``"legend2"`` for the
                 gating row).
+            sweep_index: Index of the sweep this trace belongs to.  ``-1``
+                marks non-sweep traces (saved, stored, carrier).
         """
         line: dict = {"color": color} if color is not None else {}
         if dash is not None:
@@ -611,6 +614,7 @@ def build_figure(
                 visible=visible,
                 showlegend=showlegend,
                 legend=legend_ref,
+                meta={"sweep": sweep_index},
                 **kwargs,
             ),
             row=row,
@@ -625,6 +629,7 @@ def build_figure(
         visibility: TraceVisibility | None = None,
         showlegend: bool = True,
         legend_ref: str = "legend",
+        sweep_index: int = -1,
     ) -> None:
         """Add Voltage Clamp current traces for one sweep to the figure.
 
@@ -640,6 +645,8 @@ def build_figure(
                 as visible.
             showlegend: Whether these traces appear in the legend.
             legend_ref: Which Plotly legend object these traces belong to.
+            sweep_index: Index of the sweep this trace belongs to.  ``-1``
+                marks non-sweep traces (saved, stored, carrier).
         """
         classic_defs: list[tuple[str, str, int | None]] = [
             ("total_current", "I_total", _TOTAL_CURRENT_LINE_WIDTH),
@@ -661,6 +668,7 @@ def build_figure(
                 hoverinfo=hoverinfo,
                 showlegend=showlegend,
                 legend_ref=legend_ref,
+                sweep_index=sweep_index,
             )
         for ch_name, vals in sweep.additional_currents.items():
             vis = (
@@ -679,6 +687,7 @@ def build_figure(
                 hoverinfo=hoverinfo,
                 showlegend=showlegend,
                 legend_ref=legend_ref,
+                sweep_index=sweep_index,
             )
 
     # In multi-sweep mode all real traces suppress hover; carrier traces
@@ -707,6 +716,7 @@ def build_figure(
                 visible=visibility.voltage,
                 hoverinfo=hi,
                 showlegend=sl,
+                sweep_index=sweep_idx,
             )
         else:
             # Voltage Clamp: all currents overlaid on row 1 with channel colours.
@@ -716,7 +726,12 @@ def build_figure(
             # suppressed in multi-sweep mode anyway, so the name is legend-only.
             vc_pfx = "" if sl else pfx
             _add_vc_currents(
-                sweep, vc_pfx, hoverinfo=hi, visibility=visibility, showlegend=sl
+                sweep,
+                vc_pfx,
+                hoverinfo=hi,
+                visibility=visibility,
+                showlegend=sl,
+                sweep_index=sweep_idx,
             )
 
         # Gating row is always present; traces are always added with their
@@ -739,6 +754,7 @@ def build_figure(
                 hoverinfo=hi,
                 showlegend=sl,
                 legend_ref="legend2",
+                sweep_index=sweep_idx,
             )
         for gv_name, gv_vals in sweep.additional_gating.items():
             vis = visibility.additional_gating.get(gv_name, True)
@@ -752,6 +768,7 @@ def build_figure(
                 hoverinfo=hi,
                 showlegend=sl,
                 legend_ref="legend2",
+                sweep_index=sweep_idx,
             )
 
         _scatter(
@@ -762,6 +779,7 @@ def build_figure(
             STIMULUS_COLOR,
             hoverinfo=hi,
             showlegend=False,
+            sweep_index=sweep_idx,
         )
 
     for sweep in saved_sweeps:
@@ -875,6 +893,7 @@ def build_figure(
                     hovertemplate="%{customdata}<extra></extra>",
                     customdata=html_strings,
                     name="",
+                    meta={"sweep": -1},
                 ),
                 row=sub_row,
                 col=1,

@@ -5,6 +5,7 @@ All three are pure functions with no Reflex dependency.
 """
 
 import math
+from collections import Counter
 
 import numpy as np
 import pandas as pd
@@ -900,3 +901,129 @@ def test_build_figure_stored_trace_stimulus_not_in_legend() -> None:
     assert len(ref_traces) == 2  # noqa: PLR2004
     stimulus_ref = [t for t in ref_traces if t.showlegend is False]
     assert len(stimulus_ref) == 1, "Stored trace stimulus must be excluded from legend"
+
+
+# ---------------------------------------------------------------------------
+# Sweep metadata (meta.sweep) embedding
+# ---------------------------------------------------------------------------
+
+
+def test_sweep_meta_vc_multi_sweep() -> None:
+    """Multi-sweep VC figure embeds correct sweep index in trace meta."""
+    sweeps = [
+        _make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40, -20]
+    ]
+    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+    for trace in fig.data:
+        assert trace.meta is not None, "Every trace must have meta"
+        assert "sweep" in trace.meta, "Every trace meta must contain 'sweep' key"
+    # Every sweep index 0..n-1 must be represented, with the same trace count each.
+    counts = Counter(t.meta["sweep"] for t in fig.data if t.meta["sweep"] >= 0)
+    assert sorted(counts.keys()) == list(range(len(sweeps))), (
+        "Sweep indices should span 0..n-1"
+    )
+    assert len(set(counts.values())) == 1, (
+        f"All sweeps should have equal trace counts; got {counts}"
+    )
+
+
+def test_sweep_meta_cc_multi_sweep() -> None:
+    """Multi-sweep CC figure embeds correct sweep index in trace meta."""
+    sweeps = [_make_sweep(label=f"s{i}", mode="Current Clamp") for i in range(2)]
+    fig = build_figure(sweeps, [], TraceVisibility(), "Current Clamp")
+    counts = Counter(t.meta["sweep"] for t in fig.data if t.meta["sweep"] >= 0)
+    assert sorted(counts.keys()) == list(range(len(sweeps))), (
+        "Sweep indices should span 0..n-1"
+    )
+    assert len(set(counts.values())) == 1, (
+        f"All sweeps should have equal trace counts; got {counts}"
+    )
+
+
+def test_sweep_meta_negative_for_saved_sweeps() -> None:
+    """Saved sweep traces have meta.sweep == -1."""
+    current = [_make_sweep(label="cur", mode="Current Clamp")]
+    saved = [_make_sweep(label="saved", color="#aaa", mode="Current Clamp")]
+    fig = build_figure(current, saved, TraceVisibility(), "Current Clamp")
+    # Current sweep traces use sweep=0; saved traces must all use -1.
+    non_current = [t for t in fig.data if t.meta["sweep"] != 0]
+    assert len(non_current) > 0, "Expected saved traces to be present"
+    for t in non_current:
+        assert t.meta["sweep"] == -1, (
+            f"Saved trace should have sweep=-1, got {t.meta['sweep']}"
+        )
+
+
+def test_sweep_meta_negative_for_stored_traces() -> None:
+    """Stored traces have meta.sweep == -1."""
+    current = [_make_sweep(mode="Current Clamp")]
+    stored = [_make_sweep(mode="Current Clamp")]
+    stored[0] = stored[0].model_copy(update={"label": "Ref"})
+    fig = build_figure(
+        current, [], TraceVisibility(), "Current Clamp", stored_traces=stored
+    )
+    # Current sweep traces use sweep=0; stored traces must all use -1.
+    non_current = [t for t in fig.data if t.meta["sweep"] != 0]
+    assert len(non_current) > 0, "Expected stored traces to be present"
+    for t in non_current:
+        assert t.meta["sweep"] == -1
+
+
+def test_sweep_meta_negative_for_carrier_traces() -> None:
+    """Carrier traces in multi-sweep mode have meta.sweep == -1."""
+    sweeps = [_make_sweep(label=f"s{i}", mode="Voltage Clamp") for i in range(3)]
+    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+    # Carrier traces are identified by their customdata hovertemplate — unique
+    # to these invisible hover-proxy traces.  There should be exactly 3 (one
+    # per subplot row) and each must have sweep=-1.
+    carrier_traces = [
+        t for t in fig.data if t.hovertemplate == "%{customdata}<extra></extra>"
+    ]
+    assert len(carrier_traces) == 3, (  # noqa: PLR2004
+        f"Expected 3 carrier traces (one per subplot row), got {len(carrier_traces)}"
+    )
+    for t in carrier_traces:
+        assert t.meta["sweep"] == -1, "Carrier trace should have sweep=-1"
+
+
+def test_sweep_meta_with_additional_channels() -> None:
+    """Additional current/gating traces carry the correct sweep index."""
+    extra = {"ih_current": list(np.ones(_N) * 0.5)}
+    sweeps = [
+        _make_sweep(label="s0", mode="Voltage Clamp", extra_cols=extra),
+        _make_sweep(label="s1", mode="Voltage Clamp", extra_cols=extra),
+    ]
+    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+    counts = Counter(t.meta["sweep"] for t in fig.data if t.meta["sweep"] >= 0)
+    assert sorted(counts.keys()) == list(range(len(sweeps))), (
+        "Sweep indices should span 0..n-1"
+    )
+    assert len(set(counts.values())) == 1, (
+        f"All sweeps should have equal trace counts; got {counts}"
+    )
+
+
+def test_sweep_traces_have_correct_yaxis_assignments() -> None:
+    """Sweep traces are assigned to the correct subplot yaxis.
+
+    The client-side sweep-highlight JS uses gd.data[i].yaxis to group traces
+    by subplot row when resolving which sweep the user clicked.  This test
+    verifies the contract: response traces use 'y', gating traces use 'y2',
+    and stimulus traces use 'y3'.
+    """
+    sweeps = [
+        _make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40, -20]
+    ]
+    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+
+    # Filter by meta.sweep >= 0 to exclude carrier traces at the end.
+    sweep_traces = [t for t in fig.data if t.meta and t.meta.get("sweep", -1) >= 0]
+
+    yaxis_values = {t.yaxis for t in sweep_traces}
+    assert "y" in yaxis_values, "Response traces must use yaxis='y'"
+    assert "y2" in yaxis_values, "Gating traces must use yaxis='y2'"
+    assert "y3" in yaxis_values, "Stimulus traces must use yaxis='y3'"
+
+    # Every sweep trace must have a non-None yaxis.
+    for i, t in enumerate(sweep_traces):
+        assert t.yaxis is not None, f"Trace {i} must have a yaxis assignment"
