@@ -3,29 +3,43 @@
 `patch_sim` is a Python library for simulating neuronal electrophysiology using the
 [Hodgkin-Huxley model](https://en.wikipedia.org/wiki/Hodgkin%E2%80%93Huxley_model).
 It models how action potentials arise at a neuron's membrane by simulating the dynamics
-of voltage-gated ion channels (sodium, potassium, and leak) over time.
+of voltage-gated ion channels over time. The core model includes the classic sodium,
+potassium, and leak channels, and can be extended with 10 additional channel types
+(Ih, IKa, INaP, INaR, IM, IKir, IKCa, ICaL, ICaT, ICaN) via a pluggable channel
+architecture.
 
 Key features:
 
 - **Hodgkin-Huxley neuron model** with configurable conductances, ion concentrations,
-  and temperature. Reversal potentials are automatically derived from ion concentration
-  gradients via the Nernst equation.
+  and temperature. Reversal potentials are derived via the Nernst equation, with
+  Goldman-Hodgkin-Katz support for mixed-ion channels (e.g. Ih). Optional intracellular
+  calcium dynamics are coupled to calcium-permeable channels.
 - **Current clamp** simulations: inject a stimulus current and record the resulting
   membrane voltage response.
 - **Voltage clamp** simulations: hold the membrane at a commanded voltage and record the
   resulting ionic currents.
-- A library of **stimulation protocols** covering step, ramp, pulse train, sinusoidal,
-  chirp, noise, I-V curve, and activation waveforms.
+- A library of **stimulation protocols**: current clamp (step, ramp, pulse train,
+  sinusoidal, chirp, noise) and voltage clamp (step, ramp, pulse train, I-V curve).
 - Simulation results are returned as `pandas.DataFrame` objects indexed by time (ms),
   making them straightforward to analyze or plot with standard Python tools.
 - Numerically stable handling of the singularity points in the Hodgkin-Huxley rate
   equations.
+- **RK4 numerical integration** at 40 kHz, parallel batch simulation via
+  `ProcessPoolExecutor`, and a continuous mode that carries neuron state across runs.
 
 ---
 
 ## Web UI
 
-`patch_sim` includes an interactive web interface inspired by pClamp electrophysiology software. It lets you configure Hodgkin-Huxley neuron parameters, choose stimulation protocols, run simulations, and view stacked response/stimulus traces with sweep overlay support.
+`patch_sim` includes an interactive web interface inspired by pClamp electrophysiology software.
+
+- Configure neuron parameters and enable/disable additional ion channels with conductance sliders
+- Run current clamp and voltage clamp protocols with async, non-blocking execution
+- Stacked 3-row subplot layout (response, gating variables, stimulus) with shared time axis
+- Sweep overlay with click/hover/keyboard selection, plus two-tier storage (saved sweeps and stored traces)
+- Continuous simulation mode for oscilloscope-like real-time recording
+- 6 built-in presets: Action Potential, Subthreshold Response, Repetitive Firing, I-V Curve, Na+ Channel Activation, Frequency Response
+- Dark mode, collapsible sidebar, in-app log panel with level filtering, and live reversal potential display
 
 ### Installing the UI
 
@@ -120,6 +134,10 @@ uv tool run ruff format --check .
 ```
 uv run --frozen -m mypy .
 ```
+
+#### Continuous integration
+
+GitHub Actions runs linting, type checking, and the full test suite on every push and pull request to `main`. Dependabot is configured for automated dependency updates.
 
 ---
 
