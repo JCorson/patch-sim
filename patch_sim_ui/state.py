@@ -499,7 +499,6 @@ class AppState(rx.State):
     is_running: bool = False
     error_message: str = ""
     show_hover: bool = True  # Whether plot hover tooltips are visible
-    is_dark_mode: bool = False  # Synced from the client's resolved colour mode
 
     # ------------------------------------------------------------------ #
     # Log panel state                                                    #
@@ -582,13 +581,17 @@ class AppState(rx.State):
 
     @rx.var
     def figure_data(self) -> go.Figure:
-        """Plotly figure themed to match the active colour mode.
+        """Plotly figure rebuilt when sweeps, clamp mode, or hover state change.
 
         All traces are built with full visibility; toggling show_* flags is
         handled client-side via ``Plotly.restyle`` so that figure rebuilds are
         not triggered by visibility changes.  The ``show_hover`` flag is
         respected here so that hovermode is baked into the figure data and takes
         effect immediately, even without a client-side relayout.
+
+        Dark/light theming is applied client-side by the ``rx.plotly``
+        component via its ``layout`` and ``template`` props, so no server-side
+        colour mode state is needed.
         """
         return build_figure(
             current_sweeps=self.current_sweeps,
@@ -597,50 +600,6 @@ class AppState(rx.State):
             clamp_mode=self.clamp_mode,
             stored_traces=self.stored_traces,
             show_hover=self.show_hover,
-            dark_mode=self.is_dark_mode,
-        )
-
-    def set_is_dark_mode(self, resolved: str) -> None:
-        """Update server-side dark mode flag from the client's resolved colour mode.
-
-        Used as a ``rx.call_script`` callback; Reflex passes the script return
-        value as the ``resolved`` argument.
-
-        Args:
-            resolved: The resolved colour mode string, either ``"light"`` or
-                ``"dark"``.
-        """
-        self.is_dark_mode = resolved == "dark"
-
-    def sync_resolved_color_mode(self):
-        """Read the browser's resolved colour mode after a Radix theme switch.
-
-        Intended to be chained after ``set_color_mode(mode)`` in a component
-        ``on_click`` handler.  The 100 ms delay lets Radix update the
-        ``<html>`` class before we read it.
-
-        Returns:
-            A ``call_script`` EventSpec that reads the DOM class and calls
-            :meth:`set_is_dark_mode` with the result.
-        """
-        return rx.call_script(
-            "setTimeout(function(){"
-            "var cl=document.documentElement.classList;"
-            "return cl.contains('dark')?'dark':'light';"
-            "},100)",
-            callback=AppState.set_is_dark_mode,
-        )
-
-    def sync_initial_color_mode(self):
-        """Read the browser's resolved colour mode on first page load.
-
-        Returns:
-            A ``call_script`` EventSpec that reads the DOM class and calls
-            :meth:`set_is_dark_mode` with the result.
-        """
-        return rx.call_script(
-            "document.documentElement.classList.contains('dark')?'dark':'light'",
-            callback=AppState.set_is_dark_mode,
         )
 
     # ------------------------------------------------------------------ #

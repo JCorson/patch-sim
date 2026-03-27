@@ -1,7 +1,6 @@
 """Main Reflex app entry point and page layout for the patch_sim web UI."""
 
 import reflex as rx
-from reflex.style import set_color_mode
 
 from patch_sim_ui import presets
 from patch_sim_ui.components.log_panel import log_panel
@@ -77,41 +76,7 @@ def _header() -> rx.Component:
             spacing="2",
             align="center",
         ),
-        rx.menu.root(
-            rx.menu.trigger(
-                rx.icon_button(
-                    rx.icon("sun-moon"),
-                    variant="ghost",
-                    size="2",
-                ),
-            ),
-            rx.menu.content(
-                rx.menu.item(
-                    rx.icon("sun", size=14),
-                    "Light",
-                    on_click=[
-                        set_color_mode("light"),
-                        AppState.sync_resolved_color_mode,
-                    ],
-                ),
-                rx.menu.item(
-                    rx.icon("moon", size=14),
-                    "Dark",
-                    on_click=[
-                        set_color_mode("dark"),
-                        AppState.sync_resolved_color_mode,
-                    ],
-                ),
-                rx.menu.item(
-                    rx.icon("monitor", size=14),
-                    "System",
-                    on_click=[
-                        set_color_mode("system"),
-                        AppState.sync_resolved_color_mode,
-                    ],
-                ),
-            ),
-        ),
+        rx.color_mode.button(allow_system=True, variant="ghost", size="2"),
         width="100%",
         padding_x="4",
         padding_y="3",
@@ -208,9 +173,4 @@ app = rx.App(
         radius="medium",
     )
 )
-app.add_page(
-    index,
-    route="/",
-    title="Patch Clamp Simulator",
-    on_load=AppState.sync_initial_color_mode,
-)
+app.add_page(index, route="/", title="Patch Clamp Simulator")
