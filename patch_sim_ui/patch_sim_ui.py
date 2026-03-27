@@ -1,6 +1,7 @@
 """Main Reflex app entry point and page layout for the patch_sim web UI."""
 
 import reflex as rx
+from reflex.style import set_color_mode
 
 from patch_sim_ui import presets
 from patch_sim_ui.components.log_panel import log_panel
@@ -88,17 +89,26 @@ def _header() -> rx.Component:
                 rx.menu.item(
                     rx.icon("sun", size=14),
                     "Light",
-                    on_click=AppState.set_color_mode_and_sync("light"),
+                    on_click=[
+                        set_color_mode("light"),
+                        AppState.sync_resolved_color_mode,
+                    ],
                 ),
                 rx.menu.item(
                     rx.icon("moon", size=14),
                     "Dark",
-                    on_click=AppState.set_color_mode_and_sync("dark"),
+                    on_click=[
+                        set_color_mode("dark"),
+                        AppState.sync_resolved_color_mode,
+                    ],
                 ),
                 rx.menu.item(
                     rx.icon("monitor", size=14),
                     "System",
-                    on_click=AppState.set_color_mode_and_sync("system"),
+                    on_click=[
+                        set_color_mode("system"),
+                        AppState.sync_resolved_color_mode,
+                    ],
                 ),
             ),
         ),

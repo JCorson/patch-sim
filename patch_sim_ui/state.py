@@ -12,7 +12,6 @@ import time
 import numpy as np
 import plotly.graph_objects as go
 import reflex as rx
-from reflex.style import set_color_mode
 
 import patch_sim
 import patch_sim.clamp_simulations
@@ -613,18 +612,18 @@ class AppState(rx.State):
         """
         self.is_dark_mode = resolved == "dark"
 
-    def set_color_mode_and_sync(self, mode: str):
-        """Set Radix colour mode client-side and sync resolved mode to server.
+    def sync_resolved_color_mode(self):
+        """Read the browser's resolved colour mode after a Radix theme switch.
 
-        Yields a client-side ``setColorMode`` call followed by a
-        ``call_script`` that reads the resolved DOM class after a short delay
-        and calls back to :meth:`set_is_dark_mode`.
+        Intended to be chained after ``set_color_mode(mode)`` in a component
+        ``on_click`` handler.  The 100 ms delay lets Radix update the
+        ``<html>`` class before we read it.
 
-        Args:
-            mode: One of ``"light"``, ``"dark"``, or ``"system"``.
+        Returns:
+            A ``call_script`` EventSpec that reads the DOM class and calls
+            :meth:`set_is_dark_mode` with the result.
         """
-        yield set_color_mode(mode)
-        yield rx.call_script(
+        return rx.call_script(
             "setTimeout(function(){"
             "var cl=document.documentElement.classList;"
             "return cl.contains('dark')?'dark':'light';"
