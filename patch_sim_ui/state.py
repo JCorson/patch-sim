@@ -600,8 +600,11 @@ class AppState(rx.State):
             dark_mode=self.is_dark_mode,
         )
 
-    def _sync_color_mode(self, resolved: str) -> None:
+    def set_is_dark_mode(self, resolved: str) -> None:
         """Update server-side dark mode flag from the client's resolved colour mode.
+
+        Used as a ``rx.call_script`` callback; Reflex passes the script return
+        value as the ``resolved`` argument.
 
         Args:
             resolved: The resolved colour mode string, either ``"light"`` or
@@ -614,7 +617,7 @@ class AppState(rx.State):
 
         Yields a client-side ``setColorMode`` call followed by a
         ``call_script`` that reads the resolved DOM class after a short delay
-        and calls back to :meth:`_sync_color_mode`.
+        and calls back to :meth:`set_is_dark_mode`.
 
         Args:
             mode: One of ``"light"``, ``"dark"``, or ``"system"``.
@@ -625,7 +628,7 @@ class AppState(rx.State):
             "var cl=document.documentElement.classList;"
             "return cl.contains('dark')?'dark':'light';"
             "},100)",
-            callback=type(self)._sync_color_mode,
+            callback=AppState.set_is_dark_mode,
         )
 
     def sync_initial_color_mode(self):
@@ -633,11 +636,11 @@ class AppState(rx.State):
 
         Returns:
             A ``call_script`` EventSpec that reads the DOM class and calls
-            :meth:`_sync_color_mode` with the result.
+            :meth:`set_is_dark_mode` with the result.
         """
         return rx.call_script(
             "document.documentElement.classList.contains('dark')?'dark':'light'",
-            callback=type(self)._sync_color_mode,
+            callback=AppState.set_is_dark_mode,
         )
 
     # ------------------------------------------------------------------ #
