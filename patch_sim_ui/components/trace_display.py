@@ -4,18 +4,16 @@ import reflex as rx
 
 from patch_sim_ui.state import AppState
 
-# Legend and background layout overrides applied client-side so they track the
-# active colour mode without requiring a server round-trip.  ``rx.plotly``
-# merges these into the figure via ``mergician`` before passing to
-# ``react-plotly.js``, so they take precedence over any server-built layout
-# values.  In dark mode the transparent backgrounds let the Radix surface
-# colour show through; in light mode the ``plotly`` template's default
-# ``plot_bgcolor`` (#E5ECF6) provides the familiar blue-gray contrast.
-_LAYOUT_LIGHT = {
-    "legend": {"bgcolor": "rgba(255,255,255,0.7)"},
-    "legend2": {"bgcolor": "rgba(255,255,255,0.7)"},
-}
+# Layout overrides applied client-side so they track the active colour mode
+# without requiring a server round-trip.  These take precedence over any
+# server-built layout values.  In dark mode the transparent backgrounds let
+# the Radix surface colour show through; ``plotly_dark`` applies the matching
+# trace/axis colour scheme.  In light mode no overrides are needed because the
+# server already builds the figure with ``plotly_white`` and light legend
+# colours.
+_LAYOUT_LIGHT: dict = {}
 _LAYOUT_DARK = {
+    "template": "plotly_dark",
     "paper_bgcolor": "rgba(0,0,0,0)",
     "plot_bgcolor": "rgba(0,0,0,0)",
     "legend": {"bgcolor": "rgba(40,40,40,0.9)"},
