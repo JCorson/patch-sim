@@ -12,6 +12,7 @@ import time
 import numpy as np
 import plotly.graph_objects as go
 import reflex as rx
+from reflex.style import set_color_mode
 
 import patch_sim
 import patch_sim.clamp_simulations
@@ -622,7 +623,7 @@ class AppState(rx.State):
         Args:
             mode: One of ``"light"``, ``"dark"``, or ``"system"``.
         """
-        yield rx.set_color_mode(mode)
+        yield set_color_mode(mode)
         yield rx.call_script(
             "setTimeout(function(){"
             "var cl=document.documentElement.classList;"
