@@ -405,6 +405,13 @@ _SWEEP_HIGHLIGHT_JS = """
     // Converts the raw MouseEvent pixel position to data coordinates using
     // Plotly's internal axis layout, then finds the sweep whose trace value
     // at that x-position is closest to the cursor's y-position.
+    //
+    // ⚠ Plotly private API (tested against Plotly.js 2.x / 3.x):
+    //   gd._fullLayout  — computed layout with pixel geometry (_size, _offset, _length)
+    //   gd._fullData[i] — fully-resolved trace data with typed arrays decoded
+    // If Plotly restructures these internals in a future release this function
+    // will silently return -1 (no sweep resolved) without breaking anything else.
+    //
     // Note: gd.data[i].x holds a Plotly v3 binary descriptor {dtype,bdata};
     // decoded typed arrays live in gd._fullData[i].x.
     function _resolveSweepFromMouse(evt) {
@@ -464,6 +471,7 @@ _SWEEP_HIGHLIGHT_JS = """
         var yArr = _fd && _fd.y;
         if (!xArr || !yArr || !xArr.length) continue;
         // Binary search for the nearest x index.
+        // xArr is the simulation time axis — always monotonically increasing.
         var lo = 0, hi = xArr.length - 1;
         while (lo < hi) {
           var mid = (lo + hi) >> 1;
@@ -778,7 +786,12 @@ class AppState(rx.State):
     is_running: bool = False
     error_message: str = ""
     show_hover: bool = True  # Whether plot hover tooltips are visible
-    selected_sweep: int = -1  # Index of click-selected sweep (-1 = none)
+    # Index of the last click-selected sweep seeded into the JS on figure
+    # rebuild (-1 = none selected).  Selection state is managed entirely
+    # client-side by ``window._psSweep``; this field is only written by
+    # Python (reset on run/clamp-mode change) so that the correct seed value
+    # is injected when the JS module is re-initialised after a figure rebuild.
+    selected_sweep: int = -1
 
     # ------------------------------------------------------------------ #
     # Log panel state                                                    #
@@ -959,14 +972,6 @@ class AppState(rx.State):
             f"if(gd&&gd.layout)Plotly.relayout(gd,{{hovermode:{hovermode_js}}})"
         )
         return rx.call_script(js)
-
-    def set_selected_sweep(self, index: int) -> None:
-        """Sync the selected sweep index from a client-side event.
-
-        Args:
-            index: Sweep index, or ``-1`` to deselect.
-        """
-        self.selected_sweep = index
 
     def load_preset(self, name: str) -> None:
         """Load a named preset configuration."""
