@@ -503,8 +503,12 @@ _SWEEP_HIGHLIGHT_JS = """
       }
     }
 
+    var _moveTimer = null;
     function onNativeMousemove(nativeEvt) {
       if (S.selectedSweep >= 0) return;
+      // Debounce: skip if a frame is already scheduled (~16 ms / one frame).
+      if (_moveTimer) return;
+      _moveTimer = setTimeout(function() { _moveTimer = null; }, 16);
       var si = _resolveSweepFromMouse({event: nativeEvt});
       if (si >= 0) { _applyHoverHighlight(si); }
       else { _clearStyle(); }
@@ -791,6 +795,11 @@ class AppState(rx.State):
     # client-side by ``window._psSweep``; this field is only written by
     # Python (reset on run/clamp-mode change) so that the correct seed value
     # is injected when the JS module is re-initialised after a figure rebuild.
+    #
+    # Known limitation: this field is never updated from the client side, so
+    # any figure rebuild triggered by a Python state change (e.g. add_sweep)
+    # while the user has a client-side selection active will re-seed JS with
+    # -1, silently clearing the selection.
     selected_sweep: int = -1
 
     # ------------------------------------------------------------------ #

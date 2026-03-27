@@ -973,12 +973,17 @@ def test_sweep_meta_negative_for_carrier_traces() -> None:
     """Carrier traces in multi-sweep mode have meta.sweep == -1."""
     sweeps = [_make_sweep(label=f"s{i}", mode="Voltage Clamp") for i in range(3)]
     fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
-    # One carrier trace is appended per sweep at the end of the figure.
-    n_carriers = len(sweeps)
-    for i in range(len(fig.data) - n_carriers, len(fig.data)):
-        assert fig.data[i].meta["sweep"] == -1, (
-            f"Carrier trace {i} should have sweep=-1"
-        )
+    # Carrier traces are identified by their customdata hovertemplate — unique
+    # to these invisible hover-proxy traces.  There should be exactly 3 (one
+    # per subplot row) and each must have sweep=-1.
+    carrier_traces = [
+        t for t in fig.data if t.hovertemplate == "%{customdata}<extra></extra>"
+    ]
+    assert len(carrier_traces) == 3, (  # noqa: PLR2004
+        f"Expected 3 carrier traces (one per subplot row), got {len(carrier_traces)}"
+    )
+    for t in carrier_traces:
+        assert t.meta["sweep"] == -1, "Carrier trace should have sweep=-1"
 
 
 def test_sweep_meta_with_additional_channels() -> None:
