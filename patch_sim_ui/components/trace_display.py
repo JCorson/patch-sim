@@ -8,11 +8,10 @@ from patch_sim_ui.state import AppState
 # active colour mode without requiring a server round-trip.  ``rx.plotly``
 # merges these into the figure via ``mergician`` before passing to
 # ``react-plotly.js``, so they take precedence over any server-built layout
-# values.  The transparent backgrounds let the Radix surface colour show
-# through in both modes.
+# values.  In dark mode the transparent backgrounds let the Radix surface
+# colour show through; in light mode the ``plotly`` template's default
+# ``plot_bgcolor`` (#E5ECF6) provides the familiar blue-gray contrast.
 _LAYOUT_LIGHT = {
-    "paper_bgcolor": "rgba(0,0,0,0)",
-    "plot_bgcolor": "rgba(0,0,0,0)",
     "legend": {"bgcolor": "rgba(255,255,255,0.7)"},
     "legend2": {"bgcolor": "rgba(255,255,255,0.7)"},
 }
