@@ -133,7 +133,7 @@ def sinusoidal_current(
     frequency: float,
     phase: float = 0.0,
     stimulus_start: float = 0.0,
-    stimulus_duration: float | None = None,
+    stimulus_duration: float = 0.0,
     sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> np.ndarray:
     """Generate a sinusoidal current protocol.
@@ -142,7 +142,9 @@ def sinusoidal_current(
     and frequency, useful for studying frequency response and impedance.
 
     The waveform starts at `stimulus_start` and lasts for `stimulus_duration`.
-    The pre- and post-stimulus periods are filled with 0 current.
+    The pre- and post-stimulus periods are filled with 0 current. When both
+    `stimulus_start` and `stimulus_duration` are 0.0, the waveform fills the
+    entire `duration`.
 
     Args:
         duration: Total duration of the protocol in milliseconds.
@@ -153,13 +155,14 @@ def sinusoidal_current(
         stimulus_start: Time when the waveform begins in milliseconds.
             Default is 0.0.
         stimulus_duration: Duration of the sinusoidal stimulus in milliseconds.
-            If None, the waveform lasts from stimulus_start to end of duration.
+            Default is 0.0, which fills the recording from stimulus_start to
+            the end of duration.
         sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
 
     Returns:
         Array of current values in uA/cm^2.
     """
-    if stimulus_duration is None:
+    if stimulus_duration == 0.0:
         stimulus_duration = duration - stimulus_start
 
     num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
@@ -181,7 +184,7 @@ def chirp_current(
     start_frequency: float,
     end_frequency: float,
     stimulus_start: float = 0.0,
-    stimulus_duration: float | None = None,
+    stimulus_duration: float = 0.0,
     sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> np.ndarray:
     """Generate a chirp (frequency sweep) current protocol.
@@ -192,6 +195,8 @@ def chirp_current(
     The waveform starts at `stimulus_start` and lasts for `stimulus_duration`.
     The pre- and post-stimulus periods are filled with 0 current. The frequency
     sweep spans `start_frequency` to `end_frequency` over `stimulus_duration`.
+    When both `stimulus_start` and `stimulus_duration` are 0.0, the waveform
+    fills the entire `duration`.
 
     Args:
         duration: Total duration of the protocol in milliseconds.
@@ -202,13 +207,14 @@ def chirp_current(
         stimulus_start: Time when the waveform begins in milliseconds.
             Default is 0.0.
         stimulus_duration: Duration of the chirp stimulus in milliseconds.
-            If None, the waveform lasts from stimulus_start to end of duration.
+            Default is 0.0, which fills the recording from stimulus_start to
+            the end of duration.
         sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
 
     Returns:
         Array of current values in uA/cm^2.
     """
-    if stimulus_duration is None:
+    if stimulus_duration == 0.0:
         stimulus_duration = duration - stimulus_start
 
     num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
@@ -238,7 +244,7 @@ def noise_current(
     mean_current: float,
     std_current: float,
     stimulus_start: float = 0.0,
-    stimulus_duration: float | None = None,
+    stimulus_duration: float = 0.0,
     sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
     seed: int | None = None,
 ) -> np.ndarray:
@@ -248,7 +254,9 @@ def noise_current(
     useful for studying stochastic resonance and noise effects.
 
     The noise starts at `stimulus_start` and lasts for `stimulus_duration`.
-    The pre- and post-stimulus periods are filled with 0 current.
+    The pre- and post-stimulus periods are filled with 0 current. When both
+    `stimulus_start` and `stimulus_duration` are 0.0, the noise fills the
+    entire `duration`.
 
     Args:
         duration: Total duration of the protocol in milliseconds.
@@ -257,14 +265,15 @@ def noise_current(
         stimulus_start: Time when the noise begins in milliseconds.
             Default is 0.0.
         stimulus_duration: Duration of the noise stimulus in milliseconds.
-            If None, the noise lasts from stimulus_start to end of duration.
+            Default is 0.0, which fills the recording from stimulus_start to
+            the end of duration.
         sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
         seed: Random seed for reproducibility. If None, uses random seed.
 
     Returns:
         Array of current values in uA/cm^2.
     """
-    if stimulus_duration is None:
+    if stimulus_duration == 0.0:
         stimulus_duration = duration - stimulus_start
 
     # Create a local RNG instance to avoid mutating global state
