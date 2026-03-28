@@ -167,9 +167,6 @@ _FLOAT_FIELDS: list[str] = [
     "mean_current",
     "std_current",
     # Voltage clamp protocol params
-    "vc_pre_stimulus_duration",
-    "vc_stimulus_duration",
-    "vc_post_stimulus_duration",
     "vc_voltage_amplitude",
     "vc_holding_voltage",
     "vc_start_voltage",
@@ -704,9 +701,6 @@ class AppState(rx.State):
     std_current: float = 2.0
 
     # Voltage clamp protocol params
-    vc_pre_stimulus_duration: float = 10.0
-    vc_stimulus_duration: float = 30.0
-    vc_post_stimulus_duration: float = 10.0
     vc_voltage_amplitude: float = 0.0
     vc_holding_voltage: float = -70.0
     vc_start_voltage: float = -70.0
@@ -1200,9 +1194,9 @@ class AppState(rx.State):
             return build_voltage_protocol(
                 protocol_type=self.protocol_type,
                 sampling_frequency=fs,
-                vc_pre_stimulus_duration=self.vc_pre_stimulus_duration,
-                vc_stimulus_duration=self.vc_stimulus_duration,
-                vc_post_stimulus_duration=self.vc_post_stimulus_duration,
+                pre_stimulus_duration=self.pre_stimulus_duration,
+                stimulus_duration=self.stimulus_duration,
+                post_stimulus_duration=self.post_stimulus_duration,
                 vc_holding_voltage=self.vc_holding_voltage,
                 vc_voltage_amplitude=self.vc_voltage_amplitude,
                 vc_start_voltage=self.vc_start_voltage,

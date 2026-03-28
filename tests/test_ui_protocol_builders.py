@@ -72,9 +72,9 @@ def test_single_sweep_voltage_protocol_returns_valid_list(protocol_type: str) ->
     result = build_voltage_protocol(
         protocol_type=protocol_type,
         sampling_frequency=SAMPLING_FREQUENCY,
-        vc_pre_stimulus_duration=5.0,
-        vc_stimulus_duration=10.0,
-        vc_post_stimulus_duration=5.0,
+        pre_stimulus_duration=5.0,
+        stimulus_duration=10.0,
+        post_stimulus_duration=5.0,
     )
     assert _is_valid_protocol_list(result), (
         f"Protocol '{protocol_type}' returned an invalid protocol list"
@@ -88,9 +88,9 @@ def test_iv_curve_returns_multi_sweep_list() -> None:
     result = build_voltage_protocol(
         protocol_type="I-V Curve",
         sampling_frequency=SAMPLING_FREQUENCY,
-        vc_pre_stimulus_duration=5.0,
-        vc_stimulus_duration=20.0,
-        vc_post_stimulus_duration=5.0,
+        pre_stimulus_duration=5.0,
+        stimulus_duration=20.0,
+        post_stimulus_duration=5.0,
         vc_voltage_min=-40.0,
         vc_voltage_max=40.0,
         vc_voltage_step=20.0,

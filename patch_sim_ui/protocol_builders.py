@@ -128,9 +128,9 @@ def build_current_protocol(
 def build_voltage_protocol(
     protocol_type: str,
     sampling_frequency: float,
-    vc_pre_stimulus_duration: float = 10.0,
-    vc_stimulus_duration: float = 30.0,
-    vc_post_stimulus_duration: float = 10.0,
+    pre_stimulus_duration: float = 10.0,
+    stimulus_duration: float = 30.0,
+    post_stimulus_duration: float = 10.0,
     vc_holding_voltage: float = -70.0,
     vc_voltage_amplitude: float = 0.0,
     vc_start_voltage: float = -70.0,
@@ -147,9 +147,9 @@ def build_voltage_protocol(
     Args:
         protocol_type: One of "Step", "Ramp", "Pulse Train", or "I-V Curve".
         sampling_frequency: Sampling frequency in Hz.
-        vc_pre_stimulus_duration: Duration before the stimulus in ms.
-        vc_stimulus_duration: Duration of the stimulus in ms.
-        vc_post_stimulus_duration: Duration after the stimulus in ms.
+        pre_stimulus_duration: Duration before the stimulus in ms.
+        stimulus_duration: Duration of the stimulus in ms.
+        post_stimulus_duration: Duration after the stimulus in ms.
         vc_holding_voltage: Holding voltage in mV.
         vc_voltage_amplitude: Step voltage amplitude in mV.
         vc_start_voltage: Ramp start voltage in mV.
@@ -169,15 +169,13 @@ def build_voltage_protocol(
     Raises:
         ValueError: If protocol_type is unrecognized or parameters are invalid.
     """
-    total_duration = (
-        vc_pre_stimulus_duration + vc_stimulus_duration + vc_post_stimulus_duration
-    )
+    total_duration = pre_stimulus_duration + stimulus_duration + post_stimulus_duration
     if protocol_type == "Step":
         protocol = patch_sim.step_voltage(
             duration=total_duration,
             voltage_amplitude=vc_voltage_amplitude,
-            step_start=vc_pre_stimulus_duration,
-            step_duration=vc_stimulus_duration,
+            step_start=pre_stimulus_duration,
+            step_duration=stimulus_duration,
             holding_voltage=vc_holding_voltage,
             sampling_frequency=sampling_frequency,
         )
@@ -187,8 +185,8 @@ def build_voltage_protocol(
             duration=total_duration,
             start_voltage=vc_start_voltage,
             end_voltage=vc_end_voltage,
-            ramp_start=vc_pre_stimulus_duration,
-            ramp_duration=vc_stimulus_duration,
+            ramp_start=pre_stimulus_duration,
+            ramp_duration=stimulus_duration,
             holding_voltage=vc_holding_voltage,
             sampling_frequency=sampling_frequency,
         )
@@ -199,7 +197,7 @@ def build_voltage_protocol(
             pulse_amplitude=vc_pulse_amplitude,
             pulse_width=vc_pulse_width,
             pulse_interval=vc_pulse_interval,
-            train_start=vc_pre_stimulus_duration,
+            train_start=pre_stimulus_duration,
             holding_voltage=vc_holding_voltage,
             sampling_frequency=sampling_frequency,
         )
@@ -213,8 +211,8 @@ def build_voltage_protocol(
                 patch_sim.step_voltage(
                     duration=total_duration,
                     voltage_amplitude=float(voltage),
-                    step_start=vc_pre_stimulus_duration,
-                    step_duration=vc_stimulus_duration,
+                    step_start=pre_stimulus_duration,
+                    step_duration=stimulus_duration,
                     holding_voltage=vc_holding_voltage,
                     sampling_frequency=sampling_frequency,
                 ),
