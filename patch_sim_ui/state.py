@@ -1181,8 +1181,14 @@ class AppState(rx.State):
             calcium_dynamics=calcium_dynamics,
         )
 
-    def _build_protocol(self) -> "np.ndarray":
-        """Build the stimulus array from current protocol state."""
+    def _build_protocols(self) -> "list[tuple[np.ndarray, str]]":
+        """Build stimulus arrays from current protocol state.
+
+        Returns:
+            List of (stimulus_array, sweep_label) pairs. Single-sweep protocols
+            return a one-element list with an empty label; multi-sweep protocols
+            (e.g. I-V Curve) return one entry per sweep with a descriptive label.
+        """
         fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
         if self.clamp_mode == "Current Clamp":
             return build_current_protocol(
@@ -1274,7 +1280,7 @@ class AppState(rx.State):
                     mode = self.clamp_mode
                     ptype = self.protocol_type
                     neuron = self._build_neuron()
-                    stimulus = self._build_protocol()
+                    stimulus = self._build_protocols()[0][0]
                     use_prior_state = self._cont_has_state
                     prior_V = self._cont_V
                     prior_gating = dict(self._cont_gating)
@@ -1394,34 +1400,7 @@ class AppState(rx.State):
             neuron = self._build_neuron()
             mode = self.clamp_mode
             ptype = self.protocol_type
-            fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
-            if ptype == "I-V Curve":
-                stimulus = None
-                sweep_duration = (
-                    self.vc_pre_pulse_duration
-                    + self.duration
-                    + self.vc_post_pulse_duration
-                )
-                voltage_range = self.vc_voltage_max - self.vc_voltage_min
-                n_steps = round(voltage_range / self.vc_voltage_step) + 1
-                voltages = np.linspace(
-                    self.vc_voltage_min, self.vc_voltage_max, n_steps
-                )
-                iv_protocols = [
-                    patch_sim.step_voltage(
-                        duration=sweep_duration,
-                        voltage_amplitude=float(voltage),
-                        step_start=self.vc_pre_pulse_duration,
-                        step_duration=self.duration,
-                        holding_voltage=self.vc_holding_voltage,
-                        sampling_frequency=fs,
-                    )
-                    for voltage in voltages
-                ]
-            else:
-                stimulus = self._build_protocol()
-                voltages = np.array([])
-                iv_protocols = []
+            protocols = self._build_protocols()
 
         _start_ms = time.monotonic() * 1000
         logger.info(
@@ -1430,29 +1409,25 @@ class AppState(rx.State):
             ptype,
         )
         loop = asyncio.get_running_loop()
+        sim_fn = (
+            patch_sim.simulate_current_clamp
+            if mode == CURRENT_CLAMP
+            else patch_sim.simulate_voltage_clamp
+        )
+        is_multi = len(protocols) > 1
         try:
-            if mode == CURRENT_CLAMP:
-                df = await loop.run_in_executor(
-                    None, patch_sim.simulate_current_clamp, neuron, stimulus
-                )
-                async with self:
-                    self.current_sweeps = [
-                        Sweep.from_dataframe(df, stimulus, "", "", mode)
-                    ]
+            if is_multi:
+                # Run each sweep independently so gating variables are reset
+                # between steps — matching real patch-clamp I-V experiments.
+                stim_arrays = [p for p, _ in protocols]
 
-            elif ptype == "I-V Curve":
-                # Run each voltage step as an independent sweep so that
-                # gating variables are reset between steps — matching real
-                # patch-clamp I-V curve experiments.
-                def _run_iv_batch() -> list[Sweep]:
-                    """Run all I-V curve sweeps and return assembled Sweep list."""
+                def _run_batch() -> list[Sweep]:
+                    """Run all sweeps via simulate_batch and assemble Sweep list."""
                     new_sweeps: list[Sweep] = []
-                    for sweep_df, voltage, protocol in zip(
-                        patch_sim.simulate_batch(neuron, iv_protocols),
-                        voltages,
-                        iv_protocols,
+                    for sweep_df, (protocol, label) in zip(
+                        patch_sim.simulate_batch(neuron, stim_arrays),
+                        protocols,
                     ):
-                        label = f"{voltage:+.0f} mV"
                         color_index = len(new_sweeps) % len(constants.SWEEP_COLORS)
                         new_sweeps.append(
                             Sweep.from_dataframe(
@@ -1465,14 +1440,13 @@ class AppState(rx.State):
                         )
                     return new_sweeps
 
-                new_sweeps = await loop.run_in_executor(None, _run_iv_batch)
+                new_sweeps = await loop.run_in_executor(None, _run_batch)
                 async with self:
                     self.current_sweeps = new_sweeps
 
             else:
-                df = await loop.run_in_executor(
-                    None, patch_sim.simulate_voltage_clamp, neuron, stimulus
-                )
+                stimulus, _ = protocols[0]
+                df = await loop.run_in_executor(None, sim_fn, neuron, stimulus)
                 async with self:
                     self.current_sweeps = [
                         Sweep.from_dataframe(df, stimulus, "", "", mode)

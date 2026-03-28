@@ -20,10 +20,16 @@ from patch_sim_ui.presets import PRESETS
 SAMPLING_FREQUENCY = 10000.0  # Hz — matches UI default
 
 
-def _is_valid_array(arr: np.ndarray) -> bool:
-    """Return True if arr is a non-empty ndarray with all finite values."""
-    return (
-        isinstance(arr, np.ndarray) and arr.size > 0 and bool(np.all(np.isfinite(arr)))
+def _is_valid_protocol_list(result: list[tuple[np.ndarray, str]]) -> bool:
+    """Return True if result is a non-empty list of (finite ndarray, str) pairs."""
+    if not isinstance(result, list) or len(result) == 0:
+        return False
+    return all(
+        isinstance(arr, np.ndarray)
+        and arr.size > 0
+        and bool(np.all(np.isfinite(arr)))
+        and isinstance(label, str)
+        for arr, label in result
     )
 
 
@@ -36,16 +42,18 @@ def _is_valid_array(arr: np.ndarray) -> bool:
     "protocol_type",
     ["Step", "Ramp", "Pulse Train", "Sinusoidal", "Chirp", "Noise"],
 )
-def test_current_protocol_returns_valid_array(protocol_type: str) -> None:
-    """Each current clamp protocol type returns a non-empty finite array."""
+def test_current_protocol_returns_valid_list(protocol_type: str) -> None:
+    """Each current clamp protocol returns a single-element list with a valid array."""
     result = build_current_protocol(
         protocol_type=protocol_type,
         duration=50.0,
         sampling_frequency=SAMPLING_FREQUENCY,
     )
-    assert _is_valid_array(result), (
-        f"Protocol '{protocol_type}' returned an invalid array"
+    assert _is_valid_protocol_list(result), (
+        f"Protocol '{protocol_type}' returned an invalid protocol list"
     )
+    assert len(result) == 1
+    assert result[0][1] == ""
 
 
 # ---------------------------------------------------------------------------
@@ -55,18 +63,37 @@ def test_current_protocol_returns_valid_array(protocol_type: str) -> None:
 
 @pytest.mark.parametrize(
     "protocol_type",
-    ["Step", "Ramp", "Pulse Train", "I-V Curve"],
+    ["Step", "Ramp", "Pulse Train"],
 )
-def test_voltage_protocol_returns_valid_array(protocol_type: str) -> None:
-    """Each voltage clamp protocol type returns a non-empty finite array."""
+def test_single_sweep_voltage_protocol_returns_valid_list(protocol_type: str) -> None:
+    """Single-sweep voltage protocols return a one-element list with a valid array."""
     result = build_voltage_protocol(
         protocol_type=protocol_type,
         duration=20.0,
         sampling_frequency=SAMPLING_FREQUENCY,
     )
-    assert _is_valid_array(result), (
-        f"Protocol '{protocol_type}' returned an invalid array"
+    assert _is_valid_protocol_list(result), (
+        f"Protocol '{protocol_type}' returned an invalid protocol list"
     )
+    assert len(result) == 1
+    assert result[0][1] == ""
+
+
+def test_iv_curve_returns_multi_sweep_list() -> None:
+    """I-V Curve returns one (array, label) pair per voltage step."""
+    result = build_voltage_protocol(
+        protocol_type="I-V Curve",
+        duration=20.0,
+        sampling_frequency=SAMPLING_FREQUENCY,
+        vc_voltage_min=-40.0,
+        vc_voltage_max=40.0,
+        vc_voltage_step=20.0,
+    )
+    assert _is_valid_protocol_list(result)
+    assert len(result) > 1
+    for arr, label in result:
+        assert label != "", "Each I-V Curve sweep should have a non-empty label"
+        assert "mV" in label
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +152,7 @@ def test_voltage_pulse_width_ge_interval_raises() -> None:
 
 @pytest.mark.parametrize("preset_name", list(PRESETS.keys()))
 def test_preset_produces_valid_protocol(preset_name: str) -> None:
-    """For each preset, building the corresponding protocol returns a valid array."""
+    """For each preset, building the corresponding protocol returns a valid list."""
     config = PRESETS[preset_name]
     mode = config.get("clamp_mode", "Current Clamp")
     protocol_type = config.get("protocol_type", "Step")
@@ -199,6 +226,6 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
             **kwargs,
         )
 
-    assert _is_valid_array(result), (
-        f"Preset '{preset_name}' produced an invalid protocol array"
+    assert _is_valid_protocol_list(result), (
+        f"Preset '{preset_name}' produced an invalid protocol list"
     )

@@ -35,8 +35,8 @@ def build_current_protocol(
     end_frequency: float = 100.0,
     mean_current: float = 8.0,
     std_current: float = 2.0,
-) -> np.ndarray:
-    """Build a current clamp protocol array from explicit parameters.
+) -> list[tuple[np.ndarray, str]]:
+    """Build current clamp protocol arrays from explicit parameters.
 
     Args:
         protocol_type: One of "Step", "Ramp", "Pulse Train", "Sinusoidal",
@@ -63,7 +63,8 @@ def build_current_protocol(
         std_current: Noise standard deviation in µA/cm².
 
     Returns:
-        Protocol array in µA/cm².
+        List of (stimulus_array, sweep_label) pairs. Current clamp protocols
+        always return a single-element list with an empty label.
 
     Raises:
         ValueError: If protocol_type is unrecognized or parameters are invalid.
@@ -126,7 +127,7 @@ def build_current_protocol(
         duration,
         len(protocol),
     )
-    return protocol
+    return [(protocol, "")]
 
 
 def build_voltage_protocol(
@@ -150,12 +151,12 @@ def build_voltage_protocol(
     vc_voltage_step: float = 10.0,
     vc_pre_pulse_duration: float = 5.0,
     vc_post_pulse_duration: float = 5.0,
-) -> np.ndarray:
-    """Build a voltage clamp protocol array from explicit parameters.
+) -> list[tuple[np.ndarray, str]]:
+    """Build voltage clamp protocol arrays from explicit parameters.
 
     Args:
         protocol_type: One of "Step", "Ramp", "Pulse Train", or "I-V Curve".
-        duration: Total duration in ms (or step duration for I-V).
+        duration: Total duration in ms (or step duration for I-V Curve).
         sampling_frequency: Sampling frequency in Hz.
         vc_holding_voltage: Holding voltage in mV.
         vc_voltage_amplitude: Step voltage amplitude in mV.
@@ -176,7 +177,9 @@ def build_voltage_protocol(
         vc_post_pulse_duration: Post-pulse duration in ms (I-V curve).
 
     Returns:
-        Protocol array in mV.
+        List of (stimulus_array, sweep_label) pairs. Single-sweep protocols
+        return a one-element list with an empty label. I-V Curve returns one
+        entry per voltage step labelled "+XX mV" / "-XX mV".
 
     Raises:
         ValueError: If protocol_type is unrecognized or parameters are invalid.
@@ -190,6 +193,7 @@ def build_voltage_protocol(
             holding_voltage=vc_holding_voltage,
             sampling_frequency=sampling_frequency,
         )
+        result: list[tuple[np.ndarray, str]] = [(protocol, "")]
     elif protocol_type == "Ramp":
         protocol = patch_sim.ramp_voltage(
             duration=duration,
@@ -200,6 +204,7 @@ def build_voltage_protocol(
             holding_voltage=vc_holding_voltage,
             sampling_frequency=sampling_frequency,
         )
+        result = [(protocol, "")]
     elif protocol_type == "Pulse Train":
         protocol = patch_sim.pulse_train_voltage(
             duration=duration,
@@ -210,23 +215,32 @@ def build_voltage_protocol(
             holding_voltage=vc_holding_voltage,
             sampling_frequency=sampling_frequency,
         )
+        result = [(protocol, "")]
     elif protocol_type == "I-V Curve":
-        protocol = patch_sim.iv_curve_protocol(
-            step_duration=duration,
-            voltage_min=vc_voltage_min,
-            voltage_max=vc_voltage_max,
-            voltage_step=vc_voltage_step,
-            pre_pulse_duration=vc_pre_pulse_duration,
-            post_pulse_duration=vc_post_pulse_duration,
-            holding_voltage=vc_holding_voltage,
-            sampling_frequency=sampling_frequency,
-        )
+        sweep_duration = vc_pre_pulse_duration + duration + vc_post_pulse_duration
+        voltage_range = vc_voltage_max - vc_voltage_min
+        n_steps = round(voltage_range / vc_voltage_step) + 1
+        voltages = np.linspace(vc_voltage_min, vc_voltage_max, n_steps)
+        result = [
+            (
+                patch_sim.step_voltage(
+                    duration=sweep_duration,
+                    voltage_amplitude=float(voltage),
+                    step_start=vc_pre_pulse_duration,
+                    step_duration=duration,
+                    holding_voltage=vc_holding_voltage,
+                    sampling_frequency=sampling_frequency,
+                ),
+                f"{voltage:+.0f} mV",
+            )
+            for voltage in voltages
+        ]
     else:
         raise ValueError(f"Unknown voltage protocol type: {protocol_type!r}")
     logger.debug(
-        "build_voltage_protocol: type=%r duration=%.1f ms steps=%d",
+        "build_voltage_protocol: type=%r duration=%.1f ms sweeps=%d",
         protocol_type,
         duration,
-        len(protocol),
+        len(result),
     )
-    return protocol
+    return result
