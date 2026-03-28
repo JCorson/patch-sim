@@ -20,12 +20,6 @@ Key features:
   resulting ionic currents.
 - A library of **stimulation protocols**: current clamp (step, ramp, pulse train,
   sinusoidal, chirp, noise) and voltage clamp (step, ramp, pulse train, I-V curve).
-- Simulation results are returned as `pandas.DataFrame` objects indexed by time (ms),
-  making them straightforward to analyze or plot with standard Python tools.
-- Numerically stable handling of the singularity points in the Hodgkin-Huxley rate
-  equations.
-- **RK4 numerical integration** at 40 kHz, parallel batch simulation via
-  `ProcessPoolExecutor`, and a continuous mode that carries neuron state across runs.
 
 ---
 
@@ -34,12 +28,10 @@ Key features:
 `patch_sim` includes an interactive web interface inspired by pClamp electrophysiology software.
 
 - Configure neuron parameters and enable/disable additional ion channels with conductance sliders
-- Run current clamp and voltage clamp protocols with async, non-blocking execution
-- Stacked 3-row subplot layout (response, gating variables, stimulus) with shared time axis
-- Sweep overlay with click/hover/keyboard selection, plus two-tier storage (saved sweeps and stored traces)
+- Run current clamp and voltage clamp protocols
+- Sweep overlay with click/hover/keyboard selection
 - Continuous simulation mode for oscilloscope-like real-time recording
 - 6 built-in presets: Action Potential, Subthreshold Response, Repetitive Firing, I-V Curve, Na+ Channel Activation, Frequency Response
-- Dark mode, collapsible sidebar, in-app log panel with level filtering, and live reversal potential display
 
 ### Installing the UI
 
@@ -82,7 +74,7 @@ in the top-level directory of the repository.
 
 #### Managing dependencies
 
-To regenerate all project dependencies files, run:
+To regenerate and update project dependencies, run:
 
 ```
 uv lock --upgrade
@@ -134,10 +126,6 @@ uv tool run ruff format --check .
 ```
 uv run --frozen -m mypy .
 ```
-
-#### Continuous integration
-
-GitHub Actions runs linting, type checking, and the full test suite on every push and pull request to `main`. Dependabot is configured for automated dependency updates.
 
 ---
 
