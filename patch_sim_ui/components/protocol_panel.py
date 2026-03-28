@@ -99,11 +99,7 @@ def _cc_pulse_params() -> rx.Component:
 def _cc_sine_params() -> rx.Component:
     """Parameter fields for the current clamp Sinusoidal protocol."""
     return rx.vstack(
-        _num_field(
-            "Duration (ms)",
-            AppState.stimulus_duration,
-            AppState.set_stimulus_duration,
-        ),
+        *_duration_fields(),
         _num_field("DC offset (µA/cm²)", AppState.dc_offset, AppState.set_dc_offset),
         _num_field("Amplitude (µA/cm²)", AppState.amplitude, AppState.set_amplitude),
         _num_field("Frequency (Hz)", AppState.frequency, AppState.set_frequency),
@@ -115,11 +111,7 @@ def _cc_sine_params() -> rx.Component:
 def _cc_chirp_params() -> rx.Component:
     """Parameter fields for the current clamp Chirp protocol."""
     return rx.vstack(
-        _num_field(
-            "Duration (ms)",
-            AppState.stimulus_duration,
-            AppState.set_stimulus_duration,
-        ),
+        *_duration_fields(),
         _num_field("DC offset (µA/cm²)", AppState.dc_offset, AppState.set_dc_offset),
         _num_field("Amplitude (µA/cm²)", AppState.amplitude, AppState.set_amplitude),
         _num_field(
@@ -134,11 +126,7 @@ def _cc_chirp_params() -> rx.Component:
 def _cc_noise_params() -> rx.Component:
     """Parameter fields for the current clamp Noise protocol."""
     return rx.vstack(
-        _num_field(
-            "Duration (ms)",
-            AppState.stimulus_duration,
-            AppState.set_stimulus_duration,
-        ),
+        *_duration_fields(),
         _num_field(
             "Mean current (µA/cm²)", AppState.mean_current, AppState.set_mean_current
         ),

@@ -170,6 +170,7 @@ def build_voltage_protocol(
         ValueError: If protocol_type is unrecognized or parameters are invalid.
     """
     total_duration = pre_stimulus_duration + stimulus_duration + post_stimulus_duration
+    result: list[tuple[np.ndarray, str]]
     if protocol_type == "Step":
         protocol = patch_sim.step_voltage(
             duration=total_duration,
@@ -179,7 +180,7 @@ def build_voltage_protocol(
             holding_voltage=vc_holding_voltage,
             sampling_frequency=sampling_frequency,
         )
-        result: list[tuple[np.ndarray, str]] = [(protocol, "")]
+        result = [(protocol, "")]
     elif protocol_type == "Ramp":
         protocol = patch_sim.ramp_voltage(
             duration=total_duration,
