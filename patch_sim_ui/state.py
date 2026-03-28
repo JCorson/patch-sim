@@ -55,7 +55,7 @@ from patch_sim.additional_channels import (
     make_inar_channel,
 )
 from patch_sim_ui import constants, presets
-from patch_sim_ui.constants import CURRENT_CLAMP
+from patch_sim_ui.constants import CURRENT_CLAMP, MULTI_SWEEP_PROTOCOL_TYPES
 from patch_sim_ui.plotting import (
     Sweep,
     TraceVisibility,
@@ -858,10 +858,10 @@ class AppState(rx.State):
     def can_run_continuous(self) -> bool:
         """True when the active protocol is compatible with continuous mode.
 
-        Multi-sweep protocols (I-V Curve) are excluded because each of their
-        sweeps uses independent initial conditions.
+        Multi-sweep protocols are excluded; continuous mode is limited to
+        single-sweep protocols only.
         """
-        return self.protocol_type != "I-V Curve"
+        return self.protocol_type not in MULTI_SWEEP_PROTOCOL_TYPES
 
     @rx.var
     def filtered_log_entries(self) -> list[UILogRecord]:
@@ -1419,13 +1419,13 @@ class AppState(rx.State):
             if is_multi:
                 # Run each sweep independently so gating variables are reset
                 # between steps — matching real patch-clamp I-V experiments.
-                stim_arrays = [p for p, _ in protocols]
-
                 def _run_batch() -> list[Sweep]:
                     """Run all sweeps via simulate_batch and assemble Sweep list."""
                     new_sweeps: list[Sweep] = []
                     for sweep_df, (protocol, label) in zip(
-                        patch_sim.simulate_batch(neuron, stim_arrays),
+                        patch_sim.simulate_batch(
+                            neuron, [p for p, _ in protocols], sim_fn
+                        ),
                         protocols,
                     ):
                         color_index = len(new_sweeps) % len(constants.SWEEP_COLORS)

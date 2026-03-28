@@ -89,8 +89,9 @@ def test_iv_curve_returns_multi_sweep_list() -> None:
         vc_voltage_max=40.0,
         vc_voltage_step=20.0,
     )
+    # -40 to +40 in steps of 20 → [-40, -20, 0, +20, +40] = 5 sweeps
     assert _is_valid_protocol_list(result)
-    assert len(result) > 1
+    assert len(result) == 5
     for arr, label in result:
         assert label != "", "Each I-V Curve sweep should have a non-empty label"
         assert "mV" in label
