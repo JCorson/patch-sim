@@ -69,8 +69,10 @@ def test_single_sweep_voltage_protocol_returns_valid_list(protocol_type: str) ->
     """Single-sweep voltage protocols return a one-element list with a valid array."""
     result = build_voltage_protocol(
         protocol_type=protocol_type,
-        duration=20.0,
         sampling_frequency=SAMPLING_FREQUENCY,
+        vc_pre_stimulus_duration=5.0,
+        vc_stimulus_duration=10.0,
+        vc_post_stimulus_duration=5.0,
     )
     assert _is_valid_protocol_list(result), (
         f"Protocol '{protocol_type}' returned an invalid protocol list"
@@ -83,8 +85,10 @@ def test_iv_curve_returns_multi_sweep_list() -> None:
     """I-V Curve returns one (array, label) pair per voltage step."""
     result = build_voltage_protocol(
         protocol_type="I-V Curve",
-        duration=20.0,
         sampling_frequency=SAMPLING_FREQUENCY,
+        vc_pre_stimulus_duration=5.0,
+        vc_stimulus_duration=20.0,
+        vc_post_stimulus_duration=5.0,
         vc_voltage_min=-40.0,
         vc_voltage_max=40.0,
         vc_voltage_step=20.0,
@@ -117,7 +121,6 @@ def test_unknown_voltage_protocol_raises() -> None:
     with pytest.raises(ValueError, match="Unknown voltage protocol"):
         build_voltage_protocol(
             protocol_type="BadType",
-            duration=20.0,
             sampling_frequency=SAMPLING_FREQUENCY,
         )
 
@@ -139,7 +142,6 @@ def test_voltage_pulse_width_ge_interval_raises() -> None:
     with pytest.raises(ValueError, match="pulse_width"):
         build_voltage_protocol(
             protocol_type="Pulse Train",
-            duration=50.0,
             sampling_frequency=SAMPLING_FREQUENCY,
             vc_pulse_width=5.0,
             vc_pulse_interval=5.0,
@@ -151,42 +153,42 @@ def test_voltage_pulse_width_ge_interval_raises() -> None:
 # ---------------------------------------------------------------------------
 
 
+_NEURON_KEYS = {
+    "clamp_mode",
+    "protocol_type",
+    "sampling_frequency",
+    "g_Na",
+    "g_K",
+    "g_L",
+    "C_m",
+    "v_rest",
+    "Na_out",
+    "Na_in",
+    "K_out",
+    "K_in",
+    "Cl_out",
+    "Cl_in",
+    "Ca_out",
+    "Ca_in",
+    "T",
+}
+
+
 @pytest.mark.parametrize("preset_name", list(PRESETS.keys()))
 def test_preset_produces_valid_protocol(preset_name: str) -> None:
     """For each preset, building the corresponding protocol returns a valid list."""
     config = PRESETS[preset_name]
     mode = config.get("clamp_mode", "Current Clamp")
     protocol_type = config.get("protocol_type", "Step")
-    duration = float(config.get("duration", 50.0))
     sampling_frequency = float(config.get("sampling_frequency", SAMPLING_FREQUENCY))
+    kwargs = {
+        k: float(v)
+        for k, v in config.items()
+        if k not in _NEURON_KEYS and isinstance(v, (int, float))
+    }
 
     if mode == "Current Clamp":
-        kwargs = {
-            k: float(v)
-            for k, v in config.items()
-            if k
-            not in {
-                "clamp_mode",
-                "protocol_type",
-                "duration",
-                "sampling_frequency",
-                "g_Na",
-                "g_K",
-                "g_L",
-                "C_m",
-                "v_rest",
-                "Na_out",
-                "Na_in",
-                "K_out",
-                "K_in",
-                "Cl_out",
-                "Cl_in",
-                "Ca_out",
-                "Ca_in",
-                "T",
-            }
-            and isinstance(v, (int, float))
-        }
+        duration = kwargs.pop("duration", 50.0)
         result = build_current_protocol(
             protocol_type=protocol_type,
             duration=duration,
@@ -194,35 +196,8 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
             **kwargs,
         )
     else:
-        kwargs = {
-            k: float(v)
-            for k, v in config.items()
-            if k
-            not in {
-                "clamp_mode",
-                "protocol_type",
-                "duration",
-                "sampling_frequency",
-                "g_Na",
-                "g_K",
-                "g_L",
-                "C_m",
-                "v_rest",
-                "Na_out",
-                "Na_in",
-                "K_out",
-                "K_in",
-                "Cl_out",
-                "Cl_in",
-                "Ca_out",
-                "Ca_in",
-                "T",
-            }
-            and isinstance(v, (int, float))
-        }
         result = build_voltage_protocol(
             protocol_type=protocol_type,
-            duration=duration,
             sampling_frequency=sampling_frequency,
             **kwargs,
         )

@@ -129,19 +129,25 @@ def _cc_noise_params() -> rx.Component:
 def _vc_step_params() -> rx.Component:
     """Parameter fields for the voltage clamp Step protocol."""
     return rx.vstack(
-        _num_field("Duration (ms)", AppState.duration, AppState.set_duration),
+        _num_field(
+            "Pre-stimulus (ms)",
+            AppState.vc_pre_stimulus_duration,
+            AppState.set_vc_pre_stimulus_duration,
+        ),
+        _num_field(
+            "Stimulus (ms)",
+            AppState.vc_stimulus_duration,
+            AppState.set_vc_stimulus_duration,
+        ),
+        _num_field(
+            "Post-stimulus (ms)",
+            AppState.vc_post_stimulus_duration,
+            AppState.set_vc_post_stimulus_duration,
+        ),
         _num_field(
             "Voltage amplitude (mV)",
             AppState.vc_voltage_amplitude,
             AppState.set_vc_voltage_amplitude,
-        ),
-        _num_field(
-            "Step start (ms)", AppState.vc_step_start, AppState.set_vc_step_start
-        ),
-        _num_field(
-            "Step duration (ms)",
-            AppState.vc_step_duration,
-            AppState.set_vc_step_duration,
         ),
         _num_field(
             "Holding voltage (mV)",
@@ -156,7 +162,21 @@ def _vc_step_params() -> rx.Component:
 def _vc_ramp_params() -> rx.Component:
     """Parameter fields for the voltage clamp Ramp protocol."""
     return rx.vstack(
-        _num_field("Duration (ms)", AppState.duration, AppState.set_duration),
+        _num_field(
+            "Pre-stimulus (ms)",
+            AppState.vc_pre_stimulus_duration,
+            AppState.set_vc_pre_stimulus_duration,
+        ),
+        _num_field(
+            "Stimulus (ms)",
+            AppState.vc_stimulus_duration,
+            AppState.set_vc_stimulus_duration,
+        ),
+        _num_field(
+            "Post-stimulus (ms)",
+            AppState.vc_post_stimulus_duration,
+            AppState.set_vc_post_stimulus_duration,
+        ),
         _num_field(
             "Start voltage (mV)",
             AppState.vc_start_voltage,
@@ -164,14 +184,6 @@ def _vc_ramp_params() -> rx.Component:
         ),
         _num_field(
             "End voltage (mV)", AppState.vc_end_voltage, AppState.set_vc_end_voltage
-        ),
-        _num_field(
-            "Ramp start (ms)", AppState.vc_ramp_start, AppState.set_vc_ramp_start
-        ),
-        _num_field(
-            "Ramp duration (ms)",
-            AppState.vc_ramp_duration,
-            AppState.set_vc_ramp_duration,
         ),
         _num_field(
             "Holding voltage (mV)",
@@ -186,7 +198,21 @@ def _vc_ramp_params() -> rx.Component:
 def _vc_pulse_params() -> rx.Component:
     """Parameter fields for the voltage clamp Pulse Train protocol."""
     return rx.vstack(
-        _num_field("Duration (ms)", AppState.duration, AppState.set_duration),
+        _num_field(
+            "Pre-stimulus (ms)",
+            AppState.vc_pre_stimulus_duration,
+            AppState.set_vc_pre_stimulus_duration,
+        ),
+        _num_field(
+            "Stimulus (ms)",
+            AppState.vc_stimulus_duration,
+            AppState.set_vc_stimulus_duration,
+        ),
+        _num_field(
+            "Post-stimulus (ms)",
+            AppState.vc_post_stimulus_duration,
+            AppState.set_vc_post_stimulus_duration,
+        ),
         _num_field(
             "Pulse amplitude (mV)",
             AppState.vc_pulse_amplitude,
@@ -201,9 +227,6 @@ def _vc_pulse_params() -> rx.Component:
             AppState.set_vc_pulse_interval,
         ),
         _num_field(
-            "Train start (ms)", AppState.vc_train_start, AppState.set_vc_train_start
-        ),
-        _num_field(
             "Holding voltage (mV)",
             AppState.vc_holding_voltage,
             AppState.set_vc_holding_voltage,
@@ -216,7 +239,21 @@ def _vc_pulse_params() -> rx.Component:
 def _vc_iv_params() -> rx.Component:
     """Parameter fields for the voltage clamp I-V Curve protocol."""
     return rx.vstack(
-        _num_field("Step duration (ms)", AppState.duration, AppState.set_duration),
+        _num_field(
+            "Pre-stimulus (ms)",
+            AppState.vc_pre_stimulus_duration,
+            AppState.set_vc_pre_stimulus_duration,
+        ),
+        _num_field(
+            "Stimulus (ms)",
+            AppState.vc_stimulus_duration,
+            AppState.set_vc_stimulus_duration,
+        ),
+        _num_field(
+            "Post-stimulus (ms)",
+            AppState.vc_post_stimulus_duration,
+            AppState.set_vc_post_stimulus_duration,
+        ),
         _num_field(
             "Voltage min (mV)",
             AppState.vc_voltage_min,
@@ -231,16 +268,6 @@ def _vc_iv_params() -> rx.Component:
             "Voltage step (mV)",
             AppState.vc_voltage_step,
             AppState.set_vc_voltage_step,
-        ),
-        _num_field(
-            "Pre-pulse (ms)",
-            AppState.vc_pre_pulse_duration,
-            AppState.set_vc_pre_pulse_duration,
-        ),
-        _num_field(
-            "Post-pulse (ms)",
-            AppState.vc_post_pulse_duration,
-            AppState.set_vc_post_pulse_duration,
         ),
         _num_field(
             "Holding voltage (mV)",

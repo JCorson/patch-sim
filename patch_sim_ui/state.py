@@ -171,23 +171,19 @@ _FLOAT_FIELDS: list[str] = [
     "mean_current",
     "std_current",
     # Voltage clamp protocol params
+    "vc_pre_stimulus_duration",
+    "vc_stimulus_duration",
+    "vc_post_stimulus_duration",
     "vc_voltage_amplitude",
-    "vc_step_start",
-    "vc_step_duration",
     "vc_holding_voltage",
     "vc_start_voltage",
     "vc_end_voltage",
-    "vc_ramp_start",
-    "vc_ramp_duration",
     "vc_pulse_amplitude",
     "vc_pulse_width",
     "vc_pulse_interval",
-    "vc_train_start",
     "vc_voltage_min",
     "vc_voltage_max",
     "vc_voltage_step",
-    "vc_pre_pulse_duration",
-    "vc_post_pulse_duration",
     # Additional channel params
     "ih_g_max",
     "ika_g_max",
@@ -715,23 +711,19 @@ class AppState(rx.State):
     std_current: float = 2.0
 
     # Voltage clamp protocol params
+    vc_pre_stimulus_duration: float = 10.0
+    vc_stimulus_duration: float = 30.0
+    vc_post_stimulus_duration: float = 10.0
     vc_voltage_amplitude: float = 0.0
-    vc_step_start: float = 10.0
-    vc_step_duration: float = 30.0
     vc_holding_voltage: float = -70.0
     vc_start_voltage: float = -70.0
     vc_end_voltage: float = 40.0
-    vc_ramp_start: float = 0.0
-    vc_ramp_duration: float = 40.0
     vc_pulse_amplitude: float = 20.0
     vc_pulse_width: float = 2.0
     vc_pulse_interval: float = 10.0
-    vc_train_start: float = 5.0
     vc_voltage_min: float = -100.0
     vc_voltage_max: float = 60.0
     vc_voltage_step: float = 10.0
-    vc_pre_pulse_duration: float = 5.0
-    vc_post_pulse_duration: float = 5.0
     # ------------------------------------------------------------------ #
     # Simulation results                                                  #
     # ------------------------------------------------------------------ #
@@ -1217,25 +1209,20 @@ class AppState(rx.State):
         else:
             return build_voltage_protocol(
                 protocol_type=self.protocol_type,
-                duration=self.duration,
                 sampling_frequency=fs,
+                vc_pre_stimulus_duration=self.vc_pre_stimulus_duration,
+                vc_stimulus_duration=self.vc_stimulus_duration,
+                vc_post_stimulus_duration=self.vc_post_stimulus_duration,
                 vc_holding_voltage=self.vc_holding_voltage,
                 vc_voltage_amplitude=self.vc_voltage_amplitude,
-                vc_step_start=self.vc_step_start,
-                vc_step_duration=self.vc_step_duration,
                 vc_start_voltage=self.vc_start_voltage,
                 vc_end_voltage=self.vc_end_voltage,
-                vc_ramp_start=self.vc_ramp_start,
-                vc_ramp_duration=self.vc_ramp_duration,
                 vc_pulse_amplitude=self.vc_pulse_amplitude,
                 vc_pulse_width=self.vc_pulse_width,
                 vc_pulse_interval=self.vc_pulse_interval,
-                vc_train_start=self.vc_train_start,
                 vc_voltage_min=self.vc_voltage_min,
                 vc_voltage_max=self.vc_voltage_max,
                 vc_voltage_step=self.vc_voltage_step,
-                vc_pre_pulse_duration=self.vc_pre_pulse_duration,
-                vc_post_pulse_duration=self.vc_post_pulse_duration,
             )
 
     # ------------------------------------------------------------------ #
