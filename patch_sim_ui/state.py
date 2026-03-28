@@ -149,20 +149,16 @@ _FLOAT_FIELDS: list[str] = [
     "Ca_out",
     "Ca_in",
     "T",
-    # Shared protocol params
-    "duration",
     # Current clamp protocol params
+    "pre_stimulus_duration",
+    "stimulus_duration",
+    "post_stimulus_duration",
     "current_amplitude",
-    "step_start",
-    "step_duration",
     "start_current",
     "end_current",
-    "ramp_start",
-    "ramp_duration",
     "pulse_amplitude",
     "pulse_width",
     "pulse_interval",
-    "train_start",
     "dc_offset",
     "amplitude",
     "frequency",
@@ -685,23 +681,20 @@ class AppState(rx.State):
     clamp_mode: str = CURRENT_CLAMP  # CURRENT_CLAMP | VOLTAGE_CLAMP
 
     # ------------------------------------------------------------------ #
-    # Protocol parameters — shared                                       #
+    # Protocol parameters                                                #
     # ------------------------------------------------------------------ #
     protocol_type: str = "Step"
-    duration: float = 50.0
 
     # Current clamp protocol params
+    pre_stimulus_duration: float = 10.0
+    stimulus_duration: float = 30.0
+    post_stimulus_duration: float = 10.0
     current_amplitude: float = 10.0
-    step_start: float = 10.0
-    step_duration: float = 30.0
     start_current: float = 0.0
     end_current: float = 15.0
-    ramp_start: float = 0.0
-    ramp_duration: float = 40.0
     pulse_amplitude: float = 10.0
     pulse_width: float = 2.0
     pulse_interval: float = 10.0
-    train_start: float = 5.0
     dc_offset: float = 8.0
     amplitude: float = 4.0
     frequency: float = 50.0
@@ -1185,19 +1178,16 @@ class AppState(rx.State):
         if self.clamp_mode == "Current Clamp":
             return build_current_protocol(
                 protocol_type=self.protocol_type,
-                duration=self.duration,
                 sampling_frequency=fs,
+                pre_stimulus_duration=self.pre_stimulus_duration,
+                stimulus_duration=self.stimulus_duration,
+                post_stimulus_duration=self.post_stimulus_duration,
                 current_amplitude=self.current_amplitude,
-                step_start=self.step_start,
-                step_duration=self.step_duration,
                 start_current=self.start_current,
                 end_current=self.end_current,
-                ramp_start=self.ramp_start,
-                ramp_duration=self.ramp_duration,
                 pulse_amplitude=self.pulse_amplitude,
                 pulse_width=self.pulse_width,
                 pulse_interval=self.pulse_interval,
-                train_start=self.train_start,
                 dc_offset=self.dc_offset,
                 amplitude=self.amplitude,
                 frequency=self.frequency,

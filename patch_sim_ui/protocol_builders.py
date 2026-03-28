@@ -15,19 +15,16 @@ logger = logging.getLogger(__name__)
 
 def build_current_protocol(
     protocol_type: str,
-    duration: float,
     sampling_frequency: float,
+    pre_stimulus_duration: float = 10.0,
+    stimulus_duration: float = 30.0,
+    post_stimulus_duration: float = 10.0,
     current_amplitude: float = 10.0,
-    step_start: float = 10.0,
-    step_duration: float = 30.0,
     start_current: float = 0.0,
     end_current: float = 15.0,
-    ramp_start: float = 0.0,
-    ramp_duration: float = 40.0,
     pulse_amplitude: float = 10.0,
     pulse_width: float = 2.0,
     pulse_interval: float = 10.0,
-    train_start: float = 5.0,
     dc_offset: float = 8.0,
     amplitude: float = 4.0,
     frequency: float = 50.0,
@@ -41,19 +38,16 @@ def build_current_protocol(
     Args:
         protocol_type: One of "Step", "Ramp", "Pulse Train", "Sinusoidal",
             "Chirp", or "Noise".
-        duration: Total duration in ms.
         sampling_frequency: Sampling frequency in Hz.
+        pre_stimulus_duration: Duration before the stimulus in ms.
+        stimulus_duration: Duration of the stimulus in ms.
+        post_stimulus_duration: Duration after the stimulus in ms.
         current_amplitude: Step current amplitude in µA/cm².
-        step_start: Step onset time in ms.
-        step_duration: Step duration in ms.
         start_current: Ramp start current in µA/cm².
         end_current: Ramp end current in µA/cm².
-        ramp_start: Ramp onset time in ms.
-        ramp_duration: Ramp duration in ms.
         pulse_amplitude: Pulse amplitude in µA/cm².
         pulse_width: Pulse width in ms.
         pulse_interval: Interval between pulse starts in ms.
-        train_start: Train onset time in ms.
         dc_offset: DC offset for sinusoidal/chirp in µA/cm².
         amplitude: AC amplitude for sinusoidal/chirp in µA/cm².
         frequency: Sinusoidal frequency in Hz.
@@ -69,35 +63,36 @@ def build_current_protocol(
     Raises:
         ValueError: If protocol_type is unrecognized or parameters are invalid.
     """
+    total_duration = pre_stimulus_duration + stimulus_duration + post_stimulus_duration
     if protocol_type == "Step":
         protocol = patch_sim.step_current(
-            duration=duration,
+            duration=total_duration,
             current_amplitude=current_amplitude,
-            step_start=step_start,
-            step_duration=step_duration,
+            step_start=pre_stimulus_duration,
+            step_duration=stimulus_duration,
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Ramp":
         protocol = patch_sim.ramp_current(
-            duration=duration,
+            duration=total_duration,
             start_current=start_current,
             end_current=end_current,
-            ramp_start=ramp_start,
-            ramp_duration=ramp_duration,
+            ramp_start=pre_stimulus_duration,
+            ramp_duration=stimulus_duration,
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Pulse Train":
         protocol = patch_sim.pulse_train(
-            duration=duration,
+            duration=total_duration,
             pulse_amplitude=pulse_amplitude,
             pulse_width=pulse_width,
             pulse_interval=pulse_interval,
-            train_start=train_start,
+            train_start=pre_stimulus_duration,
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Sinusoidal":
         protocol = patch_sim.sinusoidal_current(
-            duration=duration,
+            duration=total_duration,
             dc_offset=dc_offset,
             amplitude=amplitude,
             frequency=frequency,
@@ -105,7 +100,7 @@ def build_current_protocol(
         )
     elif protocol_type == "Chirp":
         protocol = patch_sim.chirp_current(
-            duration=duration,
+            duration=total_duration,
             dc_offset=dc_offset,
             amplitude=amplitude,
             start_frequency=start_frequency,
@@ -114,7 +109,7 @@ def build_current_protocol(
         )
     elif protocol_type == "Noise":
         protocol = patch_sim.noise_current(
-            duration=duration,
+            duration=total_duration,
             mean_current=mean_current,
             std_current=std_current,
             sampling_frequency=sampling_frequency,
@@ -122,9 +117,9 @@ def build_current_protocol(
     else:
         raise ValueError(f"Unknown current protocol type: {protocol_type!r}")
     logger.debug(
-        "build_current_protocol: type=%r duration=%.1f ms steps=%d",
+        "build_current_protocol: type=%r total_duration=%.1f ms steps=%d",
         protocol_type,
-        duration,
+        total_duration,
         len(protocol),
     )
     return [(protocol, "")]

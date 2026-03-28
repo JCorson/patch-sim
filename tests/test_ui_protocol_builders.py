@@ -46,8 +46,10 @@ def test_current_protocol_returns_valid_list(protocol_type: str) -> None:
     """Each current clamp protocol returns a single-element list with a valid array."""
     result = build_current_protocol(
         protocol_type=protocol_type,
-        duration=50.0,
         sampling_frequency=SAMPLING_FREQUENCY,
+        pre_stimulus_duration=5.0,
+        stimulus_duration=40.0,
+        post_stimulus_duration=5.0,
     )
     assert _is_valid_protocol_list(result), (
         f"Protocol '{protocol_type}' returned an invalid protocol list"
@@ -111,7 +113,6 @@ def test_unknown_current_protocol_raises() -> None:
     with pytest.raises(ValueError, match="Unknown current protocol"):
         build_current_protocol(
             protocol_type="BadType",
-            duration=50.0,
             sampling_frequency=SAMPLING_FREQUENCY,
         )
 
@@ -130,7 +131,6 @@ def test_current_pulse_width_ge_interval_raises() -> None:
     with pytest.raises(ValueError, match="pulse_width"):
         build_current_protocol(
             protocol_type="Pulse Train",
-            duration=50.0,
             sampling_frequency=SAMPLING_FREQUENCY,
             pulse_width=5.0,
             pulse_interval=5.0,
@@ -188,10 +188,8 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
     }
 
     if mode == "Current Clamp":
-        duration = kwargs.pop("duration", 50.0)
         result = build_current_protocol(
             protocol_type=protocol_type,
-            duration=duration,
             sampling_frequency=sampling_frequency,
             **kwargs,
         )
