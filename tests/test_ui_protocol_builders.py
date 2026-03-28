@@ -83,6 +83,26 @@ def test_single_sweep_voltage_protocol_returns_valid_list(protocol_type: str) ->
     assert result[0][1] == ""
 
 
+def test_fi_curve_returns_multi_sweep_list() -> None:
+    """F-I Curve returns one (array, label) pair per current level."""
+    result = build_current_protocol(
+        protocol_type="F-I Curve",
+        sampling_frequency=SAMPLING_FREQUENCY,
+        pre_stimulus_duration=5.0,
+        stimulus_duration=40.0,
+        post_stimulus_duration=5.0,
+        current_min=0.0,
+        current_max=10.0,
+        current_step=5.0,
+    )
+    # 0 to 10 in steps of 5 → [0, 5, 10] = 3 sweeps
+    assert _is_valid_protocol_list(result)
+    assert len(result) == 3
+    for arr, label in result:
+        assert label != "", "Each F-I Curve sweep should have a non-empty label"
+        assert "µA/cm²" in label
+
+
 def test_iv_curve_returns_multi_sweep_list() -> None:
     """I-V Curve returns one (array, label) pair per voltage step."""
     result = build_voltage_protocol(
@@ -188,10 +208,13 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
     }
 
     if mode == "Current Clamp":
+        # Preset config keys use cc_ prefix (matching state field names); strip
+        # it so they align with build_current_protocol's parameter names.
+        cc_kwargs = {k.removeprefix("cc_"): v for k, v in kwargs.items()}
         result = build_current_protocol(
             protocol_type=protocol_type,
             sampling_frequency=sampling_frequency,
-            **kwargs,
+            **cc_kwargs,
         )
     else:
         # Preset config keys use vc_ prefix (matching state field names); strip
