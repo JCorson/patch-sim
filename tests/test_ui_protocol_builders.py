@@ -91,9 +91,9 @@ def test_iv_curve_returns_multi_sweep_list() -> None:
         pre_stimulus_duration=5.0,
         stimulus_duration=20.0,
         post_stimulus_duration=5.0,
-        vc_voltage_min=-40.0,
-        vc_voltage_max=40.0,
-        vc_voltage_step=20.0,
+        voltage_min=-40.0,
+        voltage_max=40.0,
+        voltage_step=20.0,
     )
     # -40 to +40 in steps of 20 → [-40, -20, 0, +20, +40] = 5 sweeps
     assert _is_valid_protocol_list(result)
@@ -138,13 +138,13 @@ def test_current_pulse_width_ge_interval_raises() -> None:
 
 
 def test_voltage_pulse_width_ge_interval_raises() -> None:
-    """vc_pulse_width >= vc_pulse_interval raises ValueError for Pulse Train."""
+    """pulse_width >= pulse_interval raises ValueError for Voltage Pulse Train."""
     with pytest.raises(ValueError, match="pulse_width"):
         build_voltage_protocol(
             protocol_type="Pulse Train",
             sampling_frequency=SAMPLING_FREQUENCY,
-            vc_pulse_width=5.0,
-            vc_pulse_interval=5.0,
+            pulse_width=5.0,
+            pulse_interval=5.0,
         )
 
 
@@ -194,10 +194,13 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
             **kwargs,
         )
     else:
+        # Preset config keys use vc_ prefix (matching state field names); strip
+        # it so they align with build_voltage_protocol's parameter names.
+        vc_kwargs = {k.removeprefix("vc_"): v for k, v in kwargs.items()}
         result = build_voltage_protocol(
             protocol_type=protocol_type,
             sampling_frequency=sampling_frequency,
-            **kwargs,
+            **vc_kwargs,
         )
 
     assert _is_valid_protocol_list(result), (

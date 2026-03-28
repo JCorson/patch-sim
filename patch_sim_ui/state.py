@@ -149,10 +149,11 @@ _FLOAT_FIELDS: list[str] = [
     "Ca_out",
     "Ca_in",
     "T",
-    # Current clamp protocol params
+    # Protocol params — shared
     "pre_stimulus_duration",
     "stimulus_duration",
     "post_stimulus_duration",
+    # Current clamp protocol params
     "current_amplitude",
     "start_current",
     "end_current",
@@ -681,11 +682,11 @@ class AppState(rx.State):
     # Protocol parameters                                                #
     # ------------------------------------------------------------------ #
     protocol_type: str = "Step"
-
-    # Current clamp protocol params
     pre_stimulus_duration: float = 10.0
     stimulus_duration: float = 30.0
     post_stimulus_duration: float = 10.0
+
+    # Current clamp protocol params
     current_amplitude: float = 10.0
     start_current: float = 0.0
     end_current: float = 15.0
@@ -1197,16 +1198,16 @@ class AppState(rx.State):
                 pre_stimulus_duration=self.pre_stimulus_duration,
                 stimulus_duration=self.stimulus_duration,
                 post_stimulus_duration=self.post_stimulus_duration,
-                vc_holding_voltage=self.vc_holding_voltage,
-                vc_voltage_amplitude=self.vc_voltage_amplitude,
-                vc_start_voltage=self.vc_start_voltage,
-                vc_end_voltage=self.vc_end_voltage,
-                vc_pulse_amplitude=self.vc_pulse_amplitude,
-                vc_pulse_width=self.vc_pulse_width,
-                vc_pulse_interval=self.vc_pulse_interval,
-                vc_voltage_min=self.vc_voltage_min,
-                vc_voltage_max=self.vc_voltage_max,
-                vc_voltage_step=self.vc_voltage_step,
+                holding_voltage=self.vc_holding_voltage,
+                voltage_amplitude=self.vc_voltage_amplitude,
+                start_voltage=self.vc_start_voltage,
+                end_voltage=self.vc_end_voltage,
+                pulse_amplitude=self.vc_pulse_amplitude,
+                pulse_width=self.vc_pulse_width,
+                pulse_interval=self.vc_pulse_interval,
+                voltage_min=self.vc_voltage_min,
+                voltage_max=self.vc_voltage_max,
+                voltage_step=self.vc_voltage_step,
             )
 
     # ------------------------------------------------------------------ #

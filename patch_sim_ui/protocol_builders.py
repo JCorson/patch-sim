@@ -96,6 +96,8 @@ def build_current_protocol(
             dc_offset=dc_offset,
             amplitude=amplitude,
             frequency=frequency,
+            stimulus_start=pre_stimulus_duration,
+            stimulus_duration=stimulus_duration,
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Chirp":
@@ -105,6 +107,8 @@ def build_current_protocol(
             amplitude=amplitude,
             start_frequency=start_frequency,
             end_frequency=end_frequency,
+            stimulus_start=pre_stimulus_duration,
+            stimulus_duration=stimulus_duration,
             sampling_frequency=sampling_frequency,
         )
     elif protocol_type == "Noise":
@@ -112,6 +116,8 @@ def build_current_protocol(
             duration=total_duration,
             mean_current=mean_current,
             std_current=std_current,
+            stimulus_start=pre_stimulus_duration,
+            stimulus_duration=stimulus_duration,
             sampling_frequency=sampling_frequency,
         )
     else:
@@ -131,16 +137,16 @@ def build_voltage_protocol(
     pre_stimulus_duration: float = 10.0,
     stimulus_duration: float = 30.0,
     post_stimulus_duration: float = 10.0,
-    vc_holding_voltage: float = -70.0,
-    vc_voltage_amplitude: float = 0.0,
-    vc_start_voltage: float = -70.0,
-    vc_end_voltage: float = 40.0,
-    vc_pulse_amplitude: float = 20.0,
-    vc_pulse_width: float = 2.0,
-    vc_pulse_interval: float = 10.0,
-    vc_voltage_min: float = -100.0,
-    vc_voltage_max: float = 60.0,
-    vc_voltage_step: float = 10.0,
+    holding_voltage: float = -70.0,
+    voltage_amplitude: float = 0.0,
+    start_voltage: float = -70.0,
+    end_voltage: float = 40.0,
+    pulse_amplitude: float = 20.0,
+    pulse_width: float = 2.0,
+    pulse_interval: float = 10.0,
+    voltage_min: float = -100.0,
+    voltage_max: float = 60.0,
+    voltage_step: float = 10.0,
 ) -> list[tuple[np.ndarray, str]]:
     """Build voltage clamp protocol arrays from explicit parameters.
 
@@ -150,16 +156,16 @@ def build_voltage_protocol(
         pre_stimulus_duration: Duration before the stimulus in ms.
         stimulus_duration: Duration of the stimulus in ms.
         post_stimulus_duration: Duration after the stimulus in ms.
-        vc_holding_voltage: Holding voltage in mV.
-        vc_voltage_amplitude: Step voltage amplitude in mV.
-        vc_start_voltage: Ramp start voltage in mV.
-        vc_end_voltage: Ramp end voltage in mV.
-        vc_pulse_amplitude: Pulse amplitude in mV.
-        vc_pulse_width: Pulse width in ms.
-        vc_pulse_interval: Interval between pulse starts in ms.
-        vc_voltage_min: Minimum voltage for I-V curve in mV.
-        vc_voltage_max: Maximum voltage for I-V curve in mV.
-        vc_voltage_step: Voltage step size in mV (I-V curve).
+        holding_voltage: Holding voltage in mV.
+        voltage_amplitude: Step voltage amplitude in mV.
+        start_voltage: Ramp start voltage in mV.
+        end_voltage: Ramp end voltage in mV.
+        pulse_amplitude: Pulse amplitude in mV.
+        pulse_width: Pulse width in ms.
+        pulse_interval: Interval between pulse starts in ms.
+        voltage_min: Minimum voltage for I-V curve in mV.
+        voltage_max: Maximum voltage for I-V curve in mV.
+        voltage_step: Voltage step size in mV (I-V curve).
 
     Returns:
         List of (stimulus_array, sweep_label) pairs. Single-sweep protocols
@@ -174,39 +180,39 @@ def build_voltage_protocol(
     if protocol_type == "Step":
         protocol = patch_sim.step_voltage(
             duration=total_duration,
-            voltage_amplitude=vc_voltage_amplitude,
+            voltage_amplitude=voltage_amplitude,
             step_start=pre_stimulus_duration,
             step_duration=stimulus_duration,
-            holding_voltage=vc_holding_voltage,
+            holding_voltage=holding_voltage,
             sampling_frequency=sampling_frequency,
         )
         result = [(protocol, "")]
     elif protocol_type == "Ramp":
         protocol = patch_sim.ramp_voltage(
             duration=total_duration,
-            start_voltage=vc_start_voltage,
-            end_voltage=vc_end_voltage,
+            start_voltage=start_voltage,
+            end_voltage=end_voltage,
             ramp_start=pre_stimulus_duration,
             ramp_duration=stimulus_duration,
-            holding_voltage=vc_holding_voltage,
+            holding_voltage=holding_voltage,
             sampling_frequency=sampling_frequency,
         )
         result = [(protocol, "")]
     elif protocol_type == "Pulse Train":
         protocol = patch_sim.pulse_train_voltage(
             duration=total_duration,
-            pulse_amplitude=vc_pulse_amplitude,
-            pulse_width=vc_pulse_width,
-            pulse_interval=vc_pulse_interval,
+            pulse_amplitude=pulse_amplitude,
+            pulse_width=pulse_width,
+            pulse_interval=pulse_interval,
             train_start=pre_stimulus_duration,
-            holding_voltage=vc_holding_voltage,
+            holding_voltage=holding_voltage,
             sampling_frequency=sampling_frequency,
         )
         result = [(protocol, "")]
     elif protocol_type == "I-V Curve":
-        voltage_range = vc_voltage_max - vc_voltage_min
-        n_steps = round(voltage_range / vc_voltage_step) + 1
-        voltages = np.linspace(vc_voltage_min, vc_voltage_max, n_steps)
+        voltage_range = voltage_max - voltage_min
+        n_steps = round(voltage_range / voltage_step) + 1
+        voltages = np.linspace(voltage_min, voltage_max, n_steps)
         result = [
             (
                 patch_sim.step_voltage(
@@ -214,7 +220,7 @@ def build_voltage_protocol(
                     voltage_amplitude=float(voltage),
                     step_start=pre_stimulus_duration,
                     step_duration=stimulus_duration,
-                    holding_voltage=vc_holding_voltage,
+                    holding_voltage=holding_voltage,
                     sampling_frequency=sampling_frequency,
                 ),
                 f"{voltage:+.0f} mV",
