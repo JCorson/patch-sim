@@ -20,10 +20,16 @@ from patch_sim_ui.presets import PRESETS
 SAMPLING_FREQUENCY = 10000.0  # Hz — matches UI default
 
 
-def _is_valid_array(arr: np.ndarray) -> bool:
-    """Return True if arr is a non-empty ndarray with all finite values."""
-    return (
-        isinstance(arr, np.ndarray) and arr.size > 0 and bool(np.all(np.isfinite(arr)))
+def _is_valid_protocol_list(result: list[tuple[np.ndarray, str]]) -> bool:
+    """Return True if result is a non-empty list of (finite ndarray, str) pairs."""
+    if not isinstance(result, list) or len(result) == 0:
+        return False
+    return all(
+        isinstance(arr, np.ndarray)
+        and arr.size > 0
+        and bool(np.all(np.isfinite(arr)))
+        and isinstance(label, str)
+        for arr, label in result
     )
 
 
@@ -36,16 +42,20 @@ def _is_valid_array(arr: np.ndarray) -> bool:
     "protocol_type",
     ["Step", "Ramp", "Pulse Train", "Sinusoidal", "Chirp", "Noise"],
 )
-def test_current_protocol_returns_valid_array(protocol_type: str) -> None:
-    """Each current clamp protocol type returns a non-empty finite array."""
+def test_current_protocol_returns_valid_list(protocol_type: str) -> None:
+    """Each current clamp protocol returns a single-element list with a valid array."""
     result = build_current_protocol(
         protocol_type=protocol_type,
-        duration=50.0,
         sampling_frequency=SAMPLING_FREQUENCY,
+        pre_stimulus_duration=5.0,
+        stimulus_duration=40.0,
+        post_stimulus_duration=5.0,
     )
-    assert _is_valid_array(result), (
-        f"Protocol '{protocol_type}' returned an invalid array"
+    assert _is_valid_protocol_list(result), (
+        f"Protocol '{protocol_type}' returned an invalid protocol list"
     )
+    assert len(result) == 1
+    assert result[0][1] == ""
 
 
 # ---------------------------------------------------------------------------
@@ -55,18 +65,42 @@ def test_current_protocol_returns_valid_array(protocol_type: str) -> None:
 
 @pytest.mark.parametrize(
     "protocol_type",
-    ["Step", "Ramp", "Pulse Train", "I-V Curve"],
+    ["Step", "Ramp", "Pulse Train"],
 )
-def test_voltage_protocol_returns_valid_array(protocol_type: str) -> None:
-    """Each voltage clamp protocol type returns a non-empty finite array."""
+def test_single_sweep_voltage_protocol_returns_valid_list(protocol_type: str) -> None:
+    """Single-sweep voltage protocols return a one-element list with a valid array."""
     result = build_voltage_protocol(
         protocol_type=protocol_type,
-        duration=20.0,
         sampling_frequency=SAMPLING_FREQUENCY,
+        pre_stimulus_duration=5.0,
+        stimulus_duration=10.0,
+        post_stimulus_duration=5.0,
     )
-    assert _is_valid_array(result), (
-        f"Protocol '{protocol_type}' returned an invalid array"
+    assert _is_valid_protocol_list(result), (
+        f"Protocol '{protocol_type}' returned an invalid protocol list"
     )
+    assert len(result) == 1
+    assert result[0][1] == ""
+
+
+def test_iv_curve_returns_multi_sweep_list() -> None:
+    """I-V Curve returns one (array, label) pair per voltage step."""
+    result = build_voltage_protocol(
+        protocol_type="I-V Curve",
+        sampling_frequency=SAMPLING_FREQUENCY,
+        pre_stimulus_duration=5.0,
+        stimulus_duration=20.0,
+        post_stimulus_duration=5.0,
+        voltage_min=-40.0,
+        voltage_max=40.0,
+        voltage_step=20.0,
+    )
+    # -40 to +40 in steps of 20 → [-40, -20, 0, +20, +40] = 5 sweeps
+    assert _is_valid_protocol_list(result)
+    assert len(result) == 5
+    for arr, label in result:
+        assert label != "", "Each I-V Curve sweep should have a non-empty label"
+        assert "mV" in label
 
 
 # ---------------------------------------------------------------------------
@@ -79,7 +113,6 @@ def test_unknown_current_protocol_raises() -> None:
     with pytest.raises(ValueError, match="Unknown current protocol"):
         build_current_protocol(
             protocol_type="BadType",
-            duration=50.0,
             sampling_frequency=SAMPLING_FREQUENCY,
         )
 
@@ -89,7 +122,6 @@ def test_unknown_voltage_protocol_raises() -> None:
     with pytest.raises(ValueError, match="Unknown voltage protocol"):
         build_voltage_protocol(
             protocol_type="BadType",
-            duration=20.0,
             sampling_frequency=SAMPLING_FREQUENCY,
         )
 
@@ -99,7 +131,6 @@ def test_current_pulse_width_ge_interval_raises() -> None:
     with pytest.raises(ValueError, match="pulse_width"):
         build_current_protocol(
             protocol_type="Pulse Train",
-            duration=50.0,
             sampling_frequency=SAMPLING_FREQUENCY,
             pulse_width=5.0,
             pulse_interval=5.0,
@@ -107,14 +138,13 @@ def test_current_pulse_width_ge_interval_raises() -> None:
 
 
 def test_voltage_pulse_width_ge_interval_raises() -> None:
-    """vc_pulse_width >= vc_pulse_interval raises ValueError for Pulse Train."""
+    """pulse_width >= pulse_interval raises ValueError for Voltage Pulse Train."""
     with pytest.raises(ValueError, match="pulse_width"):
         build_voltage_protocol(
             protocol_type="Pulse Train",
-            duration=50.0,
             sampling_frequency=SAMPLING_FREQUENCY,
-            vc_pulse_width=5.0,
-            vc_pulse_interval=5.0,
+            pulse_width=5.0,
+            pulse_interval=5.0,
         )
 
 
@@ -123,82 +153,56 @@ def test_voltage_pulse_width_ge_interval_raises() -> None:
 # ---------------------------------------------------------------------------
 
 
+_NEURON_KEYS = {
+    "clamp_mode",
+    "protocol_type",
+    "sampling_frequency",
+    "g_Na",
+    "g_K",
+    "g_L",
+    "C_m",
+    "v_rest",
+    "Na_out",
+    "Na_in",
+    "K_out",
+    "K_in",
+    "Cl_out",
+    "Cl_in",
+    "Ca_out",
+    "Ca_in",
+    "T",
+}
+
+
 @pytest.mark.parametrize("preset_name", list(PRESETS.keys()))
 def test_preset_produces_valid_protocol(preset_name: str) -> None:
-    """For each preset, building the corresponding protocol returns a valid array."""
+    """For each preset, building the corresponding protocol returns a valid list."""
     config = PRESETS[preset_name]
     mode = config.get("clamp_mode", "Current Clamp")
     protocol_type = config.get("protocol_type", "Step")
-    duration = float(config.get("duration", 50.0))
     sampling_frequency = float(config.get("sampling_frequency", SAMPLING_FREQUENCY))
+    kwargs = {
+        k: float(v)
+        for k, v in config.items()
+        if k not in _NEURON_KEYS and isinstance(v, (int, float))
+    }
 
     if mode == "Current Clamp":
-        kwargs = {
-            k: float(v)
-            for k, v in config.items()
-            if k
-            not in {
-                "clamp_mode",
-                "protocol_type",
-                "duration",
-                "sampling_frequency",
-                "g_Na",
-                "g_K",
-                "g_L",
-                "C_m",
-                "v_rest",
-                "Na_out",
-                "Na_in",
-                "K_out",
-                "K_in",
-                "Cl_out",
-                "Cl_in",
-                "Ca_out",
-                "Ca_in",
-                "T",
-            }
-            and isinstance(v, (int, float))
-        }
         result = build_current_protocol(
             protocol_type=protocol_type,
-            duration=duration,
             sampling_frequency=sampling_frequency,
             **kwargs,
         )
     else:
-        kwargs = {
-            k: float(v)
-            for k, v in config.items()
-            if k
-            not in {
-                "clamp_mode",
-                "protocol_type",
-                "duration",
-                "sampling_frequency",
-                "g_Na",
-                "g_K",
-                "g_L",
-                "C_m",
-                "v_rest",
-                "Na_out",
-                "Na_in",
-                "K_out",
-                "K_in",
-                "Cl_out",
-                "Cl_in",
-                "Ca_out",
-                "Ca_in",
-                "T",
-            }
-            and isinstance(v, (int, float))
-        }
+        # Preset config keys use vc_ prefix (matching state field names); strip
+        # it so they align with build_voltage_protocol's parameter names.
+        vc_kwargs = {k.removeprefix("vc_"): v for k, v in kwargs.items()}
         result = build_voltage_protocol(
             protocol_type=protocol_type,
-            duration=duration,
             sampling_frequency=sampling_frequency,
-            **kwargs,
+            **vc_kwargs,
         )
 
-    assert _is_valid_array(result), (
-        f"Preset '{preset_name}' produced an invalid protocol array"
+    assert _is_valid_protocol_list(result), (
+        f"Preset '{preset_name}' produced an invalid protocol list"
     )

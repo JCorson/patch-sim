@@ -73,38 +73,38 @@ def _make_sweep(label: str = "test", color: str = "#000000") -> Sweep:
 def test_set_float_accepts_plain_float() -> None:
     """_set_float stores a plain float value as-is."""
     s = _make_state()
-    s._set_float("duration", 99.5)
-    assert s.duration == pytest.approx(99.5)
+    s._set_float("stimulus_duration", 99.5)
+    assert s.stimulus_duration == pytest.approx(99.5)
 
 
 def test_set_float_accepts_string() -> None:
     """_set_float parses a string to float and stores it."""
     s = _make_state()
-    s._set_float("duration", "77.25")
-    assert s.duration == pytest.approx(77.25)
+    s._set_float("stimulus_duration", "77.25")
+    assert s.stimulus_duration == pytest.approx(77.25)
 
 
 def test_set_float_accepts_list_uses_first_element() -> None:
     """_set_float uses the first element when given a list (slider events)."""
     s = _make_state()
-    s._set_float("duration", [42.0, 50.0])
-    assert s.duration == pytest.approx(42.0)
+    s._set_float("stimulus_duration", [42.0, 50.0])
+    assert s.stimulus_duration == pytest.approx(42.0)
 
 
 def test_set_float_ignores_unparseable_string() -> None:
     """_set_float silently ignores values that cannot be converted to float."""
     s = _make_state()
-    original = s.duration
-    s._set_float("duration", "not_a_number")
-    assert s.duration == pytest.approx(original)
+    original = s.stimulus_duration
+    s._set_float("stimulus_duration", "not_a_number")
+    assert s.stimulus_duration == pytest.approx(original)
 
 
 def test_set_float_ignores_none() -> None:
     """_set_float silently ignores None without raising."""
     s = _make_state()
-    original = s.duration
-    s._set_float("duration", None)  # type: ignore[arg-type]
-    assert s.duration == pytest.approx(original)
+    original = s.stimulus_duration
+    s._set_float("stimulus_duration", None)  # type: ignore[arg-type]
+    assert s.stimulus_duration == pytest.approx(original)
 
 
 # ---------------------------------------------------------------------------
@@ -113,24 +113,24 @@ def test_set_float_ignores_none() -> None:
 
 
 def test_generated_float_setter_stores_value() -> None:
-    """set_duration(50.0) stores 50.0 in self.duration."""
+    """set_stimulus_duration(50.0) stores 50.0 in self.stimulus_duration."""
     s = _make_state()
-    s.set_duration(50.0)
-    assert s.duration == pytest.approx(50.0)
+    s.set_stimulus_duration(50.0)
+    assert s.stimulus_duration == pytest.approx(50.0)
 
 
 def test_generated_float_setter_accepts_string() -> None:
     """Generated float setter parses a string value via _set_float."""
     s = _make_state()
-    s.set_duration("123.4")
-    assert s.duration == pytest.approx(123.4)
+    s.set_stimulus_duration("123.4")
+    assert s.stimulus_duration == pytest.approx(123.4)
 
 
 def test_generated_float_setter_accepts_list() -> None:
     """Generated float setter accepts a slider list and uses the first element."""
     s = _make_state()
-    s.set_duration([25.0, 50.0])
-    assert s.duration == pytest.approx(25.0)
+    s.set_stimulus_duration([25.0, 50.0])
+    assert s.stimulus_duration == pytest.approx(25.0)
 
 
 # ---------------------------------------------------------------------------
@@ -208,10 +208,10 @@ def test_clear_sweeps_on_empty_list_does_not_raise() -> None:
 
 
 def test_load_preset_action_potential_sets_duration() -> None:
-    """Loading 'Action Potential' preset sets duration to 50.0."""
+    """Loading 'Action Potential' preset sets stimulus_duration to 30.0."""
     s = _make_state()
     s.load_preset("Action Potential")
-    assert s.duration == pytest.approx(50.0)
+    assert s.stimulus_duration == pytest.approx(30.0)
 
 
 def test_load_preset_action_potential_sets_clamp_mode() -> None:
@@ -222,10 +222,10 @@ def test_load_preset_action_potential_sets_clamp_mode() -> None:
 
 
 def test_load_preset_repetitive_firing_sets_duration() -> None:
-    """Loading 'Repetitive Firing' preset sets duration to 200.0."""
+    """Loading 'Repetitive Firing' preset sets stimulus_duration to 180.0."""
     s = _make_state()
     s.load_preset("Repetitive Firing")
-    assert s.duration == pytest.approx(200.0)
+    assert s.stimulus_duration == pytest.approx(180.0)
 
 
 def test_load_preset_iv_curve_sets_voltage_clamp_mode() -> None:
@@ -273,9 +273,9 @@ def test_load_preset_resets_cont_has_state() -> None:
 def test_load_preset_unknown_name_is_ignored() -> None:
     """load_preset silently ignores an unknown preset name."""
     s = _make_state()
-    original_duration = s.duration
+    original = s.stimulus_duration
     s.load_preset("NonExistentPreset")
-    assert s.duration == pytest.approx(original_duration)
+    assert s.stimulus_duration == pytest.approx(original)
 
 
 # ---------------------------------------------------------------------------

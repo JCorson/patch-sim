@@ -55,7 +55,7 @@ from patch_sim.additional_channels import (
     make_inar_channel,
 )
 from patch_sim_ui import constants, presets
-from patch_sim_ui.constants import CURRENT_CLAMP
+from patch_sim_ui.constants import CURRENT_CLAMP, MULTI_SWEEP_PROTOCOL_TYPES
 from patch_sim_ui.plotting import (
     Sweep,
     TraceVisibility,
@@ -149,20 +149,17 @@ _FLOAT_FIELDS: list[str] = [
     "Ca_out",
     "Ca_in",
     "T",
-    # Shared protocol params
-    "duration",
+    # Protocol params — shared
+    "pre_stimulus_duration",
+    "stimulus_duration",
+    "post_stimulus_duration",
     # Current clamp protocol params
     "current_amplitude",
-    "step_start",
-    "step_duration",
     "start_current",
     "end_current",
-    "ramp_start",
-    "ramp_duration",
     "pulse_amplitude",
     "pulse_width",
     "pulse_interval",
-    "train_start",
     "dc_offset",
     "amplitude",
     "frequency",
@@ -172,22 +169,15 @@ _FLOAT_FIELDS: list[str] = [
     "std_current",
     # Voltage clamp protocol params
     "vc_voltage_amplitude",
-    "vc_step_start",
-    "vc_step_duration",
     "vc_holding_voltage",
     "vc_start_voltage",
     "vc_end_voltage",
-    "vc_ramp_start",
-    "vc_ramp_duration",
     "vc_pulse_amplitude",
     "vc_pulse_width",
     "vc_pulse_interval",
-    "vc_train_start",
     "vc_voltage_min",
     "vc_voltage_max",
     "vc_voltage_step",
-    "vc_pre_pulse_duration",
-    "vc_post_pulse_duration",
     # Additional channel params
     "ih_g_max",
     "ika_g_max",
@@ -689,23 +679,20 @@ class AppState(rx.State):
     clamp_mode: str = CURRENT_CLAMP  # CURRENT_CLAMP | VOLTAGE_CLAMP
 
     # ------------------------------------------------------------------ #
-    # Protocol parameters — shared                                       #
+    # Protocol parameters                                                #
     # ------------------------------------------------------------------ #
     protocol_type: str = "Step"
-    duration: float = 50.0
+    pre_stimulus_duration: float = 10.0
+    stimulus_duration: float = 30.0
+    post_stimulus_duration: float = 10.0
 
     # Current clamp protocol params
     current_amplitude: float = 10.0
-    step_start: float = 10.0
-    step_duration: float = 30.0
     start_current: float = 0.0
     end_current: float = 15.0
-    ramp_start: float = 0.0
-    ramp_duration: float = 40.0
     pulse_amplitude: float = 10.0
     pulse_width: float = 2.0
     pulse_interval: float = 10.0
-    train_start: float = 5.0
     dc_offset: float = 8.0
     amplitude: float = 4.0
     frequency: float = 50.0
@@ -716,22 +703,15 @@ class AppState(rx.State):
 
     # Voltage clamp protocol params
     vc_voltage_amplitude: float = 0.0
-    vc_step_start: float = 10.0
-    vc_step_duration: float = 30.0
     vc_holding_voltage: float = -70.0
     vc_start_voltage: float = -70.0
     vc_end_voltage: float = 40.0
-    vc_ramp_start: float = 0.0
-    vc_ramp_duration: float = 40.0
     vc_pulse_amplitude: float = 20.0
     vc_pulse_width: float = 2.0
     vc_pulse_interval: float = 10.0
-    vc_train_start: float = 5.0
     vc_voltage_min: float = -100.0
     vc_voltage_max: float = 60.0
     vc_voltage_step: float = 10.0
-    vc_pre_pulse_duration: float = 5.0
-    vc_post_pulse_duration: float = 5.0
     # ------------------------------------------------------------------ #
     # Simulation results                                                  #
     # ------------------------------------------------------------------ #
@@ -858,10 +838,10 @@ class AppState(rx.State):
     def can_run_continuous(self) -> bool:
         """True when the active protocol is compatible with continuous mode.
 
-        Multi-sweep protocols (I-V Curve) are excluded because each of their
-        sweeps uses independent initial conditions.
+        Multi-sweep protocols are excluded; continuous mode is limited to
+        single-sweep protocols only.
         """
-        return self.protocol_type != "I-V Curve"
+        return self.protocol_type not in MULTI_SWEEP_PROTOCOL_TYPES
 
     @rx.var
     def filtered_log_entries(self) -> list[UILogRecord]:
@@ -1181,25 +1161,28 @@ class AppState(rx.State):
             calcium_dynamics=calcium_dynamics,
         )
 
-    def _build_protocol(self) -> "np.ndarray":
-        """Build the stimulus array from current protocol state."""
+    def _build_protocols(self) -> "list[tuple[np.ndarray, str]]":
+        """Build stimulus arrays from current protocol state.
+
+        Returns:
+            List of (stimulus_array, sweep_label) pairs. Single-sweep protocols
+            return a one-element list with an empty label; multi-sweep protocols
+            (e.g. I-V Curve) return one entry per sweep with a descriptive label.
+        """
         fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
         if self.clamp_mode == "Current Clamp":
             return build_current_protocol(
                 protocol_type=self.protocol_type,
-                duration=self.duration,
                 sampling_frequency=fs,
+                pre_stimulus_duration=self.pre_stimulus_duration,
+                stimulus_duration=self.stimulus_duration,
+                post_stimulus_duration=self.post_stimulus_duration,
                 current_amplitude=self.current_amplitude,
-                step_start=self.step_start,
-                step_duration=self.step_duration,
                 start_current=self.start_current,
                 end_current=self.end_current,
-                ramp_start=self.ramp_start,
-                ramp_duration=self.ramp_duration,
                 pulse_amplitude=self.pulse_amplitude,
                 pulse_width=self.pulse_width,
                 pulse_interval=self.pulse_interval,
-                train_start=self.train_start,
                 dc_offset=self.dc_offset,
                 amplitude=self.amplitude,
                 frequency=self.frequency,
@@ -1211,25 +1194,20 @@ class AppState(rx.State):
         else:
             return build_voltage_protocol(
                 protocol_type=self.protocol_type,
-                duration=self.duration,
                 sampling_frequency=fs,
-                vc_holding_voltage=self.vc_holding_voltage,
-                vc_voltage_amplitude=self.vc_voltage_amplitude,
-                vc_step_start=self.vc_step_start,
-                vc_step_duration=self.vc_step_duration,
-                vc_start_voltage=self.vc_start_voltage,
-                vc_end_voltage=self.vc_end_voltage,
-                vc_ramp_start=self.vc_ramp_start,
-                vc_ramp_duration=self.vc_ramp_duration,
-                vc_pulse_amplitude=self.vc_pulse_amplitude,
-                vc_pulse_width=self.vc_pulse_width,
-                vc_pulse_interval=self.vc_pulse_interval,
-                vc_train_start=self.vc_train_start,
-                vc_voltage_min=self.vc_voltage_min,
-                vc_voltage_max=self.vc_voltage_max,
-                vc_voltage_step=self.vc_voltage_step,
-                vc_pre_pulse_duration=self.vc_pre_pulse_duration,
-                vc_post_pulse_duration=self.vc_post_pulse_duration,
+                pre_stimulus_duration=self.pre_stimulus_duration,
+                stimulus_duration=self.stimulus_duration,
+                post_stimulus_duration=self.post_stimulus_duration,
+                holding_voltage=self.vc_holding_voltage,
+                voltage_amplitude=self.vc_voltage_amplitude,
+                start_voltage=self.vc_start_voltage,
+                end_voltage=self.vc_end_voltage,
+                pulse_amplitude=self.vc_pulse_amplitude,
+                pulse_width=self.vc_pulse_width,
+                pulse_interval=self.vc_pulse_interval,
+                voltage_min=self.vc_voltage_min,
+                voltage_max=self.vc_voltage_max,
+                voltage_step=self.vc_voltage_step,
             )
 
     # ------------------------------------------------------------------ #
@@ -1274,7 +1252,7 @@ class AppState(rx.State):
                     mode = self.clamp_mode
                     ptype = self.protocol_type
                     neuron = self._build_neuron()
-                    stimulus = self._build_protocol()
+                    stimulus = self._build_protocols()[0][0]
                     use_prior_state = self._cont_has_state
                     prior_V = self._cont_V
                     prior_gating = dict(self._cont_gating)
@@ -1394,34 +1372,7 @@ class AppState(rx.State):
             neuron = self._build_neuron()
             mode = self.clamp_mode
             ptype = self.protocol_type
-            fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
-            if ptype == "I-V Curve":
-                stimulus = None
-                sweep_duration = (
-                    self.vc_pre_pulse_duration
-                    + self.duration
-                    + self.vc_post_pulse_duration
-                )
-                voltage_range = self.vc_voltage_max - self.vc_voltage_min
-                n_steps = round(voltage_range / self.vc_voltage_step) + 1
-                voltages = np.linspace(
-                    self.vc_voltage_min, self.vc_voltage_max, n_steps
-                )
-                iv_protocols = [
-                    patch_sim.step_voltage(
-                        duration=sweep_duration,
-                        voltage_amplitude=float(voltage),
-                        step_start=self.vc_pre_pulse_duration,
-                        step_duration=self.duration,
-                        holding_voltage=self.vc_holding_voltage,
-                        sampling_frequency=fs,
-                    )
-                    for voltage in voltages
-                ]
-            else:
-                stimulus = self._build_protocol()
-                voltages = np.array([])
-                iv_protocols = []
+            protocols = self._build_protocols()
 
         _start_ms = time.monotonic() * 1000
         logger.info(
@@ -1430,29 +1381,25 @@ class AppState(rx.State):
             ptype,
         )
         loop = asyncio.get_running_loop()
+        sim_fn = (
+            patch_sim.simulate_current_clamp
+            if mode == CURRENT_CLAMP
+            else patch_sim.simulate_voltage_clamp
+        )
+        is_multi = len(protocols) > 1
         try:
-            if mode == CURRENT_CLAMP:
-                df = await loop.run_in_executor(
-                    None, patch_sim.simulate_current_clamp, neuron, stimulus
-                )
-                async with self:
-                    self.current_sweeps = [
-                        Sweep.from_dataframe(df, stimulus, "", "", mode)
-                    ]
-
-            elif ptype == "I-V Curve":
-                # Run each voltage step as an independent sweep so that
-                # gating variables are reset between steps — matching real
-                # patch-clamp I-V curve experiments.
-                def _run_iv_batch() -> list[Sweep]:
-                    """Run all I-V curve sweeps and return assembled Sweep list."""
+            if is_multi:
+                # Run each sweep independently so gating variables are reset
+                # between steps — matching real patch-clamp I-V experiments.
+                def _run_batch() -> list[Sweep]:
+                    """Run all sweeps via simulate_batch and assemble Sweep list."""
                     new_sweeps: list[Sweep] = []
-                    for sweep_df, voltage, protocol in zip(
-                        patch_sim.simulate_batch(neuron, iv_protocols),
-                        voltages,
-                        iv_protocols,
+                    for sweep_df, (protocol, label) in zip(
+                        patch_sim.simulate_batch(
+                            neuron, [p for p, _ in protocols], sim_fn
+                        ),
+                        protocols,
                     ):
-                        label = f"{voltage:+.0f} mV"
                         color_index = len(new_sweeps) % len(constants.SWEEP_COLORS)
                         new_sweeps.append(
                             Sweep.from_dataframe(
@@ -1465,14 +1412,13 @@ class AppState(rx.State):
                         )
                     return new_sweeps
 
-                new_sweeps = await loop.run_in_executor(None, _run_iv_batch)
+                new_sweeps = await loop.run_in_executor(None, _run_batch)
                 async with self:
                     self.current_sweeps = new_sweeps
 
             else:
-                df = await loop.run_in_executor(
-                    None, patch_sim.simulate_voltage_clamp, neuron, stimulus
-                )
+                stimulus, _ = protocols[0]
+                df = await loop.run_in_executor(None, sim_fn, neuron, stimulus)
                 async with self:
                     self.current_sweeps = [
                         Sweep.from_dataframe(df, stimulus, "", "", mode)

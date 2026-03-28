@@ -52,6 +52,11 @@ VOLTAGE_PROTOCOLS: list[str] = [
     "I-V Curve",
 ]
 
+# Protocol types that produce multiple sweeps (multi-sweep protocols are
+# incompatible with continuous mode).  Extend this set when adding new
+# multi-sweep protocols (e.g. stepped current clamp in Issue #127).
+MULTI_SWEEP_PROTOCOL_TYPES: frozenset[str] = frozenset({"I-V Curve"})
+
 # Fixed colour for the Current Clamp voltage trace.  Matches the blue used for
 # I_total in Voltage Clamp so the primary response trace looks consistent across
 # both modes.

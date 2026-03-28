@@ -24,18 +24,35 @@ def _num_field(label: str, var: rx.Var, handler, unit: str = "") -> rx.Component
     )
 
 
+def _duration_fields() -> tuple[rx.Component, rx.Component, rx.Component]:
+    """Return the three shared pre/stimulus/post-stimulus duration fields."""
+    return (
+        _num_field(
+            "Pre-stimulus (ms)",
+            AppState.pre_stimulus_duration,
+            AppState.set_pre_stimulus_duration,
+        ),
+        _num_field(
+            "Stimulus (ms)",
+            AppState.stimulus_duration,
+            AppState.set_stimulus_duration,
+        ),
+        _num_field(
+            "Post-stimulus (ms)",
+            AppState.post_stimulus_duration,
+            AppState.set_post_stimulus_duration,
+        ),
+    )
+
+
 def _cc_step_params() -> rx.Component:
     """Parameter fields for the current clamp Step protocol."""
     return rx.vstack(
-        _num_field("Duration (ms)", AppState.duration, AppState.set_duration),
+        *_duration_fields(),
         _num_field(
             "Amplitude (µA/cm²)",
             AppState.current_amplitude,
             AppState.set_current_amplitude,
-        ),
-        _num_field("Step start (ms)", AppState.step_start, AppState.set_step_start),
-        _num_field(
-            "Step duration (ms)", AppState.step_duration, AppState.set_step_duration
         ),
         spacing="2",
         width="100%",
@@ -45,7 +62,7 @@ def _cc_step_params() -> rx.Component:
 def _cc_ramp_params() -> rx.Component:
     """Parameter fields for the current clamp Ramp protocol."""
     return rx.vstack(
-        _num_field("Duration (ms)", AppState.duration, AppState.set_duration),
+        *_duration_fields(),
         _num_field(
             "Start current (µA/cm²)",
             AppState.start_current,
@@ -53,10 +70,6 @@ def _cc_ramp_params() -> rx.Component:
         ),
         _num_field(
             "End current (µA/cm²)", AppState.end_current, AppState.set_end_current
-        ),
-        _num_field("Ramp start (ms)", AppState.ramp_start, AppState.set_ramp_start),
-        _num_field(
-            "Ramp duration (ms)", AppState.ramp_duration, AppState.set_ramp_duration
         ),
         spacing="2",
         width="100%",
@@ -66,7 +79,7 @@ def _cc_ramp_params() -> rx.Component:
 def _cc_pulse_params() -> rx.Component:
     """Parameter fields for the current clamp Pulse Train protocol."""
     return rx.vstack(
-        _num_field("Duration (ms)", AppState.duration, AppState.set_duration),
+        *_duration_fields(),
         _num_field(
             "Pulse amplitude (µA/cm²)",
             AppState.pulse_amplitude,
@@ -78,7 +91,6 @@ def _cc_pulse_params() -> rx.Component:
             AppState.pulse_interval,
             AppState.set_pulse_interval,
         ),
-        _num_field("Train start (ms)", AppState.train_start, AppState.set_train_start),
         spacing="2",
         width="100%",
     )
@@ -87,7 +99,7 @@ def _cc_pulse_params() -> rx.Component:
 def _cc_sine_params() -> rx.Component:
     """Parameter fields for the current clamp Sinusoidal protocol."""
     return rx.vstack(
-        _num_field("Duration (ms)", AppState.duration, AppState.set_duration),
+        *_duration_fields(),
         _num_field("DC offset (µA/cm²)", AppState.dc_offset, AppState.set_dc_offset),
         _num_field("Amplitude (µA/cm²)", AppState.amplitude, AppState.set_amplitude),
         _num_field("Frequency (Hz)", AppState.frequency, AppState.set_frequency),
@@ -99,7 +111,7 @@ def _cc_sine_params() -> rx.Component:
 def _cc_chirp_params() -> rx.Component:
     """Parameter fields for the current clamp Chirp protocol."""
     return rx.vstack(
-        _num_field("Duration (ms)", AppState.duration, AppState.set_duration),
+        *_duration_fields(),
         _num_field("DC offset (µA/cm²)", AppState.dc_offset, AppState.set_dc_offset),
         _num_field("Amplitude (µA/cm²)", AppState.amplitude, AppState.set_amplitude),
         _num_field(
@@ -114,7 +126,7 @@ def _cc_chirp_params() -> rx.Component:
 def _cc_noise_params() -> rx.Component:
     """Parameter fields for the current clamp Noise protocol."""
     return rx.vstack(
-        _num_field("Duration (ms)", AppState.duration, AppState.set_duration),
+        *_duration_fields(),
         _num_field(
             "Mean current (µA/cm²)", AppState.mean_current, AppState.set_mean_current
         ),
@@ -129,19 +141,11 @@ def _cc_noise_params() -> rx.Component:
 def _vc_step_params() -> rx.Component:
     """Parameter fields for the voltage clamp Step protocol."""
     return rx.vstack(
-        _num_field("Duration (ms)", AppState.duration, AppState.set_duration),
+        *_duration_fields(),
         _num_field(
             "Voltage amplitude (mV)",
             AppState.vc_voltage_amplitude,
             AppState.set_vc_voltage_amplitude,
-        ),
-        _num_field(
-            "Step start (ms)", AppState.vc_step_start, AppState.set_vc_step_start
-        ),
-        _num_field(
-            "Step duration (ms)",
-            AppState.vc_step_duration,
-            AppState.set_vc_step_duration,
         ),
         _num_field(
             "Holding voltage (mV)",
@@ -156,7 +160,7 @@ def _vc_step_params() -> rx.Component:
 def _vc_ramp_params() -> rx.Component:
     """Parameter fields for the voltage clamp Ramp protocol."""
     return rx.vstack(
-        _num_field("Duration (ms)", AppState.duration, AppState.set_duration),
+        *_duration_fields(),
         _num_field(
             "Start voltage (mV)",
             AppState.vc_start_voltage,
@@ -164,14 +168,6 @@ def _vc_ramp_params() -> rx.Component:
         ),
         _num_field(
             "End voltage (mV)", AppState.vc_end_voltage, AppState.set_vc_end_voltage
-        ),
-        _num_field(
-            "Ramp start (ms)", AppState.vc_ramp_start, AppState.set_vc_ramp_start
-        ),
-        _num_field(
-            "Ramp duration (ms)",
-            AppState.vc_ramp_duration,
-            AppState.set_vc_ramp_duration,
         ),
         _num_field(
             "Holding voltage (mV)",
@@ -186,7 +182,7 @@ def _vc_ramp_params() -> rx.Component:
 def _vc_pulse_params() -> rx.Component:
     """Parameter fields for the voltage clamp Pulse Train protocol."""
     return rx.vstack(
-        _num_field("Duration (ms)", AppState.duration, AppState.set_duration),
+        *_duration_fields(),
         _num_field(
             "Pulse amplitude (mV)",
             AppState.vc_pulse_amplitude,
@@ -201,9 +197,6 @@ def _vc_pulse_params() -> rx.Component:
             AppState.set_vc_pulse_interval,
         ),
         _num_field(
-            "Train start (ms)", AppState.vc_train_start, AppState.set_vc_train_start
-        ),
-        _num_field(
             "Holding voltage (mV)",
             AppState.vc_holding_voltage,
             AppState.set_vc_holding_voltage,
@@ -216,7 +209,7 @@ def _vc_pulse_params() -> rx.Component:
 def _vc_iv_params() -> rx.Component:
     """Parameter fields for the voltage clamp I-V Curve protocol."""
     return rx.vstack(
-        _num_field("Step duration (ms)", AppState.duration, AppState.set_duration),
+        *_duration_fields(),
         _num_field(
             "Voltage min (mV)",
             AppState.vc_voltage_min,
@@ -231,16 +224,6 @@ def _vc_iv_params() -> rx.Component:
             "Voltage step (mV)",
             AppState.vc_voltage_step,
             AppState.set_vc_voltage_step,
-        ),
-        _num_field(
-            "Pre-pulse (ms)",
-            AppState.vc_pre_pulse_duration,
-            AppState.set_vc_pre_pulse_duration,
-        ),
-        _num_field(
-            "Post-pulse (ms)",
-            AppState.vc_post_pulse_duration,
-            AppState.set_vc_post_pulse_duration,
         ),
         _num_field(
             "Holding voltage (mV)",
