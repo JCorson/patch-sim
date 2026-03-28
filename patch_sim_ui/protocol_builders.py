@@ -19,7 +19,9 @@ def build_current_protocol(
     pre_stimulus_duration: float = 10.0,
     stimulus_duration: float = 30.0,
     post_stimulus_duration: float = 10.0,
-    current_amplitude: float = 10.0,
+    current_min: float = 10.0,
+    current_max: float = 20.0,
+    current_step: float = 2.5,
     start_current: float = 0.0,
     end_current: float = 15.0,
     pulse_amplitude: float = 10.0,
@@ -37,12 +39,15 @@ def build_current_protocol(
 
     Args:
         protocol_type: One of "Step", "Ramp", "Pulse Train", "Sinusoidal",
-            "Chirp", or "Noise".
+            "Chirp", "Noise", or "F-I Curve".
         sampling_frequency: Sampling frequency in Hz.
         pre_stimulus_duration: Duration before the stimulus in ms.
         stimulus_duration: Duration of the stimulus in ms.
         post_stimulus_duration: Duration after the stimulus in ms.
-        current_amplitude: Step current amplitude in µA/cm².
+        current_min: Step current amplitude in µA/cm² (Step), or minimum
+            current for F-I Curve sweeps in µA/cm².
+        current_max: Maximum current for F-I Curve sweeps in µA/cm².
+        current_step: Current step size for F-I Curve sweeps in µA/cm².
         start_current: Ramp start current in µA/cm².
         end_current: Ramp end current in µA/cm².
         pulse_amplitude: Pulse amplitude in µA/cm².
@@ -57,8 +62,9 @@ def build_current_protocol(
         std_current: Noise standard deviation in µA/cm².
 
     Returns:
-        List of (stimulus_array, sweep_label) pairs. Current clamp protocols
-        always return a single-element list with an empty label.
+        List of (stimulus_array, sweep_label) pairs. Single-sweep protocols
+        return a one-element list with an empty label. F-I Curve returns one
+        entry per current level labelled "+X.X µA/cm²" / "-X.X µA/cm²".
 
     Raises:
         ValueError: If protocol_type is unrecognized or parameters are invalid.
@@ -67,7 +73,7 @@ def build_current_protocol(
     if protocol_type == "Step":
         protocol = patch_sim.step_current(
             duration=total_duration,
-            current_amplitude=current_amplitude,
+            current_amplitude=current_min,
             step_start=pre_stimulus_duration,
             step_duration=stimulus_duration,
             sampling_frequency=sampling_frequency,
@@ -120,6 +126,30 @@ def build_current_protocol(
             stimulus_duration=stimulus_duration,
             sampling_frequency=sampling_frequency,
         )
+    elif protocol_type == "F-I Curve":
+        current_range = current_max - current_min
+        n_steps = round(current_range / current_step) + 1
+        currents = np.linspace(current_min, current_max, n_steps)
+        result = [
+            (
+                patch_sim.step_current(
+                    duration=total_duration,
+                    current_amplitude=float(current),
+                    step_start=pre_stimulus_duration,
+                    step_duration=stimulus_duration,
+                    sampling_frequency=sampling_frequency,
+                ),
+                f"{current:+.1f} µA/cm²",
+            )
+            for current in currents
+        ]
+        logger.debug(
+            "build_current_protocol: type=%r total_duration=%.1f ms sweeps=%d",
+            protocol_type,
+            total_duration,
+            len(result),
+        )
+        return result
     else:
         raise ValueError(f"Unknown current protocol type: {protocol_type!r}")
     logger.debug(

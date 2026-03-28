@@ -17,7 +17,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "pre_stimulus_duration": 10.0,
         "stimulus_duration": 30.0,
         "post_stimulus_duration": 10.0,
-        "current_amplitude": 10.0,
+        "cc_current_min": 10.0,
     },
     "Subthreshold Response": {
         **DEFAULT_NEURON_PARAMS,
@@ -26,7 +26,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "pre_stimulus_duration": 10.0,
         "stimulus_duration": 30.0,
         "post_stimulus_duration": 10.0,
-        "current_amplitude": 4.0,
+        "cc_current_min": 4.0,
     },
     "Repetitive Firing": {
         **DEFAULT_NEURON_PARAMS,
@@ -35,7 +35,18 @@ PRESETS: dict[str, dict[str, Any]] = {
         "pre_stimulus_duration": 10.0,
         "stimulus_duration": 180.0,
         "post_stimulus_duration": 10.0,
-        "current_amplitude": 15.0,
+        "cc_current_min": 15.0,
+    },
+    "F-I Curve": {
+        **DEFAULT_NEURON_PARAMS,
+        "clamp_mode": CURRENT_CLAMP,
+        "protocol_type": "F-I Curve",
+        "pre_stimulus_duration": 10.0,
+        "stimulus_duration": 50.0,
+        "post_stimulus_duration": 10.0,
+        "cc_current_min": -10.0,
+        "cc_current_max": 20.0,
+        "cc_current_step": 2.5,
     },
     "I-V Curve": {
         **DEFAULT_NEURON_PARAMS,

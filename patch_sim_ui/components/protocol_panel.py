@@ -50,9 +50,9 @@ def _cc_step_params() -> rx.Component:
     return rx.vstack(
         *_duration_fields(),
         _num_field(
-            "Amplitude (µA/cm²)",
-            AppState.current_amplitude,
-            AppState.set_current_amplitude,
+            "Current (µA/cm²)",
+            AppState.cc_current_min,
+            AppState.set_cc_current_min,
         ),
         spacing="2",
         width="100%",
@@ -132,6 +132,30 @@ def _cc_noise_params() -> rx.Component:
         ),
         _num_field(
             "Std current (µA/cm²)", AppState.std_current, AppState.set_std_current
+        ),
+        spacing="2",
+        width="100%",
+    )
+
+
+def _cc_fi_curve_params() -> rx.Component:
+    """Parameter fields for the current clamp F-I Curve protocol."""
+    return rx.vstack(
+        *_duration_fields(),
+        _num_field(
+            "Current min (µA/cm²)",
+            AppState.cc_current_min,
+            AppState.set_cc_current_min,
+        ),
+        _num_field(
+            "Current max (µA/cm²)",
+            AppState.cc_current_max,
+            AppState.set_cc_current_max,
+        ),
+        _num_field(
+            "Current step (µA/cm²)",
+            AppState.cc_current_step,
+            AppState.set_cc_current_step,
         ),
         spacing="2",
         width="100%",
@@ -244,7 +268,9 @@ def _current_protocol_params() -> rx.Component:
         ("Pulse Train", _cc_pulse_params()),
         ("Sinusoidal", _cc_sine_params()),
         ("Chirp", _cc_chirp_params()),
-        _cc_noise_params(),  # default: Noise
+        ("Noise", _cc_noise_params()),
+        ("F-I Curve", _cc_fi_curve_params()),
+        rx.fragment(),
     )
 
 

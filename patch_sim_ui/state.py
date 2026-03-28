@@ -154,7 +154,9 @@ _FLOAT_FIELDS: list[str] = [
     "stimulus_duration",
     "post_stimulus_duration",
     # Current clamp protocol params
-    "current_amplitude",
+    "cc_current_min",
+    "cc_current_max",
+    "cc_current_step",
     "start_current",
     "end_current",
     "pulse_amplitude",
@@ -687,7 +689,9 @@ class AppState(rx.State):
     post_stimulus_duration: float = 10.0
 
     # Current clamp protocol params
-    current_amplitude: float = 10.0
+    cc_current_min: float = 10.0
+    cc_current_max: float = 20.0
+    cc_current_step: float = 2.5
     start_current: float = 0.0
     end_current: float = 15.0
     pulse_amplitude: float = 10.0
@@ -1177,7 +1181,9 @@ class AppState(rx.State):
                 pre_stimulus_duration=self.pre_stimulus_duration,
                 stimulus_duration=self.stimulus_duration,
                 post_stimulus_duration=self.post_stimulus_duration,
-                current_amplitude=self.current_amplitude,
+                current_min=self.cc_current_min,
+                current_max=self.cc_current_max,
+                current_step=self.cc_current_step,
                 start_current=self.start_current,
                 end_current=self.end_current,
                 pulse_amplitude=self.pulse_amplitude,
