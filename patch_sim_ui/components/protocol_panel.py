@@ -51,8 +51,8 @@ def _cc_step_params() -> rx.Component:
         *_duration_fields(),
         _num_field(
             "Current (µA/cm²)",
-            AppState.cc_current_min,
-            AppState.set_cc_current_min,
+            AppState.min_stimulus,
+            AppState.set_min_stimulus,
         ),
         spacing="2",
         width="100%",
@@ -144,18 +144,18 @@ def _cc_fi_curve_params() -> rx.Component:
         *_duration_fields(),
         _num_field(
             "Current min (µA/cm²)",
-            AppState.cc_current_min,
-            AppState.set_cc_current_min,
+            AppState.min_stimulus,
+            AppState.set_min_stimulus,
         ),
         _num_field(
             "Current max (µA/cm²)",
-            AppState.cc_current_max,
-            AppState.set_cc_current_max,
+            AppState.max_stimulus,
+            AppState.set_max_stimulus,
         ),
         _num_field(
             "Current step (µA/cm²)",
-            AppState.cc_current_step,
-            AppState.set_cc_current_step,
+            AppState.stimulus_step,
+            AppState.set_stimulus_step,
         ),
         spacing="2",
         width="100%",
@@ -168,8 +168,8 @@ def _vc_step_params() -> rx.Component:
         *_duration_fields(),
         _num_field(
             "Voltage amplitude (mV)",
-            AppState.vc_voltage_amplitude,
-            AppState.set_vc_voltage_amplitude,
+            AppState.min_stimulus,
+            AppState.set_min_stimulus,
         ),
         _num_field(
             "Holding voltage (mV)",
@@ -236,18 +236,18 @@ def _vc_iv_params() -> rx.Component:
         *_duration_fields(),
         _num_field(
             "Voltage min (mV)",
-            AppState.vc_voltage_min,
-            AppState.set_vc_voltage_min,
+            AppState.min_stimulus,
+            AppState.set_min_stimulus,
         ),
         _num_field(
             "Voltage max (mV)",
-            AppState.vc_voltage_max,
-            AppState.set_vc_voltage_max,
+            AppState.max_stimulus,
+            AppState.set_max_stimulus,
         ),
         _num_field(
             "Voltage step (mV)",
-            AppState.vc_voltage_step,
-            AppState.set_vc_voltage_step,
+            AppState.stimulus_step,
+            AppState.set_stimulus_step,
         ),
         _num_field(
             "Holding voltage (mV)",

@@ -153,10 +153,10 @@ _FLOAT_FIELDS: list[str] = [
     "pre_stimulus_duration",
     "stimulus_duration",
     "post_stimulus_duration",
+    "min_stimulus",
+    "max_stimulus",
+    "stimulus_step",
     # Current clamp protocol params
-    "cc_current_min",
-    "cc_current_max",
-    "cc_current_step",
     "start_current",
     "end_current",
     "pulse_amplitude",
@@ -170,16 +170,12 @@ _FLOAT_FIELDS: list[str] = [
     "mean_current",
     "std_current",
     # Voltage clamp protocol params
-    "vc_voltage_amplitude",
     "vc_holding_voltage",
     "vc_start_voltage",
     "vc_end_voltage",
     "vc_pulse_amplitude",
     "vc_pulse_width",
     "vc_pulse_interval",
-    "vc_voltage_min",
-    "vc_voltage_max",
-    "vc_voltage_step",
     # Additional channel params
     "ih_g_max",
     "ika_g_max",
@@ -688,10 +684,12 @@ class AppState(rx.State):
     stimulus_duration: float = 30.0
     post_stimulus_duration: float = 10.0
 
+    # Stimulus amplitude params — shared (units depend on clamp_mode)
+    min_stimulus: float = 10.0
+    max_stimulus: float = 20.0
+    stimulus_step: float = 2.5
+
     # Current clamp protocol params
-    cc_current_min: float = 10.0
-    cc_current_max: float = 20.0
-    cc_current_step: float = 2.5
     start_current: float = 0.0
     end_current: float = 15.0
     pulse_amplitude: float = 10.0
@@ -706,16 +704,12 @@ class AppState(rx.State):
     std_current: float = 2.0
 
     # Voltage clamp protocol params
-    vc_voltage_amplitude: float = 0.0
     vc_holding_voltage: float = -70.0
     vc_start_voltage: float = -70.0
     vc_end_voltage: float = 40.0
     vc_pulse_amplitude: float = 20.0
     vc_pulse_width: float = 2.0
     vc_pulse_interval: float = 10.0
-    vc_voltage_min: float = -100.0
-    vc_voltage_max: float = 60.0
-    vc_voltage_step: float = 10.0
     # ------------------------------------------------------------------ #
     # Simulation results                                                  #
     # ------------------------------------------------------------------ #
@@ -1181,9 +1175,9 @@ class AppState(rx.State):
                 pre_stimulus_duration=self.pre_stimulus_duration,
                 stimulus_duration=self.stimulus_duration,
                 post_stimulus_duration=self.post_stimulus_duration,
-                current_min=self.cc_current_min,
-                current_max=self.cc_current_max,
-                current_step=self.cc_current_step,
+                current_min=self.min_stimulus,
+                current_max=self.max_stimulus,
+                current_step=self.stimulus_step,
                 start_current=self.start_current,
                 end_current=self.end_current,
                 pulse_amplitude=self.pulse_amplitude,
@@ -1205,15 +1199,15 @@ class AppState(rx.State):
                 stimulus_duration=self.stimulus_duration,
                 post_stimulus_duration=self.post_stimulus_duration,
                 holding_voltage=self.vc_holding_voltage,
-                voltage_amplitude=self.vc_voltage_amplitude,
+                voltage_amplitude=self.min_stimulus,
                 start_voltage=self.vc_start_voltage,
                 end_voltage=self.vc_end_voltage,
                 pulse_amplitude=self.vc_pulse_amplitude,
                 pulse_width=self.vc_pulse_width,
                 pulse_interval=self.vc_pulse_interval,
-                voltage_min=self.vc_voltage_min,
-                voltage_max=self.vc_voltage_max,
-                voltage_step=self.vc_voltage_step,
+                voltage_min=self.min_stimulus,
+                voltage_max=self.max_stimulus,
+                voltage_step=self.stimulus_step,
             )
 
     # ------------------------------------------------------------------ #

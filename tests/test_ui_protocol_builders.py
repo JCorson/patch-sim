@@ -208,18 +208,35 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
     }
 
     if mode == "Current Clamp":
-        # Preset config keys use cc_ prefix (matching state field names); strip
-        # it so they align with build_current_protocol's parameter names.
+        # Strip cc_ prefix; map unified stimulus params to builder param names.
         cc_kwargs = {k.removeprefix("cc_"): v for k, v in kwargs.items()}
+        cc_kwargs["current_min"] = cc_kwargs.pop(
+            "min_stimulus", cc_kwargs.get("current_min", 10.0)
+        )
+        cc_kwargs["current_max"] = cc_kwargs.pop(
+            "max_stimulus", cc_kwargs.get("current_max", 20.0)
+        )
+        cc_kwargs["current_step"] = cc_kwargs.pop(
+            "stimulus_step", cc_kwargs.get("current_step", 2.5)
+        )
         result = build_current_protocol(
             protocol_type=protocol_type,
             sampling_frequency=sampling_frequency,
             **cc_kwargs,
         )
     else:
-        # Preset config keys use vc_ prefix (matching state field names); strip
-        # it so they align with build_voltage_protocol's parameter names.
+        # Strip vc_ prefix; map unified stimulus params to builder param names.
         vc_kwargs = {k.removeprefix("vc_"): v for k, v in kwargs.items()}
+        min_val = vc_kwargs.pop("min_stimulus", None)
+        if min_val is not None:
+            vc_kwargs.setdefault("voltage_amplitude", min_val)
+            vc_kwargs.setdefault("voltage_min", min_val)
+        max_val = vc_kwargs.pop("max_stimulus", None)
+        if max_val is not None:
+            vc_kwargs.setdefault("voltage_max", max_val)
+        step_val = vc_kwargs.pop("stimulus_step", None)
+        if step_val is not None:
+            vc_kwargs.setdefault("voltage_step", step_val)
         result = build_voltage_protocol(
             protocol_type=protocol_type,
             sampling_frequency=sampling_frequency,
