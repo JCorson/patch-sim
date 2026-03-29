@@ -20,8 +20,8 @@ def build_current_protocol(
     stimulus_duration: float = 30.0,
     post_stimulus_duration: float = 10.0,
     current_min: float = 10.0,
-    current_max: float = 20.0,
-    current_step: float = 2.5,
+    current_max: float = 10.0,
+    current_step: float = 0.0,
     start_current: float = 0.0,
     end_current: float = 15.0,
     pulse_amplitude: float = 10.0,
@@ -39,15 +39,17 @@ def build_current_protocol(
 
     Args:
         protocol_type: One of "Step", "Ramp", "Pulse Train", "Sinusoidal",
-            "Chirp", "Noise", or "F-I Curve".
+            "Chirp", or "Noise".
         sampling_frequency: Sampling frequency in Hz.
         pre_stimulus_duration: Duration before the stimulus in ms.
         stimulus_duration: Duration of the stimulus in ms.
         post_stimulus_duration: Duration after the stimulus in ms.
-        current_min: Step current amplitude in µA/cm² (Step), or minimum
-            current for F-I Curve sweeps in µA/cm².
-        current_max: Maximum current for F-I Curve sweeps in µA/cm².
-        current_step: Current step size for F-I Curve sweeps in µA/cm².
+        current_min: Step current amplitude in µA/cm² for a single-step, or
+            minimum current when running a multi-sweep range.
+        current_max: Maximum current for multi-sweep range in µA/cm².  Must
+            be >= current_min.
+        current_step: Step size for multi-sweep range in µA/cm².  Use 0.0
+            (or set current_min == current_max) for a single-step protocol.
         start_current: Ramp start current in µA/cm².
         end_current: Ramp end current in µA/cm².
         pulse_amplitude: Pulse amplitude in µA/cm².
@@ -62,103 +64,134 @@ def build_current_protocol(
         std_current: Noise standard deviation in µA/cm².
 
     Returns:
-        List of (stimulus_array, sweep_label) pairs. Single-sweep protocols
-        return a one-element list with an empty label. F-I Curve returns one
-        entry per current level labelled "+X.X µA/cm²" / "-X.X µA/cm²".
+        List of (stimulus_array, sweep_label) pairs.  Single-step protocols
+        return a one-element list with an empty label.  Multi-sweep Step
+        protocols return one entry per current level labelled
+        "+X.X µA/cm²" / "-X.X µA/cm²".
 
     Raises:
         ValueError: If protocol_type is unrecognized or parameters are invalid.
     """
     total_duration = pre_stimulus_duration + stimulus_duration + post_stimulus_duration
+    result: list[tuple[np.ndarray, str]]
     if protocol_type == "Step":
-        protocol = patch_sim.step_current(
-            duration=total_duration,
-            current_amplitude=current_min,
-            step_start=pre_stimulus_duration,
-            step_duration=stimulus_duration,
-            sampling_frequency=sampling_frequency,
-        )
+        if current_step < 0.0:
+            raise ValueError("current_step must be >= 0.0")
+        if current_min > current_max:
+            raise ValueError(
+                f"current_min ({current_min}) must be <= current_max ({current_max})"
+            )
+        if current_min != current_max and current_step == 0.0:
+            raise ValueError(
+                "current_step must be > 0.0 when current_min != current_max"
+            )
+        if current_min == current_max:
+            protocol = patch_sim.step_current(
+                duration=total_duration,
+                current_amplitude=current_min,
+                step_start=pre_stimulus_duration,
+                step_duration=stimulus_duration,
+                sampling_frequency=sampling_frequency,
+            )
+            result = [(protocol, "")]
+        else:
+            n_steps = round((current_max - current_min) / current_step) + 1
+            currents = np.linspace(current_min, current_max, n_steps)
+            result = [
+                (
+                    patch_sim.step_current(
+                        duration=total_duration,
+                        current_amplitude=float(current),
+                        step_start=pre_stimulus_duration,
+                        step_duration=stimulus_duration,
+                        sampling_frequency=sampling_frequency,
+                    ),
+                    f"{current:+.1f} µA/cm²",
+                )
+                for current in currents
+            ]
     elif protocol_type == "Ramp":
-        protocol = patch_sim.ramp_current(
-            duration=total_duration,
-            start_current=start_current,
-            end_current=end_current,
-            ramp_start=pre_stimulus_duration,
-            ramp_duration=stimulus_duration,
-            sampling_frequency=sampling_frequency,
-        )
-    elif protocol_type == "Pulse Train":
-        protocol = patch_sim.pulse_train(
-            duration=total_duration,
-            pulse_amplitude=pulse_amplitude,
-            pulse_width=pulse_width,
-            pulse_interval=pulse_interval,
-            train_start=pre_stimulus_duration,
-            sampling_frequency=sampling_frequency,
-        )
-    elif protocol_type == "Sinusoidal":
-        protocol = patch_sim.sinusoidal_current(
-            duration=total_duration,
-            dc_offset=dc_offset,
-            amplitude=amplitude,
-            frequency=frequency,
-            stimulus_start=pre_stimulus_duration,
-            stimulus_duration=stimulus_duration,
-            sampling_frequency=sampling_frequency,
-        )
-    elif protocol_type == "Chirp":
-        protocol = patch_sim.chirp_current(
-            duration=total_duration,
-            dc_offset=dc_offset,
-            amplitude=amplitude,
-            start_frequency=start_frequency,
-            end_frequency=end_frequency,
-            stimulus_start=pre_stimulus_duration,
-            stimulus_duration=stimulus_duration,
-            sampling_frequency=sampling_frequency,
-        )
-    elif protocol_type == "Noise":
-        protocol = patch_sim.noise_current(
-            duration=total_duration,
-            mean_current=mean_current,
-            std_current=std_current,
-            stimulus_start=pre_stimulus_duration,
-            stimulus_duration=stimulus_duration,
-            sampling_frequency=sampling_frequency,
-        )
-    elif protocol_type == "F-I Curve":
-        current_range = current_max - current_min
-        n_steps = round(current_range / current_step) + 1
-        currents = np.linspace(current_min, current_max, n_steps)
         result = [
             (
-                patch_sim.step_current(
+                patch_sim.ramp_current(
                     duration=total_duration,
-                    current_amplitude=float(current),
-                    step_start=pre_stimulus_duration,
-                    step_duration=stimulus_duration,
+                    start_current=start_current,
+                    end_current=end_current,
+                    ramp_start=pre_stimulus_duration,
+                    ramp_duration=stimulus_duration,
                     sampling_frequency=sampling_frequency,
                 ),
-                f"{current:+.1f} µA/cm²",
+                "",
             )
-            for current in currents
         ]
-        logger.debug(
-            "build_current_protocol: type=%r total_duration=%.1f ms sweeps=%d",
-            protocol_type,
-            total_duration,
-            len(result),
-        )
-        return result
+    elif protocol_type == "Pulse Train":
+        result = [
+            (
+                patch_sim.pulse_train(
+                    duration=total_duration,
+                    pulse_amplitude=pulse_amplitude,
+                    pulse_width=pulse_width,
+                    pulse_interval=pulse_interval,
+                    train_start=pre_stimulus_duration,
+                    sampling_frequency=sampling_frequency,
+                ),
+                "",
+            )
+        ]
+    elif protocol_type == "Sinusoidal":
+        result = [
+            (
+                patch_sim.sinusoidal_current(
+                    duration=total_duration,
+                    dc_offset=dc_offset,
+                    amplitude=amplitude,
+                    frequency=frequency,
+                    stimulus_start=pre_stimulus_duration,
+                    stimulus_duration=stimulus_duration,
+                    sampling_frequency=sampling_frequency,
+                ),
+                "",
+            )
+        ]
+    elif protocol_type == "Chirp":
+        result = [
+            (
+                patch_sim.chirp_current(
+                    duration=total_duration,
+                    dc_offset=dc_offset,
+                    amplitude=amplitude,
+                    start_frequency=start_frequency,
+                    end_frequency=end_frequency,
+                    stimulus_start=pre_stimulus_duration,
+                    stimulus_duration=stimulus_duration,
+                    sampling_frequency=sampling_frequency,
+                ),
+                "",
+            )
+        ]
+    elif protocol_type == "Noise":
+        result = [
+            (
+                patch_sim.noise_current(
+                    duration=total_duration,
+                    mean_current=mean_current,
+                    std_current=std_current,
+                    stimulus_start=pre_stimulus_duration,
+                    stimulus_duration=stimulus_duration,
+                    sampling_frequency=sampling_frequency,
+                ),
+                "",
+            )
+        ]
     else:
         raise ValueError(f"Unknown current protocol type: {protocol_type!r}")
     logger.debug(
-        "build_current_protocol: type=%r total_duration=%.1f ms steps=%d",
+        "build_current_protocol: type=%r total_duration=%.1f ms sweeps=%d",
         protocol_type,
         total_duration,
-        len(protocol),
+        len(result),
     )
-    return [(protocol, "")]
+    return result
 
 
 def build_voltage_protocol(
@@ -168,39 +201,41 @@ def build_voltage_protocol(
     stimulus_duration: float = 30.0,
     post_stimulus_duration: float = 10.0,
     holding_voltage: float = -70.0,
-    voltage_amplitude: float = 0.0,
     start_voltage: float = -70.0,
     end_voltage: float = 40.0,
     pulse_amplitude: float = 20.0,
     pulse_width: float = 2.0,
     pulse_interval: float = 10.0,
-    voltage_min: float = -100.0,
-    voltage_max: float = 60.0,
-    voltage_step: float = 10.0,
+    voltage_min: float = 0.0,
+    voltage_max: float = 0.0,
+    voltage_step: float = 0.0,
 ) -> list[tuple[np.ndarray, str]]:
     """Build voltage clamp protocol arrays from explicit parameters.
 
     Args:
-        protocol_type: One of "Step", "Ramp", "Pulse Train", or "I-V Curve".
+        protocol_type: One of "Step", "Ramp", or "Pulse Train".
         sampling_frequency: Sampling frequency in Hz.
         pre_stimulus_duration: Duration before the stimulus in ms.
         stimulus_duration: Duration of the stimulus in ms.
         post_stimulus_duration: Duration after the stimulus in ms.
         holding_voltage: Holding voltage in mV.
-        voltage_amplitude: Step voltage amplitude in mV.
         start_voltage: Ramp start voltage in mV.
         end_voltage: Ramp end voltage in mV.
         pulse_amplitude: Pulse amplitude in mV.
         pulse_width: Pulse width in ms.
         pulse_interval: Interval between pulse starts in ms.
-        voltage_min: Minimum voltage for I-V curve in mV.
-        voltage_max: Maximum voltage for I-V curve in mV.
-        voltage_step: Voltage step size in mV (I-V curve).
+        voltage_min: Step voltage amplitude in mV for a single-step, or
+            minimum voltage when running a multi-sweep range.
+        voltage_max: Maximum voltage for multi-sweep range in mV.  Must
+            be >= voltage_min.
+        voltage_step: Step size for multi-sweep range in mV.  Use 0.0
+            (or set voltage_min == voltage_max) for a single-step protocol.
 
     Returns:
-        List of (stimulus_array, sweep_label) pairs. Single-sweep protocols
-        return a one-element list with an empty label. I-V Curve returns one
-        entry per voltage step labelled "+XX mV" / "-XX mV".
+        List of (stimulus_array, sweep_label) pairs.  Single-step protocols
+        return a one-element list with an empty label.  Multi-sweep Step
+        protocols return one entry per voltage level labelled
+        "+XX mV" / "-XX mV".
 
     Raises:
         ValueError: If protocol_type is unrecognized or parameters are invalid.
@@ -208,15 +243,44 @@ def build_voltage_protocol(
     total_duration = pre_stimulus_duration + stimulus_duration + post_stimulus_duration
     result: list[tuple[np.ndarray, str]]
     if protocol_type == "Step":
-        protocol = patch_sim.step_voltage(
-            duration=total_duration,
-            voltage_amplitude=voltage_amplitude,
-            step_start=pre_stimulus_duration,
-            step_duration=stimulus_duration,
-            holding_voltage=holding_voltage,
-            sampling_frequency=sampling_frequency,
-        )
-        result = [(protocol, "")]
+        if voltage_step < 0.0:
+            raise ValueError("voltage_step must be >= 0.0")
+        if voltage_min > voltage_max:
+            raise ValueError(
+                f"voltage_min ({voltage_min}) must be <= voltage_max ({voltage_max})"
+            )
+        if voltage_min != voltage_max and voltage_step == 0.0:
+            raise ValueError(
+                "voltage_step must be > 0.0 when voltage_min != voltage_max"
+            )
+        is_single_step = voltage_min == voltage_max
+        if is_single_step:
+            protocol = patch_sim.step_voltage(
+                duration=total_duration,
+                voltage_amplitude=voltage_min,
+                step_start=pre_stimulus_duration,
+                step_duration=stimulus_duration,
+                holding_voltage=holding_voltage,
+                sampling_frequency=sampling_frequency,
+            )
+            result = [(protocol, "")]
+        else:
+            n_steps = round((voltage_max - voltage_min) / voltage_step) + 1
+            voltages = np.linspace(voltage_min, voltage_max, n_steps)
+            result = [
+                (
+                    patch_sim.step_voltage(
+                        duration=total_duration,
+                        voltage_amplitude=float(voltage),
+                        step_start=pre_stimulus_duration,
+                        step_duration=stimulus_duration,
+                        holding_voltage=holding_voltage,
+                        sampling_frequency=sampling_frequency,
+                    ),
+                    f"{voltage:+.0f} mV",
+                )
+                for voltage in voltages
+            ]
     elif protocol_type == "Ramp":
         protocol = patch_sim.ramp_voltage(
             duration=total_duration,
@@ -239,24 +303,6 @@ def build_voltage_protocol(
             sampling_frequency=sampling_frequency,
         )
         result = [(protocol, "")]
-    elif protocol_type == "I-V Curve":
-        voltage_range = voltage_max - voltage_min
-        n_steps = round(voltage_range / voltage_step) + 1
-        voltages = np.linspace(voltage_min, voltage_max, n_steps)
-        result = [
-            (
-                patch_sim.step_voltage(
-                    duration=total_duration,
-                    voltage_amplitude=float(voltage),
-                    step_start=pre_stimulus_duration,
-                    step_duration=stimulus_duration,
-                    holding_voltage=holding_voltage,
-                    sampling_frequency=sampling_frequency,
-                ),
-                f"{voltage:+.0f} mV",
-            )
-            for voltage in voltages
-        ]
     else:
         raise ValueError(f"Unknown voltage protocol type: {protocol_type!r}")
     logger.debug(

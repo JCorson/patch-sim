@@ -83,10 +83,10 @@ def test_single_sweep_voltage_protocol_returns_valid_list(protocol_type: str) ->
     assert result[0][1] == ""
 
 
-def test_fi_curve_returns_multi_sweep_list() -> None:
-    """F-I Curve returns one (array, label) pair per current level."""
+def test_step_multi_sweep_returns_list_per_current_level() -> None:
+    """Step with a range returns one (array, label) pair per current level."""
     result = build_current_protocol(
-        protocol_type="F-I Curve",
+        protocol_type="Step",
         sampling_frequency=SAMPLING_FREQUENCY,
         pre_stimulus_duration=5.0,
         stimulus_duration=40.0,
@@ -99,14 +99,14 @@ def test_fi_curve_returns_multi_sweep_list() -> None:
     assert _is_valid_protocol_list(result)
     assert len(result) == 3
     for arr, label in result:
-        assert label != "", "Each F-I Curve sweep should have a non-empty label"
+        assert label != "", "Each multi-sweep Step should have a non-empty label"
         assert "µA/cm²" in label
 
 
-def test_iv_curve_returns_multi_sweep_list() -> None:
-    """I-V Curve returns one (array, label) pair per voltage step."""
+def test_step_multi_sweep_voltage_returns_list_per_voltage_level() -> None:
+    """Step with a voltage range returns one (array, label) pair per voltage step."""
     result = build_voltage_protocol(
-        protocol_type="I-V Curve",
+        protocol_type="Step",
         sampling_frequency=SAMPLING_FREQUENCY,
         pre_stimulus_duration=5.0,
         stimulus_duration=20.0,
@@ -119,8 +119,34 @@ def test_iv_curve_returns_multi_sweep_list() -> None:
     assert _is_valid_protocol_list(result)
     assert len(result) == 5
     for arr, label in result:
-        assert label != "", "Each I-V Curve sweep should have a non-empty label"
+        assert label != "", "Each multi-sweep Step should have a non-empty label"
         assert "mV" in label
+
+
+def test_step_single_via_equal_range_returns_single_sweep() -> None:
+    """Step with min == max returns a single-element list regardless of step value."""
+    result = build_current_protocol(
+        protocol_type="Step",
+        sampling_frequency=SAMPLING_FREQUENCY,
+        current_min=10.0,
+        current_max=10.0,
+        current_step=5.0,
+    )
+    assert len(result) == 1
+    assert result[0][1] == ""
+
+
+def test_voltage_step_single_via_equal_range_returns_single_sweep() -> None:
+    """Voltage Step with min == max returns a single-element list regardless of step."""
+    result = build_voltage_protocol(
+        protocol_type="Step",
+        sampling_frequency=SAMPLING_FREQUENCY,
+        voltage_min=-40.0,
+        voltage_max=-40.0,
+        voltage_step=10.0,
+    )
+    assert len(result) == 1
+    assert result[0][1] == ""
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +191,78 @@ def test_voltage_pulse_width_ge_interval_raises() -> None:
             sampling_frequency=SAMPLING_FREQUENCY,
             pulse_width=5.0,
             pulse_interval=5.0,
+        )
+
+
+def test_current_step_zero_with_range_raises() -> None:
+    """Step=0.0 with min != max raises ValueError for current clamp Step."""
+    with pytest.raises(ValueError, match="current_step must be > 0"):
+        build_current_protocol(
+            protocol_type="Step",
+            sampling_frequency=SAMPLING_FREQUENCY,
+            current_min=0.0,
+            current_max=10.0,
+            current_step=0.0,
+        )
+
+
+def test_current_min_gt_max_raises() -> None:
+    """current_min > current_max raises ValueError for current clamp Step."""
+    with pytest.raises(ValueError, match="current_min"):
+        build_current_protocol(
+            protocol_type="Step",
+            sampling_frequency=SAMPLING_FREQUENCY,
+            current_min=20.0,
+            current_max=10.0,
+            current_step=5.0,
+        )
+
+
+def test_current_negative_step_raises() -> None:
+    """Negative current_step raises ValueError for current clamp Step."""
+    with pytest.raises(ValueError, match="current_step must be >= 0"):
+        build_current_protocol(
+            protocol_type="Step",
+            sampling_frequency=SAMPLING_FREQUENCY,
+            current_min=0.0,
+            current_max=10.0,
+            current_step=-1.0,
+        )
+
+
+def test_voltage_step_zero_with_range_raises() -> None:
+    """Step=0.0 with min != max raises ValueError for voltage clamp Step."""
+    with pytest.raises(ValueError, match="voltage_step must be > 0"):
+        build_voltage_protocol(
+            protocol_type="Step",
+            sampling_frequency=SAMPLING_FREQUENCY,
+            voltage_min=-40.0,
+            voltage_max=40.0,
+            voltage_step=0.0,
+        )
+
+
+def test_voltage_min_gt_max_raises() -> None:
+    """voltage_min > voltage_max raises ValueError for voltage clamp Step."""
+    with pytest.raises(ValueError, match="voltage_min"):
+        build_voltage_protocol(
+            protocol_type="Step",
+            sampling_frequency=SAMPLING_FREQUENCY,
+            voltage_min=40.0,
+            voltage_max=-40.0,
+            voltage_step=10.0,
+        )
+
+
+def test_voltage_negative_step_raises() -> None:
+    """Negative voltage_step raises ValueError for voltage clamp Step."""
+    with pytest.raises(ValueError, match="voltage_step must be >= 0"):
+        build_voltage_protocol(
+            protocol_type="Step",
+            sampling_frequency=SAMPLING_FREQUENCY,
+            voltage_min=-40.0,
+            voltage_max=40.0,
+            voltage_step=-5.0,
         )
 
 
@@ -229,7 +327,6 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
         vc_kwargs = {k.removeprefix("vc_"): v for k, v in kwargs.items()}
         min_val = vc_kwargs.pop("min_stimulus", None)
         if min_val is not None:
-            vc_kwargs.setdefault("voltage_amplitude", min_val)
             vc_kwargs.setdefault("voltage_min", min_val)
         max_val = vc_kwargs.pop("max_stimulus", None)
         if max_val is not None:

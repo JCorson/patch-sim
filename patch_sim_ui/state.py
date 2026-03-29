@@ -55,7 +55,7 @@ from patch_sim.additional_channels import (
     make_inar_channel,
 )
 from patch_sim_ui import constants, presets
-from patch_sim_ui.constants import CURRENT_CLAMP, MULTI_SWEEP_PROTOCOL_TYPES
+from patch_sim_ui.constants import CURRENT_CLAMP
 from patch_sim_ui.plotting import (
     Sweep,
     TraceVisibility,
@@ -153,9 +153,6 @@ _FLOAT_FIELDS: list[str] = [
     "pre_stimulus_duration",
     "stimulus_duration",
     "post_stimulus_duration",
-    "min_stimulus",
-    "max_stimulus",
-    "stimulus_step",
     # Current clamp protocol params
     "start_current",
     "end_current",
@@ -686,8 +683,8 @@ class AppState(rx.State):
 
     # Stimulus amplitude params — shared (units depend on clamp_mode)
     min_stimulus: float = 10.0
-    max_stimulus: float = 20.0
-    stimulus_step: float = 2.5
+    max_stimulus: float = 10.0
+    stimulus_step: float = 0.0
 
     # Current clamp protocol params
     start_current: float = 0.0
@@ -833,13 +830,27 @@ class AppState(rx.State):
         return self.continuous_mode and self.continuous_loop_running
 
     @rx.var
+    def is_step_single_sweep(self) -> bool:
+        """True when the Step protocol is configured as a single sweep.
+
+        A single sweep is produced whenever min_stimulus == max_stimulus,
+        regardless of the stimulus_step value.
+
+        Returns:
+            True if min_stimulus equals max_stimulus, False otherwise.
+        """
+        return self.min_stimulus == self.max_stimulus
+
+    @rx.var
     def can_run_continuous(self) -> bool:
         """True when the active protocol is compatible with continuous mode.
 
-        Multi-sweep protocols are excluded; continuous mode is limited to
-        single-sweep protocols only.
+        Multi-sweep Step configurations (min_stimulus != max_stimulus) are
+        excluded; all other protocols run as a single sweep and are compatible.
         """
-        return self.protocol_type not in MULTI_SWEEP_PROTOCOL_TYPES
+        if self.protocol_type != "Step":
+            return True
+        return self.is_step_single_sweep
 
     @rx.var
     def filtered_log_entries(self) -> list[UILogRecord]:
@@ -997,6 +1008,61 @@ class AppState(rx.State):
     # Reflex's metaclass sees them as regular event handlers.
     for _f in _FLOAT_FIELDS:
         vars()[f"set_{_f}"] = _make_float_setter(_f)
+
+    # Stimulus range setters — custom logic to keep stimulus_step valid.
+    def set_min_stimulus(self, value: str | float) -> None:
+        """Set min_stimulus, auto-setting stimulus_step when a range is opened.
+
+        If the new min_stimulus differs from max_stimulus and stimulus_step is
+        currently 0, stimulus_step is set to 1.0 so the Step protocol remains
+        in a valid multi-sweep state without requiring a separate user action.
+
+        Args:
+            value: Raw input value from the UI field.
+        """
+        self._set_float("min_stimulus", value)
+        if self.min_stimulus != self.max_stimulus and self.stimulus_step == 0.0:
+            self.stimulus_step = 1.0
+
+    def set_max_stimulus(self, value: str | float) -> None:
+        """Set max_stimulus, auto-setting stimulus_step when a range is opened.
+
+        If the new max_stimulus differs from min_stimulus and stimulus_step is
+        currently 0, stimulus_step is set to 1.0 so the Step protocol remains
+        in a valid multi-sweep state without requiring a separate user action.
+
+        Args:
+            value: Raw input value from the UI field.
+        """
+        self._set_float("max_stimulus", value)
+        if self.min_stimulus != self.max_stimulus and self.stimulus_step == 0.0:
+            self.stimulus_step = 1.0
+
+    def set_stimulus_step(self, value: str | float) -> None:
+        """Set stimulus_step, rejecting non-positive values when min != max.
+
+        When min_stimulus differs from max_stimulus a step of 0 (or negative)
+        would produce an invalid multi-sweep configuration.  Such values are
+        ignored, leaving the previous step unchanged.  When
+        min_stimulus == max_stimulus (single-sweep mode) any value is accepted.
+
+        Args:
+            value: Raw input value from the UI text field.
+        """
+        try:
+            parsed = float(value)
+        except (ValueError, TypeError):
+            logger.debug("set_stimulus_step: could not parse %r as float", value)
+            return
+        if self.min_stimulus != self.max_stimulus and parsed <= 0.0:
+            logger.debug(
+                "set_stimulus_step: rejected value %s"
+                " (non-positive step in multi-sweep mode)",
+                parsed,
+            )
+            self.stimulus_step = 1.0
+            return
+        self.stimulus_step = parsed
 
     # Non-visibility bool setters (channel enable/disable).
     for _f in _NON_VISIBILITY_BOOL_FIELDS:
@@ -1199,7 +1265,6 @@ class AppState(rx.State):
                 stimulus_duration=self.stimulus_duration,
                 post_stimulus_duration=self.post_stimulus_duration,
                 holding_voltage=self.vc_holding_voltage,
-                voltage_amplitude=self.min_stimulus,
                 start_voltage=self.vc_start_voltage,
                 end_voltage=self.vc_end_voltage,
                 pulse_amplitude=self.vc_pulse_amplitude,
@@ -1372,7 +1437,13 @@ class AppState(rx.State):
             neuron = self._build_neuron()
             mode = self.clamp_mode
             ptype = self.protocol_type
-            protocols = self._build_protocols()
+            try:
+                protocols = self._build_protocols()
+            except ValueError as exc:
+                logger.exception("Simulation error: %s", exc)
+                self.error_message = str(exc)
+                self.is_running = False
+                return
 
         _start_ms = time.monotonic() * 1000
         logger.info(
