@@ -158,6 +158,8 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
                 "T",
             }
             and isinstance(v, (int, float))
+            and not isinstance(v, bool)
+            and not k.endswith("_g_max")
         }
         result = build_current_protocol(
             protocol_type=protocol_type,
@@ -191,6 +193,8 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
                 "T",
             }
             and isinstance(v, (int, float))
+            and not isinstance(v, bool)
+            and not k.endswith("_g_max")
         }
         result = build_voltage_protocol(
             protocol_type=protocol_type,
