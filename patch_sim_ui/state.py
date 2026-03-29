@@ -1053,6 +1053,7 @@ class AppState(rx.State):
             parsed = float(value)
         except (ValueError, TypeError):
             logger.debug("set_stimulus_step: could not parse %r as float", value)
+            self.stimulus_step = self.stimulus_step
             return
         if self.min_stimulus != self.max_stimulus and parsed <= 0.0:
             logger.debug(
@@ -1060,6 +1061,7 @@ class AppState(rx.State):
                 " (non-positive step in multi-sweep mode)",
                 parsed,
             )
+            self.stimulus_step = self.stimulus_step
             return
         self.stimulus_step = parsed
 
