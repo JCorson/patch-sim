@@ -203,189 +203,224 @@ def test_clear_sweeps_on_empty_list_does_not_raise() -> None:
 
 
 # ---------------------------------------------------------------------------
-# load_preset
+# load_protocol_preset
 # ---------------------------------------------------------------------------
 
 
-def test_load_preset_action_potential_sets_duration() -> None:
+def test_load_protocol_preset_action_potential_sets_duration() -> None:
     """Loading 'Action Potential' preset sets duration to 50.0."""
     s = _make_state()
-    s.load_preset("Action Potential")
+    s.load_protocol_preset("Action Potential")
     assert s.duration == pytest.approx(50.0)
 
 
-def test_load_preset_action_potential_sets_clamp_mode() -> None:
+def test_load_protocol_preset_action_potential_sets_clamp_mode() -> None:
     """Loading 'Action Potential' preset sets clamp_mode to 'Current Clamp'."""
     s = _make_state()
-    s.load_preset("Action Potential")
+    s.load_protocol_preset("Action Potential")
     assert s.clamp_mode == "Current Clamp"
 
 
-def test_load_preset_repetitive_firing_sets_duration() -> None:
+def test_load_protocol_preset_repetitive_firing_sets_duration() -> None:
     """Loading 'Repetitive Firing' preset sets duration to 200.0."""
     s = _make_state()
-    s.load_preset("Repetitive Firing")
+    s.load_protocol_preset("Repetitive Firing")
     assert s.duration == pytest.approx(200.0)
 
 
-def test_load_preset_iv_curve_sets_voltage_clamp_mode() -> None:
+def test_load_protocol_preset_iv_curve_sets_voltage_clamp_mode() -> None:
     """Loading 'I-V Curve' preset sets clamp_mode to 'Voltage Clamp'."""
     s = _make_state()
-    s.load_preset("I-V Curve")
+    s.load_protocol_preset("I-V Curve")
     assert s.clamp_mode == "Voltage Clamp"
 
 
-def test_load_preset_clears_current_sweeps() -> None:
-    """load_preset resets current_sweeps to an empty list."""
+def test_load_protocol_preset_clears_current_sweeps() -> None:
+    """load_protocol_preset resets current_sweeps to an empty list."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
-    s.load_preset("Action Potential")
+    s.load_protocol_preset("Action Potential")
     assert len(s.current_sweeps) == 0
 
 
-def test_load_preset_clears_saved_sweeps() -> None:
-    """load_preset resets saved_sweeps to an empty list."""
+def test_load_protocol_preset_clears_saved_sweeps() -> None:
+    """load_protocol_preset resets saved_sweeps to an empty list."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     s.add_sweep()
-    s.load_preset("Action Potential")
+    s.load_protocol_preset("Action Potential")
     assert len(s.saved_sweeps) == 0
 
 
-def test_load_preset_clears_stored_traces() -> None:
-    """load_preset resets stored_traces to an empty list."""
+def test_load_protocol_preset_clears_stored_traces() -> None:
+    """load_protocol_preset resets stored_traces to an empty list."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     s.store_trace()
     assert len(s.stored_traces) == 1
-    s.load_preset("Action Potential")
+    s.load_protocol_preset("Action Potential")
     assert len(s.stored_traces) == 0
 
 
-def test_load_preset_resets_cont_has_state() -> None:
-    """load_preset resets _cont_has_state so the next continuous iter starts fresh."""
+def test_load_protocol_preset_resets_cont_has_state() -> None:
+    """load_protocol_preset resets _cont_has_state before the next continuous run."""
     s = _make_state()
     s._cont_has_state = True
-    s.load_preset("Action Potential")
+    s.load_protocol_preset("Action Potential")
     assert s._cont_has_state is False
 
 
-def test_load_preset_unknown_name_is_ignored() -> None:
-    """load_preset silently ignores an unknown preset name."""
+def test_load_protocol_preset_unknown_name_is_ignored() -> None:
+    """load_protocol_preset silently ignores an unknown preset name."""
     s = _make_state()
     original_duration = s.duration
-    s.load_preset("NonExistentPreset")
+    s.load_protocol_preset("NonExistentPreset")
     assert s.duration == pytest.approx(original_duration)
 
 
 # ---------------------------------------------------------------------------
-# Neuron-type presets
+# load_neuron_preset
 # ---------------------------------------------------------------------------
 
 
-def test_load_preset_fast_spiking_interneuron_enables_ika() -> None:
+def test_load_neuron_preset_fast_spiking_interneuron_enables_ika() -> None:
     """Fast-Spiking Interneuron preset enables the IKa channel."""
     s = _make_state()
-    s.load_preset("Fast-Spiking Interneuron")
+    s.load_neuron_preset("Fast-Spiking Interneuron")
     assert s.ika_enabled is True
 
 
-def test_load_preset_fast_spiking_interneuron_sets_duration() -> None:
-    """Fast-Spiking Interneuron preset sets duration to 200.0."""
+def test_load_neuron_preset_does_not_change_protocol_fields() -> None:
+    """load_neuron_preset leaves protocol fields (duration, clamp_mode) unchanged."""
     s = _make_state()
-    s.load_preset("Fast-Spiking Interneuron")
-    assert s.duration == pytest.approx(200.0)
+    original_duration = s.duration
+    original_clamp = s.clamp_mode
+    s.load_neuron_preset("Fast-Spiking Interneuron")
+    assert s.duration == pytest.approx(original_duration)
+    assert s.clamp_mode == original_clamp
 
 
-def test_load_preset_fast_spiking_interneuron_sets_current_clamp() -> None:
-    """Fast-Spiking Interneuron preset uses current clamp mode."""
+def test_load_neuron_preset_sets_active_neuron_type() -> None:
+    """load_neuron_preset records the selected neuron type on the state."""
     s = _make_state()
-    s.load_preset("Fast-Spiking Interneuron")
-    assert s.clamp_mode == constants.CURRENT_CLAMP
+    s.load_neuron_preset("Pyramidal Neuron")
+    assert s.active_neuron_type == "Pyramidal Neuron"
 
 
-def test_load_preset_pyramidal_neuron_enables_ih() -> None:
+def test_load_neuron_preset_resets_previously_enabled_channels() -> None:
+    """Loading a second neuron preset disables channels from the first."""
+    s = _make_state()
+    s.load_neuron_preset("Fast-Spiking Interneuron")
+    assert s.ika_enabled is True
+    s.load_neuron_preset("Pyramidal Neuron")
+    assert s.ika_enabled is False
+
+
+def test_load_neuron_preset_pyramidal_neuron_enables_ih() -> None:
     """Pyramidal Neuron preset enables the Ih channel."""
     s = _make_state()
-    s.load_preset("Pyramidal Neuron")
+    s.load_neuron_preset("Pyramidal Neuron")
     assert s.ih_enabled is True
 
 
-def test_load_preset_pyramidal_neuron_enables_inap() -> None:
+def test_load_neuron_preset_pyramidal_neuron_enables_inap() -> None:
     """Pyramidal Neuron preset enables the INaP channel."""
     s = _make_state()
-    s.load_preset("Pyramidal Neuron")
+    s.load_neuron_preset("Pyramidal Neuron")
     assert s.inap_enabled is True
 
 
-def test_load_preset_pyramidal_neuron_sets_duration() -> None:
-    """Pyramidal Neuron preset sets duration to 300.0."""
-    s = _make_state()
-    s.load_preset("Pyramidal Neuron")
-    assert s.duration == pytest.approx(300.0)
-
-
-def test_load_preset_purkinje_cell_enables_ical() -> None:
+def test_load_neuron_preset_purkinje_cell_enables_ical() -> None:
     """Purkinje Cell preset enables the ICaL channel."""
     s = _make_state()
-    s.load_preset("Purkinje Cell")
+    s.load_neuron_preset("Purkinje Cell")
     assert s.ical_enabled is True
 
 
-def test_load_preset_purkinje_cell_enables_ikca() -> None:
+def test_load_neuron_preset_purkinje_cell_enables_ikca() -> None:
     """Purkinje Cell preset enables the IKCa channel."""
     s = _make_state()
-    s.load_preset("Purkinje Cell")
+    s.load_neuron_preset("Purkinje Cell")
     assert s.ikca_enabled is True
 
 
-def test_load_preset_purkinje_cell_sets_duration() -> None:
-    """Purkinje Cell preset sets duration to 200.0."""
-    s = _make_state()
-    s.load_preset("Purkinje Cell")
-    assert s.duration == pytest.approx(200.0)
-
-
-def test_load_preset_dopaminergic_neuron_enables_ih() -> None:
+def test_load_neuron_preset_dopaminergic_neuron_enables_ih() -> None:
     """Dopaminergic Neuron preset enables the Ih channel."""
     s = _make_state()
-    s.load_preset("Dopaminergic Neuron")
+    s.load_neuron_preset("Dopaminergic Neuron")
     assert s.ih_enabled is True
 
 
-def test_load_preset_dopaminergic_neuron_enables_im() -> None:
+def test_load_neuron_preset_dopaminergic_neuron_enables_im() -> None:
     """Dopaminergic Neuron preset enables the IM channel."""
     s = _make_state()
-    s.load_preset("Dopaminergic Neuron")
+    s.load_neuron_preset("Dopaminergic Neuron")
     assert s.im_enabled is True
 
 
-def test_load_preset_dopaminergic_neuron_sets_duration() -> None:
-    """Dopaminergic Neuron preset sets duration to 500.0."""
-    s = _make_state()
-    s.load_preset("Dopaminergic Neuron")
-    assert s.duration == pytest.approx(500.0)
-
-
-def test_load_preset_thalamic_relay_enables_icat() -> None:
+def test_load_neuron_preset_thalamic_relay_enables_icat() -> None:
     """Thalamic Relay preset enables the ICaT channel."""
     s = _make_state()
-    s.load_preset("Thalamic Relay")
+    s.load_neuron_preset("Thalamic Relay")
     assert s.icat_enabled is True
 
 
-def test_load_preset_thalamic_relay_enables_ih() -> None:
+def test_load_neuron_preset_thalamic_relay_enables_ih() -> None:
     """Thalamic Relay preset enables the Ih channel."""
     s = _make_state()
-    s.load_preset("Thalamic Relay")
+    s.load_neuron_preset("Thalamic Relay")
     assert s.ih_enabled is True
 
 
-def test_load_preset_thalamic_relay_sets_hyperpolarizing_current() -> None:
-    """Thalamic Relay preset uses a negative current amplitude for rebound."""
+def test_load_neuron_preset_clears_current_sweeps() -> None:
+    """load_neuron_preset resets current_sweeps to an empty list."""
     s = _make_state()
-    s.load_preset("Thalamic Relay")
+    s.current_sweeps = [_make_sweep()]
+    s.load_neuron_preset("Pyramidal Neuron")
+    assert len(s.current_sweeps) == 0
+
+
+def test_load_neuron_preset_unknown_name_is_ignored() -> None:
+    """load_neuron_preset silently ignores an unknown preset name."""
+    s = _make_state()
+    s.load_neuron_preset("NonExistentNeuron")
+    assert s.active_neuron_type == ""
+
+
+# ---------------------------------------------------------------------------
+# Neuron-type protocol adjustments
+# ---------------------------------------------------------------------------
+
+
+def test_protocol_preset_with_active_neuron_type_applies_adjustment() -> None:
+    """Repetitive Firing with Thalamic Relay active uses hyperpolarizing current."""
+    s = _make_state()
+    s.load_neuron_preset("Thalamic Relay")
+    s.load_protocol_preset("Repetitive Firing")
     assert s.current_amplitude < 0.0
+
+
+def test_protocol_preset_without_active_neuron_type_uses_base_params() -> None:
+    """Repetitive Firing without an active neuron type uses the base amplitude."""
+    s = _make_state()
+    s.load_protocol_preset("Repetitive Firing")
+    assert s.current_amplitude == pytest.approx(15.0)
+
+
+def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> None:
+    """Action Potential with Thalamic Relay active falls through to base duration."""
+    s = _make_state()
+    s.load_neuron_preset("Thalamic Relay")
+    s.load_protocol_preset("Action Potential")
+    assert s.duration == pytest.approx(50.0)
+
+
+def test_protocol_preset_dopaminergic_repetitive_firing_uses_long_duration() -> None:
+    """Repetitive Firing with Dopaminergic Neuron active sets duration to 500 ms."""
+    s = _make_state()
+    s.load_neuron_preset("Dopaminergic Neuron")
+    s.load_protocol_preset("Repetitive Firing")
+    assert s.duration == pytest.approx(500.0)
 
 
 # ---------------------------------------------------------------------------

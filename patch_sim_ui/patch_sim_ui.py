@@ -20,7 +20,7 @@ def _header() -> rx.Component:
         rx.select(
             presets.PROTOCOL_PRESET_NAMES,
             placeholder="Load preset…",
-            on_change=AppState.load_preset,
+            on_change=AppState.load_protocol_preset,
             width="200px",
             size="2",
         ),
