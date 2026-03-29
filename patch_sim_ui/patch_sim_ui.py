@@ -76,6 +76,7 @@ def _header() -> rx.Component:
             spacing="2",
             align="center",
         ),
+        rx.color_mode.button(allow_system=True, variant="ghost", size="2"),
         width="100%",
         padding_x="4",
         padding_y="3",
@@ -167,7 +168,7 @@ def index() -> rx.Component:
 
 app = rx.App(
     theme=rx.theme(
-        appearance="light",
+        appearance="inherit",
         accent_color="blue",
         radius="medium",
     )

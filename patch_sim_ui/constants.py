@@ -49,7 +49,6 @@ VOLTAGE_PROTOCOLS: list[str] = [
     "Step",
     "Ramp",
     "Pulse Train",
-    "I-V Curve",
 ]
 
 # Fixed colour for the Current Clamp voltage trace.  Matches the blue used for
@@ -143,3 +142,13 @@ SWEEP_COLORS: list[str] = [
     "#9e9e9e",
     "#707070",
 ]
+
+# Sweep highlight / dim styling for the interactive sweep-selection feature.
+HIGHLIGHT_DIM_OPACITY: float = 0.15
+"""Opacity applied to non-selected sweeps after a click selection."""
+
+HIGHLIGHT_HOVER_WIDTH: float = 4.0
+"""Line width (px) applied to the hovered sweep during a hover preview."""
+
+HIGHLIGHT_DIM_WIDTH: float = 0.5
+"""Line width (px) applied to dimmed (non-selected) sweep traces."""

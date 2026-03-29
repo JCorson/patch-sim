@@ -73,38 +73,38 @@ def _make_sweep(label: str = "test", color: str = "#000000") -> Sweep:
 def test_set_float_accepts_plain_float() -> None:
     """_set_float stores a plain float value as-is."""
     s = _make_state()
-    s._set_float("duration", 99.5)
-    assert s.duration == pytest.approx(99.5)
+    s._set_float("stimulus_duration", 99.5)
+    assert s.stimulus_duration == pytest.approx(99.5)
 
 
 def test_set_float_accepts_string() -> None:
     """_set_float parses a string to float and stores it."""
     s = _make_state()
-    s._set_float("duration", "77.25")
-    assert s.duration == pytest.approx(77.25)
+    s._set_float("stimulus_duration", "77.25")
+    assert s.stimulus_duration == pytest.approx(77.25)
 
 
 def test_set_float_accepts_list_uses_first_element() -> None:
     """_set_float uses the first element when given a list (slider events)."""
     s = _make_state()
-    s._set_float("duration", [42.0, 50.0])
-    assert s.duration == pytest.approx(42.0)
+    s._set_float("stimulus_duration", [42.0, 50.0])
+    assert s.stimulus_duration == pytest.approx(42.0)
 
 
 def test_set_float_ignores_unparseable_string() -> None:
     """_set_float silently ignores values that cannot be converted to float."""
     s = _make_state()
-    original = s.duration
-    s._set_float("duration", "not_a_number")
-    assert s.duration == pytest.approx(original)
+    original = s.stimulus_duration
+    s._set_float("stimulus_duration", "not_a_number")
+    assert s.stimulus_duration == pytest.approx(original)
 
 
 def test_set_float_ignores_none() -> None:
     """_set_float silently ignores None without raising."""
     s = _make_state()
-    original = s.duration
-    s._set_float("duration", None)  # type: ignore[arg-type]
-    assert s.duration == pytest.approx(original)
+    original = s.stimulus_duration
+    s._set_float("stimulus_duration", None)  # type: ignore[arg-type]
+    assert s.stimulus_duration == pytest.approx(original)
 
 
 # ---------------------------------------------------------------------------
@@ -113,24 +113,24 @@ def test_set_float_ignores_none() -> None:
 
 
 def test_generated_float_setter_stores_value() -> None:
-    """set_duration(50.0) stores 50.0 in self.duration."""
+    """set_stimulus_duration(50.0) stores 50.0 in self.stimulus_duration."""
     s = _make_state()
-    s.set_duration(50.0)
-    assert s.duration == pytest.approx(50.0)
+    s.set_stimulus_duration(50.0)
+    assert s.stimulus_duration == pytest.approx(50.0)
 
 
 def test_generated_float_setter_accepts_string() -> None:
     """Generated float setter parses a string value via _set_float."""
     s = _make_state()
-    s.set_duration("123.4")
-    assert s.duration == pytest.approx(123.4)
+    s.set_stimulus_duration("123.4")
+    assert s.stimulus_duration == pytest.approx(123.4)
 
 
 def test_generated_float_setter_accepts_list() -> None:
     """Generated float setter accepts a slider list and uses the first element."""
     s = _make_state()
-    s.set_duration([25.0, 50.0])
-    assert s.duration == pytest.approx(25.0)
+    s.set_stimulus_duration([25.0, 50.0])
+    assert s.stimulus_duration == pytest.approx(25.0)
 
 
 # ---------------------------------------------------------------------------
@@ -207,11 +207,11 @@ def test_clear_sweeps_on_empty_list_does_not_raise() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_load_protocol_preset_action_potential_sets_duration() -> None:
-    """Loading 'Action Potential' preset sets duration to 50.0."""
+def test_load_protocol_preset_action_potential_sets_stimulus_duration() -> None:
+    """Loading 'Action Potential' preset sets stimulus_duration to 30.0."""
     s = _make_state()
     s.load_protocol_preset("Action Potential")
-    assert s.duration == pytest.approx(50.0)
+    assert s.stimulus_duration == pytest.approx(30.0)
 
 
 def test_load_protocol_preset_action_potential_sets_clamp_mode() -> None:
@@ -221,11 +221,11 @@ def test_load_protocol_preset_action_potential_sets_clamp_mode() -> None:
     assert s.clamp_mode == "Current Clamp"
 
 
-def test_load_protocol_preset_repetitive_firing_sets_duration() -> None:
-    """Loading 'Repetitive Firing' preset sets duration to 200.0."""
+def test_load_protocol_preset_repetitive_firing_sets_stimulus_duration() -> None:
+    """Loading 'Repetitive Firing' preset sets stimulus_duration to 180.0."""
     s = _make_state()
     s.load_protocol_preset("Repetitive Firing")
-    assert s.duration == pytest.approx(200.0)
+    assert s.stimulus_duration == pytest.approx(180.0)
 
 
 def test_load_protocol_preset_iv_curve_sets_voltage_clamp_mode() -> None:
@@ -273,9 +273,9 @@ def test_load_protocol_preset_resets_cont_has_state() -> None:
 def test_load_protocol_preset_unknown_name_is_ignored() -> None:
     """load_protocol_preset silently ignores an unknown preset name."""
     s = _make_state()
-    original_duration = s.duration
+    original = s.stimulus_duration
     s.load_protocol_preset("NonExistentPreset")
-    assert s.duration == pytest.approx(original_duration)
+    assert s.stimulus_duration == pytest.approx(original)
 
 
 # ---------------------------------------------------------------------------
@@ -518,7 +518,7 @@ def test_set_clamp_mode_to_current_resets_protocol_type() -> None:
     """set_clamp_mode('Current Clamp') resets protocol_type to the first CC option."""
     s = _make_state()
     s.clamp_mode = "Voltage Clamp"
-    s.protocol_type = "I-V Curve"
+    s.protocol_type = "Ramp"
     s.set_clamp_mode("Current Clamp")
     assert s.protocol_type == constants.CURRENT_PROTOCOLS[0]
 
@@ -554,11 +554,24 @@ def test_protocol_options_voltage_clamp() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_can_run_continuous_true_for_step() -> None:
-    """can_run_continuous is True for the Step protocol."""
+def test_can_run_continuous_true_for_step_single_sweep() -> None:
+    """can_run_continuous is True for a single-step Step protocol (min == max)."""
     s = _make_state()
     s.protocol_type = "Step"
+    s.min_stimulus = 10.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 0.0
     assert s.can_run_continuous is True
+
+
+def test_can_run_continuous_false_for_step_multi_sweep() -> None:
+    """can_run_continuous is False for a multi-sweep Step protocol."""
+    s = _make_state()
+    s.protocol_type = "Step"
+    s.min_stimulus = -10.0
+    s.max_stimulus = 20.0
+    s.stimulus_step = 2.5
+    assert s.can_run_continuous is False
 
 
 def test_can_run_continuous_true_for_ramp() -> None:
@@ -568,11 +581,90 @@ def test_can_run_continuous_true_for_ramp() -> None:
     assert s.can_run_continuous is True
 
 
-def test_can_run_continuous_false_for_iv_curve() -> None:
-    """can_run_continuous is False for the I-V Curve protocol."""
+# ---------------------------------------------------------------------------
+# Stimulus range setters — constraint logic
+# ---------------------------------------------------------------------------
+
+
+def test_set_max_stimulus_auto_sets_step_when_range_opens() -> None:
+    """set_max_stimulus auto-sets stimulus_step to 1.0 when min != max and step is 0."""
     s = _make_state()
-    s.protocol_type = "I-V Curve"
-    assert s.can_run_continuous is False
+    s.min_stimulus = 10.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 0.0
+    s.set_max_stimulus(20.0)
+    assert s.max_stimulus == 20.0
+    assert s.stimulus_step == 1.0
+
+
+def test_set_min_stimulus_auto_sets_step_when_range_opens() -> None:
+    """set_min_stimulus auto-sets stimulus_step to 1.0 when min != max and step is 0."""
+    s = _make_state()
+    s.min_stimulus = 10.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 0.0
+    s.set_min_stimulus(0.0)
+    assert s.min_stimulus == 0.0
+    assert s.stimulus_step == 1.0
+
+
+def test_set_max_stimulus_does_not_change_step_when_already_nonzero() -> None:
+    """set_max_stimulus leaves stimulus_step unchanged when it is already non-zero."""
+    s = _make_state()
+    s.min_stimulus = 0.0
+    s.max_stimulus = 20.0
+    s.stimulus_step = 5.0
+    s.set_max_stimulus(30.0)
+    assert s.stimulus_step == 5.0
+
+
+def test_set_stimulus_step_zero_rejected_when_range_open() -> None:
+    """set_stimulus_step resets to 1.0 when 0 is submitted in multi-sweep mode.
+
+    Resetting to 1.0 (rather than keeping the previous value) guarantees a
+    state change, which forces Reflex to emit a delta and snap the controlled
+    input back to the validated value.
+    """
+    s = _make_state()
+    s.min_stimulus = 0.0
+    s.max_stimulus = 20.0
+    s.stimulus_step = 5.0
+    s.set_stimulus_step(0.0)
+    assert s.stimulus_step == 1.0
+
+
+def test_set_stimulus_step_negative_rejected_when_range_open() -> None:
+    """set_stimulus_step resets to 1.0 for negative values in multi-sweep mode."""
+    s = _make_state()
+    s.min_stimulus = 0.0
+    s.max_stimulus = 20.0
+    s.stimulus_step = 5.0
+    s.set_stimulus_step(-1.0)
+    assert s.stimulus_step == 1.0
+
+
+def test_set_stimulus_step_rejection_always_changes_state() -> None:
+    """Rejected step values always mutate stimulus_step so Reflex emits a delta.
+
+    Even when the previous step was already 1.0, a rejected value must still
+    produce a state change so the frontend controlled input snaps back.
+    """
+    s = _make_state()
+    s.min_stimulus = 0.0
+    s.max_stimulus = 20.0
+    s.stimulus_step = 1.0
+    s.set_stimulus_step(0.0)
+    assert s.stimulus_step == 1.0
+
+
+def test_set_stimulus_step_zero_accepted_when_single_sweep() -> None:
+    """set_stimulus_step accepts 0 when min_stimulus == max_stimulus."""
+    s = _make_state()
+    s.min_stimulus = 10.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 5.0
+    s.set_stimulus_step(0.0)
+    assert s.stimulus_step == 0.0
 
 
 # ---------------------------------------------------------------------------
