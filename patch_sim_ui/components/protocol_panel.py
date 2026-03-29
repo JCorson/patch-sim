@@ -77,7 +77,7 @@ def _cc_step_params() -> rx.Component:
         ),
         _num_field(
             "Current step (µA/cm²)",
-            AppState.stimulus_step_input,
+            AppState.stimulus_step,
             AppState.set_stimulus_step,
             disabled=AppState.is_step_single_sweep,
         ),
@@ -181,7 +181,7 @@ def _vc_step_params() -> rx.Component:
         ),
         _num_field(
             "Voltage step (mV)",
-            AppState.stimulus_step_input,
+            AppState.stimulus_step,
             AppState.set_stimulus_step,
             disabled=AppState.is_step_single_sweep,
         ),

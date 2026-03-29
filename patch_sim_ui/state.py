@@ -685,13 +685,6 @@ class AppState(rx.State):
     min_stimulus: float = 10.0
     max_stimulus: float = 10.0
     stimulus_step: float = 0.0
-    # Display string for the stimulus_step input — kept in sync with
-    # stimulus_step so the controlled input always reflects the validated value.
-    stimulus_step_input: str = "0.0"
-    # Incremented on every rejected set_stimulus_step call so Reflex always
-    # emits a non-empty delta, which forces React to re-render the controlled
-    # input with the current stimulus_step_input value.
-    _step_reject_count: int = 0
 
     # Current clamp protocol params
     start_current: float = 0.0
@@ -990,7 +983,6 @@ class AppState(rx.State):
         config = presets.PRESETS[name]
         for key, value in config.items():
             setattr(self, key, value)
-        self.stimulus_step_input = str(self.stimulus_step)
         self.current_sweeps = []
         self.saved_sweeps = []
         self.stored_traces = []
@@ -1031,7 +1023,6 @@ class AppState(rx.State):
         self._set_float("min_stimulus", value)
         if self.min_stimulus != self.max_stimulus and self.stimulus_step == 0.0:
             self.stimulus_step = 1.0
-            self.stimulus_step_input = "1.0"
 
     def set_max_stimulus(self, value: str | float) -> None:
         """Set max_stimulus, auto-setting stimulus_step when a range is opened.
@@ -1046,7 +1037,6 @@ class AppState(rx.State):
         self._set_float("max_stimulus", value)
         if self.min_stimulus != self.max_stimulus and self.stimulus_step == 0.0:
             self.stimulus_step = 1.0
-            self.stimulus_step_input = "1.0"
 
     def set_stimulus_step(self, value: str | float) -> None:
         """Set stimulus_step, rejecting non-positive values when min != max.
@@ -1063,8 +1053,6 @@ class AppState(rx.State):
             parsed = float(value)
         except (ValueError, TypeError):
             logger.debug("set_stimulus_step: could not parse %r as float", value)
-            self.stimulus_step_input = str(self.stimulus_step)
-            self._step_reject_count += 1
             return
         if self.min_stimulus != self.max_stimulus and parsed <= 0.0:
             logger.debug(
@@ -1072,11 +1060,8 @@ class AppState(rx.State):
                 " (non-positive step in multi-sweep mode)",
                 parsed,
             )
-            self.stimulus_step_input = str(self.stimulus_step)
-            self._step_reject_count += 1
             return
         self.stimulus_step = parsed
-        self.stimulus_step_input = str(parsed)
 
     # Non-visibility bool setters (channel enable/disable).
     for _f in _NON_VISIBILITY_BOOL_FIELDS:
