@@ -474,23 +474,42 @@ def test_set_max_stimulus_does_not_change_step_when_already_nonzero() -> None:
 
 
 def test_set_stimulus_step_zero_rejected_when_range_open() -> None:
-    """set_stimulus_step ignores a value of 0 when min_stimulus != max_stimulus."""
+    """set_stimulus_step resets to 1.0 when 0 is submitted in multi-sweep mode.
+
+    Resetting to 1.0 (rather than keeping the previous value) guarantees a
+    state change, which forces Reflex to emit a delta and snap the controlled
+    input back to the validated value.
+    """
     s = _make_state()
     s.min_stimulus = 0.0
     s.max_stimulus = 20.0
     s.stimulus_step = 5.0
     s.set_stimulus_step(0.0)
-    assert s.stimulus_step == 5.0
+    assert s.stimulus_step == 1.0
 
 
 def test_set_stimulus_step_negative_rejected_when_range_open() -> None:
-    """set_stimulus_step ignores a negative value when min_stimulus != max_stimulus."""
+    """set_stimulus_step resets to 1.0 for negative values in multi-sweep mode."""
     s = _make_state()
     s.min_stimulus = 0.0
     s.max_stimulus = 20.0
     s.stimulus_step = 5.0
     s.set_stimulus_step(-1.0)
-    assert s.stimulus_step == 5.0
+    assert s.stimulus_step == 1.0
+
+
+def test_set_stimulus_step_rejection_always_changes_state() -> None:
+    """Rejected step values always mutate stimulus_step so Reflex emits a delta.
+
+    Even when the previous step was already 1.0, a rejected value must still
+    produce a state change so the frontend controlled input snaps back.
+    """
+    s = _make_state()
+    s.min_stimulus = 0.0
+    s.max_stimulus = 20.0
+    s.stimulus_step = 1.0
+    s.set_stimulus_step(0.0)
+    assert s.stimulus_step == 1.0
 
 
 def test_set_stimulus_step_zero_accepted_when_single_sweep() -> None:

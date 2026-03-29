@@ -1060,6 +1060,7 @@ class AppState(rx.State):
                 " (non-positive step in multi-sweep mode)",
                 parsed,
             )
+            self.stimulus_step = 1.0
             return
         self.stimulus_step = parsed
 
