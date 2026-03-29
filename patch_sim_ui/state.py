@@ -153,9 +153,6 @@ _FLOAT_FIELDS: list[str] = [
     "pre_stimulus_duration",
     "stimulus_duration",
     "post_stimulus_duration",
-    "min_stimulus",
-    "max_stimulus",
-    "stimulus_step",
     # Current clamp protocol params
     "start_current",
     "end_current",
@@ -1011,6 +1008,55 @@ class AppState(rx.State):
     # Reflex's metaclass sees them as regular event handlers.
     for _f in _FLOAT_FIELDS:
         vars()[f"set_{_f}"] = _make_float_setter(_f)
+
+    # Stimulus range setters — custom logic to keep stimulus_step valid.
+    def set_min_stimulus(self, value: "str | list[float] | float") -> None:
+        """Set min_stimulus, auto-setting stimulus_step when a range is opened.
+
+        If the new min_stimulus differs from max_stimulus and stimulus_step is
+        currently 0, stimulus_step is set to 1.0 so the Step protocol remains
+        in a valid multi-sweep state without requiring a separate user action.
+
+        Args:
+            value: Raw input value from the UI field.
+        """
+        self._set_float("min_stimulus", value)
+        if self.min_stimulus != self.max_stimulus and self.stimulus_step == 0.0:
+            self.stimulus_step = 1.0
+
+    def set_max_stimulus(self, value: "str | list[float] | float") -> None:
+        """Set max_stimulus, auto-setting stimulus_step when a range is opened.
+
+        If the new max_stimulus differs from min_stimulus and stimulus_step is
+        currently 0, stimulus_step is set to 1.0 so the Step protocol remains
+        in a valid multi-sweep state without requiring a separate user action.
+
+        Args:
+            value: Raw input value from the UI field.
+        """
+        self._set_float("max_stimulus", value)
+        if self.min_stimulus != self.max_stimulus and self.stimulus_step == 0.0:
+            self.stimulus_step = 1.0
+
+    def set_stimulus_step(self, value: "str | list[float] | float") -> None:
+        """Set stimulus_step, rejecting non-positive values when min != max.
+
+        When min_stimulus differs from max_stimulus a step of 0 (or negative)
+        would produce an invalid multi-sweep configuration.  Such values are
+        silently ignored, leaving the previous step unchanged.  When
+        min_stimulus == max_stimulus (single-sweep mode) any value is accepted.
+
+        Args:
+            value: Raw input value from the UI field.
+        """
+        v = value[0] if isinstance(value, list) else value
+        try:
+            parsed = float(v)
+        except (ValueError, TypeError):
+            return
+        if self.min_stimulus != self.max_stimulus and parsed <= 0.0:
+            return
+        self.stimulus_step = parsed
 
     # Non-visibility bool setters (channel enable/disable).
     for _f in _NON_VISIBILITY_BOOL_FIELDS:

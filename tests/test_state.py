@@ -437,6 +437,73 @@ def test_can_run_continuous_true_for_ramp() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Stimulus range setters — constraint logic
+# ---------------------------------------------------------------------------
+
+
+def test_set_max_stimulus_auto_sets_step_when_range_opens() -> None:
+    """set_max_stimulus auto-sets stimulus_step to 1.0 when min != max and step is 0."""
+    s = _make_state()
+    s.min_stimulus = 10.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 0.0
+    s.set_max_stimulus(20.0)
+    assert s.max_stimulus == 20.0
+    assert s.stimulus_step == 1.0
+
+
+def test_set_min_stimulus_auto_sets_step_when_range_opens() -> None:
+    """set_min_stimulus auto-sets stimulus_step to 1.0 when min != max and step is 0."""
+    s = _make_state()
+    s.min_stimulus = 10.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 0.0
+    s.set_min_stimulus(0.0)
+    assert s.min_stimulus == 0.0
+    assert s.stimulus_step == 1.0
+
+
+def test_set_max_stimulus_does_not_change_step_when_already_nonzero() -> None:
+    """set_max_stimulus leaves stimulus_step unchanged when it is already non-zero."""
+    s = _make_state()
+    s.min_stimulus = 0.0
+    s.max_stimulus = 20.0
+    s.stimulus_step = 5.0
+    s.set_max_stimulus(30.0)
+    assert s.stimulus_step == 5.0
+
+
+def test_set_stimulus_step_zero_rejected_when_range_open() -> None:
+    """set_stimulus_step ignores a value of 0 when min_stimulus != max_stimulus."""
+    s = _make_state()
+    s.min_stimulus = 0.0
+    s.max_stimulus = 20.0
+    s.stimulus_step = 5.0
+    s.set_stimulus_step(0.0)
+    assert s.stimulus_step == 5.0
+
+
+def test_set_stimulus_step_negative_rejected_when_range_open() -> None:
+    """set_stimulus_step ignores a negative value when min_stimulus != max_stimulus."""
+    s = _make_state()
+    s.min_stimulus = 0.0
+    s.max_stimulus = 20.0
+    s.stimulus_step = 5.0
+    s.set_stimulus_step(-1.0)
+    assert s.stimulus_step == 5.0
+
+
+def test_set_stimulus_step_zero_accepted_when_single_sweep() -> None:
+    """set_stimulus_step accepts 0 when min_stimulus == max_stimulus."""
+    s = _make_state()
+    s.min_stimulus = 10.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 5.0
+    s.set_stimulus_step(0.0)
+    assert s.stimulus_step == 0.0
+
+
+# ---------------------------------------------------------------------------
 # continuous_active computed var
 # ---------------------------------------------------------------------------
 
