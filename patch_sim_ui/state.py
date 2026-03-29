@@ -833,16 +833,27 @@ class AppState(rx.State):
         return self.continuous_mode and self.continuous_loop_running
 
     @rx.var
+    def is_step_single_sweep(self) -> bool:
+        """True when the Step protocol is configured as a single sweep.
+
+        A single sweep is produced whenever min_stimulus == max_stimulus,
+        regardless of the stimulus_step value.
+
+        Returns:
+            True if min_stimulus equals max_stimulus, False otherwise.
+        """
+        return self.min_stimulus == self.max_stimulus
+
+    @rx.var
     def can_run_continuous(self) -> bool:
         """True when the active protocol is compatible with continuous mode.
 
-        Multi-sweep Step configurations (min_stimulus != max_stimulus with a
-        positive stimulus_step) are excluded; all other protocols run as a
-        single sweep and are compatible.
+        Multi-sweep Step configurations (min_stimulus != max_stimulus) are
+        excluded; all other protocols run as a single sweep and are compatible.
         """
         if self.protocol_type != "Step":
             return True
-        return self.min_stimulus == self.max_stimulus
+        return self.is_step_single_sweep
 
     @rx.var
     def filtered_log_entries(self) -> list[UILogRecord]:
@@ -1202,7 +1213,6 @@ class AppState(rx.State):
                 stimulus_duration=self.stimulus_duration,
                 post_stimulus_duration=self.post_stimulus_duration,
                 holding_voltage=self.vc_holding_voltage,
-                voltage_amplitude=self.min_stimulus,
                 start_voltage=self.vc_start_voltage,
                 end_voltage=self.vc_end_voltage,
                 pulse_amplitude=self.vc_pulse_amplitude,

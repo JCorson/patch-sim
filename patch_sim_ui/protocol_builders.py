@@ -73,6 +73,7 @@ def build_current_protocol(
         ValueError: If protocol_type is unrecognized or parameters are invalid.
     """
     total_duration = pre_stimulus_duration + stimulus_duration + post_stimulus_duration
+    result: list[tuple[np.ndarray, str]]
     if protocol_type == "Step":
         if current_step < 0.0:
             raise ValueError("current_step must be >= 0.0")
@@ -84,8 +85,7 @@ def build_current_protocol(
             raise ValueError(
                 "current_step must be > 0.0 when current_min != current_max"
             )
-        is_single_step = current_min == current_max
-        if is_single_step:
+        if current_min == current_max:
             protocol = patch_sim.step_current(
                 duration=total_duration,
                 current_amplitude=current_min,
@@ -93,92 +93,105 @@ def build_current_protocol(
                 step_duration=stimulus_duration,
                 sampling_frequency=sampling_frequency,
             )
-            logger.debug(
-                "build_current_protocol: type=%r total_duration=%.1f ms steps=%d",
-                protocol_type,
-                total_duration,
-                len(protocol),
-            )
-            return [(protocol, "")]
-        n_steps = round((current_max - current_min) / current_step) + 1
-        currents = np.linspace(current_min, current_max, n_steps)
+            result = [(protocol, "")]
+        else:
+            n_steps = round((current_max - current_min) / current_step) + 1
+            currents = np.linspace(current_min, current_max, n_steps)
+            result = [
+                (
+                    patch_sim.step_current(
+                        duration=total_duration,
+                        current_amplitude=float(current),
+                        step_start=pre_stimulus_duration,
+                        step_duration=stimulus_duration,
+                        sampling_frequency=sampling_frequency,
+                    ),
+                    f"{current:+.1f} µA/cm²",
+                )
+                for current in currents
+            ]
+    elif protocol_type == "Ramp":
         result = [
             (
-                patch_sim.step_current(
+                patch_sim.ramp_current(
                     duration=total_duration,
-                    current_amplitude=float(current),
-                    step_start=pre_stimulus_duration,
-                    step_duration=stimulus_duration,
+                    start_current=start_current,
+                    end_current=end_current,
+                    ramp_start=pre_stimulus_duration,
+                    ramp_duration=stimulus_duration,
                     sampling_frequency=sampling_frequency,
                 ),
-                f"{current:+.1f} µA/cm²",
+                "",
             )
-            for current in currents
         ]
-        logger.debug(
-            "build_current_protocol: type=%r total_duration=%.1f ms sweeps=%d",
-            protocol_type,
-            total_duration,
-            len(result),
-        )
-        return result
-    elif protocol_type == "Ramp":
-        protocol = patch_sim.ramp_current(
-            duration=total_duration,
-            start_current=start_current,
-            end_current=end_current,
-            ramp_start=pre_stimulus_duration,
-            ramp_duration=stimulus_duration,
-            sampling_frequency=sampling_frequency,
-        )
     elif protocol_type == "Pulse Train":
-        protocol = patch_sim.pulse_train(
-            duration=total_duration,
-            pulse_amplitude=pulse_amplitude,
-            pulse_width=pulse_width,
-            pulse_interval=pulse_interval,
-            train_start=pre_stimulus_duration,
-            sampling_frequency=sampling_frequency,
-        )
+        result = [
+            (
+                patch_sim.pulse_train(
+                    duration=total_duration,
+                    pulse_amplitude=pulse_amplitude,
+                    pulse_width=pulse_width,
+                    pulse_interval=pulse_interval,
+                    train_start=pre_stimulus_duration,
+                    sampling_frequency=sampling_frequency,
+                ),
+                "",
+            )
+        ]
     elif protocol_type == "Sinusoidal":
-        protocol = patch_sim.sinusoidal_current(
-            duration=total_duration,
-            dc_offset=dc_offset,
-            amplitude=amplitude,
-            frequency=frequency,
-            stimulus_start=pre_stimulus_duration,
-            stimulus_duration=stimulus_duration,
-            sampling_frequency=sampling_frequency,
-        )
+        result = [
+            (
+                patch_sim.sinusoidal_current(
+                    duration=total_duration,
+                    dc_offset=dc_offset,
+                    amplitude=amplitude,
+                    frequency=frequency,
+                    stimulus_start=pre_stimulus_duration,
+                    stimulus_duration=stimulus_duration,
+                    sampling_frequency=sampling_frequency,
+                ),
+                "",
+            )
+        ]
     elif protocol_type == "Chirp":
-        protocol = patch_sim.chirp_current(
-            duration=total_duration,
-            dc_offset=dc_offset,
-            amplitude=amplitude,
-            start_frequency=start_frequency,
-            end_frequency=end_frequency,
-            stimulus_start=pre_stimulus_duration,
-            stimulus_duration=stimulus_duration,
-            sampling_frequency=sampling_frequency,
-        )
+        result = [
+            (
+                patch_sim.chirp_current(
+                    duration=total_duration,
+                    dc_offset=dc_offset,
+                    amplitude=amplitude,
+                    start_frequency=start_frequency,
+                    end_frequency=end_frequency,
+                    stimulus_start=pre_stimulus_duration,
+                    stimulus_duration=stimulus_duration,
+                    sampling_frequency=sampling_frequency,
+                ),
+                "",
+            )
+        ]
     elif protocol_type == "Noise":
-        protocol = patch_sim.noise_current(
-            duration=total_duration,
-            mean_current=mean_current,
-            std_current=std_current,
-            stimulus_start=pre_stimulus_duration,
-            stimulus_duration=stimulus_duration,
-            sampling_frequency=sampling_frequency,
-        )
+        result = [
+            (
+                patch_sim.noise_current(
+                    duration=total_duration,
+                    mean_current=mean_current,
+                    std_current=std_current,
+                    stimulus_start=pre_stimulus_duration,
+                    stimulus_duration=stimulus_duration,
+                    sampling_frequency=sampling_frequency,
+                ),
+                "",
+            )
+        ]
     else:
         raise ValueError(f"Unknown current protocol type: {protocol_type!r}")
     logger.debug(
-        "build_current_protocol: type=%r total_duration=%.1f ms steps=%d",
+        "build_current_protocol: type=%r total_duration=%.1f ms sweeps=%d",
         protocol_type,
         total_duration,
-        len(protocol),
+        len(result),
     )
-    return [(protocol, "")]
+    return result
 
 
 def build_voltage_protocol(
@@ -188,7 +201,6 @@ def build_voltage_protocol(
     stimulus_duration: float = 30.0,
     post_stimulus_duration: float = 10.0,
     holding_voltage: float = -70.0,
-    voltage_amplitude: float = 0.0,
     start_voltage: float = -70.0,
     end_voltage: float = 40.0,
     pulse_amplitude: float = 20.0,
@@ -207,8 +219,6 @@ def build_voltage_protocol(
         stimulus_duration: Duration of the stimulus in ms.
         post_stimulus_duration: Duration after the stimulus in ms.
         holding_voltage: Holding voltage in mV.
-        voltage_amplitude: Unused; voltage_min is used for single-step
-            amplitude.  Kept for backward compatibility.
         start_voltage: Ramp start voltage in mV.
         end_voltage: Ramp end voltage in mV.
         pulse_amplitude: Pulse amplitude in mV.

@@ -136,6 +136,19 @@ def test_step_single_via_equal_range_returns_single_sweep() -> None:
     assert result[0][1] == ""
 
 
+def test_voltage_step_single_via_equal_range_returns_single_sweep() -> None:
+    """Voltage Step with min == max returns a single-element list regardless of step."""
+    result = build_voltage_protocol(
+        protocol_type="Step",
+        sampling_frequency=SAMPLING_FREQUENCY,
+        voltage_min=-40.0,
+        voltage_max=-40.0,
+        voltage_step=10.0,
+    )
+    assert len(result) == 1
+    assert result[0][1] == ""
+
+
 # ---------------------------------------------------------------------------
 # Invalid inputs
 # ---------------------------------------------------------------------------
@@ -314,7 +327,6 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
         vc_kwargs = {k.removeprefix("vc_"): v for k, v in kwargs.items()}
         min_val = vc_kwargs.pop("min_stimulus", None)
         if min_val is not None:
-            vc_kwargs.setdefault("voltage_amplitude", min_val)
             vc_kwargs.setdefault("voltage_min", min_val)
         max_val = vc_kwargs.pop("max_stimulus", None)
         if max_val is not None:

@@ -6,8 +6,23 @@ from patch_sim_ui.constants import CURRENT_CLAMP, VOLTAGE_CLAMP
 from patch_sim_ui.state import AppState
 
 
-def _num_field(label: str, var: rx.Var, handler, unit: str = "") -> rx.Component:
-    """Render a labelled numeric input field."""
+def _num_field(
+    label: str,
+    var: rx.Var,
+    handler,
+    unit: str = "",
+    disabled: rx.Var | bool = False,
+) -> rx.Component:
+    """Render a labelled numeric input field.
+
+    Args:
+        label: Display label shown to the left of the input.
+        var: Reactive variable bound to the input value.
+        handler: Event handler called on change.
+        unit: Optional unit label shown to the right of the input.
+        disabled: When True (or a reactive bool that is True), the input is
+            rendered in a disabled state and cannot be edited.
+    """
     return rx.hstack(
         rx.text(label, size="2", color="gray", width="160px"),
         rx.input(
@@ -16,6 +31,7 @@ def _num_field(label: str, var: rx.Var, handler, unit: str = "") -> rx.Component
             width="100px",
             size="1",
             type="number",
+            disabled=disabled,
         ),
         rx.text(unit, size="1", color="gray") if unit else rx.fragment(),
         width="100%",
@@ -63,6 +79,7 @@ def _cc_step_params() -> rx.Component:
             "Current step (µA/cm²)",
             AppState.stimulus_step,
             AppState.set_stimulus_step,
+            disabled=AppState.is_step_single_sweep,
         ),
         spacing="2",
         width="100%",
@@ -166,6 +183,7 @@ def _vc_step_params() -> rx.Component:
             "Voltage step (mV)",
             AppState.stimulus_step,
             AppState.set_stimulus_step,
+            disabled=AppState.is_step_single_sweep,
         ),
         _num_field(
             "Holding voltage (mV)",
