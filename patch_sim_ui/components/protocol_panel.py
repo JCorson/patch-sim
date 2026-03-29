@@ -50,9 +50,19 @@ def _cc_step_params() -> rx.Component:
     return rx.vstack(
         *_duration_fields(),
         _num_field(
-            "Current (µA/cm²)",
+            "Current min (µA/cm²)",
             AppState.min_stimulus,
             AppState.set_min_stimulus,
+        ),
+        _num_field(
+            "Current max (µA/cm²)",
+            AppState.max_stimulus,
+            AppState.set_max_stimulus,
+        ),
+        _num_field(
+            "Current step (µA/cm²)",
+            AppState.stimulus_step,
+            AppState.set_stimulus_step,
         ),
         spacing="2",
         width="100%",
@@ -138,38 +148,24 @@ def _cc_noise_params() -> rx.Component:
     )
 
 
-def _cc_fi_curve_params() -> rx.Component:
-    """Parameter fields for the current clamp F-I Curve protocol."""
-    return rx.vstack(
-        *_duration_fields(),
-        _num_field(
-            "Current min (µA/cm²)",
-            AppState.min_stimulus,
-            AppState.set_min_stimulus,
-        ),
-        _num_field(
-            "Current max (µA/cm²)",
-            AppState.max_stimulus,
-            AppState.set_max_stimulus,
-        ),
-        _num_field(
-            "Current step (µA/cm²)",
-            AppState.stimulus_step,
-            AppState.set_stimulus_step,
-        ),
-        spacing="2",
-        width="100%",
-    )
-
-
 def _vc_step_params() -> rx.Component:
     """Parameter fields for the voltage clamp Step protocol."""
     return rx.vstack(
         *_duration_fields(),
         _num_field(
-            "Voltage amplitude (mV)",
+            "Voltage min (mV)",
             AppState.min_stimulus,
             AppState.set_min_stimulus,
+        ),
+        _num_field(
+            "Voltage max (mV)",
+            AppState.max_stimulus,
+            AppState.set_max_stimulus,
+        ),
+        _num_field(
+            "Voltage step (mV)",
+            AppState.stimulus_step,
+            AppState.set_stimulus_step,
         ),
         _num_field(
             "Holding voltage (mV)",
@@ -230,35 +226,6 @@ def _vc_pulse_params() -> rx.Component:
     )
 
 
-def _vc_iv_params() -> rx.Component:
-    """Parameter fields for the voltage clamp I-V Curve protocol."""
-    return rx.vstack(
-        *_duration_fields(),
-        _num_field(
-            "Voltage min (mV)",
-            AppState.min_stimulus,
-            AppState.set_min_stimulus,
-        ),
-        _num_field(
-            "Voltage max (mV)",
-            AppState.max_stimulus,
-            AppState.set_max_stimulus,
-        ),
-        _num_field(
-            "Voltage step (mV)",
-            AppState.stimulus_step,
-            AppState.set_stimulus_step,
-        ),
-        _num_field(
-            "Holding voltage (mV)",
-            AppState.vc_holding_voltage,
-            AppState.set_vc_holding_voltage,
-        ),
-        spacing="2",
-        width="100%",
-    )
-
-
 def _current_protocol_params() -> rx.Component:
     """Dynamic parameter form for the selected current clamp protocol."""
     return rx.match(
@@ -269,7 +236,6 @@ def _current_protocol_params() -> rx.Component:
         ("Sinusoidal", _cc_sine_params()),
         ("Chirp", _cc_chirp_params()),
         ("Noise", _cc_noise_params()),
-        ("F-I Curve", _cc_fi_curve_params()),
         rx.fragment(),
     )
 
@@ -281,7 +247,6 @@ def _voltage_protocol_params() -> rx.Component:
         ("Step", _vc_step_params()),
         ("Ramp", _vc_ramp_params()),
         ("Pulse Train", _vc_pulse_params()),
-        ("I-V Curve", _vc_iv_params()),
         rx.fragment(),
     )
 

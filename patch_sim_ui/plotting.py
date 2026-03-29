@@ -210,14 +210,14 @@ def _build_hover_tables(
     is_vc: bool,
     stride: int,
 ) -> tuple[list[str], list[str], list[str]]:
-    """Build per-time-point HTML table strings for I-V Curve hover tooltips.
+    """Build per-time-point HTML table strings for multi-sweep hover tooltips.
 
     For each downsampled time point, produces a monospace HTML table showing
     all sweeps as rows and visible quantities as columns — one table string
     per subplot (response, gating, stimulus).
 
     Args:
-        current_sweeps: The N sweeps from the I-V Curve run.
+        current_sweeps: The N sweeps from the multi-sweep run.
         visibility: Consolidated trace visibility flags.
         add_current_keys: Ordered list of additional current channel names.
         add_gating_keys: Ordered list of additional gating variable names.
@@ -397,7 +397,7 @@ def compute_trace_visibility_map(
     Returns:
         Dict mapping each ``show_*`` field name to the list of Plotly trace
         indices it controls.  When the same field controls one trace per sweep
-        (e.g. multi-sweep I-V Curve) the list contains one index per sweep.
+        (e.g. multi-sweep Step) the list contains one index per sweep.
     """
     result: dict[str, list[int]] = {}
     idx = 0
@@ -504,7 +504,7 @@ def build_figure(
     ``CHANNEL_COLORS`` and a legend entry.  Saved VC sweeps are drawn with
     dashed lines in the same channel colours.
 
-    When there are multiple current sweeps (I-V Curve mode), hover on all
+    When there are multiple current sweeps (multi-sweep mode), hover on all
     real traces is suppressed and replaced with invisible carrier traces that
     display a monospace HTML table — sweeps as rows, quantities as columns —
     via ``hovertemplate``/``customdata``.  Single-sweep modes keep the
@@ -512,7 +512,7 @@ def build_figure(
 
     Args:
         current_sweeps: Latest simulation result (1 sweep for standard runs,
-            N sweeps for I-V Curve).
+            N sweeps for multi-sweep Step).
         saved_sweeps: User-saved sweeps for comparison overlay.
         visibility: Consolidated trace visibility flags.
         clamp_mode: Active UI clamp mode, used for layout and axis labels.
@@ -849,7 +849,7 @@ def build_figure(
             showlegend=False,
         )
 
-    # Add invisible hover carrier traces for multi-sweep (I-V Curve) mode.
+    # Add invisible hover carrier traces for multi-sweep mode.
     # Each carrier sits on one subplot and delivers a per-time-point HTML
     # table via customdata / hovertemplate.
     if is_multi_sweep and current_sweeps:

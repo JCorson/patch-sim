@@ -18,6 +18,8 @@ PRESETS: dict[str, dict[str, Any]] = {
         "stimulus_duration": 30.0,
         "post_stimulus_duration": 10.0,
         "min_stimulus": 10.0,
+        "max_stimulus": 10.0,
+        "stimulus_step": 0.0,
     },
     "Subthreshold Response": {
         **DEFAULT_NEURON_PARAMS,
@@ -27,6 +29,8 @@ PRESETS: dict[str, dict[str, Any]] = {
         "stimulus_duration": 30.0,
         "post_stimulus_duration": 10.0,
         "min_stimulus": 4.0,
+        "max_stimulus": 4.0,
+        "stimulus_step": 0.0,
     },
     "Repetitive Firing": {
         **DEFAULT_NEURON_PARAMS,
@@ -36,11 +40,13 @@ PRESETS: dict[str, dict[str, Any]] = {
         "stimulus_duration": 180.0,
         "post_stimulus_duration": 10.0,
         "min_stimulus": 15.0,
+        "max_stimulus": 15.0,
+        "stimulus_step": 0.0,
     },
     "F-I Curve": {
         **DEFAULT_NEURON_PARAMS,
         "clamp_mode": CURRENT_CLAMP,
-        "protocol_type": "F-I Curve",
+        "protocol_type": "Step",
         "pre_stimulus_duration": 10.0,
         "stimulus_duration": 50.0,
         "post_stimulus_duration": 10.0,
@@ -51,7 +57,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     "I-V Curve": {
         **DEFAULT_NEURON_PARAMS,
         "clamp_mode": VOLTAGE_CLAMP,
-        "protocol_type": "I-V Curve",
+        "protocol_type": "Step",
         "pre_stimulus_duration": 5.0,
         "stimulus_duration": 20.0,
         "post_stimulus_duration": 5.0,
@@ -64,7 +70,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         **DEFAULT_NEURON_PARAMS,
         "g_K": 0.0,  # override: block K+ channels to isolate Na+ current
         "clamp_mode": VOLTAGE_CLAMP,
-        "protocol_type": "I-V Curve",
+        "protocol_type": "Step",
         "pre_stimulus_duration": 5.0,
         "stimulus_duration": 20.0,
         "post_stimulus_duration": 5.0,

@@ -343,7 +343,7 @@ def test_build_figure_single_sweep_hovermode_x_unified() -> None:
 
 
 def test_build_figure_multi_sweep_hovermode_x() -> None:
-    """Multi-sweep (I-V Curve) mode uses hovermode='x'."""
+    """Multi-sweep mode uses hovermode='x'."""
     sweeps = [_make_sweep(label=f"{v} mV") for v in [-60, -40, -20]]
     fig = build_figure(
         sweeps, [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"

@@ -55,7 +55,7 @@ from patch_sim.additional_channels import (
     make_inar_channel,
 )
 from patch_sim_ui import constants, presets
-from patch_sim_ui.constants import CURRENT_CLAMP, MULTI_SWEEP_PROTOCOL_TYPES
+from patch_sim_ui.constants import CURRENT_CLAMP
 from patch_sim_ui.plotting import (
     Sweep,
     TraceVisibility,
@@ -686,8 +686,8 @@ class AppState(rx.State):
 
     # Stimulus amplitude params — shared (units depend on clamp_mode)
     min_stimulus: float = 10.0
-    max_stimulus: float = 20.0
-    stimulus_step: float = 2.5
+    max_stimulus: float = 10.0
+    stimulus_step: float = 0.0
 
     # Current clamp protocol params
     start_current: float = 0.0
@@ -836,10 +836,13 @@ class AppState(rx.State):
     def can_run_continuous(self) -> bool:
         """True when the active protocol is compatible with continuous mode.
 
-        Multi-sweep protocols are excluded; continuous mode is limited to
-        single-sweep protocols only.
+        Multi-sweep Step configurations (min_stimulus != max_stimulus with a
+        positive stimulus_step) are excluded; all other protocols run as a
+        single sweep and are compatible.
         """
-        return self.protocol_type not in MULTI_SWEEP_PROTOCOL_TYPES
+        if self.protocol_type != "Step":
+            return True
+        return self.min_stimulus == self.max_stimulus
 
     @rx.var
     def filtered_log_entries(self) -> list[UILogRecord]:

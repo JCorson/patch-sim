@@ -373,7 +373,7 @@ def test_set_clamp_mode_to_current_resets_protocol_type() -> None:
     """set_clamp_mode('Current Clamp') resets protocol_type to the first CC option."""
     s = _make_state()
     s.clamp_mode = "Voltage Clamp"
-    s.protocol_type = "I-V Curve"
+    s.protocol_type = "Ramp"
     s.set_clamp_mode("Current Clamp")
     assert s.protocol_type == constants.CURRENT_PROTOCOLS[0]
 
@@ -409,11 +409,24 @@ def test_protocol_options_voltage_clamp() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_can_run_continuous_true_for_step() -> None:
-    """can_run_continuous is True for the Step protocol."""
+def test_can_run_continuous_true_for_step_single_sweep() -> None:
+    """can_run_continuous is True for a single-step Step protocol (min == max)."""
     s = _make_state()
     s.protocol_type = "Step"
+    s.min_stimulus = 10.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 0.0
     assert s.can_run_continuous is True
+
+
+def test_can_run_continuous_false_for_step_multi_sweep() -> None:
+    """can_run_continuous is False for a multi-sweep Step protocol."""
+    s = _make_state()
+    s.protocol_type = "Step"
+    s.min_stimulus = -10.0
+    s.max_stimulus = 20.0
+    s.stimulus_step = 2.5
+    assert s.can_run_continuous is False
 
 
 def test_can_run_continuous_true_for_ramp() -> None:
@@ -421,13 +434,6 @@ def test_can_run_continuous_true_for_ramp() -> None:
     s = _make_state()
     s.protocol_type = "Ramp"
     assert s.can_run_continuous is True
-
-
-def test_can_run_continuous_false_for_iv_curve() -> None:
-    """can_run_continuous is False for the I-V Curve protocol."""
-    s = _make_state()
-    s.protocol_type = "I-V Curve"
-    assert s.can_run_continuous is False
 
 
 # ---------------------------------------------------------------------------
