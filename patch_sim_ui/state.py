@@ -1010,7 +1010,7 @@ class AppState(rx.State):
         vars()[f"set_{_f}"] = _make_float_setter(_f)
 
     # Stimulus range setters — custom logic to keep stimulus_step valid.
-    def set_min_stimulus(self, value: "str | list[float] | float") -> None:
+    def set_min_stimulus(self, value: "str | float") -> None:
         """Set min_stimulus, auto-setting stimulus_step when a range is opened.
 
         If the new min_stimulus differs from max_stimulus and stimulus_step is
@@ -1024,7 +1024,7 @@ class AppState(rx.State):
         if self.min_stimulus != self.max_stimulus and self.stimulus_step == 0.0:
             self.stimulus_step = 1.0
 
-    def set_max_stimulus(self, value: "str | list[float] | float") -> None:
+    def set_max_stimulus(self, value: "str | float") -> None:
         """Set max_stimulus, auto-setting stimulus_step when a range is opened.
 
         If the new max_stimulus differs from min_stimulus and stimulus_step is
