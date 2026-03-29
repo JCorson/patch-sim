@@ -1375,7 +1375,13 @@ class AppState(rx.State):
             neuron = self._build_neuron()
             mode = self.clamp_mode
             ptype = self.protocol_type
-            protocols = self._build_protocols()
+            try:
+                protocols = self._build_protocols()
+            except ValueError as exc:
+                logger.exception("Simulation error: %s", exc)
+                self.error_message = str(exc)
+                self.is_running = False
+                return
 
         _start_ms = time.monotonic() * 1000
         logger.info(
