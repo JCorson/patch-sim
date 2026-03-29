@@ -1038,23 +1038,28 @@ class AppState(rx.State):
         if self.min_stimulus != self.max_stimulus and self.stimulus_step == 0.0:
             self.stimulus_step = 1.0
 
-    def set_stimulus_step(self, value: "str | list[float] | float") -> None:
+    def set_stimulus_step(self, value: "str | float") -> None:
         """Set stimulus_step, rejecting non-positive values when min != max.
 
         When min_stimulus differs from max_stimulus a step of 0 (or negative)
         would produce an invalid multi-sweep configuration.  Such values are
-        silently ignored, leaving the previous step unchanged.  When
+        ignored, leaving the previous step unchanged.  When
         min_stimulus == max_stimulus (single-sweep mode) any value is accepted.
 
         Args:
-            value: Raw input value from the UI field.
+            value: Raw input value from the UI text field.
         """
-        v = value[0] if isinstance(value, list) else value
         try:
-            parsed = float(v)
+            parsed = float(value)
         except (ValueError, TypeError):
+            logger.debug("set_stimulus_step: could not parse %r as float", value)
             return
         if self.min_stimulus != self.max_stimulus and parsed <= 0.0:
+            logger.debug(
+                "set_stimulus_step: rejected value %s"
+                " (non-positive step in multi-sweep mode)",
+                parsed,
+            )
             return
         self.stimulus_step = parsed
 
