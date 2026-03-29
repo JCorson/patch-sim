@@ -2,6 +2,7 @@
 
 import reflex as rx
 
+from patch_sim_ui import presets
 from patch_sim_ui.constants import PARAM_RANGES
 from patch_sim_ui.state import AppState
 
@@ -207,6 +208,13 @@ def neuron_panel() -> rx.Component:
     """Sidebar panel for configuring Hodgkin-Huxley neuron parameters."""
     return rx.vstack(
         rx.heading("Neuron Parameters", size="3"),
+        rx.select(
+            presets.NEURON_PRESET_NAMES,
+            placeholder="Load neuron type…",
+            on_change=AppState.load_preset,
+            width="100%",
+            size="2",
+        ),
         rx.separator(),
         rx.accordion.root(
             rx.accordion.item(

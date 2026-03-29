@@ -279,6 +279,116 @@ def test_load_preset_unknown_name_is_ignored() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Neuron-type presets
+# ---------------------------------------------------------------------------
+
+
+def test_load_preset_fast_spiking_interneuron_enables_ika() -> None:
+    """Fast-Spiking Interneuron preset enables the IKa channel."""
+    s = _make_state()
+    s.load_preset("Fast-Spiking Interneuron")
+    assert s.ika_enabled is True
+
+
+def test_load_preset_fast_spiking_interneuron_sets_duration() -> None:
+    """Fast-Spiking Interneuron preset sets duration to 200.0."""
+    s = _make_state()
+    s.load_preset("Fast-Spiking Interneuron")
+    assert s.duration == pytest.approx(200.0)
+
+
+def test_load_preset_fast_spiking_interneuron_sets_current_clamp() -> None:
+    """Fast-Spiking Interneuron preset uses current clamp mode."""
+    s = _make_state()
+    s.load_preset("Fast-Spiking Interneuron")
+    assert s.clamp_mode == constants.CURRENT_CLAMP
+
+
+def test_load_preset_pyramidal_neuron_enables_ih() -> None:
+    """Pyramidal Neuron preset enables the Ih channel."""
+    s = _make_state()
+    s.load_preset("Pyramidal Neuron")
+    assert s.ih_enabled is True
+
+
+def test_load_preset_pyramidal_neuron_enables_inap() -> None:
+    """Pyramidal Neuron preset enables the INaP channel."""
+    s = _make_state()
+    s.load_preset("Pyramidal Neuron")
+    assert s.inap_enabled is True
+
+
+def test_load_preset_pyramidal_neuron_sets_duration() -> None:
+    """Pyramidal Neuron preset sets duration to 300.0."""
+    s = _make_state()
+    s.load_preset("Pyramidal Neuron")
+    assert s.duration == pytest.approx(300.0)
+
+
+def test_load_preset_purkinje_cell_enables_ical() -> None:
+    """Purkinje Cell preset enables the ICaL channel."""
+    s = _make_state()
+    s.load_preset("Purkinje Cell")
+    assert s.ical_enabled is True
+
+
+def test_load_preset_purkinje_cell_enables_ikca() -> None:
+    """Purkinje Cell preset enables the IKCa channel."""
+    s = _make_state()
+    s.load_preset("Purkinje Cell")
+    assert s.ikca_enabled is True
+
+
+def test_load_preset_purkinje_cell_sets_duration() -> None:
+    """Purkinje Cell preset sets duration to 200.0."""
+    s = _make_state()
+    s.load_preset("Purkinje Cell")
+    assert s.duration == pytest.approx(200.0)
+
+
+def test_load_preset_dopaminergic_neuron_enables_ih() -> None:
+    """Dopaminergic Neuron preset enables the Ih channel."""
+    s = _make_state()
+    s.load_preset("Dopaminergic Neuron")
+    assert s.ih_enabled is True
+
+
+def test_load_preset_dopaminergic_neuron_enables_im() -> None:
+    """Dopaminergic Neuron preset enables the IM channel."""
+    s = _make_state()
+    s.load_preset("Dopaminergic Neuron")
+    assert s.im_enabled is True
+
+
+def test_load_preset_dopaminergic_neuron_sets_duration() -> None:
+    """Dopaminergic Neuron preset sets duration to 500.0."""
+    s = _make_state()
+    s.load_preset("Dopaminergic Neuron")
+    assert s.duration == pytest.approx(500.0)
+
+
+def test_load_preset_thalamic_relay_enables_icat() -> None:
+    """Thalamic Relay preset enables the ICaT channel."""
+    s = _make_state()
+    s.load_preset("Thalamic Relay")
+    assert s.icat_enabled is True
+
+
+def test_load_preset_thalamic_relay_enables_ih() -> None:
+    """Thalamic Relay preset enables the Ih channel."""
+    s = _make_state()
+    s.load_preset("Thalamic Relay")
+    assert s.ih_enabled is True
+
+
+def test_load_preset_thalamic_relay_sets_hyperpolarizing_current() -> None:
+    """Thalamic Relay preset uses a negative current amplitude for rebound."""
+    s = _make_state()
+    s.load_preset("Thalamic Relay")
+    assert s.current_amplitude < 0.0
+
+
+# ---------------------------------------------------------------------------
 # store_trace / clear_stored_traces
 # ---------------------------------------------------------------------------
 

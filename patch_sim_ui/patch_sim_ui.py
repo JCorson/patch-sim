@@ -18,7 +18,7 @@ def _header() -> rx.Component:
     """Top navigation bar with preset selector, title, and Run/Continuous buttons."""
     return rx.hstack(
         rx.select(
-            presets.PRESET_NAMES,
+            presets.PROTOCOL_PRESET_NAMES,
             placeholder="Load preset…",
             on_change=AppState.load_preset,
             width="200px",
