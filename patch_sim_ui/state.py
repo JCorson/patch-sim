@@ -688,6 +688,10 @@ class AppState(rx.State):
     # Display string for the stimulus_step input — kept in sync with
     # stimulus_step so the controlled input always reflects the validated value.
     stimulus_step_input: str = "0.0"
+    # Incremented on every rejected set_stimulus_step call so Reflex always
+    # emits a non-empty delta, which forces React to re-render the controlled
+    # input with the current stimulus_step_input value.
+    _step_reject_count: int = 0
 
     # Current clamp protocol params
     start_current: float = 0.0
@@ -1060,6 +1064,7 @@ class AppState(rx.State):
         except (ValueError, TypeError):
             logger.debug("set_stimulus_step: could not parse %r as float", value)
             self.stimulus_step_input = str(self.stimulus_step)
+            self._step_reject_count += 1
             return
         if self.min_stimulus != self.max_stimulus and parsed <= 0.0:
             logger.debug(
@@ -1068,6 +1073,7 @@ class AppState(rx.State):
                 parsed,
             )
             self.stimulus_step_input = str(self.stimulus_step)
+            self._step_reject_count += 1
             return
         self.stimulus_step = parsed
         self.stimulus_step_input = str(parsed)
