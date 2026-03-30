@@ -39,7 +39,6 @@ from patch_sim.constants import (
     DEFAULT_K_OUT,
     DEFAULT_NA_IN,
     DEFAULT_NA_OUT,
-    DEFAULT_NEURON_PARAMS,
     DEFAULT_T,
     DEFAULT_V_REST,
 )
@@ -1016,18 +1015,6 @@ class AppState(rx.State):
             return
         logger.info("Loaded protocol preset: %s", name)
         config = dict(presets.PROTOCOL_PRESETS[name])
-        # When a neuron preset is active, strip any neuron-parameter key whose
-        # value is just the default (i.e. came from **DEFAULT_NEURON_PARAMS in
-        # the protocol preset dict and was not deliberately overridden).  This
-        # prevents protocol presets from resetting neuron-specific values such
-        # as v_rest or g_Na back to HH defaults.  Keys with non-default values
-        # (e.g. g_K=0.0 in "Na+ Channel Activation") are kept intentionally.
-        if self.active_neuron_type in presets.NEURON_PRESETS:
-            config = {
-                k: v
-                for k, v in config.items()
-                if k not in DEFAULT_NEURON_PARAMS or v != DEFAULT_NEURON_PARAMS[k]
-            }
         adjustments = presets.NEURON_PROTOCOL_ADJUSTMENTS.get(
             self.active_neuron_type, {}
         ).get(name, {})
