@@ -58,6 +58,14 @@ def example(x: float, y: int) -> str:
 
 mypy only enforces types in `patch_sim/` (core library). UI code (`patch_sim_ui/`) is excluded — see the `[[tool.mypy.overrides]]` section in `pyproject.toml`. Do not spend time fixing mypy errors in UI code.
 
+## GitHub CLI conventions
+
+`gh issue view <number>` triggers a GraphQL deprecation error because it fetches `projectCards`. Always request explicit fields instead:
+
+```bash
+gh issue view <number> --json number,title,body,state,labels,assignees,comments
+```
+
 ## Working on GitHub issues
 
 When addressing a GitHub issue, create a dedicated branch off `main` before writing any code:
