@@ -988,6 +988,7 @@ class AppState(rx.State):
             name: Key into presets.NEURON_PRESETS.  Ignored if not found.
         """
         if name not in presets.NEURON_PRESETS:
+            logger.debug("load_neuron_preset: unknown preset %r ignored", name)
             return
         logger.info("Loaded neuron preset: %s", name)
         config = presets.NEURON_PRESETS[name]
@@ -1010,6 +1011,7 @@ class AppState(rx.State):
             name: Key into presets.PROTOCOL_PRESETS.  Ignored if not found.
         """
         if name not in presets.PROTOCOL_PRESETS:
+            logger.debug("load_protocol_preset: unknown preset %r ignored", name)
             return
         logger.info("Loaded protocol preset: %s", name)
         config = dict(presets.PROTOCOL_PRESETS[name])
