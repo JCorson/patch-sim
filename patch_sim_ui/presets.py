@@ -369,6 +369,14 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 3.0,
             "stimulus_duration": 800.0,
         },
+        # Depolarised v_rest (−55 mV) lowers threshold; use a tighter
+        # positive-only range so every sweep produces a clear burst response.
+        "F-I Curve": {
+            "min_stimulus": 0.0,
+            "max_stimulus": 12.0,
+            "stimulus_step": 1.5,
+            "stimulus_duration": 300.0,
+        },
     },
 }
 
