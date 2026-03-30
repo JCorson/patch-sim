@@ -1,4 +1,9 @@
-"""Built-in preset configurations for the patch_sim web UI."""
+"""Built-in preset configurations for the patch_sim web UI.
+
+Protocol presets, neuron-protocol adjustments, and preset name lists are
+re-exported from the core library.  Only the UI-specific neuron preset
+format (mapping state variable names to values) is defined here.
+"""
 
 from typing import Any
 
@@ -15,7 +20,14 @@ from patch_sim.constants import (
     DEFAULT_G_NAR,
     DEFAULT_NEURON_PARAMS,
 )
-from patch_sim_ui.constants import CURRENT_CLAMP, VOLTAGE_CLAMP
+
+# Re-export from core so existing UI imports continue to work.
+from patch_sim.presets import (  # noqa: F401
+    NEURON_PRESET_NAMES,
+    NEURON_PROTOCOL_ADJUSTMENTS,
+    PROTOCOL_PRESET_NAMES,
+    PROTOCOL_PRESETS,
+)
 
 # Each preset is a dict of state variable names → values.
 # Keys must match field names in AppState exactly.
@@ -44,83 +56,6 @@ _DEFAULT_AUX_CHANNEL_STATE: dict[str, Any] = {
     "icat_g_max": DEFAULT_G_ICAT,
     "ican_enabled": False,
     "ican_g_max": DEFAULT_G_ICAN,
-}
-
-PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
-    "Action Potential": {
-        "clamp_mode": CURRENT_CLAMP,
-        "protocol_type": "Step",
-        "pre_stimulus_duration": 10.0,
-        "stimulus_duration": 30.0,
-        "post_stimulus_duration": 10.0,
-        "min_stimulus": 10.0,
-        "max_stimulus": 10.0,
-        "stimulus_step": 0.0,
-    },
-    "Subthreshold Response": {
-        "clamp_mode": CURRENT_CLAMP,
-        "protocol_type": "Step",
-        "pre_stimulus_duration": 10.0,
-        "stimulus_duration": 30.0,
-        "post_stimulus_duration": 10.0,
-        "min_stimulus": 4.0,
-        "max_stimulus": 4.0,
-        "stimulus_step": 0.0,
-    },
-    "Repetitive Firing": {
-        "clamp_mode": CURRENT_CLAMP,
-        "protocol_type": "Step",
-        "pre_stimulus_duration": 10.0,
-        "stimulus_duration": 180.0,
-        "post_stimulus_duration": 10.0,
-        "min_stimulus": 15.0,
-        "max_stimulus": 15.0,
-        "stimulus_step": 0.0,
-    },
-    "F-I Curve": {
-        "clamp_mode": CURRENT_CLAMP,
-        "protocol_type": "Step",
-        "pre_stimulus_duration": 10.0,
-        "stimulus_duration": 50.0,
-        "post_stimulus_duration": 10.0,
-        "min_stimulus": -10.0,
-        "max_stimulus": 20.0,
-        "stimulus_step": 2.5,
-    },
-    "I-V Curve": {
-        "clamp_mode": VOLTAGE_CLAMP,
-        "protocol_type": "Step",
-        "pre_stimulus_duration": 5.0,
-        "stimulus_duration": 20.0,
-        "post_stimulus_duration": 5.0,
-        "min_stimulus": -100.0,
-        "max_stimulus": 60.0,
-        "stimulus_step": 10.0,
-        "vc_holding_voltage": -70.0,
-    },
-    "Na+ Channel Activation": {
-        "g_K": 0.0,  # block K+ channels to isolate Na+ current
-        "clamp_mode": VOLTAGE_CLAMP,
-        "protocol_type": "Step",
-        "pre_stimulus_duration": 5.0,
-        "stimulus_duration": 20.0,
-        "post_stimulus_duration": 5.0,
-        "vc_holding_voltage": -70.0,
-        "min_stimulus": -60.0,
-        "max_stimulus": 60.0,
-        "stimulus_step": 10.0,
-    },
-    "Frequency Response": {
-        "clamp_mode": CURRENT_CLAMP,
-        "protocol_type": "Chirp",
-        "pre_stimulus_duration": 0.0,
-        "stimulus_duration": 500.0,
-        "post_stimulus_duration": 0.0,
-        "dc_offset": 8.0,
-        "amplitude": 4.0,
-        "start_frequency": 1.0,
-        "end_frequency": 100.0,
-    },
 }
 
 NEURON_PRESETS: dict[str, dict[str, Any]] = {
@@ -271,113 +206,3 @@ NEURON_PRESETS: dict[str, dict[str, Any]] = {
         "ih_g_max": 1.5,
     },
 }
-
-# Protocol parameter overrides applied on top of a protocol preset when a
-# specific neuron type is active.  Only the fields that need to differ from
-# the base protocol preset are listed; everything else falls through to the
-# base preset values.
-#
-# Structure: neuron_type → protocol_preset_name → {field: value, …}
-NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
-    "Fast-Spiking Interneuron": {
-        # High-amplitude, standard-length step to drive rapid non-adapting firing.
-        "Repetitive Firing": {
-            "min_stimulus": 20.0,
-            "max_stimulus": 20.0,
-            "stimulus_duration": 180.0,
-        },
-    },
-    "Pyramidal Neuron": {
-        # Longer step at moderate amplitude to reveal spike-frequency adaptation.
-        "Repetitive Firing": {
-            "min_stimulus": 10.0,
-            "max_stimulus": 10.0,
-            "stimulus_duration": 280.0,
-        },
-    },
-    "Purkinje Cell": {
-        # Moderate amplitude; complex Ca²⁺-driven spiking emerges within 200 ms.
-        "Repetitive Firing": {
-            "min_stimulus": 12.0,
-            "max_stimulus": 12.0,
-            "stimulus_duration": 180.0,
-        },
-    },
-    "Dopaminergic Neuron": {
-        # Long window at low amplitude to reveal slow (~2–5 Hz) pacemaking.
-        "Repetitive Firing": {
-            "min_stimulus": 5.0,
-            "max_stimulus": 5.0,
-            "stimulus_duration": 480.0,
-        },
-    },
-    "Thalamic Relay": {
-        # Hyperpolarizing step followed by release triggers post-inhibitory
-        # rebound burst via T-type Ca²⁺ channels.
-        # pre=50 ms establishes baseline; post=100 ms captures the rebound burst.
-        "Repetitive Firing": {
-            "min_stimulus": -5.0,
-            "max_stimulus": -5.0,
-            "pre_stimulus_duration": 50.0,
-            "stimulus_duration": 150.0,
-            "post_stimulus_duration": 100.0,
-        },
-    },
-    "Hippocampal CA1 Pyramidal": {
-        # Long moderate-amplitude step reveals adaptation and pronounced AHP.
-        "Repetitive Firing": {
-            "min_stimulus": 8.0,
-            "max_stimulus": 8.0,
-            "stimulus_duration": 300.0,
-        },
-        # IKa and IM raise the firing threshold above the default HH range.
-        # Positive-only range; longer step to reveal spike-frequency adaptation.
-        "F-I Curve": {
-            "min_stimulus": 0.0,
-            "max_stimulus": 30.0,
-            "stimulus_step": 3.0,
-            "stimulus_duration": 150.0,
-        },
-    },
-    "STN Neuron": {
-        # Hyperpolarizing step followed by release reveals rebound burst;
-        # long post-stimulus window captures the burst dynamics.
-        "Repetitive Firing": {
-            "min_stimulus": -8.0,
-            "max_stimulus": -8.0,
-            "pre_stimulus_duration": 50.0,
-            "stimulus_duration": 150.0,
-            "post_stimulus_duration": 150.0,
-        },
-    },
-    "Thalamic Reticular Nucleus": {
-        # Hyperpolarizing step unlocks ICaT; long post-stimulus window
-        # reveals rhythmic burst firing on release.
-        "Repetitive Firing": {
-            "min_stimulus": -5.0,
-            "max_stimulus": -5.0,
-            "pre_stimulus_duration": 50.0,
-            "stimulus_duration": 200.0,
-            "post_stimulus_duration": 150.0,
-        },
-    },
-    "Stomatogastric Ganglion": {
-        # Long window at low current to reveal slow (~1 Hz) rhythmic bursting.
-        "Repetitive Firing": {
-            "min_stimulus": 3.0,
-            "max_stimulus": 3.0,
-            "stimulus_duration": 800.0,
-        },
-        # Depolarised v_rest (−55 mV) lowers threshold; use a tighter
-        # positive-only range so every sweep produces a clear burst response.
-        "F-I Curve": {
-            "min_stimulus": 0.0,
-            "max_stimulus": 12.0,
-            "stimulus_step": 1.5,
-            "stimulus_duration": 300.0,
-        },
-    },
-}
-
-PROTOCOL_PRESET_NAMES: list[str] = list(PROTOCOL_PRESETS.keys())
-NEURON_PRESET_NAMES: list[str] = list(NEURON_PRESETS.keys())

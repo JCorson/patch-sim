@@ -36,6 +36,13 @@ from .neuron_factory import (
     NeuronConfig,
     make_neuron,
 )
+from .presets import (
+    NEURON_PRESET_NAMES,
+    NEURON_PRESETS,
+    NEURON_PROTOCOL_ADJUSTMENTS,
+    PROTOCOL_PRESET_NAMES,
+    PROTOCOL_PRESETS,
+)
 from .additional_channels import (
     make_ican_channel,
     make_ical_channel,
@@ -87,6 +94,11 @@ __all__ = [
     "ChannelConfig",
     "NeuronConfig",
     "make_neuron",
+    "NEURON_PRESET_NAMES",
+    "NEURON_PRESETS",
+    "NEURON_PROTOCOL_ADJUSTMENTS",
+    "PROTOCOL_PRESET_NAMES",
+    "PROTOCOL_PRESETS",
     "make_ican_channel",
     "make_ical_channel",
     "make_icat_channel",
