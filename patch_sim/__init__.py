@@ -30,6 +30,12 @@ from .core_channels import (
     make_na_channel,
 )
 from .hodgkin_huxley import HodgkinHuxley
+from .neuron_factory import (
+    CHANNEL_REGISTRY,
+    ChannelConfig,
+    NeuronConfig,
+    make_neuron,
+)
 from .additional_channels import (
     make_ican_channel,
     make_ical_channel,
@@ -77,6 +83,10 @@ __all__ = [
     "IonSpecies",
     "NernstSpec",
     "HodgkinHuxley",
+    "CHANNEL_REGISTRY",
+    "ChannelConfig",
+    "NeuronConfig",
+    "make_neuron",
     "make_ican_channel",
     "make_ical_channel",
     "make_icat_channel",

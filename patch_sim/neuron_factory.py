@@ -1,0 +1,172 @@
+"""NeuronConfig/ChannelConfig dataclasses and make_neuron() factory.
+
+Provides a declarative, UI-free way to describe and instantiate HH neurons
+with optional additional channels.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Callable
+
+from .additional_channels import (
+    make_ican_channel,
+    make_ical_channel,
+    make_icat_channel,
+    make_ih_channel,
+    make_ika_channel,
+    make_ikca_channel,
+    make_ikir_channel,
+    make_im_channel,
+    make_inap_channel,
+    make_inar_channel,
+)
+from .calcium import CalciumDynamics
+from .channels import IonChannel, IonSpecies
+from .constants import (
+    DEFAULT_C_M,
+    DEFAULT_CA_IN,
+    DEFAULT_CA_OUT,
+    DEFAULT_CL_IN,
+    DEFAULT_CL_OUT,
+    DEFAULT_G_K,
+    DEFAULT_G_L,
+    DEFAULT_G_NA,
+    DEFAULT_K_IN,
+    DEFAULT_K_OUT,
+    DEFAULT_NA_IN,
+    DEFAULT_NA_OUT,
+    DEFAULT_T,
+    DEFAULT_V_REST,
+)
+from .hodgkin_huxley import HodgkinHuxley
+
+
+@dataclass(frozen=True)
+class ChannelConfig:
+    """Declarative description of one additional ion channel.
+
+    Attributes:
+        factory: Channel factory function (e.g. ``make_ih_channel``).
+        g_max: Maximum conductance in mS/cm².
+        extra_kwargs: Additional keyword arguments forwarded to *factory*.
+    """
+
+    factory: Callable[..., IonChannel]
+    g_max: float
+    extra_kwargs: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class NeuronConfig:
+    """Declarative description of a full HH neuron configuration.
+
+    All fields mirror the corresponding ``HodgkinHuxley`` constructor
+    parameters.  ``channels`` holds zero or more :class:`ChannelConfig`
+    entries describing the additional channels to attach.
+
+    Attributes:
+        g_Na: Maximum sodium conductance in mS/cm².
+        g_K: Maximum potassium conductance in mS/cm².
+        g_L: Leak conductance in mS/cm².
+        C_m: Membrane capacitance in µF/cm².
+        v_rest: Resting membrane potential in mV.
+        Na_out: Extracellular sodium concentration in mM.
+        Na_in: Intracellular sodium concentration in mM.
+        K_out: Extracellular potassium concentration in mM.
+        K_in: Intracellular potassium concentration in mM.
+        Cl_out: Extracellular chloride concentration in mM.
+        Cl_in: Intracellular chloride concentration in mM.
+        Ca_out: Extracellular calcium concentration in mM.
+        Ca_in: Intracellular calcium concentration in mM.
+        T: Temperature in Kelvin.
+        channels: Tuple of additional channel configs to include.
+    """
+
+    g_Na: float = DEFAULT_G_NA
+    g_K: float = DEFAULT_G_K
+    g_L: float = DEFAULT_G_L
+    C_m: float = DEFAULT_C_M
+    v_rest: float = DEFAULT_V_REST
+    Na_out: float = DEFAULT_NA_OUT
+    Na_in: float = DEFAULT_NA_IN
+    K_out: float = DEFAULT_K_OUT
+    K_in: float = DEFAULT_K_IN
+    Cl_out: float = DEFAULT_CL_OUT
+    Cl_in: float = DEFAULT_CL_IN
+    Ca_out: float = DEFAULT_CA_OUT
+    Ca_in: float = DEFAULT_CA_IN
+    T: float = DEFAULT_T
+    channels: tuple[ChannelConfig, ...] = ()
+
+
+#: Maps short channel names to their factory functions.
+CHANNEL_REGISTRY: dict[str, Callable[..., IonChannel]] = {
+    "ih": make_ih_channel,
+    "ika": make_ika_channel,
+    "inap": make_inap_channel,
+    "inar": make_inar_channel,
+    "im": make_im_channel,
+    "ikir": make_ikir_channel,
+    "ikca": make_ikca_channel,
+    "ical": make_ical_channel,
+    "icat": make_icat_channel,
+    "ican": make_ican_channel,
+}
+
+
+def _needs_calcium(channels: tuple[IonChannel, ...]) -> bool:
+    """Return True if any channel carries calcium ions.
+
+    Args:
+        channels: Built IonChannel instances to inspect.
+
+    Returns:
+        True if at least one channel uses ``IonSpecies.CALCIUM``.
+    """
+    for ch in channels:
+        spec = ch.reversal_spec
+        # NernstSpec has a .species attribute; GoldmanSpec has .permeabilities
+        if hasattr(spec, "species") and spec.species is IonSpecies.CALCIUM:
+            return True
+        if hasattr(spec, "permeabilities"):
+            for species, _ in spec.permeabilities:
+                if species is IonSpecies.CALCIUM:
+                    return True
+    return False
+
+
+def make_neuron(config: NeuronConfig) -> HodgkinHuxley:
+    """Build a :class:`HodgkinHuxley` neuron from a :class:`NeuronConfig`.
+
+    Automatically detects whether any additional channel requires calcium
+    dynamics and attaches a :class:`CalciumDynamics` instance when needed.
+
+    Args:
+        config: Declarative neuron configuration.
+
+    Returns:
+        A fully constructed :class:`HodgkinHuxley` instance.
+    """
+    built_channels = tuple(
+        cc.factory(g_max=cc.g_max, **cc.extra_kwargs) for cc in config.channels
+    )
+    calcium_dynamics = CalciumDynamics() if _needs_calcium(built_channels) else None
+    return HodgkinHuxley(
+        g_Na=config.g_Na,
+        g_K=config.g_K,
+        g_L=config.g_L,
+        C_m=config.C_m,
+        v_rest=config.v_rest,
+        Na_out=config.Na_out,
+        Na_in=config.Na_in,
+        K_out=config.K_out,
+        K_in=config.K_in,
+        Cl_out=config.Cl_out,
+        Cl_in=config.Cl_in,
+        Ca_out=config.Ca_out,
+        Ca_in=config.Ca_in,
+        T=config.T,
+        additional_channels=built_channels,
+        calcium_dynamics=calcium_dynamics,
+    )
