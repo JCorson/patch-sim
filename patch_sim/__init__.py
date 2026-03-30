@@ -4,6 +4,12 @@ A package for simulating patch clamp experiments using the Hodgkin-Huxley model.
 """
 
 from . import constants
+from .constants import (
+    CURRENT_CLAMP,
+    CURRENT_PROTOCOLS,
+    VOLTAGE_CLAMP,
+    VOLTAGE_PROTOCOLS,
+)
 from .calcium import CalciumDynamics
 from .channels import (
     GatingVariable,
@@ -24,6 +30,19 @@ from .core_channels import (
     make_na_channel,
 )
 from .hodgkin_huxley import HodgkinHuxley
+from .neuron_factory import (
+    CHANNEL_REGISTRY,
+    ChannelConfig,
+    NeuronConfig,
+    make_neuron,
+)
+from .presets import (
+    NEURON_PRESET_NAMES,
+    NEURON_PRESETS,
+    NEURON_PROTOCOL_ADJUSTMENTS,
+    PROTOCOL_PRESET_NAMES,
+    PROTOCOL_PRESETS,
+)
 from .additional_channels import (
     make_ican_channel,
     make_ical_channel,
@@ -60,6 +79,10 @@ from .protocols import (
 
 __all__ = [
     "constants",
+    "CURRENT_CLAMP",
+    "CURRENT_PROTOCOLS",
+    "VOLTAGE_CLAMP",
+    "VOLTAGE_PROTOCOLS",
     "CalciumDynamics",
     "GatingVariable",
     "GoldmanSpec",
@@ -67,6 +90,15 @@ __all__ = [
     "IonSpecies",
     "NernstSpec",
     "HodgkinHuxley",
+    "CHANNEL_REGISTRY",
+    "ChannelConfig",
+    "NeuronConfig",
+    "make_neuron",
+    "NEURON_PRESET_NAMES",
+    "NEURON_PRESETS",
+    "NEURON_PROTOCOL_ADJUSTMENTS",
+    "PROTOCOL_PRESET_NAMES",
+    "PROTOCOL_PRESETS",
     "make_ican_channel",
     "make_ical_channel",
     "make_icat_channel",
