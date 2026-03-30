@@ -48,10 +48,7 @@ _DEFAULT_AUX_CHANNEL_STATE: dict[str, Any] = {
 
 PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
     "Action Potential": {
-        **DEFAULT_NEURON_PARAMS,
-        # Experiment
         "clamp_mode": CURRENT_CLAMP,
-        # Protocol
         "protocol_type": "Step",
         "pre_stimulus_duration": 10.0,
         "stimulus_duration": 30.0,
@@ -61,7 +58,6 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "stimulus_step": 0.0,
     },
     "Subthreshold Response": {
-        **DEFAULT_NEURON_PARAMS,
         "clamp_mode": CURRENT_CLAMP,
         "protocol_type": "Step",
         "pre_stimulus_duration": 10.0,
@@ -72,7 +68,6 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "stimulus_step": 0.0,
     },
     "Repetitive Firing": {
-        **DEFAULT_NEURON_PARAMS,
         "clamp_mode": CURRENT_CLAMP,
         "protocol_type": "Step",
         "pre_stimulus_duration": 10.0,
@@ -83,7 +78,6 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "stimulus_step": 0.0,
     },
     "F-I Curve": {
-        **DEFAULT_NEURON_PARAMS,
         "clamp_mode": CURRENT_CLAMP,
         "protocol_type": "Step",
         "pre_stimulus_duration": 10.0,
@@ -94,7 +88,6 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "stimulus_step": 2.5,
     },
     "I-V Curve": {
-        **DEFAULT_NEURON_PARAMS,
         "clamp_mode": VOLTAGE_CLAMP,
         "protocol_type": "Step",
         "pre_stimulus_duration": 5.0,
@@ -106,8 +99,7 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "vc_holding_voltage": -70.0,
     },
     "Na+ Channel Activation": {
-        **DEFAULT_NEURON_PARAMS,
-        "g_K": 0.0,  # override: block K+ channels to isolate Na+ current
+        "g_K": 0.0,  # block K+ channels to isolate Na+ current
         "clamp_mode": VOLTAGE_CLAMP,
         "protocol_type": "Step",
         "pre_stimulus_duration": 5.0,
@@ -119,7 +111,6 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "stimulus_step": 10.0,
     },
     "Frequency Response": {
-        **DEFAULT_NEURON_PARAMS,
         "clamp_mode": CURRENT_CLAMP,
         "protocol_type": "Chirp",
         "pre_stimulus_duration": 0.0,
@@ -200,6 +191,85 @@ NEURON_PRESETS: dict[str, dict[str, Any]] = {
         "ih_enabled": True,
         "ih_g_max": 1.0,
     },
+    "Hippocampal CA1 Pyramidal": {
+        **DEFAULT_NEURON_PARAMS,
+        **_DEFAULT_AUX_CHANNEL_STATE,
+        # Reduced g_Na/g_K vs squid axon; IKa shortens ISI; IM provides
+        # spike-frequency adaptation; small Ih produces modest voltage sag;
+        # Ca²⁺ channels (L, N, T) and IKCa together produce the pronounced
+        # after-hyperpolarization (AHP) characteristic of CA1 cells.
+        # Refs: Warman et al. (1994); Migliore et al. (1999), ModelDB #2796
+        "g_Na": 35.0,
+        "g_K": 10.0,
+        "ika_enabled": True,
+        "ika_g_max": 0.5,
+        "im_enabled": True,
+        "im_g_max": 0.5,
+        "ih_enabled": True,
+        "ih_g_max": 0.05,
+        "ical_enabled": True,
+        "ical_g_max": 0.5,
+        "ican_enabled": True,
+        "ican_g_max": 0.3,
+        "icat_enabled": True,
+        "icat_g_max": 0.3,
+        "ikca_enabled": True,
+        "ikca_g_max": 2.0,
+    },
+    "STN Neuron": {
+        **DEFAULT_NEURON_PARAMS,
+        **_DEFAULT_AUX_CHANNEL_STATE,
+        # High g_Na/g_K sustain autonomous tonic firing at 5–50 Hz;
+        # prominent ICaT (g_T = 5 mS/cm²) drives rebound bursts after
+        # hyperpolarization; IKCa limits burst duration; Ih provides
+        # pacemaker depolarization.
+        # Refs: Otsuka et al. (2004); Farries & Wilson (2012), J. Neurophysiol.
+        "g_Na": 49.0,
+        "g_K": 57.0,
+        "icat_enabled": True,
+        "icat_g_max": 5.0,
+        "ical_enabled": True,
+        "ical_g_max": 0.5,
+        "ika_enabled": True,
+        "ika_g_max": 3.0,
+        "ikca_enabled": True,
+        "ikca_g_max": 1.0,
+        "ih_enabled": True,
+        "ih_g_max": 0.5,
+    },
+    "Thalamic Reticular Nucleus": {
+        **DEFAULT_NEURON_PARAMS,
+        **_DEFAULT_AUX_CHANNEL_STATE,
+        # Hyperpolarised resting potential (−77 mV) and exceptionally large
+        # ICaT (g_T ≈ 3.5 mS/cm²) are the hallmarks of TRN cells; these
+        # combine to produce rhythmic burst firing and sleep-spindle
+        # oscillations.  No auxiliary channels beyond ICaT are needed.
+        # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804;
+        #       Destexhe et al. (1994)
+        "v_rest": -77.0,
+        "icat_enabled": True,
+        "icat_g_max": 3.5,
+    },
+    "Stomatogastric Ganglion": {
+        **DEFAULT_NEURON_PARAMS,
+        **_DEFAULT_AUX_CHANNEL_STATE,
+        # Depolarised resting potential (−55 mV) and ~8 conductances produce
+        # rhythmic bursting; large IKa and IKCa shape burst waveform; slow
+        # ICaL drives plateau depolarisation; Ih contributes to inter-burst
+        # pacemaker potential.  Highly parameter-sensitive — small changes
+        # alter burst duty cycle substantially.
+        # Refs: Prinz et al. (2003), J. Neurophysiol. 90:3998;
+        #       Turrigiano et al. (1995)
+        "v_rest": -55.0,
+        "ika_enabled": True,
+        "ika_g_max": 8.0,
+        "ical_enabled": True,
+        "ical_g_max": 2.0,
+        "ikca_enabled": True,
+        "ikca_g_max": 3.0,
+        "ih_enabled": True,
+        "ih_g_max": 1.5,
+    },
 }
 
 # Protocol parameter overrides applied on top of a protocol preset when a
@@ -251,6 +321,60 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "pre_stimulus_duration": 50.0,
             "stimulus_duration": 150.0,
             "post_stimulus_duration": 100.0,
+        },
+    },
+    "Hippocampal CA1 Pyramidal": {
+        # Long moderate-amplitude step reveals adaptation and pronounced AHP.
+        "Repetitive Firing": {
+            "min_stimulus": 8.0,
+            "max_stimulus": 8.0,
+            "stimulus_duration": 300.0,
+        },
+        # IKa and IM raise the firing threshold above the default HH range.
+        # Positive-only range; longer step to reveal spike-frequency adaptation.
+        "F-I Curve": {
+            "min_stimulus": 0.0,
+            "max_stimulus": 30.0,
+            "stimulus_step": 3.0,
+            "stimulus_duration": 150.0,
+        },
+    },
+    "STN Neuron": {
+        # Hyperpolarizing step followed by release reveals rebound burst;
+        # long post-stimulus window captures the burst dynamics.
+        "Repetitive Firing": {
+            "min_stimulus": -8.0,
+            "max_stimulus": -8.0,
+            "pre_stimulus_duration": 50.0,
+            "stimulus_duration": 150.0,
+            "post_stimulus_duration": 150.0,
+        },
+    },
+    "Thalamic Reticular Nucleus": {
+        # Hyperpolarizing step unlocks ICaT; long post-stimulus window
+        # reveals rhythmic burst firing on release.
+        "Repetitive Firing": {
+            "min_stimulus": -5.0,
+            "max_stimulus": -5.0,
+            "pre_stimulus_duration": 50.0,
+            "stimulus_duration": 200.0,
+            "post_stimulus_duration": 150.0,
+        },
+    },
+    "Stomatogastric Ganglion": {
+        # Long window at low current to reveal slow (~1 Hz) rhythmic bursting.
+        "Repetitive Firing": {
+            "min_stimulus": 3.0,
+            "max_stimulus": 3.0,
+            "stimulus_duration": 800.0,
+        },
+        # Depolarised v_rest (−55 mV) lowers threshold; use a tighter
+        # positive-only range so every sweep produces a clear burst response.
+        "F-I Curve": {
+            "min_stimulus": 0.0,
+            "max_stimulus": 12.0,
+            "stimulus_step": 1.5,
+            "stimulus_duration": 300.0,
         },
     },
 }
