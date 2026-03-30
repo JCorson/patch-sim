@@ -876,6 +876,27 @@ def test_build_figure_multi_sweep_legend_names_have_no_voltage_prefix() -> None:
     assert not any("mV" in n for n in legend_names)
 
 
+def test_build_figure_cc_multi_sweep_gating_names_bare() -> None:
+    """CC multi-sweep: all gating traces use bare names regardless of sweep index.
+
+    Selecting a non-first sweep triggers the JS legend to show that sweep's
+    gating traces.  Those traces must not carry a stimulus-amplitude prefix
+    (e.g. "+5.0 uA/cm^2 n") so the legend always reads "n", "m", "h".
+    """
+    sweeps = [
+        _make_sweep(label=f"{c:+.1f} uA/cm^2", mode="Current Clamp") for c in [0.0, 5.0]
+    ]
+    fig = build_figure(
+        sweeps, [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+    )
+    gating_traces = [t for t in fig.data if getattr(t, "legend", None) == "legend2"]
+    assert gating_traces, "Expected gating traces with legend='legend2'"
+    for trace in gating_traces:
+        assert "uA" not in trace.name, (
+            f"Gating trace name '{trace.name}' must not contain stimulus prefix"
+        )
+
+
 def test_build_figure_saved_sweep_stimulus_not_in_legend() -> None:
     """Saved sweep stimulus traces are excluded from the legend."""
     current = _make_sweep(mode="Current Clamp")

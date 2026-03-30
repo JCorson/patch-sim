@@ -736,9 +736,8 @@ def build_figure(
 
         # Gating row is always present; traces are always added with their
         # visibility flags so the layout never changes on toggle.
-        # Legend-eligible traces (first sweep) use bare variable names so the
-        # command level doesn't appear in the legend (e.g. "n" not "-60 mV n").
-        gating_pfx = "" if sl else pfx
+        # All gating traces use bare variable names regardless of sweep so that
+        # the legend always shows "n", "m", "h" — never a stimulus prefix.
         for gv_attr, gv_label in [
             ("potassium_activation", "n"),
             ("sodium_activation", "m"),
@@ -747,7 +746,7 @@ def build_figure(
             _scatter(
                 t,
                 getattr(sweep, gv_attr),
-                f"{gating_pfx}{gv_label}",
+                gv_label,
                 gating_row,
                 GATING_VAR_COLORS.get(gv_label),
                 visible=getattr(visibility, gv_attr),
@@ -761,7 +760,7 @@ def build_figure(
             _scatter(
                 t,
                 gv_vals,
-                f"{gating_pfx}{gv_name}",
+                gv_name,
                 gating_row,
                 GATING_VAR_COLORS.get(gv_name),
                 visible=vis,
