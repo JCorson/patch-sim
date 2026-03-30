@@ -11,7 +11,7 @@ from patch_sim_ui.protocol_builders import (
     build_current_protocol,
     build_voltage_protocol,
 )
-from patch_sim_ui.presets import PRESETS
+from patch_sim_ui.presets import PROTOCOL_PRESETS
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -292,10 +292,10 @@ _NEURON_KEYS = {
 }
 
 
-@pytest.mark.parametrize("preset_name", list(PRESETS.keys()))
+@pytest.mark.parametrize("preset_name", list(PROTOCOL_PRESETS.keys()))
 def test_preset_produces_valid_protocol(preset_name: str) -> None:
     """For each preset, building the corresponding protocol returns a valid list."""
-    config = PRESETS[preset_name]
+    config = PROTOCOL_PRESETS[preset_name]
     mode = config.get("clamp_mode", "Current Clamp")
     protocol_type = config.get("protocol_type", "Step")
     sampling_frequency = float(config.get("sampling_frequency", SAMPLING_FREQUENCY))

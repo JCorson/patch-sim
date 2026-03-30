@@ -671,6 +671,7 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     # Experiment mode                                                     #
     # ------------------------------------------------------------------ #
+    active_neuron_type: str = ""  # name of the currently selected neuron preset, or ""
     clamp_mode: str = CURRENT_CLAMP  # CURRENT_CLAMP | VOLTAGE_CLAMP
 
     # ------------------------------------------------------------------ #
@@ -975,12 +976,49 @@ class AppState(rx.State):
         )
         return rx.call_script(js)
 
-    def load_preset(self, name: str) -> None:
-        """Load a named preset configuration."""
-        if name not in presets.PRESETS:
+    def load_neuron_preset(self, name: str) -> None:
+        """Load a neuron-type preset, updating only neuron parameters.
+
+        Sets conductances and auxiliary channel configuration for the selected
+        neuron type without touching any protocol settings.  Records the active
+        neuron type so that subsequent protocol preset loads can apply
+        neuron-specific adjustments via NEURON_PROTOCOL_ADJUSTMENTS.
+
+        Args:
+            name: Key into presets.NEURON_PRESETS.  Ignored if not found.
+        """
+        if name not in presets.NEURON_PRESETS:
+            logger.debug("load_neuron_preset: unknown preset %r ignored", name)
             return
-        logger.info("Loaded preset: %s", name)
-        config = presets.PRESETS[name]
+        logger.info("Loaded neuron preset: %s", name)
+        config = presets.NEURON_PRESETS[name]
+        for key, value in config.items():
+            setattr(self, key, value)
+        self.active_neuron_type = name
+        self.current_sweeps = []
+        self.saved_sweeps = []
+        self.stored_traces = []
+        self._cont_has_state = False
+
+    def load_protocol_preset(self, name: str) -> None:
+        """Load a protocol preset, applying neuron-type adjustments if active.
+
+        Applies the base protocol preset, then overlays any entries from
+        presets.NEURON_PROTOCOL_ADJUSTMENTS for the currently active neuron
+        type so that the stimulus parameters suit the selected cell type.
+
+        Args:
+            name: Key into presets.PROTOCOL_PRESETS.  Ignored if not found.
+        """
+        if name not in presets.PROTOCOL_PRESETS:
+            logger.debug("load_protocol_preset: unknown preset %r ignored", name)
+            return
+        logger.info("Loaded protocol preset: %s", name)
+        config = dict(presets.PROTOCOL_PRESETS[name])
+        adjustments = presets.NEURON_PROTOCOL_ADJUSTMENTS.get(
+            self.active_neuron_type, {}
+        ).get(name, {})
+        config.update(adjustments)
         for key, value in config.items():
             setattr(self, key, value)
         self.current_sweeps = []

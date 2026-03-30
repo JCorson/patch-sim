@@ -2,6 +2,7 @@
 
 import reflex as rx
 
+from patch_sim_ui import presets
 from patch_sim_ui.constants import CURRENT_CLAMP, VOLTAGE_CLAMP
 from patch_sim_ui.state import AppState
 
@@ -273,6 +274,13 @@ def protocol_panel() -> rx.Component:
     """Sidebar panel for experiment mode and protocol configuration."""
     return rx.vstack(
         rx.heading("Experiment", size="3"),
+        rx.select(
+            presets.PROTOCOL_PRESET_NAMES,
+            placeholder="Load preset…",
+            on_change=AppState.load_protocol_preset,
+            width="100%",
+            size="2",
+        ),
         rx.separator(),
         rx.text("Mode", size="2", weight="bold"),
         rx.radio_group(
