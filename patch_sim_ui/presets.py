@@ -15,7 +15,7 @@ from patch_sim.constants import (
     DEFAULT_G_NAR,
     DEFAULT_NEURON_PARAMS,
 )
-from patch_sim_ui.constants import CURRENT_CLAMP, VOLTAGE_CLAMP  # noqa: F401 (VOLTAGE_CLAMP used in PROTOCOL_PRESETS)
+from patch_sim_ui.constants import CURRENT_CLAMP, VOLTAGE_CLAMP
 
 # Each preset is a dict of state variable names → values.
 # Keys must match field names in AppState exactly.
