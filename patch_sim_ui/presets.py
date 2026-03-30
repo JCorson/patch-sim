@@ -198,43 +198,45 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
     "Fast-Spiking Interneuron": {
         # High-amplitude, standard-length step to drive rapid non-adapting firing.
         "Repetitive Firing": {
-            "current_amplitude": 20.0,
-            "duration": 200.0,
-            "step_duration": 180.0,
+            "min_stimulus": 20.0,
+            "max_stimulus": 20.0,
+            "stimulus_duration": 180.0,
         },
     },
     "Pyramidal Neuron": {
         # Longer step at moderate amplitude to reveal spike-frequency adaptation.
         "Repetitive Firing": {
-            "current_amplitude": 10.0,
-            "duration": 300.0,
-            "step_duration": 280.0,
+            "min_stimulus": 10.0,
+            "max_stimulus": 10.0,
+            "stimulus_duration": 280.0,
         },
     },
     "Purkinje Cell": {
         # Moderate amplitude; complex Ca²⁺-driven spiking emerges within 200 ms.
         "Repetitive Firing": {
-            "current_amplitude": 12.0,
-            "duration": 200.0,
-            "step_duration": 180.0,
+            "min_stimulus": 12.0,
+            "max_stimulus": 12.0,
+            "stimulus_duration": 180.0,
         },
     },
     "Dopaminergic Neuron": {
         # Long window at low amplitude to reveal slow (~2–5 Hz) pacemaking.
         "Repetitive Firing": {
-            "current_amplitude": 5.0,
-            "duration": 500.0,
-            "step_duration": 480.0,
+            "min_stimulus": 5.0,
+            "max_stimulus": 5.0,
+            "stimulus_duration": 480.0,
         },
     },
     "Thalamic Relay": {
         # Hyperpolarizing step followed by release triggers post-inhibitory
         # rebound burst via T-type Ca²⁺ channels.
+        # pre=50 ms establishes baseline; post=100 ms captures the rebound burst.
         "Repetitive Firing": {
-            "current_amplitude": -5.0,
-            "duration": 300.0,
-            "step_start": 50.0,
-            "step_duration": 150.0,
+            "min_stimulus": -5.0,
+            "max_stimulus": -5.0,
+            "pre_stimulus_duration": 50.0,
+            "stimulus_duration": 150.0,
+            "post_stimulus_duration": 100.0,
         },
     },
 }

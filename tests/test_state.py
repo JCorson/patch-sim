@@ -291,12 +291,12 @@ def test_load_neuron_preset_fast_spiking_interneuron_enables_ika() -> None:
 
 
 def test_load_neuron_preset_does_not_change_protocol_fields() -> None:
-    """load_neuron_preset leaves protocol fields (duration, clamp_mode) unchanged."""
+    """load_neuron_preset leaves stimulus_duration and clamp_mode unchanged."""
     s = _make_state()
-    original_duration = s.duration
+    original_duration = s.stimulus_duration
     original_clamp = s.clamp_mode
     s.load_neuron_preset("Fast-Spiking Interneuron")
-    assert s.duration == pytest.approx(original_duration)
+    assert s.stimulus_duration == pytest.approx(original_duration)
     assert s.clamp_mode == original_clamp
 
 
@@ -397,14 +397,14 @@ def test_protocol_preset_with_active_neuron_type_applies_adjustment() -> None:
     s = _make_state()
     s.load_neuron_preset("Thalamic Relay")
     s.load_protocol_preset("Repetitive Firing")
-    assert s.current_amplitude < 0.0
+    assert s.min_stimulus < 0.0
 
 
 def test_protocol_preset_without_active_neuron_type_uses_base_params() -> None:
-    """Repetitive Firing without an active neuron type uses the base amplitude."""
+    """Repetitive Firing without an active neuron type uses the base stimulus."""
     s = _make_state()
     s.load_protocol_preset("Repetitive Firing")
-    assert s.current_amplitude == pytest.approx(15.0)
+    assert s.min_stimulus == pytest.approx(15.0)
 
 
 def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> None:
@@ -412,15 +412,15 @@ def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> None:
     s = _make_state()
     s.load_neuron_preset("Thalamic Relay")
     s.load_protocol_preset("Action Potential")
-    assert s.duration == pytest.approx(50.0)
+    assert s.stimulus_duration == pytest.approx(30.0)
 
 
 def test_protocol_preset_dopaminergic_repetitive_firing_uses_long_duration() -> None:
-    """Repetitive Firing with Dopaminergic Neuron active sets duration to 500 ms."""
+    """Dopaminergic Neuron + Repetitive Firing sets stimulus_duration to 480 ms."""
     s = _make_state()
     s.load_neuron_preset("Dopaminergic Neuron")
     s.load_protocol_preset("Repetitive Firing")
-    assert s.duration == pytest.approx(500.0)
+    assert s.stimulus_duration == pytest.approx(480.0)
 
 
 # ---------------------------------------------------------------------------
