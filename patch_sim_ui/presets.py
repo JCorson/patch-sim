@@ -330,6 +330,14 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 8.0,
             "stimulus_duration": 300.0,
         },
+        # IKa and IM raise the firing threshold above the default HH range.
+        # Positive-only range; longer step to reveal spike-frequency adaptation.
+        "F-I Curve": {
+            "min_stimulus": 0.0,
+            "max_stimulus": 30.0,
+            "stimulus_step": 3.0,
+            "stimulus_duration": 150.0,
+        },
     },
     "STN Neuron": {
         # Hyperpolarizing step followed by release reveals rebound burst;
