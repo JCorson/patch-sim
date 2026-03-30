@@ -1,4 +1,4 @@
-"""Default neuron parameter values for the Hodgkin-Huxley model."""
+"""Default neuron parameter values and domain constants for the Hodgkin-Huxley model."""
 
 # Default neuron parameters (classic Hodgkin-Huxley values)
 DEFAULT_G_NA: float = 120.0
@@ -41,6 +41,27 @@ DEFAULT_G_ICAN: float = 0.3  # N-type Ca2+ maximum conductance in mS/cm²
 DEFAULT_ALPHA_CA: float = 1e-4  # mM / (µA/cm² · ms)
 DEFAULT_TAU_CA: float = 200.0  # ms
 DEFAULT_CA_REST: float = 1e-4  # mM
+
+#: Clamp mode identifier strings.
+CURRENT_CLAMP: str = "Current Clamp"
+VOLTAGE_CLAMP: str = "Voltage Clamp"
+
+#: Current clamp protocol type names.
+CURRENT_PROTOCOLS: list[str] = [
+    "Step",
+    "Ramp",
+    "Pulse Train",
+    "Sinusoidal",
+    "Chirp",
+    "Noise",
+]
+
+#: Voltage clamp protocol type names.
+VOLTAGE_PROTOCOLS: list[str] = [
+    "Step",
+    "Ramp",
+    "Pulse Train",
+]
 
 DEFAULT_NEURON_PARAMS: dict[str, float] = {
     "g_Na": DEFAULT_G_NA,

@@ -1,8 +1,12 @@
 """UI constants: parameter ranges and colour palettes."""
 
-#: Clamp mode identifier strings used throughout state, plotting, and UI.
-CURRENT_CLAMP: str = "Current Clamp"
-VOLTAGE_CLAMP: str = "Voltage Clamp"
+# Re-export domain constants from core so existing UI imports continue to work.
+from patch_sim.constants import (  # noqa: F401
+    CURRENT_CLAMP,
+    CURRENT_PROTOCOLS,
+    VOLTAGE_CLAMP,
+    VOLTAGE_PROTOCOLS,
+)
 
 # Slider ranges for neuron parameters
 PARAM_RANGES: dict[str, tuple[float, float, float]] = {
@@ -33,23 +37,6 @@ PARAM_RANGES: dict[str, tuple[float, float, float]] = {
     "icat_g_max": (0.0, 5.0, 0.01),
     "ican_g_max": (0.0, 5.0, 0.01),
 }
-
-# Current clamp protocol types
-CURRENT_PROTOCOLS: list[str] = [
-    "Step",
-    "Ramp",
-    "Pulse Train",
-    "Sinusoidal",
-    "Chirp",
-    "Noise",
-]
-
-# Voltage clamp protocol types
-VOLTAGE_PROTOCOLS: list[str] = [
-    "Step",
-    "Ramp",
-    "Pulse Train",
-]
 
 # Fixed colour for the Current Clamp voltage trace.  Matches the blue used for
 # I_total in Voltage Clamp so the primary response trace looks consistent across

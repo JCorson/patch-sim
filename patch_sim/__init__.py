@@ -4,6 +4,12 @@ A package for simulating patch clamp experiments using the Hodgkin-Huxley model.
 """
 
 from . import constants
+from .constants import (
+    CURRENT_CLAMP,
+    CURRENT_PROTOCOLS,
+    VOLTAGE_CLAMP,
+    VOLTAGE_PROTOCOLS,
+)
 from .calcium import CalciumDynamics
 from .channels import (
     GatingVariable,
@@ -60,6 +66,10 @@ from .protocols import (
 
 __all__ = [
     "constants",
+    "CURRENT_CLAMP",
+    "CURRENT_PROTOCOLS",
+    "VOLTAGE_CLAMP",
+    "VOLTAGE_PROTOCOLS",
     "CalciumDynamics",
     "GatingVariable",
     "GoldmanSpec",
