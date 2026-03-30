@@ -42,6 +42,7 @@ from .presets import (
     NEURON_PROTOCOL_ADJUSTMENTS,
     PROTOCOL_PRESET_NAMES,
     PROTOCOL_PRESETS,
+    build_protocol_from_preset,
 )
 from .additional_channels import (
     make_ican_channel,
@@ -64,6 +65,8 @@ from .clamp_simulations import (
 )
 from .electrochemistry import goldman_potential, nernst_potential
 from .protocols import (
+    build_current_protocol,
+    build_voltage_protocol,
     step_current,
     ramp_current,
     pulse_train,
@@ -99,6 +102,7 @@ __all__ = [
     "NEURON_PROTOCOL_ADJUSTMENTS",
     "PROTOCOL_PRESET_NAMES",
     "PROTOCOL_PRESETS",
+    "build_protocol_from_preset",
     "make_ican_channel",
     "make_ical_channel",
     "make_icat_channel",
@@ -125,6 +129,8 @@ __all__ = [
     "simulate_batch",
     "nernst_potential",
     "goldman_potential",
+    "build_current_protocol",
+    "build_voltage_protocol",
     "step_current",
     "ramp_current",
     "pulse_train",

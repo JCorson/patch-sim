@@ -8,6 +8,8 @@ be used without importing the UI package.
 
 from typing import Any
 
+import numpy as np
+
 from .additional_channels import (
     make_ican_channel,
     make_ical_channel,
@@ -337,3 +339,111 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
 
 PROTOCOL_PRESET_NAMES: list[str] = list(PROTOCOL_PRESETS.keys())
 NEURON_PRESET_NAMES: list[str] = list(NEURON_PRESETS.keys())
+
+# Keys in a protocol preset that are not builder parameters.
+_NON_BUILDER_KEYS: frozenset[str] = frozenset(
+    {
+        "clamp_mode",
+        "g_Na",
+        "g_K",
+        "g_L",
+        "C_m",
+        "v_rest",
+    }
+)
+
+
+def build_protocol_from_preset(
+    preset_name: str,
+    neuron_preset: str | None = None,
+    sampling_frequency: float = 40_000.0,
+    **overrides: Any,
+) -> list[tuple[np.ndarray, str]]:
+    """Build a protocol array list from a named preset.
+
+    Looks up *preset_name* in :data:`PROTOCOL_PRESETS`, applies any
+    neuron-specific adjustments from :data:`NEURON_PROTOCOL_ADJUSTMENTS` when
+    *neuron_preset* is supplied, then applies any caller-supplied *overrides*
+    before dispatching to :func:`build_current_protocol` or
+    :func:`build_voltage_protocol`.
+
+    Args:
+        preset_name: Key in :data:`PROTOCOL_PRESETS`.
+        neuron_preset: Optional key in :data:`NEURON_PRESETS`.  When given,
+            neuron-specific parameter adjustments are merged on top of the base
+            preset before *overrides* are applied.
+        sampling_frequency: Sampling frequency in Hz.  Defaults to the
+            standard simulation rate (40 kHz).
+        **overrides: Additional keyword arguments that override any preset or
+            neuron-adjustment values.  Use builder parameter names
+            (e.g. ``current_min``, ``voltage_step``).
+
+    Returns:
+        List of (stimulus_array, sweep_label) pairs.
+
+    Raises:
+        KeyError: If *preset_name* is not in :data:`PROTOCOL_PRESETS`.
+        ValueError: If the resolved parameters are invalid for the chosen
+            protocol type.
+    """
+    # Deferred import to avoid a circular dependency at module load time.
+    from .protocols.builders import build_current_protocol, build_voltage_protocol
+
+    if preset_name not in PROTOCOL_PRESETS:
+        raise KeyError(
+            f"Unknown protocol preset {preset_name!r}. "
+            f"Available: {list(PROTOCOL_PRESETS)}"
+        )
+
+    # Start from a copy of the base preset.
+    config: dict[str, Any] = dict(PROTOCOL_PRESETS[preset_name])
+
+    # Merge neuron-specific adjustments.
+    if neuron_preset is not None:
+        neuron_adjustments = NEURON_PROTOCOL_ADJUSTMENTS.get(neuron_preset, {})
+        config.update(neuron_adjustments.get(preset_name, {}))
+
+    # Apply caller overrides last.
+    config.update(overrides)
+
+    clamp_mode: str = config.pop("clamp_mode", "Current Clamp")
+    protocol_type: str = config.pop("protocol_type", "Step")
+
+    # Remove keys that are not builder parameters.
+    for key in _NON_BUILDER_KEYS - {"clamp_mode"}:
+        config.pop(key, None)
+
+    # Map shared preset parameter names to builder-specific names.
+    if clamp_mode == "Current Clamp":
+        config["current_min"] = config.pop(
+            "min_stimulus", config.get("current_min", 10.0)
+        )
+        config["current_max"] = config.pop(
+            "max_stimulus", config.get("current_max", 10.0)
+        )
+        config["current_step"] = config.pop(
+            "stimulus_step", config.get("current_step", 0.0)
+        )
+        return build_current_protocol(
+            protocol_type=protocol_type,
+            sampling_frequency=sampling_frequency,
+            **config,
+        )
+    else:
+        config["voltage_min"] = config.pop(
+            "min_stimulus", config.get("voltage_min", 0.0)
+        )
+        config["voltage_max"] = config.pop(
+            "max_stimulus", config.get("voltage_max", 0.0)
+        )
+        config["voltage_step"] = config.pop(
+            "stimulus_step", config.get("voltage_step", 0.0)
+        )
+        config["holding_voltage"] = config.pop(
+            "vc_holding_voltage", config.get("holding_voltage", -70.0)
+        )
+        return build_voltage_protocol(
+            protocol_type=protocol_type,
+            sampling_frequency=sampling_frequency,
+            **config,
+        )
