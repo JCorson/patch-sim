@@ -2,7 +2,6 @@
 
 import reflex as rx
 
-from patch_sim_ui import presets
 from patch_sim_ui.components.log_panel import log_panel
 from patch_sim_ui.components.neuron_panel import neuron_panel
 from patch_sim_ui.components.protocol_panel import protocol_panel
@@ -15,15 +14,8 @@ setup_logging()
 
 
 def _header() -> rx.Component:
-    """Top navigation bar with preset selector, title, and Run/Continuous buttons."""
+    """Top navigation bar with title, reset button, and Run/Continuous buttons."""
     return rx.hstack(
-        rx.select(
-            presets.PROTOCOL_PRESET_NAMES,
-            placeholder="Load preset…",
-            on_change=AppState.load_protocol_preset,
-            width="200px",
-            size="2",
-        ),
         rx.button(
             rx.icon("rotate-ccw"),
             "Reset",
