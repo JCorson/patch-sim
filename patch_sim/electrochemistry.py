@@ -12,13 +12,12 @@ This module provides:
   callable pairs from Boltzmann/cosh kinetic parameters.
 """
 
-import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 import numpy as np
 
-from .utils import safe_exp
+from .utils import safe_cosh, safe_exp
 
 # Constants
 R = 8.314  # Universal gas constant, J/(mol·K)
@@ -173,7 +172,7 @@ class BoltzmannCoshRate:
         else:
             inf = 1.0 / (1.0 + safe_exp(-(V - self.half) / self.slope))
         tau = self.tau_scale / (
-            self.tau_rate * math.cosh((V - self.half) / self.cosh_scale)
+            self.tau_rate * safe_cosh((V - self.half) / self.cosh_scale)
         )
         tau = max(tau, self.tau_floor)
         if self.is_alpha:

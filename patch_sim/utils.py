@@ -11,6 +11,10 @@ import math
 SAFE_EXP_CLIP_MIN = -100
 SAFE_EXP_CLIP_MAX = 100
 
+# Clipping bound for safe_cosh: cosh is symmetric so a single bound suffices.
+# cosh(100) ≈ 1.34e43, well below float64 overflow (~e308).
+SAFE_COSH_CLIP = 100
+
 
 def safe_exp(x: float) -> float:
     """Safely compute the exponential to avoid overflow and underflow.
@@ -33,3 +37,27 @@ def safe_exp(x: float) -> float:
     elif x != x:  # NaN — falls through both comparisons above
         return math.nan
     return math.exp(x)
+
+
+def safe_cosh(x: float) -> float:
+    """Safely compute the hyperbolic cosine to avoid overflow.
+
+    Clips the input to [-SAFE_COSH_CLIP, SAFE_COSH_CLIP] before computing
+    cosh.  Since cosh is symmetric and monotonically increasing away from
+    zero, clipping at ±100 returns cosh(100) ≈ 1.34e43 for extreme inputs,
+    which is finite and preserves the qualitative behaviour (very large tau
+    denominator → very small time constant).
+
+    Args:
+        x: The input value.
+
+    Returns:
+        The computed hyperbolic cosine value, capped to prevent overflow.
+    """
+    if x != x:  # NaN — falls through both comparisons below
+        return math.nan
+    if x > SAFE_COSH_CLIP:
+        return math.cosh(SAFE_COSH_CLIP)
+    if x < -SAFE_COSH_CLIP:
+        return math.cosh(SAFE_COSH_CLIP)
+    return math.cosh(x)

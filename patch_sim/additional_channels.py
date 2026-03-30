@@ -5,8 +5,6 @@ These channels can be added to a HodgkinHuxley model via the
 with additional biophysical mechanisms.
 """
 
-import math
-
 from .channels import (
     GatingVariable,
     GoldmanSpec,
@@ -28,7 +26,7 @@ from .constants import (
     DEFAULT_IH_P_NA,
 )
 from .electrochemistry import boltzmann_cosh_rates
-from .utils import safe_exp
+from .utils import safe_cosh, safe_exp
 
 
 def _alpha_r(V: float, ca_i: float) -> float:
@@ -485,7 +483,7 @@ def _ikca_tau(V: float) -> float:
     Returns:
         Time constant in ms (floored at 1 ms).
     """
-    tau = _IKCA_TAU_SCALE / math.cosh((V - _IKCA_V_HALF) / _IKCA_TAU_COSH_SCALE)
+    tau = _IKCA_TAU_SCALE / safe_cosh((V - _IKCA_V_HALF) / _IKCA_TAU_COSH_SCALE)
     return max(tau, _IKCA_TAU_FLOOR)
 
 
