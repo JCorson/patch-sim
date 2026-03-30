@@ -671,7 +671,7 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     # Experiment mode                                                     #
     # ------------------------------------------------------------------ #
-    active_neuron_type: str = ""  # name of the currently selected neuron preset, or ""
+    active_neuron_type: str = "Squid Giant Axon (Classic HH)"  # selected preset
     clamp_mode: str = CURRENT_CLAMP  # CURRENT_CLAMP | VOLTAGE_CLAMP
 
     # ------------------------------------------------------------------ #

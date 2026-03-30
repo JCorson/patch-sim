@@ -211,6 +211,7 @@ def neuron_panel() -> rx.Component:
         rx.select(
             presets.NEURON_PRESET_NAMES,
             placeholder="Load neuron type…",
+            value=AppState.active_neuron_type,
             on_change=AppState.load_neuron_preset,
             width="100%",
             size="2",
