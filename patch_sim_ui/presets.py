@@ -137,6 +137,8 @@ NEURON_PRESETS: dict[str, dict[str, Any]] = {
         **DEFAULT_NEURON_PARAMS,
         **_DEFAULT_AUX_CHANNEL_STATE,
         # High g_Na/g_K for narrow spikes; IKa shapes inter-spike interval.
+        # Refs: Wang & Buzsáki (1996), J. Neurosci. 16:6402;
+        #       Pospischil et al. (2008), Biol. Cybern. 99:427
         "g_Na": 150.0,
         "g_K": 50.0,
         "ika_enabled": True,
@@ -147,6 +149,8 @@ NEURON_PRESETS: dict[str, dict[str, Any]] = {
         **_DEFAULT_AUX_CHANNEL_STATE,
         # Ih produces voltage sag on hyperpolarization; INaP amplifies
         # subthreshold inputs; IM provides spike-frequency adaptation.
+        # Refs: Mainen & Sejnowski (1996);
+        #       Pospischil et al. (2008), Biol. Cybern. 99:427
         "ih_enabled": True,
         "ih_g_max": 1.5,
         "inap_enabled": True,
@@ -159,6 +163,7 @@ NEURON_PRESETS: dict[str, dict[str, Any]] = {
         **_DEFAULT_AUX_CHANNEL_STATE,
         # L-type and T-type Ca²⁺ channels drive complex spiking;
         # IKCa couples Ca²⁺ influx to after-hyperpolarization.
+        # Ref: De Schutter & Bower (1994), J. Neurophysiol. 71:375
         "ical_enabled": True,
         "ical_g_max": 1.0,
         "icat_enabled": True,
@@ -171,6 +176,8 @@ NEURON_PRESETS: dict[str, dict[str, Any]] = {
         **_DEFAULT_AUX_CHANNEL_STATE,
         # Ih drives pacemaker sag and rebound; IM provides slow
         # oscillatory hyperpolarization.
+        # Refs: Wilson & Callaway (2000), J. Neurophysiol. 83:3084;
+        #       Komendantov et al. (2004)
         "ih_enabled": True,
         "ih_g_max": 2.0,
         "im_enabled": True,
@@ -181,6 +188,7 @@ NEURON_PRESETS: dict[str, dict[str, Any]] = {
         **_DEFAULT_AUX_CHANNEL_STATE,
         # T-type Ca²⁺ produces low-threshold spike; Ih causes
         # post-inhibitory rebound burst after hyperpolarizing step.
+        # Ref: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384
         "icat_enabled": True,
         "icat_g_max": 1.5,
         "ih_enabled": True,
