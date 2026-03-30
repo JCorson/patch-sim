@@ -133,6 +133,12 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
 }
 
 NEURON_PRESETS: dict[str, dict[str, Any]] = {
+    "Squid Giant Axon (Classic HH)": {
+        **DEFAULT_NEURON_PARAMS,
+        **_DEFAULT_AUX_CHANNEL_STATE,
+        # Original Hodgkin-Huxley (1952) parameters — the app defaults.
+        # Ref: Hodgkin & Huxley (1952), J. Physiol. 117:500
+    },
     "Fast-Spiking Interneuron": {
         **DEFAULT_NEURON_PARAMS,
         **_DEFAULT_AUX_CHANNEL_STATE,

@@ -355,8 +355,9 @@ def test_load_neuron_preset_clears_current_sweeps() -> None:
 def test_load_neuron_preset_unknown_name_is_ignored() -> None:
     """load_neuron_preset silently ignores an unknown preset name."""
     s = _make_state()
+    before = s.active_neuron_type
     s.load_neuron_preset("NonExistentNeuron")
-    assert s.active_neuron_type == ""
+    assert s.active_neuron_type == before
 
 
 # ---------------------------------------------------------------------------
