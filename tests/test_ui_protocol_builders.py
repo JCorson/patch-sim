@@ -271,25 +271,7 @@ def test_voltage_negative_step_raises() -> None:
 # ---------------------------------------------------------------------------
 
 
-_NEURON_KEYS = {
-    "clamp_mode",
-    "protocol_type",
-    "sampling_frequency",
-    "g_Na",
-    "g_K",
-    "g_L",
-    "C_m",
-    "v_rest",
-    "Na_out",
-    "Na_in",
-    "K_out",
-    "K_in",
-    "Cl_out",
-    "Cl_in",
-    "Ca_out",
-    "Ca_in",
-    "T",
-}
+_NON_BUILDER_KEYS = {"clamp_mode", "protocol_type", "sampling_frequency"}
 
 
 @pytest.mark.parametrize("preset_name", list(PROTOCOL_PRESETS.keys()))
@@ -302,7 +284,7 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
     kwargs = {
         k: float(v)
         for k, v in config.items()
-        if k not in _NEURON_KEYS and isinstance(v, (int, float))
+        if k not in _NON_BUILDER_KEYS and isinstance(v, (int, float))
     }
 
     if mode == "Current Clamp":

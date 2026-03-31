@@ -203,7 +203,6 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "vc_holding_voltage": -70.0,
     },
     "Na+ Channel Activation": {
-        "g_K": 0.0,  # block K+ channels to isolate Na+ current
         "clamp_mode": VOLTAGE_CLAMP,
         "protocol_type": "Step",
         "pre_stimulus_duration": 5.0,
@@ -340,18 +339,6 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
 PROTOCOL_PRESET_NAMES: list[str] = list(PROTOCOL_PRESETS.keys())
 NEURON_PRESET_NAMES: list[str] = list(NEURON_PRESETS.keys())
 
-# Keys in a protocol preset that are not builder parameters.
-_NON_BUILDER_KEYS: frozenset[str] = frozenset(
-    {
-        "clamp_mode",
-        "g_Na",
-        "g_K",
-        "g_L",
-        "C_m",
-        "v_rest",
-    }
-)
-
 
 def build_protocol_from_preset(
     preset_name: str,
@@ -408,10 +395,6 @@ def build_protocol_from_preset(
 
     clamp_mode: str = config.pop("clamp_mode", "Current Clamp")
     protocol_type: str = config.pop("protocol_type", "Step")
-
-    # Remove keys that are not builder parameters.
-    for key in _NON_BUILDER_KEYS - {"clamp_mode"}:
-        config.pop(key, None)
 
     if clamp_mode == "Current Clamp":
         return build_current_protocol(

@@ -206,3 +206,11 @@ NEURON_PRESETS: dict[str, dict[str, Any]] = {
         "ih_g_max": 1.5,
     },
 }
+
+# Neuron-parameter overrides applied when a protocol preset is loaded,
+# regardless of which neuron type is active.  Keys must match AppState field
+# names exactly.
+PROTOCOL_NEURON_OVERRIDES: dict[str, dict[str, Any]] = {
+    # Disable K⁺ channels so only Na⁺ current is visible.
+    "Na+ Channel Activation": {"g_K": 0.0},
+}

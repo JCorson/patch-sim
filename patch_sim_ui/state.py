@@ -1019,6 +1019,7 @@ class AppState(rx.State):
             self.active_neuron_type, {}
         ).get(name, {})
         config.update(adjustments)
+        config.update(presets.PROTOCOL_NEURON_OVERRIDES.get(name, {}))
         for key, value in config.items():
             setattr(self, key, value)
         self.current_sweeps = []
