@@ -376,7 +376,7 @@ def build_protocol_from_preset(
             standard simulation rate (40 kHz).
         **overrides: Additional keyword arguments that override any preset or
             neuron-adjustment values.  Use builder parameter names
-            (e.g. ``current_min``, ``voltage_step``).
+            (e.g. ``min_stimulus``, ``stimulus_step``).
 
     Returns:
         List of (stimulus_array, sweep_label) pairs.
@@ -413,35 +413,13 @@ def build_protocol_from_preset(
     for key in _NON_BUILDER_KEYS - {"clamp_mode"}:
         config.pop(key, None)
 
-    # Map shared preset parameter names to builder-specific names.
     if clamp_mode == "Current Clamp":
-        config["current_min"] = config.pop(
-            "min_stimulus", config.get("current_min", 10.0)
-        )
-        config["current_max"] = config.pop(
-            "max_stimulus", config.get("current_max", 10.0)
-        )
-        config["current_step"] = config.pop(
-            "stimulus_step", config.get("current_step", 0.0)
-        )
         return build_current_protocol(
             protocol_type=protocol_type,
             sampling_frequency=sampling_frequency,
             **config,
         )
     else:
-        config["voltage_min"] = config.pop(
-            "min_stimulus", config.get("voltage_min", 0.0)
-        )
-        config["voltage_max"] = config.pop(
-            "max_stimulus", config.get("voltage_max", 0.0)
-        )
-        config["voltage_step"] = config.pop(
-            "stimulus_step", config.get("voltage_step", 0.0)
-        )
-        config["holding_voltage"] = config.pop(
-            "vc_holding_voltage", config.get("holding_voltage", -70.0)
-        )
         return build_voltage_protocol(
             protocol_type=protocol_type,
             sampling_frequency=sampling_frequency,

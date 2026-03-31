@@ -100,8 +100,8 @@ def test_build_protocol_from_preset_overrides_applied() -> None:
     result = patch_sim.build_protocol_from_preset(
         "Action Potential",
         sampling_frequency=SAMPLING_FREQUENCY,
-        current_min=5.0,
-        current_max=5.0,
+        min_stimulus=5.0,
+        max_stimulus=5.0,
     )
     assert _is_valid_protocol_list(result)
     assert len(result) == 1

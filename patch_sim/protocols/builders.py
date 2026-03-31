@@ -31,9 +31,9 @@ def build_current_protocol(
     pre_stimulus_duration: float = 10.0,
     stimulus_duration: float = 30.0,
     post_stimulus_duration: float = 10.0,
-    current_min: float = 10.0,
-    current_max: float = 10.0,
-    current_step: float = 0.0,
+    min_stimulus: float = 10.0,
+    max_stimulus: float = 10.0,
+    stimulus_step: float = 0.0,
     start_current: float = 0.0,
     end_current: float = 15.0,
     pulse_amplitude: float = 10.0,
@@ -56,12 +56,12 @@ def build_current_protocol(
         pre_stimulus_duration: Duration before the stimulus in ms.
         stimulus_duration: Duration of the stimulus in ms.
         post_stimulus_duration: Duration after the stimulus in ms.
-        current_min: Step current amplitude in µA/cm² for a single-step, or
+        min_stimulus: Step current amplitude in µA/cm² for a single-step, or
             minimum current when running a multi-sweep range.
-        current_max: Maximum current for multi-sweep range in µA/cm².  Must
-            be >= current_min.
-        current_step: Step size for multi-sweep range in µA/cm².  Use 0.0
-            (or set current_min == current_max) for a single-step protocol.
+        max_stimulus: Maximum current for multi-sweep range in µA/cm².  Must
+            be >= min_stimulus.
+        stimulus_step: Step size for multi-sweep range in µA/cm².  Use 0.0
+            (or set min_stimulus == max_stimulus) for a single-step protocol.
         start_current: Ramp start current in µA/cm².
         end_current: Ramp end current in µA/cm².
         pulse_amplitude: Pulse amplitude in µA/cm².
@@ -87,28 +87,29 @@ def build_current_protocol(
     total_duration = pre_stimulus_duration + stimulus_duration + post_stimulus_duration
     result: list[tuple[np.ndarray, str]]
     if protocol_type == "Step":
-        if current_step < 0.0:
-            raise ValueError("current_step must be >= 0.0")
-        if current_min > current_max:
+        if stimulus_step < 0.0:
+            raise ValueError("stimulus_step must be >= 0.0")
+        if min_stimulus > max_stimulus:
             raise ValueError(
-                f"current_min ({current_min}) must be <= current_max ({current_max})"
+                f"min_stimulus ({min_stimulus}) must be"
+                f" <= max_stimulus ({max_stimulus})"
             )
-        if current_min != current_max and current_step == 0.0:
+        if min_stimulus != max_stimulus and stimulus_step == 0.0:
             raise ValueError(
-                "current_step must be > 0.0 when current_min != current_max"
+                "stimulus_step must be > 0.0 when min_stimulus != max_stimulus"
             )
-        if current_min == current_max:
+        if min_stimulus == max_stimulus:
             protocol = step_current(
                 duration=total_duration,
-                current_amplitude=current_min,
+                current_amplitude=min_stimulus,
                 step_start=pre_stimulus_duration,
                 step_duration=stimulus_duration,
                 sampling_frequency=sampling_frequency,
             )
             result = [(protocol, "")]
         else:
-            n_steps = round((current_max - current_min) / current_step) + 1
-            currents = np.linspace(current_min, current_max, n_steps)
+            n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
+            currents = np.linspace(min_stimulus, max_stimulus, n_steps)
             result = [
                 (
                     step_current(
@@ -212,15 +213,15 @@ def build_voltage_protocol(
     pre_stimulus_duration: float = 10.0,
     stimulus_duration: float = 30.0,
     post_stimulus_duration: float = 10.0,
-    holding_voltage: float = -70.0,
+    vc_holding_voltage: float = -70.0,
     start_voltage: float = -70.0,
     end_voltage: float = 40.0,
     pulse_amplitude: float = 20.0,
     pulse_width: float = 2.0,
     pulse_interval: float = 10.0,
-    voltage_min: float = 0.0,
-    voltage_max: float = 0.0,
-    voltage_step: float = 0.0,
+    min_stimulus: float = 0.0,
+    max_stimulus: float = 0.0,
+    stimulus_step: float = 0.0,
 ) -> list[tuple[np.ndarray, str]]:
     """Build voltage clamp protocol arrays from explicit parameters.
 
@@ -230,18 +231,18 @@ def build_voltage_protocol(
         pre_stimulus_duration: Duration before the stimulus in ms.
         stimulus_duration: Duration of the stimulus in ms.
         post_stimulus_duration: Duration after the stimulus in ms.
-        holding_voltage: Holding voltage in mV.
+        vc_holding_voltage: Holding voltage in mV.
         start_voltage: Ramp start voltage in mV.
         end_voltage: Ramp end voltage in mV.
         pulse_amplitude: Pulse amplitude in mV.
         pulse_width: Pulse width in ms.
         pulse_interval: Interval between pulse starts in ms.
-        voltage_min: Step voltage amplitude in mV for a single-step, or
+        min_stimulus: Step voltage amplitude in mV for a single-step, or
             minimum voltage when running a multi-sweep range.
-        voltage_max: Maximum voltage for multi-sweep range in mV.  Must
-            be >= voltage_min.
-        voltage_step: Step size for multi-sweep range in mV.  Use 0.0
-            (or set voltage_min == voltage_max) for a single-step protocol.
+        max_stimulus: Maximum voltage for multi-sweep range in mV.  Must
+            be >= min_stimulus.
+        stimulus_step: Step size for multi-sweep range in mV.  Use 0.0
+            (or set min_stimulus == max_stimulus) for a single-step protocol.
 
     Returns:
         List of (stimulus_array, sweep_label) pairs.  Single-step protocols
@@ -255,30 +256,31 @@ def build_voltage_protocol(
     total_duration = pre_stimulus_duration + stimulus_duration + post_stimulus_duration
     result: list[tuple[np.ndarray, str]]
     if protocol_type == "Step":
-        if voltage_step < 0.0:
-            raise ValueError("voltage_step must be >= 0.0")
-        if voltage_min > voltage_max:
+        if stimulus_step < 0.0:
+            raise ValueError("stimulus_step must be >= 0.0")
+        if min_stimulus > max_stimulus:
             raise ValueError(
-                f"voltage_min ({voltage_min}) must be <= voltage_max ({voltage_max})"
+                f"min_stimulus ({min_stimulus}) must be"
+                f" <= max_stimulus ({max_stimulus})"
             )
-        if voltage_min != voltage_max and voltage_step == 0.0:
+        if min_stimulus != max_stimulus and stimulus_step == 0.0:
             raise ValueError(
-                "voltage_step must be > 0.0 when voltage_min != voltage_max"
+                "stimulus_step must be > 0.0 when min_stimulus != max_stimulus"
             )
-        is_single_step = voltage_min == voltage_max
+        is_single_step = min_stimulus == max_stimulus
         if is_single_step:
             protocol = step_voltage(
                 duration=total_duration,
-                voltage_amplitude=voltage_min,
+                voltage_amplitude=min_stimulus,
                 step_start=pre_stimulus_duration,
                 step_duration=stimulus_duration,
-                holding_voltage=holding_voltage,
+                holding_voltage=vc_holding_voltage,
                 sampling_frequency=sampling_frequency,
             )
             result = [(protocol, "")]
         else:
-            n_steps = round((voltage_max - voltage_min) / voltage_step) + 1
-            voltages = np.linspace(voltage_min, voltage_max, n_steps)
+            n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
+            voltages = np.linspace(min_stimulus, max_stimulus, n_steps)
             result = [
                 (
                     step_voltage(
@@ -286,7 +288,7 @@ def build_voltage_protocol(
                         voltage_amplitude=float(voltage),
                         step_start=pre_stimulus_duration,
                         step_duration=stimulus_duration,
-                        holding_voltage=holding_voltage,
+                        holding_voltage=vc_holding_voltage,
                         sampling_frequency=sampling_frequency,
                     ),
                     f"{voltage:+.0f} mV",
@@ -300,7 +302,7 @@ def build_voltage_protocol(
             end_voltage=end_voltage,
             ramp_start=pre_stimulus_duration,
             ramp_duration=stimulus_duration,
-            holding_voltage=holding_voltage,
+            holding_voltage=vc_holding_voltage,
             sampling_frequency=sampling_frequency,
         )
         result = [(protocol, "")]
@@ -311,7 +313,7 @@ def build_voltage_protocol(
             pulse_width=pulse_width,
             pulse_interval=pulse_interval,
             train_start=pre_stimulus_duration,
-            holding_voltage=holding_voltage,
+            holding_voltage=vc_holding_voltage,
             sampling_frequency=sampling_frequency,
         )
         result = [(protocol, "")]
