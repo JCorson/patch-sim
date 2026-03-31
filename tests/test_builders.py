@@ -1,4 +1,4 @@
-"""Regression tests for patch_sim.protocols.builders.
+"""Tests for patch_sim.protocols.builders.
 
 These tests call build_current_protocol and build_voltage_protocol directly,
 requiring no Reflex runtime.
