@@ -42,18 +42,6 @@ from patch_sim.constants import (
     DEFAULT_T,
     DEFAULT_V_REST,
 )
-from patch_sim.additional_channels import (
-    make_ican_channel,
-    make_ical_channel,
-    make_icat_channel,
-    make_ih_channel,
-    make_ika_channel,
-    make_ikca_channel,
-    make_ikir_channel,
-    make_im_channel,
-    make_inap_channel,
-    make_inar_channel,
-)
 from patch_sim_ui import constants, presets
 from patch_sim_ui.constants import CURRENT_CLAMP
 from patch_sim_ui.plotting import (
@@ -68,25 +56,6 @@ from patch_sim.protocols.builders import (
 )
 
 logger = logging.getLogger("patch_sim_ui.state")
-
-# ------------------------------------------------------------------ #
-# Channel registry                                                   #
-# ------------------------------------------------------------------ #
-# Each entry is (enabled_attr, g_max_attr, factory, extra_kwargs).   #
-# extra_kwargs maps kwarg name → state attribute name.               #
-
-_CHANNEL_REGISTRY: list[tuple[str, str, object, dict[str, str]]] = [
-    ("ih_enabled", "ih_g_max", make_ih_channel, {}),
-    ("ika_enabled", "ika_g_max", make_ika_channel, {}),
-    ("inap_enabled", "inap_g_max", make_inap_channel, {}),
-    ("inar_enabled", "inar_g_max", make_inar_channel, {}),
-    ("im_enabled", "im_g_max", make_im_channel, {}),
-    ("ikir_enabled", "ikir_g_max", make_ikir_channel, {}),
-    ("ikca_enabled", "ikca_g_max", make_ikca_channel, {}),
-    ("ical_enabled", "ical_g_max", make_ical_channel, {}),
-    ("icat_enabled", "icat_g_max", make_icat_channel, {}),
-    ("ican_enabled", "ican_g_max", make_ican_channel, {}),
-]
 
 # ------------------------------------------------------------------ #
 # Additional-channel visibility field maps                          #
@@ -1231,21 +1200,12 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     def _build_neuron(self) -> "patch_sim.HodgkinHuxley":
         """Construct a HodgkinHuxley neuron from current state parameters."""
-        additional_channels = []
-        for enabled_attr, g_max_attr, factory, extra_kwargs in _CHANNEL_REGISTRY:
-            if getattr(self, enabled_attr):
-                kwargs = {k: getattr(self, v) for k, v in extra_kwargs.items()}
-                additional_channels.append(
-                    factory(g_max=getattr(self, g_max_attr), **kwargs)  # type: ignore[operator]
-                )
-        needs_calcium = (
-            self.ikca_enabled
-            or self.ical_enabled
-            or self.icat_enabled
-            or self.ican_enabled
+        channels = tuple(
+            patch_sim.ChannelConfig(factory, g_max=getattr(self, f"{name}_g_max"))
+            for name, factory in patch_sim.CHANNEL_REGISTRY.items()
+            if getattr(self, f"{name}_enabled")
         )
-        calcium_dynamics = patch_sim.CalciumDynamics() if needs_calcium else None
-        return patch_sim.HodgkinHuxley(
+        config = patch_sim.NeuronConfig(
             g_Na=self.g_Na,
             g_K=self.g_K,
             g_L=self.g_L,
@@ -1260,9 +1220,9 @@ class AppState(rx.State):
             Ca_out=self.Ca_out,
             Ca_in=self.Ca_in,
             T=self.T,
-            additional_channels=tuple(additional_channels),
-            calcium_dynamics=calcium_dynamics,
+            channels=channels,
         )
+        return patch_sim.make_neuron(config=config)
 
     def _build_protocols(self) -> "list[tuple[np.ndarray, str]]":
         """Build stimulus arrays from current protocol state.
