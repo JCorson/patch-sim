@@ -188,8 +188,8 @@ def _vc_step_params() -> rx.Component:
         ),
         _num_field(
             "Holding voltage (mV)",
-            AppState.vc_holding_voltage,
-            AppState.set_vc_holding_voltage,
+            AppState.holding_voltage,
+            AppState.set_holding_voltage,
         ),
         spacing="2",
         width="100%",
@@ -210,8 +210,8 @@ def _vc_ramp_params() -> rx.Component:
         ),
         _num_field(
             "Holding voltage (mV)",
-            AppState.vc_holding_voltage,
-            AppState.set_vc_holding_voltage,
+            AppState.holding_voltage,
+            AppState.set_holding_voltage,
         ),
         spacing="2",
         width="100%",
@@ -237,8 +237,8 @@ def _vc_pulse_params() -> rx.Component:
         ),
         _num_field(
             "Holding voltage (mV)",
-            AppState.vc_holding_voltage,
-            AppState.set_vc_holding_voltage,
+            AppState.holding_voltage,
+            AppState.set_holding_voltage,
         ),
         spacing="2",
         width="100%",

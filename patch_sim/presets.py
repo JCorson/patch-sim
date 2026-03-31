@@ -200,7 +200,7 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "min_stimulus": -100.0,
         "max_stimulus": 60.0,
         "stimulus_step": 10.0,
-        "vc_holding_voltage": -70.0,
+        "holding_voltage": -70.0,
     },
     "Na+ Channel Activation": {
         "clamp_mode": VOLTAGE_CLAMP,
@@ -208,7 +208,7 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "pre_stimulus_duration": 5.0,
         "stimulus_duration": 20.0,
         "post_stimulus_duration": 5.0,
-        "vc_holding_voltage": -70.0,
+        "holding_voltage": -70.0,
         "min_stimulus": -60.0,
         "max_stimulus": 60.0,
         "stimulus_step": 10.0,

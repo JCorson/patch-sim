@@ -213,7 +213,7 @@ def build_voltage_protocol(
     pre_stimulus_duration: float = 10.0,
     stimulus_duration: float = 30.0,
     post_stimulus_duration: float = 10.0,
-    vc_holding_voltage: float = -70.0,
+    holding_voltage: float = -70.0,
     start_voltage: float = -70.0,
     end_voltage: float = 40.0,
     pulse_amplitude: float = 20.0,
@@ -231,7 +231,7 @@ def build_voltage_protocol(
         pre_stimulus_duration: Duration before the stimulus in ms.
         stimulus_duration: Duration of the stimulus in ms.
         post_stimulus_duration: Duration after the stimulus in ms.
-        vc_holding_voltage: Holding voltage in mV.
+        holding_voltage: Holding voltage in mV.
         start_voltage: Ramp start voltage in mV.
         end_voltage: Ramp end voltage in mV.
         pulse_amplitude: Pulse amplitude in mV.
@@ -274,7 +274,7 @@ def build_voltage_protocol(
                 voltage_amplitude=min_stimulus,
                 step_start=pre_stimulus_duration,
                 step_duration=stimulus_duration,
-                holding_voltage=vc_holding_voltage,
+                holding_voltage=holding_voltage,
                 sampling_frequency=sampling_frequency,
             )
             result = [(protocol, "")]
@@ -288,7 +288,7 @@ def build_voltage_protocol(
                         voltage_amplitude=float(voltage),
                         step_start=pre_stimulus_duration,
                         step_duration=stimulus_duration,
-                        holding_voltage=vc_holding_voltage,
+                        holding_voltage=holding_voltage,
                         sampling_frequency=sampling_frequency,
                     ),
                     f"{voltage:+.0f} mV",
@@ -302,7 +302,7 @@ def build_voltage_protocol(
             end_voltage=end_voltage,
             ramp_start=pre_stimulus_duration,
             ramp_duration=stimulus_duration,
-            holding_voltage=vc_holding_voltage,
+            holding_voltage=holding_voltage,
             sampling_frequency=sampling_frequency,
         )
         result = [(protocol, "")]
@@ -313,7 +313,7 @@ def build_voltage_protocol(
             pulse_width=pulse_width,
             pulse_interval=pulse_interval,
             train_start=pre_stimulus_duration,
-            holding_voltage=vc_holding_voltage,
+            holding_voltage=holding_voltage,
             sampling_frequency=sampling_frequency,
         )
         result = [(protocol, "")]
