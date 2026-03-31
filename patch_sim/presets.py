@@ -8,6 +8,8 @@ be used without importing the UI package.
 
 from typing import Any
 
+import numpy as np
+
 from .additional_channels import (
     make_ican_channel,
     make_ical_channel,
@@ -198,16 +200,15 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "min_stimulus": -100.0,
         "max_stimulus": 60.0,
         "stimulus_step": 10.0,
-        "vc_holding_voltage": -70.0,
+        "holding_voltage": -70.0,
     },
     "Na+ Channel Activation": {
-        "g_K": 0.0,  # block K+ channels to isolate Na+ current
         "clamp_mode": VOLTAGE_CLAMP,
         "protocol_type": "Step",
         "pre_stimulus_duration": 5.0,
         "stimulus_duration": 20.0,
         "post_stimulus_duration": 5.0,
-        "vc_holding_voltage": -70.0,
+        "holding_voltage": -70.0,
         "min_stimulus": -60.0,
         "max_stimulus": 60.0,
         "stimulus_step": 10.0,
@@ -337,3 +338,73 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
 
 PROTOCOL_PRESET_NAMES: list[str] = list(PROTOCOL_PRESETS.keys())
 NEURON_PRESET_NAMES: list[str] = list(NEURON_PRESETS.keys())
+
+
+def build_protocol_from_preset(
+    preset_name: str,
+    neuron_preset: str | None = None,
+    sampling_frequency: float = 40_000.0,
+    **overrides: Any,
+) -> list[tuple[np.ndarray, str]]:
+    """Build a protocol array list from a named preset.
+
+    Looks up *preset_name* in :data:`PROTOCOL_PRESETS`, applies any
+    neuron-specific adjustments from :data:`NEURON_PROTOCOL_ADJUSTMENTS` when
+    *neuron_preset* is supplied, then applies any caller-supplied *overrides*
+    before dispatching to :func:`build_current_protocol` or
+    :func:`build_voltage_protocol`.
+
+    Args:
+        preset_name: Key in :data:`PROTOCOL_PRESETS`.
+        neuron_preset: Optional key in :data:`NEURON_PRESETS`.  When given,
+            neuron-specific parameter adjustments are merged on top of the base
+            preset before *overrides* are applied.
+        sampling_frequency: Sampling frequency in Hz.  Defaults to the
+            standard simulation rate (40 kHz).
+        **overrides: Additional keyword arguments that override any preset or
+            neuron-adjustment values.  Use builder parameter names
+            (e.g. ``min_stimulus``, ``stimulus_step``).
+
+    Returns:
+        List of (stimulus_array, sweep_label) pairs.
+
+    Raises:
+        KeyError: If *preset_name* is not in :data:`PROTOCOL_PRESETS`.
+        ValueError: If the resolved parameters are invalid for the chosen
+            protocol type.
+    """
+    # Deferred import to avoid a circular dependency at module load time.
+    from .protocols.builders import build_current_protocol, build_voltage_protocol
+
+    if preset_name not in PROTOCOL_PRESETS:
+        raise KeyError(
+            f"Unknown protocol preset {preset_name!r}. "
+            f"Available: {list(PROTOCOL_PRESETS)}"
+        )
+
+    # Start from a copy of the base preset.
+    config: dict[str, Any] = dict(PROTOCOL_PRESETS[preset_name])
+
+    # Merge neuron-specific adjustments.
+    if neuron_preset is not None:
+        neuron_adjustments = NEURON_PROTOCOL_ADJUSTMENTS.get(neuron_preset, {})
+        config.update(neuron_adjustments.get(preset_name, {}))
+
+    # Apply caller overrides last.
+    config.update(overrides)
+
+    clamp_mode: str = config.pop("clamp_mode", "Current Clamp")
+    protocol_type: str = config.pop("protocol_type", "Step")
+
+    if clamp_mode == "Current Clamp":
+        return build_current_protocol(
+            protocol_type=protocol_type,
+            sampling_frequency=sampling_frequency,
+            **config,
+        )
+    else:
+        return build_voltage_protocol(
+            protocol_type=protocol_type,
+            sampling_frequency=sampling_frequency,
+            **config,
+        )

@@ -62,7 +62,7 @@ from patch_sim_ui.plotting import (
     build_figure,
     compute_trace_visibility_map,
 )
-from patch_sim_ui.protocol_builders import (
+from patch_sim.protocols.builders import (
     build_current_protocol,
     build_voltage_protocol,
 )
@@ -167,7 +167,7 @@ _FLOAT_FIELDS: list[str] = [
     "mean_current",
     "std_current",
     # Voltage clamp protocol params
-    "vc_holding_voltage",
+    "holding_voltage",
     "vc_start_voltage",
     "vc_end_voltage",
     "vc_pulse_amplitude",
@@ -702,7 +702,7 @@ class AppState(rx.State):
     std_current: float = 2.0
 
     # Voltage clamp protocol params
-    vc_holding_voltage: float = -70.0
+    holding_voltage: float = -70.0
     vc_start_voltage: float = -70.0
     vc_end_voltage: float = 40.0
     vc_pulse_amplitude: float = 20.0
@@ -1019,6 +1019,7 @@ class AppState(rx.State):
             self.active_neuron_type, {}
         ).get(name, {})
         config.update(adjustments)
+        config.update(presets.PROTOCOL_NEURON_OVERRIDES.get(name, {}))
         for key, value in config.items():
             setattr(self, key, value)
         self.current_sweeps = []
@@ -1279,9 +1280,9 @@ class AppState(rx.State):
                 pre_stimulus_duration=self.pre_stimulus_duration,
                 stimulus_duration=self.stimulus_duration,
                 post_stimulus_duration=self.post_stimulus_duration,
-                current_min=self.min_stimulus,
-                current_max=self.max_stimulus,
-                current_step=self.stimulus_step,
+                min_stimulus=self.min_stimulus,
+                max_stimulus=self.max_stimulus,
+                stimulus_step=self.stimulus_step,
                 start_current=self.start_current,
                 end_current=self.end_current,
                 pulse_amplitude=self.pulse_amplitude,
@@ -1302,15 +1303,15 @@ class AppState(rx.State):
                 pre_stimulus_duration=self.pre_stimulus_duration,
                 stimulus_duration=self.stimulus_duration,
                 post_stimulus_duration=self.post_stimulus_duration,
-                holding_voltage=self.vc_holding_voltage,
+                holding_voltage=self.holding_voltage,
                 start_voltage=self.vc_start_voltage,
                 end_voltage=self.vc_end_voltage,
                 pulse_amplitude=self.vc_pulse_amplitude,
                 pulse_width=self.vc_pulse_width,
                 pulse_interval=self.vc_pulse_interval,
-                voltage_min=self.min_stimulus,
-                voltage_max=self.max_stimulus,
-                voltage_step=self.stimulus_step,
+                min_stimulus=self.min_stimulus,
+                max_stimulus=self.max_stimulus,
+                stimulus_step=self.stimulus_step,
             )
 
     # ------------------------------------------------------------------ #
