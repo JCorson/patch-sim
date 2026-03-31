@@ -1,7 +1,7 @@
 """Pure functions for building simulation protocol arrays.
 
 These functions take explicit parameters and return a list of
-(stimulus_array, sweep_label) pairs, with no dependency on the UI layer.
+(stimulus_array, sweep_label) pairs.
 """
 
 import logging
