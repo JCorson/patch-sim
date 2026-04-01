@@ -2,7 +2,7 @@
 
 import reflex as rx
 
-from patch_sim_ui import presets
+from patch_sim.presets import NEURON_PRESET_NAMES
 from patch_sim_ui.constants import PARAM_RANGES
 from patch_sim_ui.state import AppState
 
@@ -209,7 +209,7 @@ def neuron_panel() -> rx.Component:
     return rx.vstack(
         rx.heading("Neuron Parameters", size="3"),
         rx.select(
-            presets.NEURON_PRESET_NAMES,
+            NEURON_PRESET_NAMES,
             placeholder="Load neuron type…",
             value=AppState.active_neuron_type,
             on_change=AppState.load_neuron_preset,

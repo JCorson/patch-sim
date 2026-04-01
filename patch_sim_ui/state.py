@@ -42,6 +42,10 @@ from patch_sim.constants import (
     DEFAULT_T,
     DEFAULT_V_REST,
 )
+from patch_sim.presets import (
+    NEURON_PROTOCOL_ADJUSTMENTS,
+    PROTOCOL_PRESETS,
+)
 from patch_sim_ui import constants, presets
 from patch_sim_ui.constants import CURRENT_CLAMP
 from patch_sim_ui.plotting import (
@@ -954,7 +958,8 @@ class AppState(rx.State):
         neuron-specific adjustments via NEURON_PROTOCOL_ADJUSTMENTS.
 
         Args:
-            name: Key into presets.NEURON_PRESETS.  Ignored if not found.
+            name: Key into ``patch_sim_ui.presets.NEURON_PRESETS``.
+                Ignored if not found.
         """
         if name not in presets.NEURON_PRESETS:
             logger.debug("load_neuron_preset: unknown preset %r ignored", name)
@@ -973,20 +978,20 @@ class AppState(rx.State):
         """Load a protocol preset, applying neuron-type adjustments if active.
 
         Applies the base protocol preset, then overlays any entries from
-        presets.NEURON_PROTOCOL_ADJUSTMENTS for the currently active neuron
-        type so that the stimulus parameters suit the selected cell type.
+        NEURON_PROTOCOL_ADJUSTMENTS for the currently active neuron type so
+        that the stimulus parameters suit the selected cell type.
 
         Args:
-            name: Key into presets.PROTOCOL_PRESETS.  Ignored if not found.
+            name: Key into PROTOCOL_PRESETS.  Ignored if not found.
         """
-        if name not in presets.PROTOCOL_PRESETS:
+        if name not in PROTOCOL_PRESETS:
             logger.debug("load_protocol_preset: unknown preset %r ignored", name)
             return
         logger.info("Loaded protocol preset: %s", name)
-        config = dict(presets.PROTOCOL_PRESETS[name])
-        adjustments = presets.NEURON_PROTOCOL_ADJUSTMENTS.get(
-            self.active_neuron_type, {}
-        ).get(name, {})
+        config = dict(PROTOCOL_PRESETS[name])
+        adjustments = NEURON_PROTOCOL_ADJUSTMENTS.get(self.active_neuron_type, {}).get(
+            name, {}
+        )
         config.update(adjustments)
         config.update(presets.PROTOCOL_NEURON_OVERRIDES.get(name, {}))
         for key, value in config.items():

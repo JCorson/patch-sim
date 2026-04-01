@@ -11,7 +11,7 @@ from patch_sim.protocols.builders import (
     build_current_protocol,
     build_voltage_protocol,
 )
-from patch_sim_ui.presets import PROTOCOL_PRESETS
+from patch_sim.presets import PROTOCOL_PRESETS
 
 # ---------------------------------------------------------------------------
 # Helpers
