@@ -21,9 +21,10 @@ from patch_sim_ui.constants import (
     VOLTAGE_CLAMP,
 )
 
-# Classic column names that are always present in simulation DataFrames.
+# Classic field names that are always present in simulation results.
 _CLASSIC_COLUMNS = frozenset(
     {
+        "time",
         "voltage",
         "total_current",
         "Na_current",
@@ -141,22 +142,22 @@ class Sweep(BaseModel):
     additional_gating: dict[str, list[float]] = {}
 
     @classmethod
-    def from_dataframe(
+    def from_result(
         cls,
-        df,
+        result,
         stimulus,
         label: str,
         color: str,
         mode: str,
     ) -> "Sweep":
-        """Create a Sweep from a simulation result DataFrame.
+        """Create a Sweep from a simulation result structured array.
 
-        Columns not in the classic set are classified as additional: columns
+        Fields not in the classic set are classified as additional: fields
         whose name ends with ``_current`` become ``additional_currents``; all
-        other extra columns become ``additional_gating``.
+        other extra fields become ``additional_gating``.
 
         Args:
-            df: Simulation result DataFrame with time as the index.
+            result: Simulation result structured array with a ``"time"`` field.
             stimulus: Stimulus array (current or voltage command).
             label: Display name for this sweep in the legend.
             color: Hex colour string; pass empty string to use Plotly default.
@@ -165,11 +166,11 @@ class Sweep(BaseModel):
         Returns:
             A fully populated Sweep instance.
         """
-        columns = df.columns.tolist()
+        columns = list(result.dtype.names)
 
         def _col(name: str) -> list[float]:
-            """Return column as list, or empty list if column absent."""
-            return df[name].tolist() if name in columns else []
+            """Return field as list, or empty list if field absent."""
+            return result[name].tolist() if name in columns else []
 
         additional_currents: dict[str, list[float]] = {}
         additional_gating: dict[str, list[float]] = {}
@@ -179,15 +180,15 @@ class Sweep(BaseModel):
             if col.endswith("_current"):
                 # Strip trailing _current to get the channel name key
                 ch_name = col[: -len("_current")]
-                additional_currents[ch_name] = df[col].tolist()
+                additional_currents[ch_name] = result[col].tolist()
             else:
-                additional_gating[col] = df[col].tolist()
+                additional_gating[col] = result[col].tolist()
 
         return cls(
             label=label,
             color=color,
             clamp_mode=mode,
-            time=df.index.tolist(),
+            time=result["time"].tolist(),
             stimulus=stimulus.tolist(),
             voltage=_col("voltage"),
             sodium_current=_col("Na_current"),

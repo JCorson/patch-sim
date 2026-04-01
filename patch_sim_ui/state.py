@@ -1383,13 +1383,13 @@ class AppState(rx.State):
                     break
 
                 # Extract terminal state for next iteration.
-                last_V = float(df["voltage"].iloc[-1])
+                last_V = float(df["voltage"][-1])
                 gating_vars = {gv.name for gv in neuron.all_gating_variables}
-                gating_cols = [col for col in df.columns if col in gating_vars]
-                last_gating = {col: float(df[col].iloc[-1]) for col in gating_cols}
-                last_ca_i = float(df["ca_i"].iloc[-1]) if "ca_i" in df.columns else 0.0
+                gating_cols = [col for col in df.dtype.names if col in gating_vars]
+                last_gating = {col: float(df[col][-1]) for col in gating_cols}
+                last_ca_i = float(df["ca_i"][-1]) if "ca_i" in df.dtype.names else 0.0
 
-                sweep = Sweep.from_dataframe(df, stimulus, "", "", mode)
+                sweep = Sweep.from_result(df, stimulus, "", "", mode)
 
                 async with self:
                     if not self.continuous_mode:
@@ -1477,7 +1477,7 @@ class AppState(rx.State):
                     ):
                         color_index = len(new_sweeps) % len(constants.SWEEP_COLORS)
                         new_sweeps.append(
-                            Sweep.from_dataframe(
+                            Sweep.from_result(
                                 sweep_df,
                                 protocol,
                                 label,
@@ -1496,7 +1496,7 @@ class AppState(rx.State):
                 df = await loop.run_in_executor(None, sim_fn, neuron, stimulus)
                 async with self:
                     self.current_sweeps = [
-                        Sweep.from_dataframe(df, stimulus, "", "", mode)
+                        Sweep.from_result(df, stimulus, "", "", mode)
                     ]
 
         except ValueError as exc:

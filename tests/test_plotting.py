@@ -1,6 +1,6 @@
 """Unit tests for patch_sim_ui/plotting.py.
 
-Covers Sweep.from_dataframe, build_figure, and _build_hover_tables.
+Covers Sweep.from_result, build_figure, and _build_hover_tables.
 All three are pure functions with no Reflex dependency.
 """
 
@@ -8,7 +8,6 @@ import math
 from collections import Counter
 
 import numpy as np
-import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
@@ -25,36 +24,51 @@ from patch_sim_ui.plotting import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-_N = 50  # default number of time points for test DataFrames
+_N = 50  # default number of time points for test simulation results
 
 
-def _make_df(
+def _make_result(
     extra_cols: dict[str, list[float]] | None = None,
     n: int = _N,
-) -> pd.DataFrame:
-    """Return a minimal simulation DataFrame with classic columns.
+) -> np.ndarray:
+    """Return a minimal simulation result structured array with classic fields.
 
     Args:
-        extra_cols: Additional columns to include beyond the classic set.
+        extra_cols: Additional fields to include beyond the classic set.
         n: Number of time points.
 
     Returns:
-        A DataFrame indexed by time (ms) with classic simulation columns.
+        A structured array with time and classic simulation fields.
     """
     t = np.linspace(0.0, 50.0, n)
-    data: dict[str, list[float]] = {
-        "voltage": list(np.full(n, -65.0)),
-        "total_current": list(np.zeros(n)),
-        "Na_current": list(np.zeros(n)),
-        "K_current": list(np.zeros(n)),
-        "leak_current": list(np.zeros(n)),
-        "potassium_activation": list(np.full(n, 0.3)),
-        "sodium_activation": list(np.full(n, 0.05)),
-        "sodium_inactivation": list(np.full(n, 0.6)),
-    }
+    fields = [
+        ("time", np.float64),
+        ("voltage", np.float64),
+        ("total_current", np.float64),
+        ("Na_current", np.float64),
+        ("K_current", np.float64),
+        ("leak_current", np.float64),
+        ("potassium_activation", np.float64),
+        ("sodium_activation", np.float64),
+        ("sodium_inactivation", np.float64),
+    ]
     if extra_cols:
-        data.update(extra_cols)
-    return pd.DataFrame(data, index=t)
+        for name in extra_cols:
+            fields.append((name, np.float64))
+    result = np.empty(n, dtype=np.dtype(fields))
+    result["time"] = t
+    result["voltage"] = np.full(n, -65.0)
+    result["total_current"] = np.zeros(n)
+    result["Na_current"] = np.zeros(n)
+    result["K_current"] = np.zeros(n)
+    result["leak_current"] = np.zeros(n)
+    result["potassium_activation"] = np.full(n, 0.3)
+    result["sodium_activation"] = np.full(n, 0.05)
+    result["sodium_inactivation"] = np.full(n, 0.6)
+    if extra_cols:
+        for name, values in extra_cols.items():
+            result[name] = values
+    return result
 
 
 def _make_stimulus(n: int = _N) -> np.ndarray:
@@ -76,33 +90,33 @@ def _make_sweep(
     n: int = _N,
     extra_cols: dict[str, list[float]] | None = None,
 ) -> Sweep:
-    """Construct a Sweep via from_dataframe for use in figure tests.
+    """Construct a Sweep via from_result for use in figure tests.
 
     Args:
         label: Sweep label string.
         color: Hex colour string.
         mode: Clamp mode string.
         n: Number of time points.
-        extra_cols: Extra DataFrame columns to include.
+        extra_cols: Extra fields to include.
 
     Returns:
         A fully-populated Sweep instance.
     """
-    df = _make_df(extra_cols=extra_cols, n=n)
+    result = _make_result(extra_cols=extra_cols, n=n)
     stim = _make_stimulus(n)
-    return Sweep.from_dataframe(df, stim, label, color, mode)
+    return Sweep.from_result(result, stim, label, color, mode)
 
 
 # ---------------------------------------------------------------------------
-# Sweep.from_dataframe — classic column classification
+# Sweep.from_result — classic column classification
 # ---------------------------------------------------------------------------
 
 
-def test_from_dataframe_classic_columns_are_populated() -> None:
+def test_from_result_classic_columns_are_populated() -> None:
     """Classic columns are stored correctly in the Sweep fields."""
-    df = _make_df()
+    df = _make_result()
     stim = _make_stimulus()
-    s = Sweep.from_dataframe(df, stim, "A", "#fff", "Current Clamp")
+    s = Sweep.from_result(df, stim, "A", "#fff", "Current Clamp")
     assert len(s.voltage) == _N
     assert len(s.sodium_current) == _N
     assert len(s.potassium_current) == _N
@@ -113,89 +127,101 @@ def test_from_dataframe_classic_columns_are_populated() -> None:
     assert len(s.sodium_inactivation) == _N
 
 
-def test_from_dataframe_time_index_stored() -> None:
-    """The DataFrame index is stored as the time axis."""
-    df = _make_df()
+def test_from_result_time_field_stored() -> None:
+    """The time field is stored as the time axis."""
+    result = _make_result()
     stim = _make_stimulus()
-    s = Sweep.from_dataframe(df, stim, "", "", "Current Clamp")
-    assert s.time == pytest.approx(df.index.tolist())
+    s = Sweep.from_result(result, stim, "", "", "Current Clamp")
+    assert s.time == pytest.approx(result["time"].tolist())
 
 
-def test_from_dataframe_stimulus_stored() -> None:
+def test_from_result_stimulus_stored() -> None:
     """The stimulus array is stored as sweep.stimulus."""
     stim = np.linspace(0, 10, _N)
-    df = _make_df()
-    s = Sweep.from_dataframe(df, stim, "", "", "Current Clamp")
+    df = _make_result()
+    s = Sweep.from_result(df, stim, "", "", "Current Clamp")
     assert s.stimulus == pytest.approx(stim.tolist())
 
 
-def test_from_dataframe_no_extra_columns_gives_empty_dicts() -> None:
+def test_from_result_no_extra_columns_gives_empty_dicts() -> None:
     """With only classic columns both additional dicts are empty."""
-    s = Sweep.from_dataframe(_make_df(), _make_stimulus(), "", "", "Current Clamp")
+    s = Sweep.from_result(_make_result(), _make_stimulus(), "", "", "Current Clamp")
     assert s.additional_currents == {}
     assert s.additional_gating == {}
 
 
-def test_from_dataframe_current_suffix_goes_to_additional_currents() -> None:
+def test_from_result_current_suffix_goes_to_additional_currents() -> None:
     """Extra columns ending with _current are placed in additional_currents."""
     extra = {"ih_current": list(np.ones(_N) * 0.5)}
-    s = Sweep.from_dataframe(_make_df(extra_cols=extra), _make_stimulus(), "", "", "CC")
+    s = Sweep.from_result(
+        _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
+    )
     assert "ih" in s.additional_currents
     assert "ih_current" not in s.additional_currents
     assert s.additional_currents["ih"] == pytest.approx([0.5] * _N)
 
 
-def test_from_dataframe_current_suffix_stripped_correctly() -> None:
+def test_from_result_current_suffix_stripped_correctly() -> None:
     """The _current suffix is fully stripped to produce the channel key."""
     extra = {"foo_current": list(np.zeros(_N))}
-    s = Sweep.from_dataframe(_make_df(extra_cols=extra), _make_stimulus(), "", "", "CC")
+    s = Sweep.from_result(
+        _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
+    )
     assert list(s.additional_currents.keys()) == ["foo"]
 
 
-def test_from_dataframe_non_current_extra_goes_to_additional_gating() -> None:
+def test_from_result_non_current_extra_goes_to_additional_gating() -> None:
     """Extra columns without _current suffix are placed in additional_gating."""
     extra = {"r": list(np.full(_N, 0.4))}
-    s = Sweep.from_dataframe(_make_df(extra_cols=extra), _make_stimulus(), "", "", "CC")
+    s = Sweep.from_result(
+        _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
+    )
     assert "r" in s.additional_gating
     assert "r" not in s.additional_currents
     assert s.additional_gating["r"] == pytest.approx([0.4] * _N)
 
 
-def test_from_dataframe_multiple_extra_columns_classified() -> None:
+def test_from_result_multiple_extra_columns_classified() -> None:
     """Multiple extra columns are each classified into the correct dict."""
     extra = {
         "ika_current": list(np.ones(_N)),
         "a": list(np.full(_N, 0.1)),
         "b": list(np.full(_N, 0.9)),
     }
-    s = Sweep.from_dataframe(_make_df(extra_cols=extra), _make_stimulus(), "", "", "CC")
+    s = Sweep.from_result(
+        _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
+    )
     assert set(s.additional_currents.keys()) == {"ika"}
     assert set(s.additional_gating.keys()) == {"a", "b"}
 
 
-def test_from_dataframe_missing_classic_column_returns_empty_list() -> None:
-    """When a classic column is absent the corresponding field is an empty list."""
-    df = _make_df()
-    df = df.drop(columns=["voltage"])
-    s = Sweep.from_dataframe(df, _make_stimulus(), "", "", "Current Clamp")
+def test_from_result_missing_classic_field_returns_empty_list() -> None:
+    """When a classic field is absent the corresponding Sweep field is an empty list."""
+    base = _make_result()
+    # Build a structured array without the "voltage" field
+    names = [f for f in base.dtype.names if f != "voltage"]
+    result = np.empty(len(base), dtype=np.dtype([(n, np.float64) for n in names]))
+    for n in names:
+        result[n] = base[n]
+    s = Sweep.from_result(result, _make_stimulus(), "", "", "Current Clamp")
     assert s.voltage == []
 
 
-def test_from_dataframe_current_clamp_mode_stored() -> None:
+def test_from_result_current_clamp_mode_stored() -> None:
     """clamp_mode is stored verbatim from the mode argument."""
-    s = Sweep.from_dataframe(_make_df(), _make_stimulus(), "", "", "Current Clamp")
+    s = Sweep.from_result(_make_result(), _make_stimulus(), "", "", "Current Clamp")
     assert s.clamp_mode == "Current Clamp"
 
 
-def test_from_dataframe_voltage_clamp_mode_stored() -> None:
+def test_from_result_voltage_clamp_mode_stored() -> None:
     """clamp_mode is stored correctly for Voltage Clamp."""
-    s = Sweep.from_dataframe(_make_df(), _make_stimulus(), "", "", "Voltage Clamp")
+    s = Sweep.from_result(_make_result(), _make_stimulus(), "", "", "Voltage Clamp")
     assert s.clamp_mode == "Voltage Clamp"
 
 
-def test_from_dataframe_label_and_color_stored() -> None:
+def test_from_result_label_and_color_stored() -> None:
     """Label and color are stored verbatim."""
-    s = Sweep.from_dataframe(_make_df(), _make_stimulus(), "My Label", "#abcdef", "CC")
+    s = Sweep.from_result(_make_result(), _make_stimulus(), "My Label", "#abcdef", "CC")
     assert s.label == "My Label"
     assert s.color == "#abcdef"
 

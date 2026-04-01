@@ -8,7 +8,6 @@ requires-python = ">=3.11"
 dependencies = [
     "numpy",
     "matplotlib",
-    "pandas",
 ]
 
 [tool.ruff]
@@ -22,7 +21,7 @@ ignore = []
 convention = "google"
 
 [project.optional-dependencies]
-dev = ["ruff", "pytest", "mypy", "pandas-stubs"]
+dev = ["ruff", "pytest", "mypy"]
 ui = ["reflex>=0.8", "plotly"]
 
 [tool.uv.sources]
@@ -51,5 +50,6 @@ filterwarnings = [
 
 [dependency-groups]
 dev = [
+    "mypy>=1.19.1",
     "pytest-cov>=7.0.0",
 ]

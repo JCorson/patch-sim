@@ -1,18 +1,14 @@
 """Tests for the current clamp simulation in the Hodgkin-Huxley model."""
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
 from patch_sim.hodgkin_huxley import HodgkinHuxley
 
 
-def test_simulate_current_clamp_returns_dataframe(hh_model):
-    """Test that simulate_current_clamp returns a DataFrame with the correct structure.
-
-    Validates the data types and structure of the returned DataFrame.
-    """
+def test_simulate_current_clamp_returns_structured_array(hh_model):
+    """Test that simulate_current_clamp returns a structured array."""
     # Create a current array for a 10ms simulation
     duration = 10  # ms
     num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
@@ -24,12 +20,13 @@ def test_simulate_current_clamp_returns_dataframe(hh_model):
     )
 
     # Check result type
-    assert isinstance(result, pd.DataFrame)
+    assert isinstance(result, np.ndarray)
+    assert result.dtype.names is not None
 
-    # Check that DataFrame has expected index name
-    assert result.index.name == "time"
+    # Check that result has a time field
+    assert "time" in result.dtype.names
 
-    # Check that DataFrame has the expected columns
+    # Check that result has the expected fields
     expected_columns = [
         "voltage",
         "potassium_activation",
@@ -37,7 +34,7 @@ def test_simulate_current_clamp_returns_dataframe(hh_model):
         "sodium_inactivation",
     ]
     for col in expected_columns:
-        assert col in result.columns
+        assert col in result.dtype.names
 
     # Check that gating variables are within physiological bounds (0 to 1)
     gating_vars = ["potassium_activation", "sodium_activation", "sodium_inactivation"]
@@ -66,7 +63,7 @@ def test_simulation_dynamics():
     )
 
     # Voltage should change from initial value
-    initial_voltage = result["voltage"].iloc[0]
+    initial_voltage = result["voltage"][0]
     max_voltage = result["voltage"].max()
     assert initial_voltage != max_voltage
 
@@ -75,7 +72,7 @@ def test_simulation_dynamics():
     assert any(result["voltage"] > threshold)
 
     # Sodium activation should increase during depolarization
-    assert result["sodium_activation"].max() > result["sodium_activation"].iloc[0]
+    assert result["sodium_activation"].max() > result["sodium_activation"][0]
 
 
 def test_simulate_current_clamp_with_zero_current(hh_model):
@@ -94,7 +91,8 @@ def test_simulate_current_clamp_with_zero_current(hh_model):
     )
 
     # Check result type and structure
-    assert isinstance(result, pd.DataFrame)
+    assert isinstance(result, np.ndarray)
+    assert result.dtype.names is not None
     expected_columns = [
         "voltage",
         "potassium_activation",
@@ -102,7 +100,7 @@ def test_simulate_current_clamp_with_zero_current(hh_model):
         "sodium_inactivation",
     ]
     for col in expected_columns:
-        assert col in result.columns
+        assert col in result.dtype.names
 
     # With zero external current, voltage should remain close to resting potential
     # Allow for small fluctuations due to intrinsic dynamics
@@ -131,7 +129,8 @@ def test_simulate_current_clamp_with_non_zero_currents(current_amplitude: float)
     )
 
     # Check result type and structure
-    assert isinstance(result, pd.DataFrame)
+    assert isinstance(result, np.ndarray)
+    assert result.dtype.names is not None
     expected_columns = [
         "voltage",
         "potassium_activation",
@@ -139,10 +138,10 @@ def test_simulate_current_clamp_with_non_zero_currents(current_amplitude: float)
         "sodium_inactivation",
     ]
     for col in expected_columns:
-        assert col in result.columns
+        assert col in result.dtype.names
 
     # For non-zero currents, voltage should change significantly
-    initial_voltage = result["voltage"].iloc[0]
+    initial_voltage = result["voltage"][0]
     max_change = abs(result["voltage"].max() - initial_voltage)
 
     # Adjusted threshold based on observed behavior
@@ -196,7 +195,7 @@ def test_physiological_limits_and_action_potentials():
         )
 
         # Count action potentials (threshold crossings from below)
-        voltage = result["voltage"].values
+        voltage = result["voltage"]
         threshold_crossings = 0
         above_threshold = False
 
@@ -243,7 +242,8 @@ def test_simulate_current_clamp_with_different_currents():
     )
 
     # Check basic properties of the result
-    assert isinstance(result, pd.DataFrame)
+    assert isinstance(result, np.ndarray)
+    assert result.dtype.names is not None
     assert len(result) == num_time_steps
 
     # Find the point where current changes
@@ -254,8 +254,8 @@ def test_simulate_current_clamp_with_different_currents():
     before_time = midpoint_time - 5  # 5 ms before the change
     after_time = midpoint_time + 10  # 10 ms after the change
 
-    voltage_before = result.loc[result.index <= before_time, "voltage"].mean()
-    voltage_after = result.loc[result.index >= after_time, "voltage"].mean()
+    voltage_before = result["voltage"][result["time"] <= before_time].mean()
+    voltage_after = result["voltage"][result["time"] >= after_time].mean()
 
     # Voltage should be higher after the current increase
     assert voltage_after > voltage_before, (
@@ -283,7 +283,7 @@ def test_simulation_time_from_current_waveform():
     # Check that the simulation time matches what we expect from the current array
     # length
     expected_simulation_time = (len(current_waveform) - 1) * dt
-    actual_simulation_time = result.index[-1]
+    actual_simulation_time = result["time"][-1]
 
     assert actual_simulation_time == pytest.approx(expected_simulation_time)
     assert len(result) == num_steps
@@ -320,12 +320,13 @@ def test_inf_in_current_array_raises(hh_model):
 
 
 def test_single_element_current_protocol(hh_model):
-    """A single-element current array must return a one-row DataFrame."""
+    """A single-element current array must return a one-element structured array."""
     result = simulate_current_clamp(hh_model, current_external=np.array([0.0]))
 
-    assert isinstance(result, pd.DataFrame)
+    assert isinstance(result, np.ndarray)
+    assert result.dtype.names is not None
     assert len(result) == 1
-    assert result["voltage"].iloc[0] == pytest.approx(hh_model.v_rest)
+    assert result["voltage"][0] == pytest.approx(hh_model.v_rest)
 
 
 # ---------------------------------------------------------------------------
@@ -345,10 +346,10 @@ def test_large_hyperpolarizing_current_does_not_crash(hh_model):
 
     result = simulate_current_clamp(hh_model, current_external=current)
 
-    assert isinstance(result, pd.DataFrame)
+    assert isinstance(result, np.ndarray)
+    assert result.dtype.names is not None
     assert len(result) == num_steps
-    assert result["voltage"].notna().all()
-    assert np.isfinite(result["voltage"].values).all()
+    assert np.isfinite(result["voltage"]).all()
 
 
 def test_large_hyperpolarizing_current_voltage_stays_bounded(hh_model):
