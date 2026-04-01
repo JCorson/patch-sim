@@ -195,6 +195,7 @@ def test_batch_matches_sequential() -> None:
     assert len(batch) == len(sequential)
     for seq_df, batch_df in zip(sequential, batch):
         assert seq_df.dtype == batch_df.dtype
+        assert seq_df.dtype.names is not None
         for field in seq_df.dtype.names:
             np.testing.assert_array_equal(seq_df[field], batch_df[field])
 
@@ -211,6 +212,7 @@ def test_batch_single_sweep() -> None:
     assert len(results) == 1
     expected = simulate_voltage_clamp(neuron, protocols[0])
     assert results[0].dtype == expected.dtype
+    assert expected.dtype.names is not None
     for field in expected.dtype.names:
         np.testing.assert_array_equal(results[0][field], expected[field])
 
@@ -273,6 +275,7 @@ def test_batch_with_calcium_channels() -> None:
 
     assert len(results) == len(voltages)
     for df in results:
+        assert df.dtype.names is not None
         assert "ICaL_current" in df.dtype.names
         assert "ca_i" in df.dtype.names
         assert "d" in df.dtype.names
@@ -301,5 +304,6 @@ def test_batch_with_current_clamp() -> None:
     assert len(results) == 1
     expected = simulate_current_clamp(neuron, stimulus)
     assert results[0].dtype == expected.dtype
+    assert expected.dtype.names is not None
     for field in expected.dtype.names:
         np.testing.assert_array_equal(results[0][field], expected[field])

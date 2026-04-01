@@ -176,6 +176,7 @@ def test_noise_current_to_simulation() -> None:
     _assert_current_clamp_result(result_a)
 
     # Same seed → identical results
+    assert result_a.dtype.names is not None
     for field in result_a.dtype.names:
         np.testing.assert_array_equal(result_a[field], result_b[field])
 

@@ -156,6 +156,7 @@ def test_current_clamp_no_ca_column_by_default(hh_model: HodgkinHuxley) -> None:
         step_duration=3.0,
     )
     df = simulate_current_clamp(hh_model, protocol)
+    assert df.dtype.names is not None
     assert "ca_i" not in df.dtype.names
 
 
@@ -169,6 +170,7 @@ def test_voltage_clamp_no_ca_column_by_default(hh_model: HodgkinHuxley) -> None:
         holding_voltage=-65.0,
     )
     df = simulate_voltage_clamp(hh_model, protocol)
+    assert df.dtype.names is not None
     assert "ca_i" not in df.dtype.names
 
 
@@ -188,6 +190,7 @@ def test_current_clamp_ca_stays_at_rest_no_calcium_channels() -> None:
         step_duration=3.0,
     )
     df = simulate_current_clamp(neuron, protocol)
+    assert df.dtype.names is not None
     assert "ca_i" in df.dtype.names
     np.testing.assert_allclose(np.asarray(df["ca_i"]), cd.ca_rest, rtol=1e-6)
 
@@ -204,6 +207,7 @@ def test_voltage_clamp_ca_stays_at_rest_no_calcium_channels() -> None:
         holding_voltage=-65.0,
     )
     df = simulate_voltage_clamp(neuron, protocol)
+    assert df.dtype.names is not None
     assert "ca_i" in df.dtype.names
     np.testing.assert_allclose(np.asarray(df["ca_i"]), cd.ca_rest, rtol=1e-6)
 
@@ -227,6 +231,7 @@ def test_current_clamp_ca_varies_with_calcium_channel() -> None:
         step_duration=10.0,
     )
     df = simulate_current_clamp(neuron, protocol)
+    assert df.dtype.names is not None
     assert "ca_i" in df.dtype.names
     # With a calcium-carrying channel that has inward drive, [Ca2+] should change
     assert not np.allclose(np.asarray(df["ca_i"]), cd.ca_rest, rtol=1e-6)
@@ -247,6 +252,7 @@ def test_voltage_clamp_ca_varies_with_calcium_channel() -> None:
         holding_voltage=-65.0,
     )
     df = simulate_voltage_clamp(neuron, protocol)
+    assert df.dtype.names is not None
     assert "ca_i" in df.dtype.names
     assert not np.allclose(np.asarray(df["ca_i"]), cd.ca_rest, rtol=1e-6)
 
