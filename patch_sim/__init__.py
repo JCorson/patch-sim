@@ -77,7 +77,6 @@ from .protocols import (
     step_voltage,
     ramp_voltage,
     pulse_train_voltage,
-    iv_curve_protocol,
 )
 
 __all__ = [
@@ -141,5 +140,4 @@ __all__ = [
     "step_voltage",
     "ramp_voltage",
     "pulse_train_voltage",
-    "iv_curve_protocol",
 ]

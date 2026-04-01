@@ -12,7 +12,6 @@ from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage
 from patch_sim.hodgkin_huxley import HodgkinHuxley
 from patch_sim.protocols import (
     chirp_current,
-    iv_curve_protocol,
     noise_current,
     pulse_train,
     pulse_train_voltage,
@@ -263,38 +262,6 @@ def test_pulse_train_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
     # Each depolarising pulse should produce an inward Na⁺ transient
     # Verify at least one strong inward Na⁺ event occurred
     assert result["Na_current"].min() < -10.0
-
-
-def test_iv_curve_protocol_to_simulation(hh_model: HodgkinHuxley) -> None:
-    """iv_curve_protocol → simulate_voltage_clamp: I-V relationship is monotonic."""
-    # Use a coarser step to keep the test fast
-    voltage_min = -80.0
-    voltage_max = 40.0
-    voltage_step_size = 20.0
-    protocol = iv_curve_protocol(
-        step_duration=5.0,
-        voltage_min=voltage_min,
-        voltage_max=voltage_max,
-        voltage_step=voltage_step_size,
-        pre_pulse_duration=5.0,
-        post_pulse_duration=5.0,
-        sampling_frequency=10000.0,
-    )
-    result = simulate_voltage_clamp(hh_model, voltage_protocol=protocol)
-
-    _assert_voltage_clamp_dataframe(result)
-    assert len(result) == len(protocol)
-
-    # Steady-state total current should be more outward at most positive voltage
-    # than at the most negative voltage in the sweep
-    total_current = result["total_current"]
-    n = len(result)
-    # Derive segment size from the actual voltage sweep parameters
-    num_voltage_steps = round((voltage_max - voltage_min) / voltage_step_size) + 1
-    segment = n // num_voltage_steps
-    first_seg_current = total_current.iloc[:segment].mean()
-    last_seg_current = total_current.iloc[-segment:].mean()
-    assert last_seg_current > first_seg_current
 
 
 # ---------------------------------------------------------------------------

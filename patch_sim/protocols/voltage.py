@@ -7,8 +7,6 @@ protocols that can be used with voltage clamp simulations.
 import numpy as np
 
 from .common import (
-    _apply_time_window,
-    _calculate_time_parameters,
     _generate_pulse_train_protocol,
     _generate_ramp_protocol,
     _generate_step_protocol,
@@ -130,59 +128,3 @@ def pulse_train_voltage(
         num_pulses=num_pulses,
         sampling_frequency=sampling_frequency,
     )
-
-
-def iv_curve_protocol(
-    step_duration: float,
-    voltage_min: float = -100.0,
-    voltage_max: float = 60.0,
-    voltage_step: float = 10.0,
-    pre_pulse_duration: float = 10.0,
-    post_pulse_duration: float = 10.0,
-    holding_voltage: float = -70.0,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
-) -> np.ndarray:
-    """Generate an I-V curve protocol for voltage clamp experiments.
-
-    Creates a series of voltage steps from minimum to maximum voltage,
-    useful for characterizing current-voltage relationships.
-
-    Args:
-        step_duration: Duration of each voltage step in milliseconds.
-        voltage_min: Minimum voltage in mV. Default is -100 mV.
-        voltage_max: Maximum voltage in mV. Default is 60 mV.
-        voltage_step: Voltage increment between steps in mV. Default is 10 mV.
-        pre_pulse_duration: Duration before each step in milliseconds.
-            Default is 10 ms.
-        post_pulse_duration: Duration after each step in milliseconds.
-            Default is 10 ms.
-        holding_voltage: Holding voltage in mV. Default is -70.0 mV.
-        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
-
-    Returns:
-        Array of voltage values in mV for the complete protocol.
-    """
-    # Calculate voltage steps
-    n_steps = round((voltage_max - voltage_min) / voltage_step) + 1
-    voltages = np.linspace(voltage_min, voltage_max, n_steps)
-
-    # Calculate total duration for one sweep
-    sweep_duration = pre_pulse_duration + step_duration + post_pulse_duration
-    total_duration = sweep_duration * len(voltages)
-
-    num_points, time_array = _calculate_time_parameters(
-        total_duration, sampling_frequency
-    )
-
-    # Initialize voltage array with holding voltage
-    voltage_array = np.full(num_points, holding_voltage)
-
-    # Generate each voltage step
-    for i, voltage in enumerate(voltages):
-        sweep_start = i * sweep_duration
-        step_start = sweep_start + pre_pulse_duration
-
-        step_mask = _apply_time_window(time_array, step_start, step_duration)
-        voltage_array[step_mask] = voltage
-
-    return voltage_array
