@@ -22,10 +22,10 @@ os.environ.setdefault("PYTEST_CURRENT_TEST", "test_state.py::setup")
 pytest.importorskip("reflex")
 
 from patch_sim.constants import (
-    FAST_SPIKING_INTERNEURON,
     CORTICAL_PYRAMIDAL,
-    PURKINJE,
     DOPAMINERGIC,
+    FAST_SPIKING_INTERNEURON,
+    PURKINJE,
     THALAMIC_RELAY,
 )
 from patch_sim_ui import constants  # noqa: E402

@@ -3,6 +3,7 @@
 import math
 
 import pytest
+
 from patch_sim.electrochemistry import (
     boltzmann_cosh_rates,
     goldman_potential,

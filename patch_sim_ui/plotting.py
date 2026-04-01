@@ -15,10 +15,10 @@ from patch_sim_ui.constants import (
     CC_VOLTAGE_COLOR,
     CHANNEL_COLORS,
     CURRENT_CLAMP,
-    VOLTAGE_CLAMP,
     GATING_VAR_COLORS,
     STIMULUS_COLOR,
     STORED_TRACE_COLORS,
+    VOLTAGE_CLAMP,
 )
 
 # Classic column names that are always present in simulation DataFrames.

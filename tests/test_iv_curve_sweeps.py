@@ -13,7 +13,6 @@ import patch_sim
 import patch_sim.clamp_simulations
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

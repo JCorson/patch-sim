@@ -10,8 +10,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from .additional_channels import (
-    make_ican_channel,
     make_ical_channel,
+    make_ican_channel,
     make_icat_channel,
     make_ih_channel,
     make_ika_channel,

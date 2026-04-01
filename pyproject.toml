@@ -15,7 +15,7 @@ dependencies = [
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "D"]
+select = ["E", "F", "W", "D", "I"]
 ignore = []
 
 [tool.ruff.lint.pydocstyle]

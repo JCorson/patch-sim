@@ -4,11 +4,17 @@ A package for simulating patch clamp experiments using the Hodgkin-Huxley model.
 """
 
 from . import constants
-from .constants import (
-    CURRENT_CLAMP,
-    CURRENT_PROTOCOLS,
-    VOLTAGE_CLAMP,
-    VOLTAGE_PROTOCOLS,
+from .additional_channels import (
+    make_ical_channel,
+    make_ican_channel,
+    make_icat_channel,
+    make_ih_channel,
+    make_ika_channel,
+    make_ikca_channel,
+    make_ikir_channel,
+    make_im_channel,
+    make_inap_channel,
+    make_inar_channel,
 )
 from .calcium import CalciumDynamics
 from .channels import (
@@ -17,6 +23,19 @@ from .channels import (
     IonChannel,
     IonSpecies,
     NernstSpec,
+)
+from .clamp_simulations import (
+    simulate_batch,
+    simulate_current_clamp,
+    simulate_current_clamp_from_state,
+    simulate_voltage_clamp,
+    simulate_voltage_clamp_from_state,
+)
+from .constants import (
+    CURRENT_CLAMP,
+    CURRENT_PROTOCOLS,
+    VOLTAGE_CLAMP,
+    VOLTAGE_PROTOCOLS,
 )
 from .core_channels import (
     alpha_h,
@@ -29,6 +48,7 @@ from .core_channels import (
     make_leak_channel,
     make_na_channel,
 )
+from .electrochemistry import goldman_potential, nernst_potential
 from .hodgkin_huxley import HodgkinHuxley
 from .neuron_factory import (
     CHANNEL_REGISTRY,
@@ -44,39 +64,19 @@ from .presets import (
     PROTOCOL_PRESETS,
     build_protocol_from_preset,
 )
-from .additional_channels import (
-    make_ican_channel,
-    make_ical_channel,
-    make_icat_channel,
-    make_ih_channel,
-    make_ika_channel,
-    make_ikca_channel,
-    make_ikir_channel,
-    make_im_channel,
-    make_inap_channel,
-    make_inar_channel,
-)
-from .clamp_simulations import (
-    simulate_voltage_clamp,
-    simulate_current_clamp,
-    simulate_voltage_clamp_from_state,
-    simulate_current_clamp_from_state,
-    simulate_batch,
-)
-from .electrochemistry import goldman_potential, nernst_potential
 from .protocols import (
     build_current_protocol,
     build_voltage_protocol,
-    step_current,
-    ramp_current,
-    pulse_train,
-    sinusoidal_current,
     chirp_current,
     noise_current,
+    pulse_train,
+    pulse_train_voltage,
+    ramp_current,
+    ramp_voltage,
+    sinusoidal_current,
+    step_current,
     # Voltage clamp protocols
     step_voltage,
-    ramp_voltage,
-    pulse_train_voltage,
 )
 
 __all__ = [

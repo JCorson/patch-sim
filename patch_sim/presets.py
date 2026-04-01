@@ -11,8 +11,8 @@ from typing import Any
 import numpy as np
 
 from .additional_channels import (
-    make_ican_channel,
     make_ical_channel,
+    make_ican_channel,
     make_icat_channel,
     make_ih_channel,
     make_ika_channel,
@@ -20,20 +20,19 @@ from .additional_channels import (
     make_im_channel,
     make_inap_channel,
 )
-
 from .constants import (
-    CURRENT_CLAMP,
-    VOLTAGE_CLAMP,
-    SQUID_GIANT_AXON,
-    FAST_SPIKING_INTERNEURON,
-    CORTICAL_PYRAMIDAL,
-    PURKINJE,
-    DOPAMINERGIC,
-    THALAMIC_RELAY,
     CA1_PYRAMIDAL,
+    CORTICAL_PYRAMIDAL,
+    CURRENT_CLAMP,
+    DOPAMINERGIC,
+    FAST_SPIKING_INTERNEURON,
+    PURKINJE,
+    SQUID_GIANT_AXON,
     STN,
-    TRN,
     STOMATOGASTRIC_GANGLION,
+    THALAMIC_RELAY,
+    TRN,
+    VOLTAGE_CLAMP,
 )
 from .neuron_factory import ChannelConfig, NeuronConfig
 

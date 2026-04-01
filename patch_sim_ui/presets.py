@@ -10,8 +10,8 @@ from typing import Any
 
 from patch_sim.constants import (
     DEFAULT_G_ICAL,
-    DEFAULT_G_ICAT,
     DEFAULT_G_ICAN,
+    DEFAULT_G_ICAT,
     DEFAULT_G_IH,
     DEFAULT_G_IKA,
     DEFAULT_G_IKCA,

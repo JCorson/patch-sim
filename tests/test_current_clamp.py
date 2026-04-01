@@ -1,10 +1,11 @@
 """Tests for the current clamp simulation in the Hodgkin-Huxley model."""
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
+from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
 from patch_sim.hodgkin_huxley import HodgkinHuxley
-from patch_sim.clamp_simulations import simulate_current_clamp, SIM_SAMPLING_FREQ
 
 
 def test_simulate_current_clamp_returns_dataframe(hh_model):

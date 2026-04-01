@@ -16,7 +16,6 @@ from patch_sim.core_channels import (
 )
 from patch_sim.hodgkin_huxley import HodgkinHuxley
 
-
 # ---------------------------------------------------------------------------
 # Rate function positivity
 # ---------------------------------------------------------------------------

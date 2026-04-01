@@ -5,19 +5,19 @@ Covers automatic calcium-dynamics detection and custom configuration.
 
 import pytest
 
+from patch_sim.additional_channels import make_ical_channel, make_icat_channel
 from patch_sim.calcium import CalciumDynamics
 from patch_sim.constants import (
-    PURKINJE,
-    THALAMIC_RELAY,
     CA1_PYRAMIDAL,
+    PURKINJE,
     STN,
-    TRN,
     STOMATOGASTRIC_GANGLION,
+    THALAMIC_RELAY,
+    TRN,
 )
 from patch_sim.hodgkin_huxley import HodgkinHuxley
 from patch_sim.neuron_factory import ChannelConfig, NeuronConfig, make_neuron
 from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
-from patch_sim.additional_channels import make_ical_channel, make_icat_channel
 
 # ---------------------------------------------------------------------------
 # Presets that include at least one calcium-carrying channel.
