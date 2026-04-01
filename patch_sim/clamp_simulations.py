@@ -24,6 +24,28 @@ logger = logging.getLogger(__name__)
 #: 40 kHz (dt = 0.025 ms) is standard for Hodgkin-Huxley models.
 SIM_SAMPLING_FREQ: float = 40_000.0
 
+#: Voltage clamp bounds for the current-clamp RK4 integrator (mV).
+#: Physiological voltages span ~[-90, +60] mV; ±150 mV covers all reversal
+#: potentials (Ca²⁺ ~+120 mV, Na⁺ ~+60 mV, K⁺ ~-90 mV) with margin while
+#: preventing numerical runaway during extreme stimulus inputs.
+_V_CLAMP_MIN: float = -150.0
+_V_CLAMP_MAX: float = 150.0
+
+
+def _clamp_v(v: float) -> float:
+    """Clamp membrane voltage to the numerical safety range.
+
+    Constrains voltage to [_V_CLAMP_MIN, _V_CLAMP_MAX] to prevent runaway
+    integration when extreme external currents are applied.
+
+    Args:
+        v: Membrane voltage in mV.
+
+    Returns:
+        Voltage clamped to [_V_CLAMP_MIN, _V_CLAMP_MAX] in mV.
+    """
+    return max(_V_CLAMP_MIN, min(_V_CLAMP_MAX, v))
+
 
 def _setup_simulation(
     num_time_steps: int, sampling_frequency: float
@@ -232,15 +254,17 @@ def _rk4_step_current_clamp(
     dV1, d1, dca1 = _hh_derivatives(neuron, V, gating_state, I_ext, ca_i)
     s2 = _advance_state(gating_state, d1, 0.5 * dt)
     dV2, d2, dca2 = _hh_derivatives(
-        neuron, V + 0.5 * dt * dV1, s2, I_ext, ca_i + 0.5 * dt * dca1
+        neuron, _clamp_v(V + 0.5 * dt * dV1), s2, I_ext, ca_i + 0.5 * dt * dca1
     )
     s3 = _advance_state(gating_state, d2, 0.5 * dt)
     dV3, d3, dca3 = _hh_derivatives(
-        neuron, V + 0.5 * dt * dV2, s3, I_ext, ca_i + 0.5 * dt * dca2
+        neuron, _clamp_v(V + 0.5 * dt * dV2), s3, I_ext, ca_i + 0.5 * dt * dca2
     )
     s4 = _advance_state(gating_state, d3, dt)
-    dV4, d4, dca4 = _hh_derivatives(neuron, V + dt * dV3, s4, I_ext, ca_i + dt * dca3)
-    V_new = V + (dt / 6.0) * (dV1 + 2 * dV2 + 2 * dV3 + dV4)
+    dV4, d4, dca4 = _hh_derivatives(
+        neuron, _clamp_v(V + dt * dV3), s4, I_ext, ca_i + dt * dca3
+    )
+    V_new = _clamp_v(V + (dt / 6.0) * (dV1 + 2 * dV2 + 2 * dV3 + dV4))
     new_state = _clip_state(
         {
             k: gating_state[k] + (dt / 6.0) * (d1[k] + 2 * d2[k] + 2 * d3[k] + d4[k])

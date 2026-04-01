@@ -325,3 +325,42 @@ def test_single_element_current_protocol(hh_model):
     assert isinstance(result, pd.DataFrame)
     assert len(result) == 1
     assert result["voltage"].iloc[0] == pytest.approx(hh_model.v_rest)
+
+
+# ---------------------------------------------------------------------------
+# Numerical-stability / overflow-protection tests (issue #135)
+# ---------------------------------------------------------------------------
+
+
+def test_large_hyperpolarizing_current_does_not_crash(hh_model):
+    """A large hyperpolarizing current must not raise OverflowError or crash.
+
+    Regression test for GitHub issue #135: extreme negative stimulus values
+    previously caused math.cosh to overflow inside the RK4 integrator.
+    """
+    duration = 20  # ms
+    num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
+    current = np.full(num_steps, -200.0)  # large hyperpolarizing current
+
+    result = simulate_current_clamp(hh_model, current_external=current)
+
+    assert isinstance(result, pd.DataFrame)
+    assert len(result) == num_steps
+    assert result["voltage"].notna().all()
+    assert np.isfinite(result["voltage"].values).all()
+
+
+def test_large_hyperpolarizing_current_voltage_stays_bounded(hh_model):
+    """Voltage must stay within the numerical safety bounds under extreme input.
+
+    Regression test for GitHub issue #135: extreme negative stimulus values
+    previously caused a large positive voltage artifact in the trace.
+    """
+    duration = 20  # ms
+    num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
+    current = np.full(num_steps, -200.0)  # large hyperpolarizing current
+
+    result = simulate_current_clamp(hh_model, current_external=current)
+
+    assert result["voltage"].min() >= -150.0
+    assert result["voltage"].max() <= 150.0

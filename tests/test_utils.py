@@ -1,9 +1,11 @@
 """Tests for the utilities module."""
 
+import math
+
 import numpy as np
 import pytest
 
-from patch_sim.utils import safe_exp
+from patch_sim.utils import safe_cosh, safe_exp
 
 
 class TestSafeExp:
@@ -70,3 +72,50 @@ class TestSafeExp:
         """Boolean input (True=1, False=0) should be handled without error."""
         assert safe_exp(True) == pytest.approx(np.exp(1.0))
         assert safe_exp(False) == pytest.approx(1.0)
+
+
+class TestSafeCosh:
+    """Test the safe_cosh function."""
+
+    def test_safe_cosh_normal_range(self):
+        """safe_cosh matches math.cosh for inputs well within bounds."""
+        for x in [-10.0, -1.0, 0.0, 1.0, 10.0]:
+            assert safe_cosh(x) == pytest.approx(math.cosh(x))
+
+    def test_safe_cosh_boundary(self):
+        """safe_cosh at exactly ±100 matches math.cosh(100)."""
+        assert safe_cosh(100.0) == pytest.approx(math.cosh(100.0))
+        assert safe_cosh(-100.0) == pytest.approx(math.cosh(100.0))
+
+    def test_safe_cosh_extreme_positive_does_not_overflow(self):
+        """safe_cosh clips large positive inputs and returns a finite value."""
+        result = safe_cosh(1000.0)
+        assert math.isfinite(result)
+        assert result == pytest.approx(math.cosh(100.0))
+
+    def test_safe_cosh_extreme_negative_does_not_overflow(self):
+        """safe_cosh clips large negative inputs and returns a finite value."""
+        result = safe_cosh(-1000.0)
+        assert math.isfinite(result)
+        assert result == pytest.approx(math.cosh(100.0))
+
+    def test_safe_cosh_symmetric(self):
+        """safe_cosh is symmetric: safe_cosh(x) == safe_cosh(-x)."""
+        for x in [0.0, 5.0, 50.0, 100.0, 500.0]:
+            assert safe_cosh(x) == pytest.approx(safe_cosh(-x))
+
+    def test_safe_cosh_nan_propagates(self):
+        """NaN input should produce NaN output."""
+        assert math.isnan(safe_cosh(float("nan")))
+
+    def test_safe_cosh_positive_inf_clips(self):
+        """Positive infinity is clipped to cosh(100)."""
+        assert safe_cosh(float("inf")) == pytest.approx(math.cosh(100.0))
+
+    def test_safe_cosh_negative_inf_clips(self):
+        """Negative infinity is clipped to cosh(100)."""
+        assert safe_cosh(float("-inf")) == pytest.approx(math.cosh(100.0))
+
+    def test_safe_cosh_minimum_at_zero(self):
+        """Cosh has a minimum of 1.0 at x=0."""
+        assert safe_cosh(0.0) == pytest.approx(1.0)
