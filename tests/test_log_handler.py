@@ -185,12 +185,40 @@ def test_setup_logging_attaches_handler():
     assert any(isinstance(h, StateLogHandler) for h in logger.handlers)
 
 
-def test_setup_logging_is_idempotent():
-    """Calling setup_logging twice does not add a second handler."""
-    logger = logging.getLogger("patch_sim_ui")
+def test_setup_logging_attaches_handler_to_patch_sim():
+    """setup_logging registers a StateLogHandler on the patch_sim logger."""
+    logger = logging.getLogger("patch_sim")
     logger.handlers.clear()
 
     setup_logging()
+    assert any(isinstance(h, StateLogHandler) for h in logger.handlers)
+
+
+def test_setup_logging_is_idempotent():
+    """Calling setup_logging twice does not add a second handler to either logger."""
+    for name in ("patch_sim_ui", "patch_sim"):
+        logging.getLogger(name).handlers.clear()
+
     setup_logging()
-    count = sum(1 for h in logger.handlers if isinstance(h, StateLogHandler))
-    assert count == 1
+    setup_logging()
+    for name in ("patch_sim_ui", "patch_sim"):
+        handlers = logging.getLogger(name).handlers
+        count = sum(1 for h in handlers if isinstance(h, StateLogHandler))
+        assert count == 1
+
+
+def test_patch_sim_child_logger_captured():
+    """Log messages from patch_sim.* child loggers appear in the buffer."""
+    for name in ("patch_sim_ui", "patch_sim"):
+        logging.getLogger(name).handlers.clear()
+
+    setup_logging()
+
+    child_logger = logging.getLogger("patch_sim.hodgkin_huxley")
+    child_logger.debug("test core library message")
+
+    records = StateLogHandler.drain()
+    assert len(records) == 1
+    assert records[0].message == "test core library message"
+    assert records[0].level == "DEBUG"
+    assert records[0].logger_name == "patch_sim.hodgkin_huxley"
