@@ -15,15 +15,15 @@ import reflex as rx
 
 import patch_sim
 import patch_sim.clamp_simulations
-from patch_sim_ui.log_handler import MAX_LOG_ENTRIES, StateLogHandler, UILogRecord
 from patch_sim.constants import (
+    CURRENT_CLAMP,
     DEFAULT_C_M,
     DEFAULT_CA_IN,
     DEFAULT_CA_OUT,
     DEFAULT_CL_IN,
     DEFAULT_CL_OUT,
-    DEFAULT_G_ICAN,
     DEFAULT_G_ICAL,
+    DEFAULT_G_ICAN,
     DEFAULT_G_ICAT,
     DEFAULT_G_IH,
     DEFAULT_G_IKA,
@@ -46,17 +46,17 @@ from patch_sim.presets import (
     NEURON_PROTOCOL_ADJUSTMENTS,
     PROTOCOL_PRESETS,
 )
+from patch_sim.protocols.builders import (
+    build_current_protocol,
+    build_voltage_protocol,
+)
 from patch_sim_ui import constants, presets
-from patch_sim.constants import CURRENT_CLAMP
+from patch_sim_ui.log_handler import MAX_LOG_ENTRIES, StateLogHandler, UILogRecord
 from patch_sim_ui.plotting import (
     Sweep,
     TraceVisibility,
     build_figure,
     compute_trace_visibility_map,
-)
-from patch_sim.protocols.builders import (
-    build_current_protocol,
-    build_voltage_protocol,
 )
 
 logger = logging.getLogger("patch_sim_ui.state")

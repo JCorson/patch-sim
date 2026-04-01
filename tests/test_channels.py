@@ -8,15 +8,6 @@ import numpy as np
 import pytest
 
 import patch_sim
-from patch_sim.channels import (
-    GatingVariable,
-    GoldmanSpec,
-    IonChannel,
-    IonSpecies,
-    NernstSpec,
-)
-from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
-from patch_sim.hodgkin_huxley import HodgkinHuxley
 from patch_sim.additional_channels import (
     _alpha_a,
     _alpha_b,
@@ -48,19 +39,27 @@ from patch_sim.additional_channels import (
     _beta_r,
     _beta_s,
     _beta_w,
-    make_ican_channel,
     make_ical_channel,
+    make_ican_channel,
     make_icat_channel,
     make_ih_channel,
     make_ika_channel,
     make_ikca_channel,
     make_ikir_channel,
     make_im_channel,
-    make_inar_channel,
     make_inap_channel,
+    make_inar_channel,
 )
+from patch_sim.channels import (
+    GatingVariable,
+    GoldmanSpec,
+    IonChannel,
+    IonSpecies,
+    NernstSpec,
+)
+from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
+from patch_sim.hodgkin_huxley import HodgkinHuxley
 from patch_sim.protocols import step_current, step_voltage
-
 
 # ---------------------------------------------------------------------------
 # GatingVariable

@@ -19,7 +19,6 @@ from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage
 from patch_sim.hodgkin_huxley import HodgkinHuxley
 from patch_sim.protocols import step_current, step_voltage
 
-
 # ---------------------------------------------------------------------------
 # Minimal calcium channel for use in tests.
 # Uses IonChannel with carries_calcium=True.

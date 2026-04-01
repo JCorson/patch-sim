@@ -8,12 +8,12 @@ Both clamp modes use a unified gating-state dictionary that covers all channels
 """
 
 import logging
-import numpy as np
-import pandas as pd
 from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from typing import TYPE_CHECKING
 
+import numpy as np
+import pandas as pd
 
 if TYPE_CHECKING:
     from .hodgkin_huxley import HodgkinHuxley

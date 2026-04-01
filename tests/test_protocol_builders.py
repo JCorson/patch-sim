@@ -4,11 +4,11 @@ import numpy as np
 import pytest
 
 import patch_sim
+from patch_sim.presets import NEURON_PRESET_NAMES, PROTOCOL_PRESETS
 from patch_sim.protocols.builders import (
     build_current_protocol,
     build_voltage_protocol,
 )
-from patch_sim.presets import PROTOCOL_PRESETS, NEURON_PRESET_NAMES
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -7,10 +7,10 @@ protocols that can be used with voltage clamp simulations.
 import numpy as np
 
 from .common import (
+    DEFAULT_SAMPLING_FREQUENCY,
     _generate_pulse_train_protocol,
     _generate_ramp_protocol,
     _generate_step_protocol,
-    DEFAULT_SAMPLING_FREQUENCY,
 )
 
 

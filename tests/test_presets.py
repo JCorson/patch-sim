@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 import patch_sim
+from patch_sim.constants import DOPAMINERGIC, SQUID_GIANT_AXON
 from patch_sim.presets import (
     NEURON_PRESET_NAMES,
     NEURON_PRESETS,
@@ -102,9 +103,7 @@ def test_neuron_protocol_adjustments_change_stimulus_duration() -> None:
     the longer duration must result in a longer stimulus array.
     """
     base_samples = _protocol_total_samples("Repetitive Firing", None)
-    adjusted_samples = _protocol_total_samples(
-        "Repetitive Firing", "Dopaminergic Neuron"
-    )
+    adjusted_samples = _protocol_total_samples("Repetitive Firing", DOPAMINERGIC)
     assert adjusted_samples > base_samples, (
         "Dopaminergic Neuron adjustment should produce a longer array"
     )
@@ -114,9 +113,7 @@ def test_neuron_protocol_adjustments_not_applied_for_unknown_neuron() -> None:
     """Passing a neuron preset with no adjustments returns the base-preset output."""
     # "Squid Giant Axon (Classic HH)" has no adjustments defined.
     base_samples = _protocol_total_samples("Repetitive Firing", None)
-    squid_samples = _protocol_total_samples(
-        "Repetitive Firing", "Squid Giant Axon (Classic HH)"
-    )
+    squid_samples = _protocol_total_samples("Repetitive Firing", SQUID_GIANT_AXON)
     assert squid_samples == base_samples
 
 
@@ -158,7 +155,7 @@ def test_caller_overrides_take_precedence_over_neuron_adjustments() -> None:
     )
     overridden = build_protocol_from_preset(
         "Repetitive Firing",
-        neuron_preset="Dopaminergic Neuron",
+        neuron_preset=DOPAMINERGIC,
         sampling_frequency=SAMPLING_FREQUENCY,
         pre_stimulus_duration=10.0,
         stimulus_duration=50.0,

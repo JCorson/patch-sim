@@ -13,8 +13,8 @@ from .channels import (
     NernstSpec,
 )
 from .constants import (
-    DEFAULT_G_ICAN,
     DEFAULT_G_ICAL,
+    DEFAULT_G_ICAN,
     DEFAULT_G_ICAT,
     DEFAULT_G_IH,
     DEFAULT_G_IKA,

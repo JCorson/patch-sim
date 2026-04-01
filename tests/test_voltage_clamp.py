@@ -1,11 +1,12 @@
 """Tests for the voltage clamp simulation in the Hodgkin-Huxley model."""
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
+from patch_sim.clamp_simulations import simulate_voltage_clamp
 from patch_sim.core_channels import alpha_h, alpha_m, alpha_n, beta_h, beta_m, beta_n
 from patch_sim.hodgkin_huxley import HodgkinHuxley
-from patch_sim.clamp_simulations import simulate_voltage_clamp
 
 
 def test_simulate_voltage_clamp_returns_dataframe(hh_model):

@@ -10,8 +10,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from .additional_channels import (
-    make_ican_channel,
     make_ical_channel,
+    make_ican_channel,
     make_icat_channel,
     make_ih_channel,
     make_ika_channel,
@@ -22,7 +22,7 @@ from .additional_channels import (
     make_inar_channel,
 )
 from .calcium import CalciumDynamics
-from .channels import IonChannel, IonSpecies
+from .channels import GoldmanSpec, IonChannel, IonSpecies, NernstSpec
 from .constants import (
     DEFAULT_C_M,
     DEFAULT_CA_IN,
@@ -126,10 +126,9 @@ def _needs_calcium(channels: tuple[IonChannel, ...]) -> bool:
     """
     for ch in channels:
         spec = ch.reversal_spec
-        # NernstSpec has a .species attribute; GoldmanSpec has .permeabilities
-        if hasattr(spec, "species") and spec.species is IonSpecies.CALCIUM:
+        if isinstance(spec, NernstSpec) and spec.species is IonSpecies.CALCIUM:
             return True
-        if hasattr(spec, "permeabilities"):
+        if isinstance(spec, GoldmanSpec):
             for species, _ in spec.permeabilities:
                 if species is IonSpecies.CALCIUM:
                     return True

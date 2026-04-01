@@ -1,6 +1,7 @@
 """Shared pytest fixtures for the ap-sim test suite."""
 
 import pytest
+
 from patch_sim.hodgkin_huxley import HodgkinHuxley
 
 

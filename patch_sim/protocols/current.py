@@ -7,12 +7,12 @@ protocols that can be used with current clamp simulations.
 import numpy as np
 
 from .common import (
+    DEFAULT_SAMPLING_FREQUENCY,
     _apply_time_window,
     _calculate_time_parameters,
     _generate_pulse_train_protocol,
     _generate_ramp_protocol,
     _generate_step_protocol,
-    DEFAULT_SAMPLING_FREQUENCY,
 )
 
 

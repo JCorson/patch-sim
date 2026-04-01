@@ -21,6 +21,13 @@ os.environ.setdefault("PYTEST_CURRENT_TEST", "test_state.py::setup")
 
 pytest.importorskip("reflex")
 
+from patch_sim.constants import (
+    CORTICAL_PYRAMIDAL,
+    DOPAMINERGIC,
+    FAST_SPIKING_INTERNEURON,
+    PURKINJE,
+    THALAMIC_RELAY,
+)
 from patch_sim_ui import constants  # noqa: E402
 from patch_sim_ui.log_handler import UILogRecord  # noqa: E402
 from patch_sim_ui.plotting import Sweep  # noqa: E402
@@ -288,7 +295,7 @@ def test_load_neuron_preset_fast_spiking_interneuron() -> None:
     s = _make_state()
     original_duration = s.stimulus_duration
     original_clamp = s.clamp_mode
-    s.load_neuron_preset("Fast-Spiking Interneuron")
+    s.load_neuron_preset(FAST_SPIKING_INTERNEURON)
     assert s.ika_enabled is True
     assert s.stimulus_duration == pytest.approx(original_duration)
     assert s.clamp_mode == original_clamp
@@ -297,23 +304,23 @@ def test_load_neuron_preset_fast_spiking_interneuron() -> None:
 def test_load_neuron_preset_sets_active_neuron_type() -> None:
     """load_neuron_preset records the selected neuron type on the state."""
     s = _make_state()
-    s.load_neuron_preset("Pyramidal Neuron")
-    assert s.active_neuron_type == "Pyramidal Neuron"
+    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert s.active_neuron_type == CORTICAL_PYRAMIDAL
 
 
 def test_load_neuron_preset_resets_previously_enabled_channels() -> None:
     """Loading a second neuron preset disables channels from the first."""
     s = _make_state()
-    s.load_neuron_preset("Fast-Spiking Interneuron")
+    s.load_neuron_preset(FAST_SPIKING_INTERNEURON)
     assert s.ika_enabled is True
-    s.load_neuron_preset("Pyramidal Neuron")
+    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
     assert s.ika_enabled is False
 
 
 def test_load_neuron_preset_pyramidal_neuron() -> None:
     """Pyramidal Neuron preset enables Ih, INaP, and IM channels."""
     s = _make_state()
-    s.load_neuron_preset("Pyramidal Neuron")
+    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
     assert s.ih_enabled is True
     assert s.inap_enabled is True
     assert s.im_enabled is True
@@ -322,7 +329,7 @@ def test_load_neuron_preset_pyramidal_neuron() -> None:
 def test_load_neuron_preset_purkinje_cell() -> None:
     """Purkinje Cell preset enables ICaL, ICaT, and IKCa channels."""
     s = _make_state()
-    s.load_neuron_preset("Purkinje Cell")
+    s.load_neuron_preset(PURKINJE)
     assert s.ical_enabled is True
     assert s.icat_enabled is True
     assert s.ikca_enabled is True
@@ -331,7 +338,7 @@ def test_load_neuron_preset_purkinje_cell() -> None:
 def test_load_neuron_preset_dopaminergic_neuron() -> None:
     """Dopaminergic Neuron preset enables Ih and IM channels."""
     s = _make_state()
-    s.load_neuron_preset("Dopaminergic Neuron")
+    s.load_neuron_preset(DOPAMINERGIC)
     assert s.ih_enabled is True
     assert s.im_enabled is True
 
@@ -339,7 +346,7 @@ def test_load_neuron_preset_dopaminergic_neuron() -> None:
 def test_load_neuron_preset_thalamic_relay() -> None:
     """Thalamic Relay preset enables ICaT and Ih channels."""
     s = _make_state()
-    s.load_neuron_preset("Thalamic Relay")
+    s.load_neuron_preset(THALAMIC_RELAY)
     assert s.icat_enabled is True
     assert s.ih_enabled is True
 
@@ -348,7 +355,7 @@ def test_load_neuron_preset_clears_current_sweeps() -> None:
     """load_neuron_preset resets current_sweeps to an empty list."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
-    s.load_neuron_preset("Pyramidal Neuron")
+    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
     assert len(s.current_sweeps) == 0
 
 
@@ -368,7 +375,7 @@ def test_load_neuron_preset_unknown_name_is_ignored() -> None:
 def test_protocol_preset_with_active_neuron_type_applies_adjustment() -> None:
     """Repetitive Firing with Thalamic Relay active uses hyperpolarizing current."""
     s = _make_state()
-    s.load_neuron_preset("Thalamic Relay")
+    s.load_neuron_preset(THALAMIC_RELAY)
     s.load_protocol_preset("Repetitive Firing")
     assert s.min_stimulus < 0.0
 
@@ -383,7 +390,7 @@ def test_protocol_preset_without_active_neuron_type_uses_base_params() -> None:
 def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> None:
     """Action Potential with Thalamic Relay active falls through to base duration."""
     s = _make_state()
-    s.load_neuron_preset("Thalamic Relay")
+    s.load_neuron_preset(THALAMIC_RELAY)
     s.load_protocol_preset("Action Potential")
     assert s.stimulus_duration == pytest.approx(30.0)
 
@@ -391,7 +398,7 @@ def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> None:
 def test_protocol_preset_dopaminergic_repetitive_firing_uses_long_duration() -> None:
     """Dopaminergic Neuron + Repetitive Firing sets stimulus_duration to 480 ms."""
     s = _make_state()
-    s.load_neuron_preset("Dopaminergic Neuron")
+    s.load_neuron_preset(DOPAMINERGIC)
     s.load_protocol_preset("Repetitive Firing")
     assert s.stimulus_duration == pytest.approx(480.0)
 
