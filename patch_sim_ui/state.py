@@ -47,7 +47,7 @@ from patch_sim.presets import (
     PROTOCOL_PRESETS,
 )
 from patch_sim_ui import constants, presets
-from patch_sim_ui.constants import CURRENT_CLAMP
+from patch_sim.constants import CURRENT_CLAMP
 from patch_sim_ui.plotting import (
     Sweep,
     TraceVisibility,
@@ -958,14 +958,14 @@ class AppState(rx.State):
         neuron-specific adjustments via NEURON_PROTOCOL_ADJUSTMENTS.
 
         Args:
-            name: Key into ``patch_sim_ui.presets.NEURON_PRESETS``.
+            name: Key into ``patch_sim_ui.presets.NEURON_UI_PRESETS``.
                 Ignored if not found.
         """
-        if name not in presets.NEURON_PRESETS:
+        if name not in presets.NEURON_UI_PRESETS:
             logger.debug("load_neuron_preset: unknown preset %r ignored", name)
             return
         logger.info("Loaded neuron preset: %s", name)
-        config = presets.NEURON_PRESETS[name]
+        config = presets.NEURON_UI_PRESETS[name]
         for key, value in config.items():
             setattr(self, key, value)
         self.active_neuron_type = name

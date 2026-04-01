@@ -21,7 +21,7 @@ from patch_sim.constants import (
     DEFAULT_G_NAR,
 )
 from patch_sim.neuron_factory import CHANNEL_REGISTRY, NeuronConfig
-from patch_sim.presets import NEURON_PRESETS as _CORE_NEURON_PRESETS
+from patch_sim.presets import NEURON_PRESETS
 
 # Default conductances for each auxiliary channel, keyed by channel name.
 _DEFAULT_G_MAX: dict[str, float] = {
@@ -89,8 +89,8 @@ def neuron_config_to_ui_state(config: NeuronConfig) -> dict[str, Any]:
 
 
 # Flat UI-state dicts derived from core NeuronConfig presets.
-NEURON_PRESETS: dict[str, dict[str, Any]] = {
-    name: neuron_config_to_ui_state(cfg) for name, cfg in _CORE_NEURON_PRESETS.items()
+NEURON_UI_PRESETS: dict[str, dict[str, Any]] = {
+    name: neuron_config_to_ui_state(cfg) for name, cfg in NEURON_PRESETS.items()
 }
 
 # Neuron-parameter overrides applied when a protocol preset is loaded,
