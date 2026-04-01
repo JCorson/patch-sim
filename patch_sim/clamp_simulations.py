@@ -25,11 +25,11 @@ logger = logging.getLogger(__name__)
 SIM_SAMPLING_FREQ: float = 40_000.0
 
 #: Voltage clamp bounds for the current-clamp RK4 integrator (mV).
-#: Physiological voltages never exceed ~[-90, +60] mV; these generous bounds
-#: prevent numerical runaway during extreme stimulus inputs without affecting
-#: normal simulations.
-_V_CLAMP_MIN: float = -500.0
-_V_CLAMP_MAX: float = 500.0
+#: Physiological voltages span ~[-90, +60] mV; ±150 mV covers all reversal
+#: potentials (Ca²⁺ ~+120 mV, Na⁺ ~+60 mV, K⁺ ~-90 mV) with margin while
+#: preventing numerical runaway during extreme stimulus inputs.
+_V_CLAMP_MIN: float = -150.0
+_V_CLAMP_MAX: float = 150.0
 
 
 def _clamp_v(v: float) -> float:

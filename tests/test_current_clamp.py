@@ -362,5 +362,5 @@ def test_large_hyperpolarizing_current_voltage_stays_bounded(hh_model):
 
     result = simulate_current_clamp(hh_model, current_external=current)
 
-    assert result["voltage"].min() >= -500.0
-    assert result["voltage"].max() <= 500.0
+    assert result["voltage"].min() >= -150.0
+    assert result["voltage"].max() <= 150.0

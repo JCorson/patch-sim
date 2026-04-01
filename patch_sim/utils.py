@@ -54,7 +54,7 @@ def safe_cosh(x: float) -> float:
     Returns:
         The computed hyperbolic cosine value, capped to prevent overflow.
     """
-    if x != x:  # NaN — falls through both comparisons below
+    if math.isnan(x):
         return math.nan
     if x > SAFE_COSH_CLIP:
         return math.cosh(SAFE_COSH_CLIP)
