@@ -1,8 +1,9 @@
 """Built-in preset configurations for the patch_sim web UI.
 
-Protocol presets, neuron-protocol adjustments, and preset name lists are
-re-exported from the core library.  Only the UI-specific neuron preset
-format (mapping state variable names to values) is defined here.
+Only the UI-specific neuron preset format (mapping state variable names to
+values) is defined here.  All protocol presets, adjustments, and name lists
+live in the core library and should be imported from ``patch_sim.presets``
+directly.
 """
 
 from typing import Any
@@ -20,15 +21,7 @@ from patch_sim.constants import (
     DEFAULT_G_NAR,
 )
 from patch_sim.neuron_factory import CHANNEL_REGISTRY, NeuronConfig
-
-# Re-export from core so existing UI imports continue to work.
-from patch_sim.presets import (  # noqa: F401
-    NEURON_PRESET_NAMES,
-    NEURON_PRESETS as _CORE_NEURON_PRESETS,
-    NEURON_PROTOCOL_ADJUSTMENTS,
-    PROTOCOL_PRESET_NAMES,
-    PROTOCOL_PRESETS,
-)
+from patch_sim.presets import NEURON_PRESETS
 
 # Default conductances for each auxiliary channel, keyed by channel name.
 _DEFAULT_G_MAX: dict[str, float] = {
@@ -96,8 +89,8 @@ def neuron_config_to_ui_state(config: NeuronConfig) -> dict[str, Any]:
 
 
 # Flat UI-state dicts derived from core NeuronConfig presets.
-NEURON_PRESETS: dict[str, dict[str, Any]] = {
-    name: neuron_config_to_ui_state(cfg) for name, cfg in _CORE_NEURON_PRESETS.items()
+NEURON_UI_PRESETS: dict[str, dict[str, Any]] = {
+    name: neuron_config_to_ui_state(cfg) for name, cfg in NEURON_PRESETS.items()
 }
 
 # Neuron-parameter overrides applied when a protocol preset is loaded,

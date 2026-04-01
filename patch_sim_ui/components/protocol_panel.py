@@ -2,7 +2,7 @@
 
 import reflex as rx
 
-from patch_sim_ui import presets
+from patch_sim.presets import PROTOCOL_PRESET_NAMES
 from patch_sim_ui.constants import CURRENT_CLAMP, VOLTAGE_CLAMP
 from patch_sim_ui.state import AppState
 
@@ -275,7 +275,7 @@ def protocol_panel() -> rx.Component:
     return rx.vstack(
         rx.heading("Experiment", size="3"),
         rx.select(
-            presets.PROTOCOL_PRESET_NAMES,
+            PROTOCOL_PRESET_NAMES,
             placeholder="Load preset…",
             on_change=AppState.load_protocol_preset,
             width="100%",
