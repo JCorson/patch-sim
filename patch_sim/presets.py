@@ -24,6 +24,16 @@ from .additional_channels import (
 from .constants import (
     CURRENT_CLAMP,
     VOLTAGE_CLAMP,
+    SQUID_GIANT_AXON,
+    FAST_SPIKING_INTERNEURON,
+    CORTICAL_PYRAMIDAL,
+    PURKINJE,
+    DOPAMINERGIC,
+    THALAMIC_RELAY,
+    CA1_PYRAMIDAL,
+    STN,
+    TRN,
+    STOMATOGASTRIC_GANGLION,
 )
 from .neuron_factory import ChannelConfig, NeuronConfig
 
@@ -32,11 +42,11 @@ from .neuron_factory import ChannelConfig, NeuronConfig
 # ---------------------------------------------------------------------------
 
 NEURON_PRESETS: dict[str, NeuronConfig] = {
-    "Squid Giant Axon (Classic HH)": NeuronConfig(
+    SQUID_GIANT_AXON: NeuronConfig(
         # Original Hodgkin-Huxley (1952) parameters — the app defaults.
         # Ref: Hodgkin & Huxley (1952), J. Physiol. 117:500
     ),
-    "Fast-Spiking Interneuron": NeuronConfig(
+    FAST_SPIKING_INTERNEURON: NeuronConfig(
         # High g_Na/g_K for narrow spikes; IKa shapes inter-spike interval.
         # Refs: Wang & Buzsáki (1996), J. Neurosci. 16:6402;
         #       Pospischil et al. (2008), Biol. Cybern. 99:427
@@ -44,7 +54,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         g_K=50.0,
         channels=(ChannelConfig(make_ika_channel, g_max=5.0),),
     ),
-    "Pyramidal Neuron": NeuronConfig(
+    CORTICAL_PYRAMIDAL: NeuronConfig(
         # Ih produces voltage sag on hyperpolarization; INaP amplifies
         # subthreshold inputs; IM provides spike-frequency adaptation.
         # Refs: Mainen & Sejnowski (1996);
@@ -55,7 +65,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_im_channel, g_max=0.5),
         ),
     ),
-    "Purkinje Cell": NeuronConfig(
+    PURKINJE: NeuronConfig(
         # L-type and T-type Ca²⁺ channels drive complex spiking;
         # IKCa couples Ca²⁺ influx to after-hyperpolarization.
         # Ref: De Schutter & Bower (1994), J. Neurophysiol. 71:375
@@ -65,7 +75,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ikca_channel, g_max=2.0),
         ),
     ),
-    "Dopaminergic Neuron": NeuronConfig(
+    DOPAMINERGIC: NeuronConfig(
         # Ih drives pacemaker sag and rebound; IM provides slow
         # oscillatory hyperpolarization.
         # Refs: Wilson & Callaway (2000), J. Neurophysiol. 83:3084;
@@ -75,7 +85,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_im_channel, g_max=1.0),
         ),
     ),
-    "Thalamic Relay": NeuronConfig(
+    THALAMIC_RELAY: NeuronConfig(
         # T-type Ca²⁺ produces low-threshold spike; Ih causes
         # post-inhibitory rebound burst after hyperpolarizing step.
         # Ref: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384
@@ -84,7 +94,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ih_channel, g_max=1.0),
         ),
     ),
-    "Hippocampal CA1 Pyramidal": NeuronConfig(
+    CA1_PYRAMIDAL: NeuronConfig(
         # Reduced g_Na/g_K vs squid axon; IKa shortens ISI; IM provides
         # spike-frequency adaptation; small Ih produces modest voltage sag;
         # Ca²⁺ channels (L, N, T) and IKCa together produce the pronounced
@@ -102,7 +112,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ikca_channel, g_max=2.0),
         ),
     ),
-    "STN Neuron": NeuronConfig(
+    STN: NeuronConfig(
         # High g_Na/g_K sustain autonomous tonic firing at 5–50 Hz;
         # prominent ICaT (g_T = 5 mS/cm²) drives rebound bursts after
         # hyperpolarization; IKCa limits burst duration; Ih provides
@@ -118,7 +128,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ih_channel, g_max=0.5),
         ),
     ),
-    "Thalamic Reticular Nucleus": NeuronConfig(
+    TRN: NeuronConfig(
         # Hyperpolarised resting potential (−77 mV) and exceptionally large
         # ICaT (g_T ≈ 3.5 mS/cm²) are the hallmarks of TRN cells; these
         # combine to produce rhythmic burst firing and sleep-spindle
@@ -128,7 +138,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         v_rest=-77.0,
         channels=(ChannelConfig(make_icat_channel, g_max=3.5),),
     ),
-    "Stomatogastric Ganglion": NeuronConfig(
+    STOMATOGASTRIC_GANGLION: NeuronConfig(
         # Depolarised resting potential (−55 mV) and ~8 conductances produce
         # rhythmic bursting; large IKa and IKCa shape burst waveform; slow
         # ICaL drives plateau depolarisation; Ih contributes to inter-burst
@@ -236,7 +246,7 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
 #
 # Structure: neuron_preset_name → protocol_preset_name → {field: value, …}
 NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
-    "Fast-Spiking Interneuron": {
+    FAST_SPIKING_INTERNEURON: {
         # High-amplitude, standard-length step to drive rapid non-adapting firing.
         "Repetitive Firing": {
             "min_stimulus": 20.0,
@@ -244,7 +254,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_duration": 180.0,
         },
     },
-    "Pyramidal Neuron": {
+    CORTICAL_PYRAMIDAL: {
         # Longer step at moderate amplitude to reveal spike-frequency adaptation.
         "Repetitive Firing": {
             "min_stimulus": 10.0,
@@ -252,7 +262,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_duration": 280.0,
         },
     },
-    "Purkinje Cell": {
+    PURKINJE: {
         # Moderate amplitude; complex Ca²⁺-driven spiking emerges within 200 ms.
         "Repetitive Firing": {
             "min_stimulus": 12.0,
@@ -260,7 +270,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_duration": 180.0,
         },
     },
-    "Dopaminergic Neuron": {
+    DOPAMINERGIC: {
         # Long window at low amplitude to reveal slow (~2–5 Hz) pacemaking.
         "Repetitive Firing": {
             "min_stimulus": 5.0,
@@ -268,7 +278,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_duration": 480.0,
         },
     },
-    "Thalamic Relay": {
+    THALAMIC_RELAY: {
         # Hyperpolarizing step followed by release triggers post-inhibitory
         # rebound burst via T-type Ca²⁺ channels.
         # pre=50 ms establishes baseline; post=100 ms captures the rebound burst.
@@ -280,7 +290,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "post_stimulus_duration": 100.0,
         },
     },
-    "Hippocampal CA1 Pyramidal": {
+    CA1_PYRAMIDAL: {
         # Long moderate-amplitude step reveals adaptation and pronounced AHP.
         "Repetitive Firing": {
             "min_stimulus": 8.0,
@@ -296,7 +306,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_duration": 150.0,
         },
     },
-    "STN Neuron": {
+    STN: {
         # Hyperpolarizing step followed by release reveals rebound burst;
         # long post-stimulus window captures the burst dynamics.
         "Repetitive Firing": {
@@ -307,7 +317,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "post_stimulus_duration": 150.0,
         },
     },
-    "Thalamic Reticular Nucleus": {
+    TRN: {
         # Hyperpolarizing step unlocks ICaT; long post-stimulus window
         # reveals rhythmic burst firing on release.
         "Repetitive Firing": {
@@ -318,7 +328,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "post_stimulus_duration": 150.0,
         },
     },
-    "Stomatogastric Ganglion": {
+    STOMATOGASTRIC_GANGLION: {
         # Long window at low current to reveal slow (~1 Hz) rhythmic bursting.
         "Repetitive Firing": {
             "min_stimulus": 3.0,

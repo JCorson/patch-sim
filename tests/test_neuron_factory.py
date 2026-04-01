@@ -6,6 +6,14 @@ Covers automatic calcium-dynamics detection and custom configuration.
 import pytest
 
 from patch_sim.calcium import CalciumDynamics
+from patch_sim.constants import (
+    PURKINJE,
+    THALAMIC_RELAY,
+    CA1_PYRAMIDAL,
+    STN,
+    TRN,
+    STOMATOGASTRIC_GANGLION,
+)
 from patch_sim.hodgkin_huxley import HodgkinHuxley
 from patch_sim.neuron_factory import ChannelConfig, NeuronConfig, make_neuron
 from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
@@ -17,12 +25,12 @@ from patch_sim.additional_channels import make_ical_channel, make_icat_channel
 # ---------------------------------------------------------------------------
 
 _CALCIUM_PRESETS = {
-    "Purkinje Cell",
-    "Thalamic Relay",
-    "Hippocampal CA1 Pyramidal",
-    "STN Neuron",
-    "Thalamic Reticular Nucleus",
-    "Stomatogastric Ganglion",
+    PURKINJE,
+    THALAMIC_RELAY,
+    CA1_PYRAMIDAL,
+    STN,
+    TRN,
+    STOMATOGASTRIC_GANGLION,
 }
 
 _NON_CALCIUM_PRESETS = set(NEURON_PRESET_NAMES) - _CALCIUM_PRESETS

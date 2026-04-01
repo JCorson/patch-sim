@@ -72,3 +72,15 @@ DEFAULT_NEURON_PARAMS: dict[str, float] = {
     "Ca_in": DEFAULT_CA_IN,
     "T": DEFAULT_T,
 }
+
+# Neuron preset names
+SQUID_GIANT_AXON: str = "Squid Giant Axon (Classic HH)"
+FAST_SPIKING_INTERNEURON: str = "Fast-Spiking Interneuron"
+CORTICAL_PYRAMIDAL: str = "Cortical Pyramidal Neuron"
+PURKINJE: str = "Purkinje Neuron"
+DOPAMINERGIC: str = "Dopaminergic Neuron"
+THALAMIC_RELAY: str = "Thalamic Relay Neuron"
+CA1_PYRAMIDAL: str = "Hippocampal CA1 Pyramidal Neuron"
+STN: str = "Subthalamic Nucleus Neuron"
+TRN: str = "Thalamic Reticular Nucleus Neuron"
+STOMATOGASTRIC_GANGLION: str = "Stomatogastric Ganglion Neuron"
