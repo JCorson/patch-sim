@@ -20,19 +20,12 @@ DEFAULT_CA_IN: float = 0.0001  # mM intracellular Ca2+ (physiological resting)
 DEFAULT_G_IH: float = 0.1  # HCN/Ih maximum conductance in mS/cm²
 # Ih Na+ permeability relative to K+ (GHK); yields ~-30 mV at default concentrations
 DEFAULT_IH_P_NA: float = 0.289
-
 DEFAULT_G_IKA: float = 5.0  # A-type K+ maximum conductance in mS/cm²
-
 DEFAULT_G_NAP: float = 0.5  # Persistent Na+ maximum conductance in mS/cm²
-
 DEFAULT_G_NAR: float = 0.3  # Resurgent Na+ maximum conductance in mS/cm²
-
 DEFAULT_G_IM: float = 0.5  # Muscarinic K+ maximum conductance in mS/cm²
-
 DEFAULT_G_IKIR: float = 0.2  # Inward rectifier K+ maximum conductance in mS/cm²
-
 DEFAULT_G_IKCA: float = 1.0  # Calcium-activated K+ maximum conductance in mS/cm²
-
 DEFAULT_G_ICAL: float = 0.5  # L-type Ca2+ maximum conductance in mS/cm²
 DEFAULT_G_ICAT: float = 0.3  # T-type Ca2+ maximum conductance in mS/cm²
 DEFAULT_G_ICAN: float = 0.3  # N-type Ca2+ maximum conductance in mS/cm²
