@@ -1659,7 +1659,7 @@ def test_make_ican_channel_defaults():
 
 
 def test_current_clamp_with_ican_extra_columns():
-    """Current clamp with ICaN channel adds ICaN, dn, and fn columns."""
+    """Current clamp with CaN channel adds ICaN, dn, and fn columns."""
     from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
