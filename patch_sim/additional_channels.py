@@ -151,7 +151,7 @@ def make_ika_channel(
     a_var = GatingVariable(name="a", power=1, alpha=_alpha_a, beta=_beta_a)
     b_var = GatingVariable(name="b", power=1, alpha=_alpha_b, beta=_beta_b)
     return IonChannel(
-        name="IKa",
+        name="Ka",
         g_max=g_max,
         gating_variables=(a_var, b_var),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
@@ -189,7 +189,7 @@ def make_ih_channel(
     """
     r_var = GatingVariable(name="r", power=1, alpha=_alpha_r, beta=_beta_r)
     return IonChannel(
-        name="Ih",
+        name="h",
         g_max=g_max,
         gating_variables=(r_var,),
         reversal_spec=GoldmanSpec(
@@ -235,7 +235,7 @@ def make_inap_channel(
     """
     p_var = GatingVariable(name="p", power=1, alpha=_alpha_p, beta=_beta_p)
     return IonChannel(
-        name="INaP",
+        name="NaP",
         g_max=g_max,
         gating_variables=(p_var,),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
@@ -351,7 +351,7 @@ def make_inar_channel(
     s_var = GatingVariable(name="s", power=1, alpha=_alpha_s, beta=_beta_s)
     hr_var = GatingVariable(name="hr", power=1, alpha=_alpha_hr, beta=_beta_hr)
     return IonChannel(
-        name="INaR",
+        name="NaR",
         g_max=g_max,
         gating_variables=(s_var, hr_var),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
@@ -393,7 +393,7 @@ def make_im_channel(
     """
     w_var = GatingVariable(name="w", power=1, alpha=_alpha_w, beta=_beta_w)
     return IonChannel(
-        name="IM",
+        name="M",
         g_max=g_max,
         gating_variables=(w_var,),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
@@ -435,7 +435,7 @@ def make_ikir_channel(
     """
     kir_var = GatingVariable(name="kir", power=1, alpha=_alpha_kir, beta=_beta_kir)
     return IonChannel(
-        name="IKir",
+        name="Kir",
         g_max=g_max,
         gating_variables=(kir_var,),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
@@ -547,7 +547,7 @@ def make_ikca_channel(
     """
     q_var = GatingVariable(name="q", power=1, alpha=_alpha_q, beta=_beta_q)
     return IonChannel(
-        name="IKCa",
+        name="KCa",
         g_max=g_max,
         gating_variables=(q_var,),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
@@ -597,7 +597,7 @@ def make_ical_channel(
     d_var = GatingVariable(name="d", power=2, alpha=_alpha_d, beta=_beta_d)
     f_var = GatingVariable(name="f", power=1, alpha=_alpha_f, beta=_beta_f)
     return IonChannel(
-        name="ICaL",
+        name="CaL",
         g_max=g_max,
         gating_variables=(d_var, f_var),
         reversal_spec=NernstSpec(IonSpecies.CALCIUM),
@@ -643,7 +643,7 @@ def make_icat_channel(
     dt_var = GatingVariable(name="dt", power=2, alpha=_alpha_dt, beta=_beta_dt)
     ft_var = GatingVariable(name="ft", power=1, alpha=_alpha_ft, beta=_beta_ft)
     return IonChannel(
-        name="ICaT",
+        name="CaT",
         g_max=g_max,
         gating_variables=(dt_var, ft_var),
         reversal_spec=NernstSpec(IonSpecies.CALCIUM),
@@ -690,7 +690,7 @@ def make_ican_channel(
     dn_var = GatingVariable(name="dn", power=2, alpha=_alpha_dn, beta=_beta_dn)
     fn_var = GatingVariable(name="fn", power=1, alpha=_alpha_fn, beta=_beta_fn)
     return IonChannel(
-        name="ICaN",
+        name="CaN",
         g_max=g_max,
         gating_variables=(dn_var, fn_var),
         reversal_spec=NernstSpec(IonSpecies.CALCIUM),

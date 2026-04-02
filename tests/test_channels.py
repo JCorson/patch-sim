@@ -278,7 +278,7 @@ def test_make_ih_channel_defaults():
     from patch_sim.constants import DEFAULT_G_IH, DEFAULT_IH_P_NA
 
     ch = make_ih_channel()
-    assert ch.name == "Ih"
+    assert ch.name == "h"
     assert ch.g_max == pytest.approx(DEFAULT_G_IH)
     assert isinstance(ch.reversal_spec, GoldmanSpec)
     assert ch.reversal_spec.permeabilities[0] == (IonSpecies.SODIUM, DEFAULT_IH_P_NA)
@@ -438,7 +438,7 @@ def test_multiple_optional_channels_coexist():
         name="q", power=1, alpha=lambda V, ca_i: 0.05, beta=lambda V, ca_i: 0.05
     )
     ch2 = IonChannel(
-        name="Iq",
+        name="q",
         g_max=0.05,
         gating_variables=(gv2,),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
@@ -514,7 +514,7 @@ def test_make_ika_channel_defaults():
     from patch_sim.constants import DEFAULT_G_IKA
 
     ch = make_ika_channel()
-    assert ch.name == "IKa"
+    assert ch.name == "Ka"
     assert ch.g_max == pytest.approx(DEFAULT_G_IKA)
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.POTASSIUM
@@ -663,7 +663,7 @@ def test_make_inap_channel_defaults():
     from patch_sim.constants import DEFAULT_G_NAP
 
     ch = make_inap_channel()
-    assert ch.name == "INaP"
+    assert ch.name == "NaP"
     assert ch.g_max == pytest.approx(DEFAULT_G_NAP)
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.SODIUM
@@ -804,7 +804,7 @@ def test_make_inar_channel_defaults():
     from patch_sim.constants import DEFAULT_G_NAR
 
     ch = make_inar_channel()
-    assert ch.name == "INaR"
+    assert ch.name == "NaR"
     assert ch.g_max == pytest.approx(DEFAULT_G_NAR)
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.SODIUM
@@ -984,7 +984,7 @@ def test_make_im_channel_defaults():
     from patch_sim.constants import DEFAULT_G_IM
 
     ch = make_im_channel()
-    assert ch.name == "IM"
+    assert ch.name == "M"
     assert ch.g_max == pytest.approx(DEFAULT_G_IM)
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.POTASSIUM
@@ -1101,7 +1101,7 @@ def test_make_ikir_channel_defaults():
     from patch_sim.constants import DEFAULT_G_IKIR
 
     ch = make_ikir_channel()
-    assert ch.name == "IKir"
+    assert ch.name == "Kir"
     assert ch.g_max == pytest.approx(DEFAULT_G_IKIR)
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.POTASSIUM
@@ -1188,7 +1188,7 @@ def test_calcium_gating_variable_in_integrator():
         beta=lambda V, ca_i: 0.1,
     )
     ch = IonChannel(
-        name="ITest",
+        name="Test",
         g_max=0.5,
         gating_variables=(cg,),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
@@ -1310,7 +1310,7 @@ def test_make_ikca_channel_defaults():
     from patch_sim.constants import DEFAULT_G_IKCA
 
     ch = make_ikca_channel()
-    assert ch.name == "IKCa"
+    assert ch.name == "KCa"
     assert ch.g_max == pytest.approx(DEFAULT_G_IKCA)
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.POTASSIUM
@@ -1416,7 +1416,7 @@ def test_make_ical_channel_defaults():
     from patch_sim.constants import DEFAULT_G_ICAL
 
     ch = make_ical_channel()
-    assert ch.name == "ICaL"
+    assert ch.name == "CaL"
     assert ch.g_max == pytest.approx(DEFAULT_G_ICAL)
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.CALCIUM
@@ -1531,7 +1531,7 @@ def test_make_icat_channel_defaults():
     from patch_sim.constants import DEFAULT_G_ICAT
 
     ch = make_icat_channel()
-    assert ch.name == "ICaT"
+    assert ch.name == "CaT"
     assert ch.g_max == pytest.approx(DEFAULT_G_ICAT)
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.CALCIUM
@@ -1646,7 +1646,7 @@ def test_make_ican_channel_defaults():
     from patch_sim.constants import DEFAULT_G_ICAN
 
     ch = make_ican_channel()
-    assert ch.name == "ICaN"
+    assert ch.name == "CaN"
     assert ch.g_max == pytest.approx(DEFAULT_G_ICAN)
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.CALCIUM

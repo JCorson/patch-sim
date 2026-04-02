@@ -174,17 +174,17 @@ class IonChannel:
             )
 
     @property
-    def current_field_name(self) -> str:
+    def current_name(self) -> str:
         """Structured-array field name for this channel's current contribution.
 
-        Channels whose name already starts with ``'I'`` (e.g. ``'Ih'``,
-        ``'ICaL'``) use the name as-is.  All others receive an ``'I'`` prefix
-        so that e.g. the ``'Na'`` channel contributes a field named ``'INa'``.
+        Always prepends ``'I'`` to the channel name, so e.g. a channel named
+        ``'Na'`` contributes a field named ``'INa'``, and a channel named
+        ``'h'`` contributes a field named ``'Ih'``.
 
         Returns:
             The field name string used in simulation result structured arrays.
         """
-        return self.name if self.name.startswith("I") else f"I{self.name}"
+        return f"I{self.name}"
 
     def reversal_potential(self, neuron: Any) -> float:
         """Compute the reversal potential from the neuron's ion concentrations.
