@@ -12,7 +12,6 @@ registration does not see a non-testing environment.
 import os
 
 import numpy as np
-import pandas as pd
 import pytest
 
 # Must be set before importing Reflex/AppState so the metaclass and init
@@ -56,20 +55,31 @@ def _make_sweep(label: str = "test", color: str = "#000000") -> Sweep:
     n = 100
     t = np.linspace(0, 50, n)
     zeros = np.zeros(n)
-    df = pd.DataFrame(
-        {
-            "time": t,
-            "voltage": zeros,
-            "total_current": zeros,
-            "Na_current": zeros,
-            "K_current": zeros,
-            "leak_current": zeros,
-            "potassium_activation": zeros,
-            "sodium_activation": zeros,
-            "sodium_inactivation": zeros,
-        }
-    )
-    return Sweep.from_dataframe(df, zeros, label, color, "Current Clamp")
+    fields = [
+        ("time", np.float64),
+        ("voltage", np.float64),
+        ("Itotal", np.float64),
+        ("INa", np.float64),
+        ("IK", np.float64),
+        ("Ileak", np.float64),
+        ("n", np.float64),
+        ("m", np.float64),
+        ("h", np.float64),
+    ]
+    result = np.empty(n, dtype=np.dtype(fields))
+    result["time"] = t
+    for name in (
+        "voltage",
+        "Itotal",
+        "INa",
+        "IK",
+        "Ileak",
+        "n",
+        "m",
+        "h",
+    ):
+        result[name] = zeros
+    return Sweep.from_result(result, zeros, label, color, "Current Clamp")
 
 
 # ---------------------------------------------------------------------------

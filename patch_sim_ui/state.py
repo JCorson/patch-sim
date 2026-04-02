@@ -1342,7 +1342,7 @@ class AppState(rx.State):
                 try:
                     if mode == CURRENT_CLAMP:
                         if use_prior_state:
-                            df = await loop.run_in_executor(
+                            result = await loop.run_in_executor(
                                 None,
                                 patch_sim.simulate_current_clamp_from_state,
                                 neuron,
@@ -1352,7 +1352,7 @@ class AppState(rx.State):
                                 prior_ca_i,
                             )
                         else:
-                            df = await loop.run_in_executor(
+                            result = await loop.run_in_executor(
                                 None,
                                 patch_sim.simulate_current_clamp,
                                 neuron,
@@ -1360,7 +1360,7 @@ class AppState(rx.State):
                             )
                     else:
                         if use_prior_state:
-                            df = await loop.run_in_executor(
+                            result = await loop.run_in_executor(
                                 None,
                                 patch_sim.simulate_voltage_clamp_from_state,
                                 neuron,
@@ -1369,7 +1369,7 @@ class AppState(rx.State):
                                 prior_ca_i,
                             )
                         else:
-                            df = await loop.run_in_executor(
+                            result = await loop.run_in_executor(
                                 None,
                                 patch_sim.simulate_voltage_clamp,
                                 neuron,
@@ -1383,13 +1383,15 @@ class AppState(rx.State):
                     break
 
                 # Extract terminal state for next iteration.
-                last_V = float(df["voltage"].iloc[-1])
+                last_V = float(result["voltage"][-1])
                 gating_vars = {gv.name for gv in neuron.all_gating_variables}
-                gating_cols = [col for col in df.columns if col in gating_vars]
-                last_gating = {col: float(df[col].iloc[-1]) for col in gating_cols}
-                last_ca_i = float(df["ca_i"].iloc[-1]) if "ca_i" in df.columns else 0.0
+                gating_cols = [col for col in result.dtype.names if col in gating_vars]
+                last_gating = {col: float(result[col][-1]) for col in gating_cols}
+                last_ca_i = (
+                    float(result["ca_i"][-1]) if "ca_i" in result.dtype.names else 0.0
+                )
 
-                sweep = Sweep.from_dataframe(df, stimulus, "", "", mode)
+                sweep = Sweep.from_result(result, stimulus, "", "", mode)
 
                 async with self:
                     if not self.continuous_mode:
@@ -1469,7 +1471,7 @@ class AppState(rx.State):
                 def _run_batch() -> list[Sweep]:
                     """Run all sweeps via simulate_batch and assemble Sweep list."""
                     new_sweeps: list[Sweep] = []
-                    for sweep_df, (protocol, label) in zip(
+                    for sweep_result, (protocol, label) in zip(
                         patch_sim.simulate_batch(
                             neuron, [p for p, _ in protocols], sim_fn
                         ),
@@ -1477,8 +1479,8 @@ class AppState(rx.State):
                     ):
                         color_index = len(new_sweeps) % len(constants.SWEEP_COLORS)
                         new_sweeps.append(
-                            Sweep.from_dataframe(
-                                sweep_df,
+                            Sweep.from_result(
+                                sweep_result,
                                 protocol,
                                 label,
                                 constants.SWEEP_COLORS[color_index],
@@ -1493,10 +1495,10 @@ class AppState(rx.State):
 
             else:
                 stimulus, _ = protocols[0]
-                df = await loop.run_in_executor(None, sim_fn, neuron, stimulus)
+                result = await loop.run_in_executor(None, sim_fn, neuron, stimulus)
                 async with self:
                     self.current_sweeps = [
-                        Sweep.from_dataframe(df, stimulus, "", "", mode)
+                        Sweep.from_result(result, stimulus, "", "", mode)
                     ]
 
         except ValueError as exc:

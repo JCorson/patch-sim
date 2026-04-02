@@ -6,7 +6,6 @@ the full end-to-end workflow rather than either component in isolation.
 """
 
 import numpy as np
-import pandas as pd
 
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from patch_sim.hodgkin_huxley import HodgkinHuxley
@@ -27,50 +26,54 @@ from patch_sim.protocols import (
 # ---------------------------------------------------------------------------
 
 CURRENT_CLAMP_COLUMNS = [
+    "time",
     "voltage",
-    "Na_current",
-    "K_current",
-    "leak_current",
-    "total_current",
-    "potassium_activation",
-    "sodium_activation",
-    "sodium_inactivation",
+    "INa",
+    "IK",
+    "Ileak",
+    "Itotal",
+    "n",
+    "m",
+    "h",
 ]
 
 VOLTAGE_CLAMP_COLUMNS = [
+    "time",
     "voltage",
-    "total_current",
-    "Na_current",
-    "K_current",
-    "leak_current",
-    "potassium_activation",
-    "sodium_activation",
-    "sodium_inactivation",
+    "Itotal",
+    "INa",
+    "IK",
+    "Ileak",
+    "n",
+    "m",
+    "h",
 ]
 
 
-def _assert_current_clamp_dataframe(result: pd.DataFrame) -> None:
+def _assert_current_clamp_result(result: np.ndarray) -> None:
     """Shared structural assertions for simulate_current_clamp results."""
-    assert isinstance(result, pd.DataFrame)
-    assert result.index.name == "time"
+    assert isinstance(result, np.ndarray)
+    assert result.dtype.names is not None
+    assert "time" in result.dtype.names
     for col in CURRENT_CLAMP_COLUMNS:
-        assert col in result.columns
-    assert np.isfinite(result.values).all()
+        assert col in result.dtype.names
+    assert all(np.isfinite(result[f]).all() for f in result.dtype.names)
     assert result["voltage"].min() >= -100.0
     assert result["voltage"].max() <= 60.0
-    for gate in ("potassium_activation", "sodium_activation", "sodium_inactivation"):
+    for gate in ("n", "m", "h"):
         assert (result[gate] >= 0.0).all()
         assert (result[gate] <= 1.0).all()
 
 
-def _assert_voltage_clamp_dataframe(result: pd.DataFrame) -> None:
+def _assert_voltage_clamp_result(result: np.ndarray) -> None:
     """Shared structural assertions for simulate_voltage_clamp results."""
-    assert isinstance(result, pd.DataFrame)
-    assert result.index.name == "time"
+    assert isinstance(result, np.ndarray)
+    assert result.dtype.names is not None
+    assert "time" in result.dtype.names
     for col in VOLTAGE_CLAMP_COLUMNS:
-        assert col in result.columns
-    assert np.isfinite(result.values).all()
-    for gate in ("potassium_activation", "sodium_activation", "sodium_inactivation"):
+        assert col in result.dtype.names
+    assert all(np.isfinite(result[f]).all() for f in result.dtype.names)
+    for gate in ("n", "m", "h"):
         assert (result[gate] >= 0.0).all()
         assert (result[gate] <= 1.0).all()
 
@@ -98,7 +101,7 @@ def test_step_current_to_simulation(hh_model: HodgkinHuxley) -> None:
     protocol = step_current(duration=50.0, current_amplitude=15.0)
     result = simulate_current_clamp(hh_model, current_external=protocol)
 
-    _assert_current_clamp_dataframe(result)
+    _assert_current_clamp_result(result)
     assert len(result) == len(protocol)
 
     # A 15 µA/cm² step is suprathreshold — at least one AP expected
@@ -110,7 +113,7 @@ def test_ramp_current_to_simulation(hh_model: HodgkinHuxley) -> None:
     protocol = ramp_current(duration=50.0, start_current=0.0, end_current=30.0)
     result = simulate_current_clamp(hh_model, current_external=protocol)
 
-    _assert_current_clamp_dataframe(result)
+    _assert_current_clamp_result(result)
     assert len(result) == len(protocol)
 
     # Voltage should depart from resting during the ramp
@@ -127,11 +130,11 @@ def test_pulse_train_current_to_simulation(hh_model: HodgkinHuxley) -> None:
     )
     result = simulate_current_clamp(hh_model, current_external=protocol)
 
-    _assert_current_clamp_dataframe(result)
+    _assert_current_clamp_result(result)
     assert len(result) == len(protocol)
 
     # Multiple suprathreshold pulses should evoke multiple APs
-    ap_count = _count_action_potentials(result["voltage"].to_numpy())
+    ap_count = _count_action_potentials(result["voltage"])
     assert ap_count >= 2
 
 
@@ -145,11 +148,11 @@ def test_sinusoidal_current_to_simulation(hh_model: HodgkinHuxley) -> None:
     )
     result = simulate_current_clamp(hh_model, current_external=protocol)
 
-    _assert_current_clamp_dataframe(result)
+    _assert_current_clamp_result(result)
     assert len(result) == len(protocol)
 
     # DC offset ensures net depolarizing drive; voltage should shift from resting
-    initial_voltage = result["voltage"].iloc[0]
+    initial_voltage = result["voltage"][0]
     assert result["voltage"].max() - initial_voltage > 3.0
 
 
@@ -170,13 +173,15 @@ def test_noise_current_to_simulation() -> None:
     result_b = simulate_current_clamp(HodgkinHuxley(), current_external=protocol_b)
     result_c = simulate_current_clamp(HodgkinHuxley(), current_external=protocol_c)
 
-    _assert_current_clamp_dataframe(result_a)
+    _assert_current_clamp_result(result_a)
 
     # Same seed → identical results
-    pd.testing.assert_frame_equal(result_a, result_b)
+    assert result_a.dtype.names is not None
+    for field in result_a.dtype.names:
+        np.testing.assert_array_equal(result_a[field], result_b[field])
 
     # Different seed → different voltage trace
-    assert not result_a["voltage"].equals(result_c["voltage"])
+    assert not np.array_equal(result_a["voltage"], result_c["voltage"])
 
 
 def test_chirp_current_to_simulation(hh_model: HodgkinHuxley) -> None:
@@ -190,7 +195,7 @@ def test_chirp_current_to_simulation(hh_model: HodgkinHuxley) -> None:
     )
     result = simulate_current_clamp(hh_model, current_external=protocol)
 
-    _assert_current_clamp_dataframe(result)
+    _assert_current_clamp_result(result)
     assert len(result) == len(protocol)
 
     # DC offset provides a sustained depolarising drive; voltage should depart
@@ -213,13 +218,13 @@ def test_step_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
     )
     result = simulate_voltage_clamp(hh_model, voltage_protocol=protocol)
 
-    _assert_voltage_clamp_dataframe(result)
+    _assert_voltage_clamp_result(result)
     assert len(result) == len(protocol)
 
     # During the depolarising step there should be inward Na⁺ current
-    step_mask = np.isclose(result["voltage"].to_numpy(), 0.0)
+    step_mask = np.isclose(result["voltage"], 0.0)
     assert step_mask.any(), "No rows matched the step voltage — mask is empty"
-    assert result.loc[step_mask, "Na_current"].min() < -10.0
+    assert result["INa"][step_mask].min() < -10.0
 
 
 def test_ramp_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
@@ -231,17 +236,17 @@ def test_ramp_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
     )
     result = simulate_voltage_clamp(hh_model, voltage_protocol=protocol)
 
-    _assert_voltage_clamp_dataframe(result)
+    _assert_voltage_clamp_result(result)
     assert len(result) == len(protocol)
 
     # Voltage in result should rise monotonically (mirrors the ramp)
-    assert np.isclose(result["voltage"].iloc[0], -80.0)
-    assert np.isclose(result["voltage"].iloc[-1], 40.0)
+    assert np.isclose(result["voltage"][0], -80.0)
+    assert np.isclose(result["voltage"][-1], 40.0)
 
     # K⁺ current (outward) should be higher in second half of ramp
     n = len(result)
-    k_first_half = result["K_current"].iloc[: n // 2].mean()
-    k_second_half = result["K_current"].iloc[n // 2 :].mean()
+    k_first_half = result["IK"][: n // 2].mean()
+    k_second_half = result["IK"][n // 2 :].mean()
     assert k_second_half > k_first_half
 
 
@@ -256,12 +261,12 @@ def test_pulse_train_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
     )
     result = simulate_voltage_clamp(hh_model, voltage_protocol=protocol)
 
-    _assert_voltage_clamp_dataframe(result)
+    _assert_voltage_clamp_result(result)
     assert len(result) == len(protocol)
 
     # Each depolarising pulse should produce an inward Na⁺ transient
     # Verify at least one strong inward Na⁺ event occurred
-    assert result["Na_current"].min() < -10.0
+    assert result["INa"].min() < -10.0
 
 
 # ---------------------------------------------------------------------------
@@ -274,7 +279,7 @@ def test_action_potential_with_step_current(hh_model: HodgkinHuxley) -> None:
     protocol = step_current(duration=50.0, current_amplitude=15.0)
     result = simulate_current_clamp(hh_model, current_external=protocol)
 
-    voltage: np.ndarray = result["voltage"].to_numpy()
+    voltage: np.ndarray = result["voltage"]
 
     # AP peak must exceed +20 mV
     assert float(voltage.max()) > 20.0

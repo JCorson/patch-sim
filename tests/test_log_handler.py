@@ -58,7 +58,7 @@ def clear_buffer():
 # ---------------------------------------------------------------------------
 
 
-def test_ui_log_record_fields():
+def test_ui_log_record_fields() -> None:
     """UILogRecord stores all four fields correctly."""
     rec = UILogRecord(
         timestamp="12:00:00.000",
@@ -77,7 +77,7 @@ def test_ui_log_record_fields():
 # ---------------------------------------------------------------------------
 
 
-def test_emit_appends_to_buffer():
+def test_emit_appends_to_buffer() -> None:
     """A single emitted record appears in the buffer after drain."""
     handler = StateLogHandler()
     _emit(handler, "test message")
@@ -87,7 +87,7 @@ def test_emit_appends_to_buffer():
     assert records[0].level == "INFO"
 
 
-def test_drain_clears_buffer():
+def test_drain_clears_buffer() -> None:
     """After drain() the buffer is empty."""
     handler = StateLogHandler()
     _emit(handler, "msg")
@@ -95,7 +95,7 @@ def test_drain_clears_buffer():
     assert StateLogHandler.drain() == []
 
 
-def test_drain_returns_records_in_emission_order():
+def test_drain_returns_records_in_emission_order() -> None:
     """drain() returns records oldest-first."""
     handler = StateLogHandler()
     for i in range(5):
@@ -104,7 +104,7 @@ def test_drain_returns_records_in_emission_order():
     assert [r.message for r in records] == [f"msg{i}" for i in range(5)]
 
 
-def test_level_name_stored_correctly():
+def test_level_name_stored_correctly() -> None:
     """The level field reflects the emitted record's level name."""
     handler = StateLogHandler()
     _emit(handler, "debug msg", level=logging.DEBUG)
@@ -114,7 +114,7 @@ def test_level_name_stored_correctly():
     assert records[1].level == "WARNING"
 
 
-def test_timestamp_format():
+def test_timestamp_format() -> None:
     """Timestamps match HH:MM:SS.mmm format."""
     import re
 
@@ -129,7 +129,7 @@ def test_timestamp_format():
 # ---------------------------------------------------------------------------
 
 
-def test_buffer_respects_max_log_entries_cap():
+def test_buffer_respects_max_log_entries_cap() -> None:
     """Emitting more than MAX_LOG_ENTRIES records drops the oldest."""
     handler = StateLogHandler()
     for i in range(MAX_LOG_ENTRIES + 10):
@@ -145,7 +145,7 @@ def test_buffer_respects_max_log_entries_cap():
 # ---------------------------------------------------------------------------
 
 
-def test_drain_is_thread_safe():
+def test_drain_is_thread_safe() -> None:
     """Concurrent emits and a drain do not raise or lose records silently."""
     handler = StateLogHandler()
     errors: list[Exception] = []
@@ -175,7 +175,7 @@ def test_drain_is_thread_safe():
 # ---------------------------------------------------------------------------
 
 
-def test_setup_logging_attaches_handler():
+def test_setup_logging_attaches_handler() -> None:
     """setup_logging registers a StateLogHandler on the patch_sim_ui logger."""
     logger = logging.getLogger("patch_sim_ui")
     # Remove any existing handlers first.

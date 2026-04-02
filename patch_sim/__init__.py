@@ -25,6 +25,7 @@ from .channels import (
     NernstSpec,
 )
 from .clamp_simulations import (
+    SimulationResult,
     simulate_batch,
     simulate_current_clamp,
     simulate_current_clamp_from_state,
@@ -121,6 +122,7 @@ __all__ = [
     "make_k_channel",
     "make_leak_channel",
     "make_na_channel",
+    "SimulationResult",
     "simulate_voltage_clamp",
     "simulate_current_clamp",
     "simulate_voltage_clamp_from_state",

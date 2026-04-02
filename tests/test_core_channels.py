@@ -132,9 +132,9 @@ def test_make_na_channel_structure() -> None:
     assert ch.name == "Na"
     assert ch.g_max == pytest.approx(120.0)
     assert len(ch.gating_variables) == 2
-    assert ch.gating_variables[0].name == "sodium_activation"
+    assert ch.gating_variables[0].name == "m"
     assert ch.gating_variables[0].power == 3
-    assert ch.gating_variables[1].name == "sodium_inactivation"
+    assert ch.gating_variables[1].name == "h"
     assert ch.gating_variables[1].power == 1
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.SODIUM
@@ -148,7 +148,7 @@ def test_make_k_channel_structure() -> None:
     assert ch.name == "K"
     assert ch.g_max == pytest.approx(36.0)
     assert len(ch.gating_variables) == 1
-    assert ch.gating_variables[0].name == "potassium_activation"
+    assert ch.gating_variables[0].name == "n"
     assert ch.gating_variables[0].power == 4
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.POTASSIUM
@@ -180,7 +180,7 @@ def test_na_channel_current_matches_inline(V: float) -> None:
 
     m = alpha_m(V, 0.0) / (alpha_m(V, 0.0) + beta_m(V, 0.0))
     h = alpha_h(V, 0.0) / (alpha_h(V, 0.0) + beta_h(V, 0.0))
-    gating_state = {"sodium_activation": m, "sodium_inactivation": h}
+    gating_state = {"m": m, "h": h}
 
     result = ch.compute_current(V, gating_state, neuron)
     E_Na = ch.reversal_potential(neuron)
@@ -195,7 +195,7 @@ def test_k_channel_current_matches_inline(V: float) -> None:
     ch = make_k_channel(g_max=neuron.g_K)
 
     n = alpha_n(V, 0.0) / (alpha_n(V, 0.0) + beta_n(V, 0.0))
-    gating_state = {"potassium_activation": n}
+    gating_state = {"n": n}
 
     result = ch.compute_current(V, gating_state, neuron)
     E_K = ch.reversal_potential(neuron)

@@ -6,7 +6,6 @@ and that each sweep has the expected single-step protocol shape.
 """
 
 import numpy as np
-import pandas as pd
 import pytest
 
 import patch_sim
@@ -68,8 +67,8 @@ def _make_iv_sweeps(
     pre_pulse_duration: float = 5.0,
     post_pulse_duration: float = 5.0,
     holding_voltage: float = -70.0,
-) -> list[tuple[np.ndarray, pd.DataFrame]]:
-    """Run an I-V curve as independent sweeps and return (protocol, df) pairs.
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Run an I-V curve as independent sweeps and return (protocol, result) pairs.
 
     Args:
         voltage_min: Minimum test voltage in mV.
@@ -81,13 +80,13 @@ def _make_iv_sweeps(
         holding_voltage: Holding voltage in mV.
 
     Returns:
-        List of (protocol_array, result_dataframe) tuples, one per voltage.
+        List of (protocol_array, result_array) tuples, one per voltage.
     """
     neuron = patch_sim.HodgkinHuxley()
     sweep_duration = pre_pulse_duration + step_duration + post_pulse_duration
     n_steps = round((voltage_max - voltage_min) / voltage_step) + 1
     voltages = np.linspace(voltage_min, voltage_max, n_steps)
-    results: list[tuple[np.ndarray, pd.DataFrame]] = []
+    results: list[tuple[np.ndarray, np.ndarray]] = []
     for voltage in voltages:
         protocol = patch_sim.step_voltage(
             duration=sweep_duration,
@@ -150,7 +149,7 @@ def test_iv_curve_sweeps_are_independent() -> None:
     from a previous step).
     """
     sweeps = _make_iv_sweeps(voltage_step=20.0)  # fewer sweeps for speed
-    first_currents = [df["total_current"].iloc[0] for _proto, df in sweeps]
+    first_currents = [df["Itotal"][0] for _proto, df in sweeps]
     # All sweeps start at holding voltage → first current values should be
     # nearly identical (same initial state).
     assert max(first_currents) - min(first_currents) == pytest.approx(0.0, abs=1e-6)
@@ -195,7 +194,10 @@ def test_batch_matches_sequential() -> None:
     batch = list(patch_sim.simulate_batch(neuron, protocols, max_workers=2))
     assert len(batch) == len(sequential)
     for seq_df, batch_df in zip(sequential, batch):
-        pd.testing.assert_frame_equal(seq_df, batch_df)
+        assert seq_df.dtype == batch_df.dtype
+        assert seq_df.dtype.names is not None
+        for field in seq_df.dtype.names:
+            np.testing.assert_array_equal(seq_df[field], batch_df[field])
 
 
 def test_batch_single_sweep() -> None:
@@ -209,7 +211,10 @@ def test_batch_single_sweep() -> None:
     results = list(patch_sim.simulate_batch(neuron, protocols, max_workers=2))
     assert len(results) == 1
     expected = simulate_voltage_clamp(neuron, protocols[0])
-    pd.testing.assert_frame_equal(results[0], expected)
+    assert results[0].dtype == expected.dtype
+    assert expected.dtype.names is not None
+    for field in expected.dtype.names:
+        np.testing.assert_array_equal(results[0][field], expected[field])
 
 
 def test_batch_empty_protocols() -> None:
@@ -233,9 +238,9 @@ def test_batch_preserves_order() -> None:
         # Each protocol steps to its commanded voltage — check the peak matches.
         holding = -70.0
         if voltage >= holding:
-            peak = float(np.max(df["voltage"].to_numpy()))
+            peak = float(np.max(df["voltage"]))
         else:
-            peak = float(np.min(df["voltage"].to_numpy()))
+            peak = float(np.min(df["voltage"]))
         assert peak == pytest.approx(float(voltage), abs=1e-6)
 
 
@@ -270,10 +275,11 @@ def test_batch_with_calcium_channels() -> None:
 
     assert len(results) == len(voltages)
     for df in results:
-        assert "ICaL_current" in df.columns
-        assert "ca_i" in df.columns
-        assert "d" in df.columns
-        assert "f" in df.columns
+        assert df.dtype.names is not None
+        assert "ICaL" in df.dtype.names
+        assert "ca_i" in df.dtype.names
+        assert "d" in df.dtype.names
+        assert "f" in df.dtype.names
     # Calcium should accumulate above resting level during the depolarising
     # step (ICaL activates with depolarisation).
     ca_rest = cd.ca_rest
@@ -297,4 +303,7 @@ def test_batch_with_current_clamp() -> None:
     )
     assert len(results) == 1
     expected = simulate_current_clamp(neuron, stimulus)
-    pd.testing.assert_frame_equal(results[0], expected)
+    assert results[0].dtype == expected.dtype
+    assert expected.dtype.names is not None
+    for field in expected.dtype.names:
+        np.testing.assert_array_equal(results[0][field], expected[field])
