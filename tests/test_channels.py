@@ -254,12 +254,12 @@ def test_hh_duplicate_additional_channel_names_raises():
 
 
 def test_hh_builtin_channel_name_collision_raises():
-    """Additional channel named 'Na' collides with built-in and raises ValueError."""
+    """Additional channel named 'INa' collides with built-in and raises ValueError."""
     gv = GatingVariable(
         name="r", power=1, alpha=lambda V, ca_i: 0.1, beta=lambda V, ca_i: 0.1
     )
     ch = IonChannel(
-        name="Na",
+        name="INa",
         g_max=0.1,
         gating_variables=(gv,),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
@@ -310,7 +310,7 @@ def test_current_clamp_no_additional_channels_identical_columns(hh_model):
         step_duration=5.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(hh_model, stim)
+    result = simulate_current_clamp(hh_model, stim)
     expected = {
         "time",
         "voltage",
@@ -322,7 +322,7 @@ def test_current_clamp_no_additional_channels_identical_columns(hh_model):
         "m",
         "h",
     }
-    assert set(df.dtype.names) == expected
+    assert set(result.dtype.names) == expected
 
 
 def test_voltage_clamp_no_additional_channels_identical_columns(hh_model):
@@ -335,7 +335,7 @@ def test_voltage_clamp_no_additional_channels_identical_columns(hh_model):
         holding_voltage=-70.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_voltage_clamp(hh_model, prot)
+    result = simulate_voltage_clamp(hh_model, prot)
     expected = {
         "time",
         "voltage",
@@ -347,7 +347,7 @@ def test_voltage_clamp_no_additional_channels_identical_columns(hh_model):
         "m",
         "h",
     }
-    assert set(df.dtype.names) == expected
+    assert set(result.dtype.names) == expected
 
 
 def test_current_clamp_no_additional_channels_values_unchanged():
@@ -359,9 +359,9 @@ def test_current_clamp_no_additional_channels_values_unchanged():
         step_duration=10.0,
         sampling_frequency=40000.0,
     )
-    df_default = simulate_current_clamp(HodgkinHuxley(), stim)
-    df_empty = simulate_current_clamp(HodgkinHuxley(additional_channels=()), stim)
-    np.testing.assert_array_equal(df_default["voltage"], df_empty["voltage"])
+    result_default = simulate_current_clamp(HodgkinHuxley(), stim)
+    result_empty = simulate_current_clamp(HodgkinHuxley(additional_channels=()), stim)
+    np.testing.assert_array_equal(result_default["voltage"], result_empty["voltage"])
 
 
 # ---------------------------------------------------------------------------
@@ -379,9 +379,9 @@ def test_current_clamp_with_ih_extra_columns():
         step_duration=10.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert "Ih" in df.dtype.names
-    assert "r" in df.dtype.names
+    result = simulate_current_clamp(neuron, stim)
+    assert "Ih" in result.dtype.names
+    assert "r" in result.dtype.names
 
 
 def test_current_clamp_ih_gating_variable_in_bounds():
@@ -394,9 +394,9 @@ def test_current_clamp_ih_gating_variable_in_bounds():
         step_duration=20.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert df["r"].min() >= 0.0
-    assert df["r"].max() <= 1.0
+    result = simulate_current_clamp(neuron, stim)
+    assert result["r"].min() >= 0.0
+    assert result["r"].max() <= 1.0
 
 
 def test_voltage_clamp_with_ih_extra_columns():
@@ -410,9 +410,9 @@ def test_voltage_clamp_with_ih_extra_columns():
         holding_voltage=-70.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_voltage_clamp(neuron, prot)
-    assert "Ih" in df.dtype.names
-    assert "r" in df.dtype.names
+    result = simulate_voltage_clamp(neuron, prot)
+    assert "Ih" in result.dtype.names
+    assert "r" in result.dtype.names
 
 
 def test_voltage_clamp_total_current_includes_ih():
@@ -426,9 +426,9 @@ def test_voltage_clamp_total_current_includes_ih():
         holding_voltage=-70.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_voltage_clamp(neuron, prot)
-    expected = df["INa"] + df["IK"] + df["Ileak"] + df["Ih"]
-    np.testing.assert_allclose(df["Itotal"], expected, rtol=1e-10)
+    result = simulate_voltage_clamp(neuron, prot)
+    expected = result["INa"] + result["IK"] + result["Ileak"] + result["Ih"]
+    np.testing.assert_allclose(result["Itotal"], expected, rtol=1e-10)
 
 
 def test_multiple_optional_channels_coexist():
@@ -451,11 +451,11 @@ def test_multiple_optional_channels_coexist():
         step_duration=5.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert "Ih" in df.dtype.names
-    assert "Iq" in df.dtype.names
-    assert "r" in df.dtype.names
-    assert "q" in df.dtype.names
+    result = simulate_current_clamp(neuron, stim)
+    assert "Ih" in result.dtype.names
+    assert "Iq" in result.dtype.names
+    assert "r" in result.dtype.names
+    assert "q" in result.dtype.names
 
 
 def test_public_api_exports():
@@ -548,10 +548,10 @@ def test_current_clamp_with_ika_extra_columns():
         step_duration=10.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert "IKa" in df.dtype.names
-    assert "a" in df.dtype.names
-    assert "b" in df.dtype.names
+    result = simulate_current_clamp(neuron, stim)
+    assert "IKa" in result.dtype.names
+    assert "a" in result.dtype.names
+    assert "b" in result.dtype.names
 
 
 def test_current_clamp_ika_gating_in_bounds():
@@ -564,11 +564,11 @@ def test_current_clamp_ika_gating_in_bounds():
         step_duration=20.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert df["a"].min() >= 0.0
-    assert df["a"].max() <= 1.0
-    assert df["b"].min() >= 0.0
-    assert df["b"].max() <= 1.0
+    result = simulate_current_clamp(neuron, stim)
+    assert result["a"].min() >= 0.0
+    assert result["a"].max() <= 1.0
+    assert result["b"].min() >= 0.0
+    assert result["b"].max() <= 1.0
 
 
 def test_voltage_clamp_with_ika_extra_columns():
@@ -582,10 +582,10 @@ def test_voltage_clamp_with_ika_extra_columns():
         holding_voltage=-70.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_voltage_clamp(neuron, prot)
-    assert "IKa" in df.dtype.names
-    assert "a" in df.dtype.names
-    assert "b" in df.dtype.names
+    result = simulate_voltage_clamp(neuron, prot)
+    assert "IKa" in result.dtype.names
+    assert "a" in result.dtype.names
+    assert "b" in result.dtype.names
 
 
 def test_ika_and_ih_coexist():
@@ -598,12 +598,12 @@ def test_ika_and_ih_coexist():
         step_duration=10.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert "IKa" in df.dtype.names
-    assert "Ih" in df.dtype.names
-    assert "a" in df.dtype.names
-    assert "b" in df.dtype.names
-    assert "r" in df.dtype.names
+    result = simulate_current_clamp(neuron, stim)
+    assert "IKa" in result.dtype.names
+    assert "Ih" in result.dtype.names
+    assert "a" in result.dtype.names
+    assert "b" in result.dtype.names
+    assert "r" in result.dtype.names
 
 
 def test_public_api_exports_ika():
@@ -695,9 +695,9 @@ def test_current_clamp_with_inap_extra_columns():
         step_duration=10.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert "INaP" in df.dtype.names
-    assert "p" in df.dtype.names
+    result = simulate_current_clamp(neuron, stim)
+    assert "INaP" in result.dtype.names
+    assert "p" in result.dtype.names
 
 
 def test_voltage_clamp_with_inap_extra_columns():
@@ -711,9 +711,9 @@ def test_voltage_clamp_with_inap_extra_columns():
         holding_voltage=-70.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_voltage_clamp(neuron, prot)
-    assert "INaP" in df.dtype.names
-    assert "p" in df.dtype.names
+    result = simulate_voltage_clamp(neuron, prot)
+    assert "INaP" in result.dtype.names
+    assert "p" in result.dtype.names
 
 
 def test_current_clamp_inap_gating_in_bounds():
@@ -726,9 +726,9 @@ def test_current_clamp_inap_gating_in_bounds():
         step_duration=20.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert df["p"].min() >= 0.0
-    assert df["p"].max() <= 1.0
+    result = simulate_current_clamp(neuron, stim)
+    assert result["p"].min() >= 0.0
+    assert result["p"].max() <= 1.0
 
 
 def test_public_api_exports_inap():
@@ -838,10 +838,10 @@ def test_current_clamp_with_inar_extra_columns():
         step_duration=10.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert "INaR" in df.dtype.names
-    assert "s" in df.dtype.names
-    assert "hr" in df.dtype.names
+    result = simulate_current_clamp(neuron, stim)
+    assert "INaR" in result.dtype.names
+    assert "s" in result.dtype.names
+    assert "hr" in result.dtype.names
 
 
 def test_voltage_clamp_with_inar_extra_columns():
@@ -855,10 +855,10 @@ def test_voltage_clamp_with_inar_extra_columns():
         holding_voltage=-70.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_voltage_clamp(neuron, prot)
-    assert "INaR" in df.dtype.names
-    assert "s" in df.dtype.names
-    assert "hr" in df.dtype.names
+    result = simulate_voltage_clamp(neuron, prot)
+    assert "INaR" in result.dtype.names
+    assert "s" in result.dtype.names
+    assert "hr" in result.dtype.names
 
 
 def test_current_clamp_inar_gating_in_bounds():
@@ -871,11 +871,11 @@ def test_current_clamp_inar_gating_in_bounds():
         step_duration=20.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert df["s"].min() >= 0.0
-    assert df["s"].max() <= 1.0
-    assert df["hr"].min() >= 0.0
-    assert df["hr"].max() <= 1.0
+    result = simulate_current_clamp(neuron, stim)
+    assert result["s"].min() >= 0.0
+    assert result["s"].max() <= 1.0
+    assert result["hr"].min() >= 0.0
+    assert result["hr"].max() <= 1.0
 
 
 def test_inap_and_inar_coexist():
@@ -890,12 +890,12 @@ def test_inap_and_inar_coexist():
         step_duration=10.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert "INaP" in df.dtype.names
-    assert "INaR" in df.dtype.names
-    assert "p" in df.dtype.names
-    assert "s" in df.dtype.names
-    assert "hr" in df.dtype.names
+    result = simulate_current_clamp(neuron, stim)
+    assert "INaP" in result.dtype.names
+    assert "INaR" in result.dtype.names
+    assert "p" in result.dtype.names
+    assert "s" in result.dtype.names
+    assert "hr" in result.dtype.names
 
 
 def test_all_additional_channels_coexist():
@@ -921,7 +921,7 @@ def test_all_additional_channels_coexist():
         step_duration=10.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
+    result = simulate_current_clamp(neuron, stim)
     for col in (
         "Ih",
         "IKa",
@@ -931,9 +931,9 @@ def test_all_additional_channels_coexist():
         "IKir",
         "IKCa",
     ):
-        assert col in df.dtype.names
+        assert col in result.dtype.names
     for gate in ("r", "a", "b", "p", "s", "hr", "w", "kir", "q"):
-        assert gate in df.dtype.names
+        assert gate in result.dtype.names
 
 
 def test_public_api_exports_inar():
@@ -1016,9 +1016,9 @@ def test_current_clamp_with_im_extra_columns():
         step_duration=10.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert "IM" in df.dtype.names
-    assert "w" in df.dtype.names
+    result = simulate_current_clamp(neuron, stim)
+    assert "IM" in result.dtype.names
+    assert "w" in result.dtype.names
 
 
 def test_voltage_clamp_with_im_extra_columns():
@@ -1032,9 +1032,9 @@ def test_voltage_clamp_with_im_extra_columns():
         holding_voltage=-70.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_voltage_clamp(neuron, prot)
-    assert "IM" in df.dtype.names
-    assert "w" in df.dtype.names
+    result = simulate_voltage_clamp(neuron, prot)
+    assert "IM" in result.dtype.names
+    assert "w" in result.dtype.names
 
 
 def test_current_clamp_im_gating_in_bounds():
@@ -1047,9 +1047,9 @@ def test_current_clamp_im_gating_in_bounds():
         step_duration=20.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert df["w"].min() >= 0.0
-    assert df["w"].max() <= 1.0
+    result = simulate_current_clamp(neuron, stim)
+    assert result["w"].min() >= 0.0
+    assert result["w"].max() <= 1.0
 
 
 def test_public_api_exports_im():
@@ -1133,9 +1133,9 @@ def test_current_clamp_with_ikir_extra_columns():
         step_duration=10.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert "IKir" in df.dtype.names
-    assert "kir" in df.dtype.names
+    result = simulate_current_clamp(neuron, stim)
+    assert "IKir" in result.dtype.names
+    assert "kir" in result.dtype.names
 
 
 def test_voltage_clamp_with_ikir_extra_columns():
@@ -1149,9 +1149,9 @@ def test_voltage_clamp_with_ikir_extra_columns():
         holding_voltage=-70.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_voltage_clamp(neuron, prot)
-    assert "IKir" in df.dtype.names
-    assert "kir" in df.dtype.names
+    result = simulate_voltage_clamp(neuron, prot)
+    assert "IKir" in result.dtype.names
+    assert "kir" in result.dtype.names
 
 
 def test_current_clamp_ikir_gating_in_bounds():
@@ -1164,9 +1164,9 @@ def test_current_clamp_ikir_gating_in_bounds():
         step_duration=20.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert df["kir"].min() >= 0.0
-    assert df["kir"].max() <= 1.0
+    result = simulate_current_clamp(neuron, stim)
+    assert result["kir"].min() >= 0.0
+    assert result["kir"].max() <= 1.0
 
 
 def test_public_api_exports_ikir():
@@ -1206,9 +1206,9 @@ def test_calcium_gating_variable_in_integrator():
         step_duration=5.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert "ITest" in df.dtype.names
-    assert "q_test" in df.dtype.names
+    result = simulate_current_clamp(neuron, stim)
+    assert "ITest" in result.dtype.names
+    assert "q_test" in result.dtype.names
 
 
 def test_calcium_gating_variable_steady_state_depends_on_ca():
@@ -1239,11 +1239,11 @@ def test_existing_channels_unaffected_by_calcium_gating_infra():
         step_duration=5.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert "Ih" in df.dtype.names
-    assert "IKa" in df.dtype.names
-    assert df["r"].min() >= 0.0
-    assert df["r"].max() <= 1.0
+    result = simulate_current_clamp(neuron, stim)
+    assert "Ih" in result.dtype.names
+    assert "IKa" in result.dtype.names
+    assert result["r"].min() >= 0.0
+    assert result["r"].max() <= 1.0
 
 
 def test_calcium_gating_variable_exported():
@@ -1353,9 +1353,9 @@ def test_current_clamp_with_ikca():
         step_duration=10.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert "IKCa" in df.dtype.names
-    assert "q" in df.dtype.names
+    result = simulate_current_clamp(neuron, stim)
+    assert "IKCa" in result.dtype.names
+    assert "q" in result.dtype.names
 
 
 def test_current_clamp_ikca_gating_in_bounds():
@@ -1373,9 +1373,9 @@ def test_current_clamp_ikca_gating_in_bounds():
         step_duration=20.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert df["q"].min() >= 0.0
-    assert df["q"].max() <= 1.0
+    result = simulate_current_clamp(neuron, stim)
+    assert result["q"].min() >= 0.0
+    assert result["q"].max() <= 1.0
 
 
 def test_public_api_exports_ikca():
@@ -1443,10 +1443,10 @@ def test_current_clamp_with_ical_extra_columns():
         step_duration=10.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert "ICaL" in df.dtype.names
-    assert "d" in df.dtype.names
-    assert "f" in df.dtype.names
+    result = simulate_current_clamp(neuron, stim)
+    assert "ICaL" in result.dtype.names
+    assert "d" in result.dtype.names
+    assert "f" in result.dtype.names
 
 
 def test_current_clamp_ical_gating_in_bounds():
@@ -1464,11 +1464,11 @@ def test_current_clamp_ical_gating_in_bounds():
         step_duration=20.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert df["d"].min() >= 0.0
-    assert df["d"].max() <= 1.0
-    assert df["f"].min() >= 0.0
-    assert df["f"].max() <= 1.0
+    result = simulate_current_clamp(neuron, stim)
+    assert result["d"].min() >= 0.0
+    assert result["d"].max() <= 1.0
+    assert result["f"].min() >= 0.0
+    assert result["f"].max() <= 1.0
 
 
 def test_voltage_clamp_with_ical_extra_columns():
@@ -1487,10 +1487,10 @@ def test_voltage_clamp_with_ical_extra_columns():
         holding_voltage=-70.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_voltage_clamp(neuron, prot)
-    assert "ICaL" in df.dtype.names
-    assert "d" in df.dtype.names
-    assert "f" in df.dtype.names
+    result = simulate_voltage_clamp(neuron, prot)
+    assert "ICaL" in result.dtype.names
+    assert "d" in result.dtype.names
+    assert "f" in result.dtype.names
 
 
 def test_public_api_exports_ical():
@@ -1558,10 +1558,10 @@ def test_current_clamp_with_icat_extra_columns():
         step_duration=10.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert "ICaT" in df.dtype.names
-    assert "dt" in df.dtype.names
-    assert "ft" in df.dtype.names
+    result = simulate_current_clamp(neuron, stim)
+    assert "ICaT" in result.dtype.names
+    assert "dt" in result.dtype.names
+    assert "ft" in result.dtype.names
 
 
 def test_current_clamp_icat_gating_in_bounds():
@@ -1579,11 +1579,11 @@ def test_current_clamp_icat_gating_in_bounds():
         step_duration=20.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert df["dt"].min() >= 0.0
-    assert df["dt"].max() <= 1.0
-    assert df["ft"].min() >= 0.0
-    assert df["ft"].max() <= 1.0
+    result = simulate_current_clamp(neuron, stim)
+    assert result["dt"].min() >= 0.0
+    assert result["dt"].max() <= 1.0
+    assert result["ft"].min() >= 0.0
+    assert result["ft"].max() <= 1.0
 
 
 def test_voltage_clamp_with_icat_extra_columns():
@@ -1602,10 +1602,10 @@ def test_voltage_clamp_with_icat_extra_columns():
         holding_voltage=-70.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_voltage_clamp(neuron, prot)
-    assert "ICaT" in df.dtype.names
-    assert "dt" in df.dtype.names
-    assert "ft" in df.dtype.names
+    result = simulate_voltage_clamp(neuron, prot)
+    assert "ICaT" in result.dtype.names
+    assert "dt" in result.dtype.names
+    assert "ft" in result.dtype.names
 
 
 def test_public_api_exports_icat():
@@ -1673,10 +1673,10 @@ def test_current_clamp_with_ican_extra_columns():
         step_duration=10.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert "ICaN" in df.dtype.names
-    assert "dn" in df.dtype.names
-    assert "fn" in df.dtype.names
+    result = simulate_current_clamp(neuron, stim)
+    assert "ICaN" in result.dtype.names
+    assert "dn" in result.dtype.names
+    assert "fn" in result.dtype.names
 
 
 def test_current_clamp_ican_gating_in_bounds():
@@ -1694,11 +1694,11 @@ def test_current_clamp_ican_gating_in_bounds():
         step_duration=20.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_current_clamp(neuron, stim)
-    assert df["dn"].min() >= 0.0
-    assert df["dn"].max() <= 1.0
-    assert df["fn"].min() >= 0.0
-    assert df["fn"].max() <= 1.0
+    result = simulate_current_clamp(neuron, stim)
+    assert result["dn"].min() >= 0.0
+    assert result["dn"].max() <= 1.0
+    assert result["fn"].min() >= 0.0
+    assert result["fn"].max() <= 1.0
 
 
 def test_voltage_clamp_with_ican_extra_columns():
@@ -1717,10 +1717,10 @@ def test_voltage_clamp_with_ican_extra_columns():
         holding_voltage=-70.0,
         sampling_frequency=40000.0,
     )
-    df = simulate_voltage_clamp(neuron, prot)
-    assert "ICaN" in df.dtype.names
-    assert "dn" in df.dtype.names
-    assert "fn" in df.dtype.names
+    result = simulate_voltage_clamp(neuron, prot)
+    assert "ICaN" in result.dtype.names
+    assert "dn" in result.dtype.names
+    assert "fn" in result.dtype.names
 
 
 def test_public_api_exports_ican():

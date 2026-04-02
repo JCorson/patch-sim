@@ -115,8 +115,8 @@ def make_na_channel(g_max: float) -> IonChannel:
     and inactivation gate *h* (power 1).  The reversal potential is computed
     dynamically via the Nernst equation for Na⁺.
 
-    Gating variable names are ``"m"`` and ``"h"``, matching the DataFrame
-    column names used throughout the simulator.
+    Gating variable names are ``"m"`` and ``"h"``, matching the simulation
+    result fields used throughout the simulator.
 
     Args:
         g_max: Maximum conductance in mS/cm².
@@ -126,7 +126,7 @@ def make_na_channel(g_max: float) -> IonChannel:
         channel.
     """
     return IonChannel(
-        name="Na",
+        name="INa",
         g_max=g_max,
         gating_variables=(
             GatingVariable(name="m", power=3, alpha=alpha_m, beta=beta_m),
@@ -142,7 +142,7 @@ def make_k_channel(g_max: float) -> IonChannel:
     Uses the classic HH activation gate *n* (power 4).  The reversal potential
     is computed dynamically via the Nernst equation for K⁺.
 
-    The gating variable name is ``"n"``, matching the DataFrame column name
+    The gating variable name is ``"n"``, matching the simulation result field
     used throughout the simulator.
 
     Args:
@@ -153,7 +153,7 @@ def make_k_channel(g_max: float) -> IonChannel:
         rectifier K⁺ channel.
     """
     return IonChannel(
-        name="K",
+        name="IK",
         g_max=g_max,
         gating_variables=(
             GatingVariable(name="n", power=4, alpha=alpha_n, beta=beta_n),
@@ -175,7 +175,7 @@ def make_leak_channel(g_max: float) -> IonChannel:
         An :class:`~patch_sim.channels.IonChannel` representing the leak channel.
     """
     return IonChannel(
-        name="leak",
+        name="Ileak",
         g_max=g_max,
         gating_variables=(),
         reversal_spec=NernstSpec(IonSpecies.CHLORIDE),

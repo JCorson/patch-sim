@@ -129,7 +129,7 @@ def test_make_na_channel_structure() -> None:
     """make_na_channel returns a channel with correct name, gates, and reversal spec."""
     ch = make_na_channel(g_max=120.0)
     assert isinstance(ch, IonChannel)
-    assert ch.name == "Na"
+    assert ch.name == "INa"
     assert ch.g_max == pytest.approx(120.0)
     assert len(ch.gating_variables) == 2
     assert ch.gating_variables[0].name == "m"
@@ -145,7 +145,7 @@ def test_make_k_channel_structure() -> None:
     """make_k_channel returns a channel with correct name, gate, and reversal spec."""
     ch = make_k_channel(g_max=36.0)
     assert isinstance(ch, IonChannel)
-    assert ch.name == "K"
+    assert ch.name == "IK"
     assert ch.g_max == pytest.approx(36.0)
     assert len(ch.gating_variables) == 1
     assert ch.gating_variables[0].name == "n"
@@ -159,7 +159,7 @@ def test_make_leak_channel_structure() -> None:
     """make_leak_channel returns a channel with no gates and Cl⁻ reversal spec."""
     ch = make_leak_channel(g_max=0.3)
     assert isinstance(ch, IonChannel)
-    assert ch.name == "leak"
+    assert ch.name == "Ileak"
     assert ch.g_max == pytest.approx(0.3)
     assert len(ch.gating_variables) == 0
     assert isinstance(ch.reversal_spec, NernstSpec)

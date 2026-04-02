@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 #: Each result is a NumPy structured array with one element per time step.
 #: Field ``"time"`` holds the time axis in milliseconds; remaining fields are
 #: named columns (e.g. ``"voltage"``, ``"Itotal"``, per-channel current fields
-#: named via :func:`_current_field_name`, gating variables, and optionally
+#: named after each channel (e.g. ``"INa"``, ``"IK"``), gating variables, and optionally
 #: ``"ca_i"``).
 SimulationResult: TypeAlias = np.ndarray
 
@@ -282,22 +282,6 @@ def _rk4_step_current_clamp(
     return V_new, new_state, new_ca
 
 
-def _current_field_name(ch_name: str) -> str:
-    """Return the structured-array field name for a channel's current.
-
-    Additional channels whose names already start with ``"I"`` (e.g. ``"Ih"``,
-    ``"ICaL"``) are used as-is.  Classic channels (``"Na"``, ``"K"``,
-    ``"leak"``) are prefixed: ``"INa"``, ``"IK"``, ``"Ileak"``.
-
-    Args:
-        ch_name: The channel's ``name`` attribute.
-
-    Returns:
-        The field name string to use in the output structured array.
-    """
-    return ch_name if ch_name.startswith("I") else f"I{ch_name}"
-
-
 def _simulate_voltage_clamp_core(
     neuron: "HodgkinHuxley",
     voltage_protocol: np.ndarray,
@@ -390,7 +374,7 @@ def _simulate_voltage_clamp_core(
         ("Itotal", np.float64),
     ]
     for ch in neuron.all_channels:
-        fields.append((_current_field_name(ch.name), np.float64))
+        fields.append((ch.name, np.float64))
     for gv in neuron.all_gating_variables:
         fields.append((gv.name, np.float64))
     if ca_arr is not None:
@@ -401,7 +385,7 @@ def _simulate_voltage_clamp_core(
     results["voltage"] = voltage_protocol
     results["Itotal"] = I_total
     for ch in neuron.all_channels:
-        results[_current_field_name(ch.name)] = ch_current_arrs[ch.name]
+        results[ch.name] = ch_current_arrs[ch.name]
     for gv in neuron.all_gating_variables:
         results[gv.name] = gating_arrs[gv.name]
     if ca_arr is not None:
@@ -505,7 +489,7 @@ def _simulate_current_clamp_core(
     # Assemble output structured array
     fields: list[tuple[str, type]] = [("time", np.float64), ("voltage", np.float64)]
     for ch in neuron.all_channels:
-        fields.append((_current_field_name(ch.name), np.float64))
+        fields.append((ch.name, np.float64))
     fields.append(("Itotal", np.float64))
     for gv in neuron.all_gating_variables:
         fields.append((gv.name, np.float64))
@@ -516,7 +500,7 @@ def _simulate_current_clamp_core(
     results["time"] = time_array
     results["voltage"] = V_arr
     for ch in neuron.all_channels:
-        results[_current_field_name(ch.name)] = ch_current_arrs[ch.name]
+        results[ch.name] = ch_current_arrs[ch.name]
     results["Itotal"] = I_total
     for gv in neuron.all_gating_variables:
         results[gv.name] = gating_arrs[gv.name]
@@ -541,10 +525,9 @@ def simulate_voltage_clamp(
     The simulation always uses :data:`SIM_SAMPLING_FREQ` (40 kHz, dt = 0.025 ms)
     as the integration time step.
 
-    All ion channels — core (Na, K, leak) and additional — are handled via a
-    single unified loop. The result includes a field named via
-    :func:`_current_field_name` for every channel and a field for every gating
-    variable.
+    All ion channels — core (INa, IK, Ileak) and additional — are handled via a
+    single unified loop. The result includes a field named after each channel
+    for every channel and a field for every gating variable.
 
     When the neuron has ``calcium_dynamics`` configured, a ``ca_i`` field
     containing intracellular Ca²⁺ concentration in mM is included.
@@ -586,10 +569,9 @@ def simulate_current_clamp(
     The simulation always uses :data:`SIM_SAMPLING_FREQ` (40 kHz, dt = 0.025 ms)
     as the integration time step.
 
-    All ion channels — core (Na, K, leak) and additional — are handled via a
-    single unified loop. The result includes a field named via
-    :func:`_current_field_name` for every channel (including core channels)
-    and ``"Itotal"``.
+    All ion channels — core (INa, IK, Ileak) and additional — are handled via a
+    single unified loop. The result includes a field named after each channel
+    for every channel (including core channels) and ``"Itotal"``.
 
     When the neuron has ``calcium_dynamics`` configured, a ``ca_i`` field
     containing intracellular Ca²⁺ concentration in mM is included.
