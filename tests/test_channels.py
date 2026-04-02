@@ -365,12 +365,12 @@ def test_current_clamp_no_additional_channels_values_unchanged():
 
 
 # ---------------------------------------------------------------------------
-# Ih channel integration tests
+# h channel integration tests
 # ---------------------------------------------------------------------------
 
 
 def test_current_clamp_with_ih_extra_columns():
-    """Current clamp with Ih channel adds Ih and r columns."""
+    """Current clamp with h channel adds Ih and r columns."""
     neuron = HodgkinHuxley(additional_channels=(make_ih_channel(),))
     stim = step_current(
         duration=20.0,
@@ -400,7 +400,7 @@ def test_current_clamp_ih_gating_variable_in_bounds():
 
 
 def test_voltage_clamp_with_ih_extra_columns():
-    """Voltage clamp with Ih channel adds Ih and r columns."""
+    """Voltage clamp with h channel adds Ih and r columns."""
     neuron = HodgkinHuxley(additional_channels=(make_ih_channel(),))
     prot = step_voltage(
         duration=20.0,
@@ -539,7 +539,7 @@ def test_make_ika_channel_custom_params():
 
 
 def test_current_clamp_with_ika_extra_columns():
-    """Current clamp with IKa channel adds IKa, a, and b columns."""
+    """Current clamp with Ka channel adds IKa, a, and b columns."""
     neuron = HodgkinHuxley(additional_channels=(make_ika_channel(),))
     stim = step_current(
         duration=20.0,
@@ -572,7 +572,7 @@ def test_current_clamp_ika_gating_in_bounds():
 
 
 def test_voltage_clamp_with_ika_extra_columns():
-    """Voltage clamp with IKa channel adds IKa, a, and b columns."""
+    """Voltage clamp with Ka channel adds IKa, a, and b columns."""
     neuron = HodgkinHuxley(additional_channels=(make_ika_channel(),))
     prot = step_voltage(
         duration=20.0,
@@ -589,7 +589,7 @@ def test_voltage_clamp_with_ika_extra_columns():
 
 
 def test_ika_and_ih_coexist():
-    """IKa and Ih channels can coexist and each contributes its columns."""
+    """Ka and h channels can coexist and each contributes its columns."""
     neuron = HodgkinHuxley(additional_channels=(make_ika_channel(), make_ih_channel()))
     stim = step_current(
         duration=20.0,
@@ -686,7 +686,7 @@ def test_make_inap_channel_custom_params():
 
 
 def test_current_clamp_with_inap_extra_columns():
-    """Current clamp with INaP channel adds INaP and p columns."""
+    """Current clamp with NaP channel adds INaP and p columns."""
     neuron = HodgkinHuxley(additional_channels=(make_inap_channel(),))
     stim = step_current(
         duration=20.0,
@@ -701,7 +701,7 @@ def test_current_clamp_with_inap_extra_columns():
 
 
 def test_voltage_clamp_with_inap_extra_columns():
-    """Voltage clamp with INaP channel adds INaP and p columns."""
+    """Voltage clamp with NaP channel adds INaP and p columns."""
     neuron = HodgkinHuxley(additional_channels=(make_inap_channel(),))
     prot = step_voltage(
         duration=20.0,
@@ -829,7 +829,7 @@ def test_make_inar_channel_custom_params():
 
 
 def test_current_clamp_with_inar_extra_columns():
-    """Current clamp with INaR channel adds INaR, s, and hr columns."""
+    """Current clamp with NaR channel adds INaR, s, and hr columns."""
     neuron = HodgkinHuxley(additional_channels=(make_inar_channel(),))
     stim = step_current(
         duration=20.0,
@@ -845,7 +845,7 @@ def test_current_clamp_with_inar_extra_columns():
 
 
 def test_voltage_clamp_with_inar_extra_columns():
-    """Voltage clamp with INaR channel adds INaR, s, and hr columns."""
+    """Voltage clamp with NaR channel adds INaR, s, and hr columns."""
     neuron = HodgkinHuxley(additional_channels=(make_inar_channel(),))
     prot = step_voltage(
         duration=20.0,
@@ -879,7 +879,7 @@ def test_current_clamp_inar_gating_in_bounds():
 
 
 def test_inap_and_inar_coexist():
-    """INaP and INaR channels can coexist and each contributes columns."""
+    """NaP and NaR channels can coexist and each contributes columns."""
     neuron = HodgkinHuxley(
         additional_channels=(make_inap_channel(), make_inar_channel())
     )
@@ -1007,7 +1007,7 @@ def test_make_im_channel_custom_params():
 
 
 def test_current_clamp_with_im_extra_columns():
-    """Current clamp with IM channel adds IM and w columns."""
+    """Current clamp with M channel adds IM and w columns."""
     neuron = HodgkinHuxley(additional_channels=(make_im_channel(),))
     stim = step_current(
         duration=20.0,
@@ -1022,7 +1022,7 @@ def test_current_clamp_with_im_extra_columns():
 
 
 def test_voltage_clamp_with_im_extra_columns():
-    """Voltage clamp with IM channel adds IM and w columns."""
+    """Voltage clamp with M channel adds IM and w columns."""
     neuron = HodgkinHuxley(additional_channels=(make_im_channel(),))
     prot = step_voltage(
         duration=20.0,
@@ -1124,7 +1124,7 @@ def test_make_ikir_channel_custom_params():
 
 
 def test_current_clamp_with_ikir_extra_columns():
-    """Current clamp with IKir channel adds IKir and kir columns."""
+    """Current clamp with Kir channel adds IKir and kir columns."""
     neuron = HodgkinHuxley(additional_channels=(make_ikir_channel(),))
     stim = step_current(
         duration=20.0,
@@ -1139,7 +1139,7 @@ def test_current_clamp_with_ikir_extra_columns():
 
 
 def test_voltage_clamp_with_ikir_extra_columns():
-    """Voltage clamp with IKir channel adds IKir and kir columns."""
+    """Voltage clamp with Kir channel adds IKir and kir columns."""
     neuron = HodgkinHuxley(additional_channels=(make_ikir_channel(),))
     prot = step_voltage(
         duration=20.0,
@@ -1339,7 +1339,7 @@ def test_ikca_is_not_calcium_ion_channel():
 
 
 def test_current_clamp_with_ikca():
-    """Current clamp with IKCa channel adds IKCa and q columns."""
+    """Current clamp with KCa channel adds IKCa and q columns."""
     from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
@@ -1429,7 +1429,7 @@ def test_make_ical_channel_defaults():
 
 
 def test_current_clamp_with_ical_extra_columns():
-    """Current clamp with ICaL channel adds ICaL, d, and f columns."""
+    """Current clamp with CaL channel adds ICaL, d, and f columns."""
     from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
@@ -1472,7 +1472,7 @@ def test_current_clamp_ical_gating_in_bounds():
 
 
 def test_voltage_clamp_with_ical_extra_columns():
-    """Voltage clamp with ICaL channel adds ICaL, d, and f columns."""
+    """Voltage clamp with CaL channel adds ICaL, d, and f columns."""
     from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
@@ -1544,7 +1544,7 @@ def test_make_icat_channel_defaults():
 
 
 def test_current_clamp_with_icat_extra_columns():
-    """Current clamp with ICaT channel adds ICaT, dt, and ft columns."""
+    """Current clamp with CaT channel adds ICaT, dt, and ft columns."""
     from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
@@ -1587,7 +1587,7 @@ def test_current_clamp_icat_gating_in_bounds():
 
 
 def test_voltage_clamp_with_icat_extra_columns():
-    """Voltage clamp with ICaT channel adds ICaT, dt, and ft columns."""
+    """Voltage clamp with CaT channel adds ICaT, dt, and ft columns."""
     from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
