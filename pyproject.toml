@@ -31,15 +31,18 @@ patch_sim = {path = "./patch_sim", editable = true}
 exclude = ["scratch/"]
 
 [[tool.mypy.overrides]]
-module = ["patch_sim_ui.*", "reflex.*", "plotly.*", "rxconfig"]
-ignore_errors = true
-
-[[tool.mypy.overrides]]
 # test_state.py uses Reflex internals (_reflex_internal_init) and accesses
 # dynamically-generated AppState attributes (set_duration, set_show_voltage,
 # etc.) that mypy cannot resolve from the class definition alone.
 # test_plotting.py imports plotly directly; plotly has no type stubs.
-module = ["tests.test_state", "tests.test_plotting"]
+module = [
+    "patch_sim_ui.*",
+    "reflex.*",
+    "plotly.*",
+    "rxconfig",
+    "tests.test_state",
+    "tests.test_plotting",
+    ]
 ignore_errors = true
 
 [tool.pytest.ini_options]
