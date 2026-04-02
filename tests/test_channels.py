@@ -254,12 +254,12 @@ def test_hh_duplicate_additional_channel_names_raises():
 
 
 def test_hh_builtin_channel_name_collision_raises():
-    """Additional channel named 'INa' collides with built-in and raises ValueError."""
+    """Additional channel named 'Na' collides with built-in and raises ValueError."""
     gv = GatingVariable(
         name="r", power=1, alpha=lambda V, ca_i: 0.1, beta=lambda V, ca_i: 0.1
     )
     ch = IonChannel(
-        name="INa",
+        name="Na",
         g_max=0.1,
         gating_variables=(gv,),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),

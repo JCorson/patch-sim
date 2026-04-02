@@ -374,7 +374,7 @@ def _simulate_voltage_clamp_core(
         ("Itotal", np.float64),
     ]
     for ch in neuron.all_channels:
-        fields.append((ch.name, np.float64))
+        fields.append((ch.current_field_name, np.float64))
     for gv in neuron.all_gating_variables:
         fields.append((gv.name, np.float64))
     if ca_arr is not None:
@@ -385,7 +385,7 @@ def _simulate_voltage_clamp_core(
     results["voltage"] = voltage_protocol
     results["Itotal"] = I_total
     for ch in neuron.all_channels:
-        results[ch.name] = ch_current_arrs[ch.name]
+        results[ch.current_field_name] = ch_current_arrs[ch.name]
     for gv in neuron.all_gating_variables:
         results[gv.name] = gating_arrs[gv.name]
     if ca_arr is not None:
@@ -489,7 +489,7 @@ def _simulate_current_clamp_core(
     # Assemble output structured array
     fields: list[tuple[str, type]] = [("time", np.float64), ("voltage", np.float64)]
     for ch in neuron.all_channels:
-        fields.append((ch.name, np.float64))
+        fields.append((ch.current_field_name, np.float64))
     fields.append(("Itotal", np.float64))
     for gv in neuron.all_gating_variables:
         fields.append((gv.name, np.float64))
@@ -500,7 +500,7 @@ def _simulate_current_clamp_core(
     results["time"] = time_array
     results["voltage"] = V_arr
     for ch in neuron.all_channels:
-        results[ch.name] = ch_current_arrs[ch.name]
+        results[ch.current_field_name] = ch_current_arrs[ch.name]
     results["Itotal"] = I_total
     for gv in neuron.all_gating_variables:
         results[gv.name] = gating_arrs[gv.name]

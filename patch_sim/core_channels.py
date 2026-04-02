@@ -126,7 +126,7 @@ def make_na_channel(g_max: float) -> IonChannel:
         channel.
     """
     return IonChannel(
-        name="INa",
+        name="Na",
         g_max=g_max,
         gating_variables=(
             GatingVariable(name="m", power=3, alpha=alpha_m, beta=beta_m),
@@ -153,7 +153,7 @@ def make_k_channel(g_max: float) -> IonChannel:
         rectifier K⁺ channel.
     """
     return IonChannel(
-        name="IK",
+        name="K",
         g_max=g_max,
         gating_variables=(
             GatingVariable(name="n", power=4, alpha=alpha_n, beta=beta_n),
@@ -175,7 +175,7 @@ def make_leak_channel(g_max: float) -> IonChannel:
         An :class:`~patch_sim.channels.IonChannel` representing the leak channel.
     """
     return IonChannel(
-        name="Ileak",
+        name="leak",
         g_max=g_max,
         gating_variables=(),
         reversal_spec=NernstSpec(IonSpecies.CHLORIDE),

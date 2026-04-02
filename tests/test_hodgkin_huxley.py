@@ -21,9 +21,9 @@ def test_core_channels_structure(hh_model: HodgkinHuxley) -> None:
     """core_channels returns (Na, K, leak) IonChannel tuple in that order."""
     chs = hh_model.core_channels
     assert len(chs) == 3
-    assert chs[0].name == "INa"
-    assert chs[1].name == "IK"
-    assert chs[2].name == "Ileak"
+    assert chs[0].name == "Na"
+    assert chs[1].name == "K"
+    assert chs[2].name == "leak"
     assert all(isinstance(ch, IonChannel) for ch in chs)
 
 

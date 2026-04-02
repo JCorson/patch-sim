@@ -114,7 +114,7 @@ class HodgkinHuxley:
         ]:
             if value <= 0:
                 raise ValueError(f"Ion concentration ({name}) must be positive.")
-        _BUILTIN_NAMES = {"INa", "IK", "Ileak"}
+        _BUILTIN_NAMES = {"Na", "K", "leak"}
         ch_names = [ch.name for ch in self.additional_channels]
         if len(ch_names) != len(set(ch_names)):
             raise ValueError(
@@ -124,7 +124,7 @@ class HodgkinHuxley:
             if ch_name in _BUILTIN_NAMES:
                 raise ValueError(
                     f"Additional channel name '{ch_name}' collides with a built-in "
-                    "channel name (INa, IK, Ileak)."
+                    "channel name (Na, K, leak)."
                 )
         logger.debug(
             "HodgkinHuxley: g_Na=%.1f g_K=%.1f g_L=%.3f C_m=%.2f T=%.1f K "

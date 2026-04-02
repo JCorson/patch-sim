@@ -20,9 +20,6 @@ ignore = []
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
-[project.optional-dependencies]
-ui = ["reflex>=0.8", "plotly"]
-
 [tool.uv.sources]
 patch_sim = {path = "./patch_sim", editable = true}
 
@@ -56,4 +53,8 @@ dev = [
     "pytest>=7",
     "pytest-cov>=7.0.0",
     "ruff>=0.1",
+]
+ui = [
+    "plotly>=5",
+    "reflex>=0.8",
 ]
