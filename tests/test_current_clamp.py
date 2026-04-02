@@ -29,15 +29,15 @@ def test_simulate_current_clamp_returns_structured_array(hh_model):
     # Check that result has the expected fields
     expected_columns = [
         "voltage",
-        "potassium_activation",
-        "sodium_activation",
-        "sodium_inactivation",
+        "n",
+        "m",
+        "h",
     ]
     for col in expected_columns:
         assert col in result.dtype.names
 
     # Check that gating variables are within physiological bounds (0 to 1)
-    gating_vars = ["potassium_activation", "sodium_activation", "sodium_inactivation"]
+    gating_vars = ["n", "m", "h"]
     for gating_var in gating_vars:
         assert (result[gating_var] >= 0).all()
         assert (result[gating_var] <= 1).all()
@@ -72,7 +72,7 @@ def test_simulation_dynamics():
     assert any(result["voltage"] > threshold)
 
     # Sodium activation should increase during depolarization
-    assert result["sodium_activation"].max() > result["sodium_activation"][0]
+    assert result["m"].max() > result["m"][0]
 
 
 def test_simulate_current_clamp_with_zero_current(hh_model):
@@ -95,9 +95,9 @@ def test_simulate_current_clamp_with_zero_current(hh_model):
     assert result.dtype.names is not None
     expected_columns = [
         "voltage",
-        "potassium_activation",
-        "sodium_activation",
-        "sodium_inactivation",
+        "n",
+        "m",
+        "h",
     ]
     for col in expected_columns:
         assert col in result.dtype.names
@@ -133,9 +133,9 @@ def test_simulate_current_clamp_with_non_zero_currents(current_amplitude: float)
     assert result.dtype.names is not None
     expected_columns = [
         "voltage",
-        "potassium_activation",
-        "sodium_activation",
-        "sodium_inactivation",
+        "n",
+        "m",
+        "h",
     ]
     for col in expected_columns:
         assert col in result.dtype.names
@@ -151,9 +151,9 @@ def test_simulate_current_clamp_with_non_zero_currents(current_amplitude: float)
 
     # Check that gating variables are within physiological bounds
     gating_vars = [
-        "potassium_activation",
-        "sodium_activation",
-        "sodium_inactivation",
+        "n",
+        "m",
+        "h",
     ]
     for gating_var in gating_vars:
         assert (result[gating_var] >= 0).all()

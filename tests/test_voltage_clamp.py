@@ -28,13 +28,13 @@ def test_simulate_voltage_clamp_returns_structured_array(hh_model):
     # Check that result has expected fields
     expected_columns = [
         "voltage",
-        "total_current",
-        "Na_current",
-        "K_current",
-        "leak_current",
-        "potassium_activation",
-        "sodium_activation",
-        "sodium_inactivation",
+        "Itotal",
+        "INa",
+        "IK",
+        "Ileak",
+        "n",
+        "m",
+        "h",
     ]
     for col in expected_columns:
         assert col in result.dtype.names
@@ -56,7 +56,7 @@ def test_voltage_clamp_constant_voltage(hh_model):
 
     # At resting potential, the current might not be exactly zero
     # Check that current settles to a relatively small value
-    assert abs(result_rest["total_current"][-1]) < 10.0
+    assert abs(result_rest["Itotal"][-1]) < 10.0
 
     # Test at depolarized potential
     depolarized_voltage = np.full(num_steps, 0.0)  # 0 mV is strongly depolarized
@@ -66,17 +66,17 @@ def test_voltage_clamp_constant_voltage(hh_model):
 
     # Depolarization should activate Na+ and K+ channels
     # Na+ current should be significant at depolarized voltages
-    na_currents = result_depol["Na_current"]
+    na_currents = result_depol["INa"]
     assert (
         min(na_currents) < -10.0
     )  # Check for inward Na+ current at depolarized voltage
 
     # In our implementation, we should see some K+ current
-    k_currents = result_depol["K_current"]
+    k_currents = result_depol["IK"]
     assert max(k_currents) > 0  # Should have some outward K+ current
 
     # K+ current should increase (outward/positive) and remain elevated
-    k_currents = result_depol["K_current"]
+    k_currents = result_depol["IK"]
     assert max(k_currents) > 10.0  # Strong outward K+ current
     assert k_currents[-1] > 0.8 * max(k_currents)  # K+ current remains high
 
@@ -115,19 +115,17 @@ def test_voltage_step_protocol():
     step_start_idx = hold_steps
 
     # Sodium current should be large (negative) shortly after the step
-    na_currents_during_step = result["Na_current"][step_start_idx : step_start_idx + 20]
+    na_currents_during_step = result["INa"][step_start_idx : step_start_idx + 20]
     assert min(na_currents_during_step) < -30.0
 
     # Sodium current should inactivate during the sustained step
     # Compare early step vs late step
-    early_step_na = result["Na_current"][step_start_idx + 5]
-    late_step_na = result["Na_current"][step_start_idx + step_steps - 5]
+    early_step_na = result["INa"][step_start_idx + 5]
+    late_step_na = result["INa"][step_start_idx + step_steps - 5]
     assert abs(late_step_na) < abs(early_step_na)
 
     # Potassium current should increase and remain elevated during the step
-    k_currents_during_step = result["K_current"][
-        step_start_idx : step_start_idx + step_steps
-    ]
+    k_currents_during_step = result["IK"][step_start_idx : step_start_idx + step_steps]
     # Should start small and increase
     assert k_currents_during_step[0] < 5.0
     assert max(k_currents_during_step) > 10.0
@@ -156,10 +154,10 @@ def test_voltage_clamp_i_v_relationship():
         )
 
         # Get steady-state total current (last time point)
-        steady_state_currents.append(result["total_current"][-1])
+        steady_state_currents.append(result["Itotal"][-1])
 
         # Get peak sodium current (minimum value, since inward current is negative)
-        peak_na_currents.append(min(result["Na_current"]))
+        peak_na_currents.append(min(result["INa"]))
 
     # Verify that steady-state current generally increases with voltage
     # Check a few specific points instead of correlation to avoid NaN issues
@@ -216,7 +214,7 @@ def test_voltage_ramp_protocol():
     assert np.isclose(result["voltage"][-1], 40.0)
 
     # The sodium current should be largest (most negative) at some intermediate voltage
-    na_current_min_idx = int(np.argmin(result["Na_current"]))
+    na_current_min_idx = int(np.argmin(result["INa"]))
     min_current_voltage = result["voltage"][na_current_min_idx]
 
     # The peak Na current should occur at a moderately negative voltage
@@ -224,8 +222,8 @@ def test_voltage_ramp_protocol():
 
     # Potassium current should generally increase with depolarization
     k_current_segments = [
-        result["K_current"][: num_steps // 4].mean(),  # First quarter
-        result["K_current"][-num_steps // 4 :].mean(),  # Last quarter
+        result["IK"][: num_steps // 4].mean(),  # First quarter
+        result["IK"][-num_steps // 4 :].mean(),  # Last quarter
     ]
     assert (
         k_current_segments[1] > k_current_segments[0]
@@ -271,8 +269,8 @@ def test_current_conservation(hh_model):
 
     result = simulate_voltage_clamp(hh_model, voltage_protocol=voltage)
 
-    reconstructed = result["Na_current"] + result["K_current"] + result["leak_current"]
-    assert np.allclose(result["total_current"], reconstructed)
+    reconstructed = result["INa"] + result["IK"] + result["Ileak"]
+    assert np.allclose(result["Itotal"], reconstructed)
 
 
 def test_gating_variable_initialisation(hh_model):
@@ -289,9 +287,9 @@ def test_gating_variable_initialisation(hh_model):
     ah = alpha_h(v_start, 0.0)
     bh = beta_h(v_start, 0.0)
 
-    assert result["potassium_activation"][0] == pytest.approx(an / (an + bn))
-    assert result["sodium_activation"][0] == pytest.approx(am / (am + bm))
-    assert result["sodium_inactivation"][0] == pytest.approx(ah / (ah + bh))
+    assert result["n"][0] == pytest.approx(an / (an + bn))
+    assert result["m"][0] == pytest.approx(am / (am + bm))
+    assert result["h"][0] == pytest.approx(ah / (ah + bh))
 
 
 def test_single_element_voltage_protocol(hh_model):

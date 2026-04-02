@@ -20,8 +20,9 @@ if TYPE_CHECKING:
 #: Type alias for simulation results returned by clamp simulation functions.
 #: Each result is a NumPy structured array with one element per time step.
 #: Field ``"time"`` holds the time axis in milliseconds; remaining fields are
-#: named columns (e.g. ``"voltage"``, ``"total_current"``, per-channel
-#: ``"{name}_current"``, gating variables, and optionally ``"ca_i"``).
+#: named columns (e.g. ``"voltage"``, ``"Itotal"``, per-channel current fields
+#: named via :func:`_current_field_name`, gating variables, and optionally
+#: ``"ca_i"``).
 SimulationResult: TypeAlias = np.ndarray
 
 logger = logging.getLogger(__name__)
@@ -281,6 +282,22 @@ def _rk4_step_current_clamp(
     return V_new, new_state, new_ca
 
 
+def _current_field_name(ch_name: str) -> str:
+    """Return the structured-array field name for a channel's current.
+
+    Additional channels whose names already start with ``"I"`` (e.g. ``"Ih"``,
+    ``"ICaL"``) are used as-is.  Classic channels (``"Na"``, ``"K"``,
+    ``"leak"``) are prefixed: ``"INa"``, ``"IK"``, ``"Ileak"``.
+
+    Args:
+        ch_name: The channel's ``name`` attribute.
+
+    Returns:
+        The field name string to use in the output structured array.
+    """
+    return ch_name if ch_name.startswith("I") else f"I{ch_name}"
+
+
 def _simulate_voltage_clamp_core(
     neuron: "HodgkinHuxley",
     voltage_protocol: np.ndarray,
@@ -370,10 +387,10 @@ def _simulate_voltage_clamp_core(
     fields: list[tuple[str, type]] = [
         ("time", np.float64),
         ("voltage", np.float64),
-        ("total_current", np.float64),
+        ("Itotal", np.float64),
     ]
     for ch in neuron.all_channels:
-        fields.append((f"{ch.name}_current", np.float64))
+        fields.append((_current_field_name(ch.name), np.float64))
     for gv in neuron.all_gating_variables:
         fields.append((gv.name, np.float64))
     if ca_arr is not None:
@@ -382,9 +399,9 @@ def _simulate_voltage_clamp_core(
     results = np.empty(num_time_steps, dtype=np.dtype(fields))
     results["time"] = time_array
     results["voltage"] = voltage_protocol
-    results["total_current"] = I_total
+    results["Itotal"] = I_total
     for ch in neuron.all_channels:
-        results[f"{ch.name}_current"] = ch_current_arrs[ch.name]
+        results[_current_field_name(ch.name)] = ch_current_arrs[ch.name]
     for gv in neuron.all_gating_variables:
         results[gv.name] = gating_arrs[gv.name]
     if ca_arr is not None:
@@ -488,8 +505,8 @@ def _simulate_current_clamp_core(
     # Assemble output structured array
     fields: list[tuple[str, type]] = [("time", np.float64), ("voltage", np.float64)]
     for ch in neuron.all_channels:
-        fields.append((f"{ch.name}_current", np.float64))
-    fields.append(("total_current", np.float64))
+        fields.append((_current_field_name(ch.name), np.float64))
+    fields.append(("Itotal", np.float64))
     for gv in neuron.all_gating_variables:
         fields.append((gv.name, np.float64))
     if ca_arr is not None:
@@ -499,8 +516,8 @@ def _simulate_current_clamp_core(
     results["time"] = time_array
     results["voltage"] = V_arr
     for ch in neuron.all_channels:
-        results[f"{ch.name}_current"] = ch_current_arrs[ch.name]
-    results["total_current"] = I_total
+        results[_current_field_name(ch.name)] = ch_current_arrs[ch.name]
+    results["Itotal"] = I_total
     for gv in neuron.all_gating_variables:
         results[gv.name] = gating_arrs[gv.name]
     if ca_arr is not None:
@@ -525,8 +542,9 @@ def simulate_voltage_clamp(
     as the integration time step.
 
     All ion channels — core (Na, K, leak) and additional — are handled via a
-    single unified loop. The result includes a ``{ch.name}_current`` field
-    for every channel and a field for every gating variable.
+    single unified loop. The result includes a field named via
+    :func:`_current_field_name` for every channel and a field for every gating
+    variable.
 
     When the neuron has ``calcium_dynamics`` configured, a ``ca_i`` field
     containing intracellular Ca²⁺ concentration in mM is included.
@@ -539,8 +557,8 @@ def simulate_voltage_clamp(
     Returns:
         Structured array with one element per time step. Field ``"time"`` holds
         the time axis in milliseconds. Remaining fields: ``"voltage"``,
-        ``"total_current"``, per-channel ``"{name}_current"``, gating variable
-        fields, and optionally ``"ca_i"``.
+        ``"Itotal"``, per-channel current fields, gating variable fields, and
+        optionally ``"ca_i"``.
     """
     if len(voltage_protocol) == 0:
         raise ValueError("voltage_protocol must not be empty.")
@@ -569,8 +587,9 @@ def simulate_current_clamp(
     as the integration time step.
 
     All ion channels — core (Na, K, leak) and additional — are handled via a
-    single unified loop. The result includes a ``{ch.name}_current`` field
-    for every channel (including core channels) and ``total_current``.
+    single unified loop. The result includes a field named via
+    :func:`_current_field_name` for every channel (including core channels)
+    and ``"Itotal"``.
 
     When the neuron has ``calcium_dynamics`` configured, a ``ca_i`` field
     containing intracellular Ca²⁺ concentration in mM is included.
@@ -583,8 +602,8 @@ def simulate_current_clamp(
     Returns:
         Structured array with one element per time step. Field ``"time"`` holds
         the time axis in milliseconds. Remaining fields: ``"voltage"``,
-        per-channel ``"{name}_current"``, ``"total_current"``, gating variable
-        fields, and optionally ``"ca_i"``.
+        per-channel current fields, ``"Itotal"``, gating variable fields, and
+        optionally ``"ca_i"``.
     """
     if len(current_external) == 0:
         raise ValueError("current_external must not be empty.")

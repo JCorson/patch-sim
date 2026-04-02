@@ -58,25 +58,25 @@ def _make_sweep(label: str = "test", color: str = "#000000") -> Sweep:
     fields = [
         ("time", np.float64),
         ("voltage", np.float64),
-        ("total_current", np.float64),
-        ("Na_current", np.float64),
-        ("K_current", np.float64),
-        ("leak_current", np.float64),
-        ("potassium_activation", np.float64),
-        ("sodium_activation", np.float64),
-        ("sodium_inactivation", np.float64),
+        ("Itotal", np.float64),
+        ("INa", np.float64),
+        ("IK", np.float64),
+        ("Ileak", np.float64),
+        ("n", np.float64),
+        ("m", np.float64),
+        ("h", np.float64),
     ]
     result = np.empty(n, dtype=np.dtype(fields))
     result["time"] = t
     for name in (
         "voltage",
-        "total_current",
-        "Na_current",
-        "K_current",
-        "leak_current",
-        "potassium_activation",
-        "sodium_activation",
-        "sodium_inactivation",
+        "Itotal",
+        "INa",
+        "IK",
+        "Ileak",
+        "n",
+        "m",
+        "h",
     ):
         result[name] = zeros
     return Sweep.from_result(result, zeros, label, color, "Current Clamp")

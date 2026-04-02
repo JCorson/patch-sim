@@ -149,7 +149,7 @@ def test_iv_curve_sweeps_are_independent() -> None:
     from a previous step).
     """
     sweeps = _make_iv_sweeps(voltage_step=20.0)  # fewer sweeps for speed
-    first_currents = [df["total_current"][0] for _proto, df in sweeps]
+    first_currents = [df["Itotal"][0] for _proto, df in sweeps]
     # All sweeps start at holding voltage → first current values should be
     # nearly identical (same initial state).
     assert max(first_currents) - min(first_currents) == pytest.approx(0.0, abs=1e-6)
@@ -276,7 +276,7 @@ def test_batch_with_calcium_channels() -> None:
     assert len(results) == len(voltages)
     for df in results:
         assert df.dtype.names is not None
-        assert "ICaL_current" in df.dtype.names
+        assert "ICaL" in df.dtype.names
         assert "ca_i" in df.dtype.names
         assert "d" in df.dtype.names
         assert "f" in df.dtype.names

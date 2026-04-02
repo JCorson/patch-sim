@@ -28,25 +28,25 @@ from patch_sim.protocols import (
 CURRENT_CLAMP_COLUMNS = [
     "time",
     "voltage",
-    "Na_current",
-    "K_current",
-    "leak_current",
-    "total_current",
-    "potassium_activation",
-    "sodium_activation",
-    "sodium_inactivation",
+    "INa",
+    "IK",
+    "Ileak",
+    "Itotal",
+    "n",
+    "m",
+    "h",
 ]
 
 VOLTAGE_CLAMP_COLUMNS = [
     "time",
     "voltage",
-    "total_current",
-    "Na_current",
-    "K_current",
-    "leak_current",
-    "potassium_activation",
-    "sodium_activation",
-    "sodium_inactivation",
+    "Itotal",
+    "INa",
+    "IK",
+    "Ileak",
+    "n",
+    "m",
+    "h",
 ]
 
 
@@ -60,7 +60,7 @@ def _assert_current_clamp_result(result: np.ndarray) -> None:
     assert all(np.isfinite(result[f]).all() for f in result.dtype.names)
     assert result["voltage"].min() >= -100.0
     assert result["voltage"].max() <= 60.0
-    for gate in ("potassium_activation", "sodium_activation", "sodium_inactivation"):
+    for gate in ("n", "m", "h"):
         assert (result[gate] >= 0.0).all()
         assert (result[gate] <= 1.0).all()
 
@@ -73,7 +73,7 @@ def _assert_voltage_clamp_result(result: np.ndarray) -> None:
     for col in VOLTAGE_CLAMP_COLUMNS:
         assert col in result.dtype.names
     assert all(np.isfinite(result[f]).all() for f in result.dtype.names)
-    for gate in ("potassium_activation", "sodium_activation", "sodium_inactivation"):
+    for gate in ("n", "m", "h"):
         assert (result[gate] >= 0.0).all()
         assert (result[gate] <= 1.0).all()
 
@@ -224,7 +224,7 @@ def test_step_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
     # During the depolarising step there should be inward Na⁺ current
     step_mask = np.isclose(result["voltage"], 0.0)
     assert step_mask.any(), "No rows matched the step voltage — mask is empty"
-    assert result["Na_current"][step_mask].min() < -10.0
+    assert result["INa"][step_mask].min() < -10.0
 
 
 def test_ramp_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
@@ -245,8 +245,8 @@ def test_ramp_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
 
     # K⁺ current (outward) should be higher in second half of ramp
     n = len(result)
-    k_first_half = result["K_current"][: n // 2].mean()
-    k_second_half = result["K_current"][n // 2 :].mean()
+    k_first_half = result["IK"][: n // 2].mean()
+    k_second_half = result["IK"][n // 2 :].mean()
     assert k_second_half > k_first_half
 
 
@@ -266,7 +266,7 @@ def test_pulse_train_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
 
     # Each depolarising pulse should produce an inward Na⁺ transient
     # Verify at least one strong inward Na⁺ event occurred
-    assert result["Na_current"].min() < -10.0
+    assert result["INa"].min() < -10.0
 
 
 # ---------------------------------------------------------------------------

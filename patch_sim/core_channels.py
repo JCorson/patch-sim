@@ -115,9 +115,8 @@ def make_na_channel(g_max: float) -> IonChannel:
     and inactivation gate *h* (power 1).  The reversal potential is computed
     dynamically via the Nernst equation for Na⁺.
 
-    Gating variable names are ``"sodium_activation"`` and
-    ``"sodium_inactivation"``, matching the DataFrame column names used
-    throughout the simulator.
+    Gating variable names are ``"m"`` and ``"h"``, matching the DataFrame
+    column names used throughout the simulator.
 
     Args:
         g_max: Maximum conductance in mS/cm².
@@ -130,12 +129,8 @@ def make_na_channel(g_max: float) -> IonChannel:
         name="Na",
         g_max=g_max,
         gating_variables=(
-            GatingVariable(
-                name="sodium_activation", power=3, alpha=alpha_m, beta=beta_m
-            ),
-            GatingVariable(
-                name="sodium_inactivation", power=1, alpha=alpha_h, beta=beta_h
-            ),
+            GatingVariable(name="m", power=3, alpha=alpha_m, beta=beta_m),
+            GatingVariable(name="h", power=1, alpha=alpha_h, beta=beta_h),
         ),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
     )
@@ -147,8 +142,8 @@ def make_k_channel(g_max: float) -> IonChannel:
     Uses the classic HH activation gate *n* (power 4).  The reversal potential
     is computed dynamically via the Nernst equation for K⁺.
 
-    The gating variable name is ``"potassium_activation"``, matching the
-    DataFrame column name used throughout the simulator.
+    The gating variable name is ``"n"``, matching the DataFrame column name
+    used throughout the simulator.
 
     Args:
         g_max: Maximum conductance in mS/cm².
@@ -161,9 +156,7 @@ def make_k_channel(g_max: float) -> IonChannel:
         name="K",
         g_max=g_max,
         gating_variables=(
-            GatingVariable(
-                name="potassium_activation", power=4, alpha=alpha_n, beta=beta_n
-            ),
+            GatingVariable(name="n", power=4, alpha=alpha_n, beta=beta_n),
         ),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )

@@ -314,13 +314,13 @@ def test_current_clamp_no_additional_channels_identical_columns(hh_model):
     expected = {
         "time",
         "voltage",
-        "Na_current",
-        "K_current",
-        "leak_current",
-        "total_current",
-        "potassium_activation",
-        "sodium_activation",
-        "sodium_inactivation",
+        "INa",
+        "IK",
+        "Ileak",
+        "Itotal",
+        "n",
+        "m",
+        "h",
     }
     assert set(df.dtype.names) == expected
 
@@ -339,13 +339,13 @@ def test_voltage_clamp_no_additional_channels_identical_columns(hh_model):
     expected = {
         "time",
         "voltage",
-        "total_current",
-        "Na_current",
-        "K_current",
-        "leak_current",
-        "potassium_activation",
-        "sodium_activation",
-        "sodium_inactivation",
+        "Itotal",
+        "INa",
+        "IK",
+        "Ileak",
+        "n",
+        "m",
+        "h",
     }
     assert set(df.dtype.names) == expected
 
@@ -370,7 +370,7 @@ def test_current_clamp_no_additional_channels_values_unchanged():
 
 
 def test_current_clamp_with_ih_extra_columns():
-    """Current clamp with Ih channel adds Ih_current and r columns."""
+    """Current clamp with Ih channel adds Ih and r columns."""
     neuron = HodgkinHuxley(additional_channels=(make_ih_channel(),))
     stim = step_current(
         duration=20.0,
@@ -380,7 +380,7 @@ def test_current_clamp_with_ih_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    assert "Ih_current" in df.dtype.names
+    assert "Ih" in df.dtype.names
     assert "r" in df.dtype.names
 
 
@@ -400,7 +400,7 @@ def test_current_clamp_ih_gating_variable_in_bounds():
 
 
 def test_voltage_clamp_with_ih_extra_columns():
-    """Voltage clamp with Ih channel adds Ih_current and r columns."""
+    """Voltage clamp with Ih channel adds Ih and r columns."""
     neuron = HodgkinHuxley(additional_channels=(make_ih_channel(),))
     prot = step_voltage(
         duration=20.0,
@@ -411,7 +411,7 @@ def test_voltage_clamp_with_ih_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_voltage_clamp(neuron, prot)
-    assert "Ih_current" in df.dtype.names
+    assert "Ih" in df.dtype.names
     assert "r" in df.dtype.names
 
 
@@ -427,10 +427,8 @@ def test_voltage_clamp_total_current_includes_ih():
         sampling_frequency=40000.0,
     )
     df = simulate_voltage_clamp(neuron, prot)
-    expected = (
-        df["Na_current"] + df["K_current"] + df["leak_current"] + df["Ih_current"]
-    )
-    np.testing.assert_allclose(df["total_current"], expected, rtol=1e-10)
+    expected = df["INa"] + df["IK"] + df["Ileak"] + df["Ih"]
+    np.testing.assert_allclose(df["Itotal"], expected, rtol=1e-10)
 
 
 def test_multiple_optional_channels_coexist():
@@ -454,8 +452,8 @@ def test_multiple_optional_channels_coexist():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    assert "Ih_current" in df.dtype.names
-    assert "Iq_current" in df.dtype.names
+    assert "Ih" in df.dtype.names
+    assert "Iq" in df.dtype.names
     assert "r" in df.dtype.names
     assert "q" in df.dtype.names
 
@@ -541,7 +539,7 @@ def test_make_ika_channel_custom_params():
 
 
 def test_current_clamp_with_ika_extra_columns():
-    """Current clamp with IKa channel adds IKa_current, a, and b columns."""
+    """Current clamp with IKa channel adds IKa, a, and b columns."""
     neuron = HodgkinHuxley(additional_channels=(make_ika_channel(),))
     stim = step_current(
         duration=20.0,
@@ -551,7 +549,7 @@ def test_current_clamp_with_ika_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    assert "IKa_current" in df.dtype.names
+    assert "IKa" in df.dtype.names
     assert "a" in df.dtype.names
     assert "b" in df.dtype.names
 
@@ -574,7 +572,7 @@ def test_current_clamp_ika_gating_in_bounds():
 
 
 def test_voltage_clamp_with_ika_extra_columns():
-    """Voltage clamp with IKa channel adds IKa_current, a, and b columns."""
+    """Voltage clamp with IKa channel adds IKa, a, and b columns."""
     neuron = HodgkinHuxley(additional_channels=(make_ika_channel(),))
     prot = step_voltage(
         duration=20.0,
@@ -585,7 +583,7 @@ def test_voltage_clamp_with_ika_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_voltage_clamp(neuron, prot)
-    assert "IKa_current" in df.dtype.names
+    assert "IKa" in df.dtype.names
     assert "a" in df.dtype.names
     assert "b" in df.dtype.names
 
@@ -601,8 +599,8 @@ def test_ika_and_ih_coexist():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    assert "IKa_current" in df.dtype.names
-    assert "Ih_current" in df.dtype.names
+    assert "IKa" in df.dtype.names
+    assert "Ih" in df.dtype.names
     assert "a" in df.dtype.names
     assert "b" in df.dtype.names
     assert "r" in df.dtype.names
@@ -688,7 +686,7 @@ def test_make_inap_channel_custom_params():
 
 
 def test_current_clamp_with_inap_extra_columns():
-    """Current clamp with INaP channel adds INaP_current and p columns."""
+    """Current clamp with INaP channel adds INaP and p columns."""
     neuron = HodgkinHuxley(additional_channels=(make_inap_channel(),))
     stim = step_current(
         duration=20.0,
@@ -698,12 +696,12 @@ def test_current_clamp_with_inap_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    assert "INaP_current" in df.dtype.names
+    assert "INaP" in df.dtype.names
     assert "p" in df.dtype.names
 
 
 def test_voltage_clamp_with_inap_extra_columns():
-    """Voltage clamp with INaP channel adds INaP_current and p columns."""
+    """Voltage clamp with INaP channel adds INaP and p columns."""
     neuron = HodgkinHuxley(additional_channels=(make_inap_channel(),))
     prot = step_voltage(
         duration=20.0,
@@ -714,7 +712,7 @@ def test_voltage_clamp_with_inap_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_voltage_clamp(neuron, prot)
-    assert "INaP_current" in df.dtype.names
+    assert "INaP" in df.dtype.names
     assert "p" in df.dtype.names
 
 
@@ -831,7 +829,7 @@ def test_make_inar_channel_custom_params():
 
 
 def test_current_clamp_with_inar_extra_columns():
-    """Current clamp with INaR channel adds INaR_current, s, and hr columns."""
+    """Current clamp with INaR channel adds INaR, s, and hr columns."""
     neuron = HodgkinHuxley(additional_channels=(make_inar_channel(),))
     stim = step_current(
         duration=20.0,
@@ -841,13 +839,13 @@ def test_current_clamp_with_inar_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    assert "INaR_current" in df.dtype.names
+    assert "INaR" in df.dtype.names
     assert "s" in df.dtype.names
     assert "hr" in df.dtype.names
 
 
 def test_voltage_clamp_with_inar_extra_columns():
-    """Voltage clamp with INaR channel adds INaR_current, s, and hr columns."""
+    """Voltage clamp with INaR channel adds INaR, s, and hr columns."""
     neuron = HodgkinHuxley(additional_channels=(make_inar_channel(),))
     prot = step_voltage(
         duration=20.0,
@@ -858,7 +856,7 @@ def test_voltage_clamp_with_inar_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_voltage_clamp(neuron, prot)
-    assert "INaR_current" in df.dtype.names
+    assert "INaR" in df.dtype.names
     assert "s" in df.dtype.names
     assert "hr" in df.dtype.names
 
@@ -893,8 +891,8 @@ def test_inap_and_inar_coexist():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    assert "INaP_current" in df.dtype.names
-    assert "INaR_current" in df.dtype.names
+    assert "INaP" in df.dtype.names
+    assert "INaR" in df.dtype.names
     assert "p" in df.dtype.names
     assert "s" in df.dtype.names
     assert "hr" in df.dtype.names
@@ -925,13 +923,13 @@ def test_all_additional_channels_coexist():
     )
     df = simulate_current_clamp(neuron, stim)
     for col in (
-        "Ih_current",
-        "IKa_current",
-        "INaP_current",
-        "INaR_current",
-        "IM_current",
-        "IKir_current",
-        "IKCa_current",
+        "Ih",
+        "IKa",
+        "INaP",
+        "INaR",
+        "IM",
+        "IKir",
+        "IKCa",
     ):
         assert col in df.dtype.names
     for gate in ("r", "a", "b", "p", "s", "hr", "w", "kir", "q"):
@@ -1009,7 +1007,7 @@ def test_make_im_channel_custom_params():
 
 
 def test_current_clamp_with_im_extra_columns():
-    """Current clamp with IM channel adds IM_current and w columns."""
+    """Current clamp with IM channel adds IM and w columns."""
     neuron = HodgkinHuxley(additional_channels=(make_im_channel(),))
     stim = step_current(
         duration=20.0,
@@ -1019,12 +1017,12 @@ def test_current_clamp_with_im_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    assert "IM_current" in df.dtype.names
+    assert "IM" in df.dtype.names
     assert "w" in df.dtype.names
 
 
 def test_voltage_clamp_with_im_extra_columns():
-    """Voltage clamp with IM channel adds IM_current and w columns."""
+    """Voltage clamp with IM channel adds IM and w columns."""
     neuron = HodgkinHuxley(additional_channels=(make_im_channel(),))
     prot = step_voltage(
         duration=20.0,
@@ -1035,7 +1033,7 @@ def test_voltage_clamp_with_im_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_voltage_clamp(neuron, prot)
-    assert "IM_current" in df.dtype.names
+    assert "IM" in df.dtype.names
     assert "w" in df.dtype.names
 
 
@@ -1126,7 +1124,7 @@ def test_make_ikir_channel_custom_params():
 
 
 def test_current_clamp_with_ikir_extra_columns():
-    """Current clamp with IKir channel adds IKir_current and kir columns."""
+    """Current clamp with IKir channel adds IKir and kir columns."""
     neuron = HodgkinHuxley(additional_channels=(make_ikir_channel(),))
     stim = step_current(
         duration=20.0,
@@ -1136,12 +1134,12 @@ def test_current_clamp_with_ikir_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    assert "IKir_current" in df.dtype.names
+    assert "IKir" in df.dtype.names
     assert "kir" in df.dtype.names
 
 
 def test_voltage_clamp_with_ikir_extra_columns():
-    """Voltage clamp with IKir channel adds IKir_current and kir columns."""
+    """Voltage clamp with IKir channel adds IKir and kir columns."""
     neuron = HodgkinHuxley(additional_channels=(make_ikir_channel(),))
     prot = step_voltage(
         duration=20.0,
@@ -1152,7 +1150,7 @@ def test_voltage_clamp_with_ikir_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_voltage_clamp(neuron, prot)
-    assert "IKir_current" in df.dtype.names
+    assert "IKir" in df.dtype.names
     assert "kir" in df.dtype.names
 
 
@@ -1209,7 +1207,7 @@ def test_calcium_gating_variable_in_integrator():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    assert "ITest_current" in df.dtype.names
+    assert "ITest" in df.dtype.names
     assert "q_test" in df.dtype.names
 
 
@@ -1242,8 +1240,8 @@ def test_existing_channels_unaffected_by_calcium_gating_infra():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    assert "Ih_current" in df.dtype.names
-    assert "IKa_current" in df.dtype.names
+    assert "Ih" in df.dtype.names
+    assert "IKa" in df.dtype.names
     assert df["r"].min() >= 0.0
     assert df["r"].max() <= 1.0
 
@@ -1341,7 +1339,7 @@ def test_ikca_is_not_calcium_ion_channel():
 
 
 def test_current_clamp_with_ikca():
-    """Current clamp with IKCa channel adds IKCa_current and q columns."""
+    """Current clamp with IKCa channel adds IKCa and q columns."""
     from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
@@ -1356,7 +1354,7 @@ def test_current_clamp_with_ikca():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    assert "IKCa_current" in df.dtype.names
+    assert "IKCa" in df.dtype.names
     assert "q" in df.dtype.names
 
 
@@ -1431,7 +1429,7 @@ def test_make_ical_channel_defaults():
 
 
 def test_current_clamp_with_ical_extra_columns():
-    """Current clamp with ICaL channel adds ICaL_current, d, and f columns."""
+    """Current clamp with ICaL channel adds ICaL, d, and f columns."""
     from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
@@ -1446,7 +1444,7 @@ def test_current_clamp_with_ical_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    assert "ICaL_current" in df.dtype.names
+    assert "ICaL" in df.dtype.names
     assert "d" in df.dtype.names
     assert "f" in df.dtype.names
 
@@ -1474,7 +1472,7 @@ def test_current_clamp_ical_gating_in_bounds():
 
 
 def test_voltage_clamp_with_ical_extra_columns():
-    """Voltage clamp with ICaL channel adds ICaL_current, d, and f columns."""
+    """Voltage clamp with ICaL channel adds ICaL, d, and f columns."""
     from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
@@ -1490,7 +1488,7 @@ def test_voltage_clamp_with_ical_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_voltage_clamp(neuron, prot)
-    assert "ICaL_current" in df.dtype.names
+    assert "ICaL" in df.dtype.names
     assert "d" in df.dtype.names
     assert "f" in df.dtype.names
 
@@ -1546,7 +1544,7 @@ def test_make_icat_channel_defaults():
 
 
 def test_current_clamp_with_icat_extra_columns():
-    """Current clamp with ICaT channel adds ICaT_current, dt, and ft columns."""
+    """Current clamp with ICaT channel adds ICaT, dt, and ft columns."""
     from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
@@ -1561,7 +1559,7 @@ def test_current_clamp_with_icat_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    assert "ICaT_current" in df.dtype.names
+    assert "ICaT" in df.dtype.names
     assert "dt" in df.dtype.names
     assert "ft" in df.dtype.names
 
@@ -1589,7 +1587,7 @@ def test_current_clamp_icat_gating_in_bounds():
 
 
 def test_voltage_clamp_with_icat_extra_columns():
-    """Voltage clamp with ICaT channel adds ICaT_current, dt, and ft columns."""
+    """Voltage clamp with ICaT channel adds ICaT, dt, and ft columns."""
     from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
@@ -1605,7 +1603,7 @@ def test_voltage_clamp_with_icat_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_voltage_clamp(neuron, prot)
-    assert "ICaT_current" in df.dtype.names
+    assert "ICaT" in df.dtype.names
     assert "dt" in df.dtype.names
     assert "ft" in df.dtype.names
 
@@ -1661,7 +1659,7 @@ def test_make_ican_channel_defaults():
 
 
 def test_current_clamp_with_ican_extra_columns():
-    """Current clamp with ICaN channel adds ICaN_current, dn, and fn columns."""
+    """Current clamp with ICaN channel adds ICaN, dn, and fn columns."""
     from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
@@ -1676,7 +1674,7 @@ def test_current_clamp_with_ican_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_current_clamp(neuron, stim)
-    assert "ICaN_current" in df.dtype.names
+    assert "ICaN" in df.dtype.names
     assert "dn" in df.dtype.names
     assert "fn" in df.dtype.names
 
@@ -1704,7 +1702,7 @@ def test_current_clamp_ican_gating_in_bounds():
 
 
 def test_voltage_clamp_with_ican_extra_columns():
-    """Voltage clamp with ICaN channel adds ICaN_current, dn, and fn columns."""
+    """Voltage clamp with ICaN channel adds ICaN, dn, and fn columns."""
     from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
@@ -1720,7 +1718,7 @@ def test_voltage_clamp_with_ican_extra_columns():
         sampling_frequency=40000.0,
     )
     df = simulate_voltage_clamp(neuron, prot)
-    assert "ICaN_current" in df.dtype.names
+    assert "ICaN" in df.dtype.names
     assert "dn" in df.dtype.names
     assert "fn" in df.dtype.names
 

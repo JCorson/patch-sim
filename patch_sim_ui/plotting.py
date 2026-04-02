@@ -26,23 +26,23 @@ _CLASSIC_COLUMNS = frozenset(
     {
         "time",
         "voltage",
-        "total_current",
-        "Na_current",
-        "K_current",
-        "leak_current",
-        "potassium_activation",
-        "sodium_activation",
-        "sodium_inactivation",
+        "Itotal",
+        "INa",
+        "IK",
+        "Ileak",
+        "n",
+        "m",
+        "h",
     }
 )
 
-# Classic current columns (end with _current and are in the classic set).
+# Classic current columns (start with I and are in the classic set).
 _CLASSIC_CURRENT_COLUMNS = frozenset(
     {
-        "total_current",
-        "Na_current",
-        "K_current",
-        "leak_current",
+        "Itotal",
+        "INa",
+        "IK",
+        "Ileak",
     }
 )
 
@@ -177,10 +177,8 @@ class Sweep(BaseModel):
         for col in columns:
             if col in _CLASSIC_COLUMNS:
                 continue
-            if col.endswith("_current"):
-                # Strip trailing _current to get the channel name key
-                ch_name = col[: -len("_current")]
-                additional_currents[ch_name] = result[col].tolist()
+            if col.startswith("I"):
+                additional_currents[col] = result[col].tolist()
             else:
                 additional_gating[col] = result[col].tolist()
 
@@ -191,13 +189,13 @@ class Sweep(BaseModel):
             time=result["time"].tolist(),
             stimulus=stimulus.tolist(),
             voltage=_col("voltage"),
-            sodium_current=_col("Na_current"),
-            potassium_current=_col("K_current"),
-            leak_current=_col("leak_current"),
-            total_current=_col("total_current"),
-            potassium_activation=_col("potassium_activation"),
-            sodium_activation=_col("sodium_activation"),
-            sodium_inactivation=_col("sodium_inactivation"),
+            sodium_current=_col("INa"),
+            potassium_current=_col("IK"),
+            leak_current=_col("Ileak"),
+            total_current=_col("Itotal"),
+            potassium_activation=_col("n"),
+            sodium_activation=_col("m"),
+            sodium_inactivation=_col("h"),
             additional_currents=additional_currents,
             additional_gating=additional_gating,
         )

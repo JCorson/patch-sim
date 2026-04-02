@@ -53,9 +53,9 @@ def test_all_gating_variables_no_additional(hh_model: HodgkinHuxley) -> None:
     """all_gating_variables has exactly 3 variables for the default HH model."""
     gvs = hh_model.all_gating_variables
     names = [gv.name for gv in gvs]
-    assert "sodium_activation" in names
-    assert "sodium_inactivation" in names
-    assert "potassium_activation" in names
+    assert "m" in names
+    assert "h" in names
+    assert "n" in names
     assert len(gvs) == 3
 
 

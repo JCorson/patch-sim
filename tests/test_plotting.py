@@ -44,13 +44,13 @@ def _make_result(
     fields = [
         ("time", np.float64),
         ("voltage", np.float64),
-        ("total_current", np.float64),
-        ("Na_current", np.float64),
-        ("K_current", np.float64),
-        ("leak_current", np.float64),
-        ("potassium_activation", np.float64),
-        ("sodium_activation", np.float64),
-        ("sodium_inactivation", np.float64),
+        ("Itotal", np.float64),
+        ("INa", np.float64),
+        ("IK", np.float64),
+        ("Ileak", np.float64),
+        ("n", np.float64),
+        ("m", np.float64),
+        ("h", np.float64),
     ]
     if extra_cols:
         for name in extra_cols:
@@ -58,13 +58,13 @@ def _make_result(
     result = np.empty(n, dtype=np.dtype(fields))
     result["time"] = t
     result["voltage"] = np.full(n, -65.0)
-    result["total_current"] = np.zeros(n)
-    result["Na_current"] = np.zeros(n)
-    result["K_current"] = np.zeros(n)
-    result["leak_current"] = np.zeros(n)
-    result["potassium_activation"] = np.full(n, 0.3)
-    result["sodium_activation"] = np.full(n, 0.05)
-    result["sodium_inactivation"] = np.full(n, 0.6)
+    result["Itotal"] = np.zeros(n)
+    result["INa"] = np.zeros(n)
+    result["IK"] = np.zeros(n)
+    result["Ileak"] = np.zeros(n)
+    result["n"] = np.full(n, 0.3)
+    result["m"] = np.full(n, 0.05)
+    result["h"] = np.full(n, 0.6)
     if extra_cols:
         for name, values in extra_cols.items():
             result[name] = values
@@ -150,28 +150,27 @@ def test_from_result_no_extra_columns_gives_empty_dicts() -> None:
     assert s.additional_gating == {}
 
 
-def test_from_result_current_suffix_goes_to_additional_currents() -> None:
-    """Extra columns ending with _current are placed in additional_currents."""
-    extra = {"ih_current": list(np.ones(_N) * 0.5)}
+def test_from_result_i_prefix_goes_to_additional_currents() -> None:
+    """Extra columns starting with I are placed in additional_currents."""
+    extra = {"Ih": list(np.ones(_N) * 0.5)}
     s = Sweep.from_result(
         _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
     )
-    assert "ih" in s.additional_currents
-    assert "ih_current" not in s.additional_currents
-    assert s.additional_currents["ih"] == pytest.approx([0.5] * _N)
+    assert "Ih" in s.additional_currents
+    assert s.additional_currents["Ih"] == pytest.approx([0.5] * _N)
 
 
-def test_from_result_current_suffix_stripped_correctly() -> None:
-    """The _current suffix is fully stripped to produce the channel key."""
-    extra = {"foo_current": list(np.zeros(_N))}
+def test_from_result_i_prefix_key_is_column_name() -> None:
+    """The column name is used as-is as the key in additional_currents."""
+    extra = {"IKa": list(np.zeros(_N))}
     s = Sweep.from_result(
         _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
     )
-    assert list(s.additional_currents.keys()) == ["foo"]
+    assert list(s.additional_currents.keys()) == ["IKa"]
 
 
 def test_from_result_non_current_extra_goes_to_additional_gating() -> None:
-    """Extra columns without _current suffix are placed in additional_gating."""
+    """Extra columns not starting with I are placed in additional_gating."""
     extra = {"r": list(np.full(_N, 0.4))}
     s = Sweep.from_result(
         _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
@@ -184,14 +183,14 @@ def test_from_result_non_current_extra_goes_to_additional_gating() -> None:
 def test_from_result_multiple_extra_columns_classified() -> None:
     """Multiple extra columns are each classified into the correct dict."""
     extra = {
-        "ika_current": list(np.ones(_N)),
+        "IKa": list(np.ones(_N)),
         "a": list(np.full(_N, 0.1)),
         "b": list(np.full(_N, 0.9)),
     }
     s = Sweep.from_result(
         _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
     )
-    assert set(s.additional_currents.keys()) == {"ika"}
+    assert set(s.additional_currents.keys()) == {"IKa"}
     assert set(s.additional_gating.keys()) == {"a", "b"}
 
 
@@ -730,13 +729,13 @@ def test_compute_trace_visibility_map_cc_additional_gating_mapped() -> None:
 
 def test_compute_trace_visibility_map_vc_additional_current_mapped() -> None:
     """VC sweep with additional current maps the field to the correct index."""
-    extra = {"foo_current": [0.0] * _N}
+    extra = {"IFoo": [0.0] * _N}
     sweep = _make_sweep(mode="Voltage Clamp", extra_cols=extra)
-    curr_map = {"foo": "show_foo_current"}
+    curr_map = {"IFoo": "show_foo_current"}
     result = compute_trace_visibility_map(
         [sweep], [], "Voltage Clamp", additional_current_field_map=curr_map
     )
-    # total(0), Na(1), K(2), leak(3), foo(4), n(5), m(6), h(7), stim(8)
+    # total(0), Na(1), K(2), leak(3), IFoo(4), n(5), m(6), h(7), stim(8)
     assert result["show_foo_current"] == [4]
     assert result["show_potassium_activation"] == [5]
     assert result["show_sodium_activation"] == [6]
@@ -757,10 +756,10 @@ def test_compute_trace_visibility_map_multi_gating_keys_same_field() -> None:
 
 def test_compute_trace_visibility_map_unknown_additional_key_advances_counter() -> None:
     """Additional keys absent from the field map still advance the index counter."""
-    extra = {"unknown_current": [0.0] * _N}
+    extra = {"IUnknown": [0.0] * _N}
     sweep = _make_sweep(mode="Voltage Clamp", extra_cols=extra)
     result = compute_trace_visibility_map([sweep], [], "Voltage Clamp")
-    # unknown advances the counter; classic gating should be at 5, 6, 7
+    # IUnknown (additional_current) advances the counter; classic gating at 5, 6, 7
     assert result["show_potassium_activation"] == [5]
     assert result["show_sodium_activation"] == [6]
     assert result["show_sodium_inactivation"] == [7]
