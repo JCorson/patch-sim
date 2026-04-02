@@ -1702,7 +1702,7 @@ def test_current_clamp_ican_gating_in_bounds():
 
 
 def test_voltage_clamp_with_ican_extra_columns():
-    """Voltage clamp with ICaN channel adds ICaN, dn, and fn columns."""
+    """Voltage clamp with CaN channel adds ICaN, dn, and fn columns."""
     from patch_sim.calcium import CalciumDynamics
 
     neuron = HodgkinHuxley(
