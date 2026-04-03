@@ -61,6 +61,7 @@ def test_cc_from_state_voltage_continuity(hh_model):
     df1 = simulate_current_clamp(hh_model, stimulus)
 
     last_V = float(df1["voltage"][-1])
+    assert df1.dtype.names is not None
     gating_cols = [
         col
         for col in df1.dtype.names
@@ -89,6 +90,7 @@ def test_cc_from_state_gating_continuity(hh_model):
     df1 = simulate_current_clamp(hh_model, stimulus)
 
     # Map HH variable names as column names
+    assert df1.dtype.names is not None
     gating_cols = [
         col
         for col in df1.dtype.names
@@ -120,6 +122,7 @@ def test_cc_from_state_split_matches_full_run(hh_model):
     df_full = simulate_current_clamp(hh_model, full)
 
     df1 = simulate_current_clamp(hh_model, half)
+    assert df1.dtype.names is not None
     gating_cols = [
         col
         for col in df1.dtype.names
@@ -170,6 +173,7 @@ def test_vc_from_state_gating_continuity(hh_model):
 
     df1 = simulate_voltage_clamp(hh_model, protocol)
 
+    assert df1.dtype.names is not None
     gating_cols = [
         col
         for col in df1.dtype.names
@@ -200,6 +204,7 @@ def test_vc_from_state_split_matches_full_run(hh_model):
     df_full = simulate_voltage_clamp(hh_model, full)
 
     df1 = simulate_voltage_clamp(hh_model, half)
+    assert df1.dtype.names is not None
     gating_cols = [
         col
         for col in df1.dtype.names

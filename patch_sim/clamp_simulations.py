@@ -10,20 +10,32 @@ Both clamp modes use a unified gating-state dictionary that covers all channels
 import logging
 from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ProcessPoolExecutor
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from .hodgkin_huxley import HodgkinHuxley
 
-#: Type alias for simulation results returned by clamp simulation functions.
-#: Each result is a NumPy structured array with one element per time step.
-#: Field ``"time"`` holds the time axis in milliseconds; remaining fields are
-#: named columns (e.g. ``"voltage"``, ``"Itotal"``, per-channel current fields
-#: named after each channel (e.g. ``"INa"``, ``"IK"``), gating variables, and optionally
-#: ``"ca_i"``).
-SimulationResult: TypeAlias = np.ndarray
+    class _StructuredDtype:
+        """Dtype stub for structured arrays — ``names`` is always set."""
+
+        names: tuple[str, ...]
+
+    class SimulationResult(np.ndarray[Any, Any]):
+        """A NumPy structured array with named dtype fields.
+
+        Each element represents one time step. Fields include ``"time"``,
+        ``"voltage"``, ``"Itotal"``, per-channel currents (e.g. ``"INa"``,
+        ``"IK"``), gating variables, and optionally ``"ca_i"``.
+        """
+
+        dtype: _StructuredDtype  # type: ignore[assignment]
+
+else:
+    SimulationResult = np.ndarray
 
 logger = logging.getLogger(__name__)
 
@@ -392,7 +404,7 @@ def _simulate_voltage_clamp_core(
         results["ca_i"] = ca_arr
 
     logger.debug("simulate_voltage_clamp: complete — %d steps", num_time_steps)
-    return results
+    return cast("SimulationResult", results)
 
 
 def _simulate_current_clamp_core(
@@ -508,7 +520,7 @@ def _simulate_current_clamp_core(
         results["ca_i"] = ca_arr
 
     logger.debug("simulate_current_clamp: complete — %d steps", num_time_steps)
-    return results
+    return cast("SimulationResult", results)
 
 
 def simulate_voltage_clamp(

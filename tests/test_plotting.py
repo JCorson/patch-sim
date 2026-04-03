@@ -198,6 +198,7 @@ def test_from_result_missing_classic_field_returns_empty_list() -> None:
     """When a classic field is absent the corresponding Sweep field is an empty list."""
     base = _make_result()
     # Build a structured array without the "voltage" field
+    assert base.dtype.names is not None
     names = [f for f in base.dtype.names if f != "voltage"]
     result = np.empty(len(base), dtype=np.dtype([(n, np.float64) for n in names]))
     for n in names:
