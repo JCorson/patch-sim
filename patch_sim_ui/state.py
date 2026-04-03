@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import time
+from typing import Any, AsyncGenerator
 
 import numpy as np
 import plotly.graph_objects as go
@@ -1292,7 +1293,7 @@ class AppState(rx.State):
             return AppState.run_continuous  # type: ignore[return-value]
 
     @rx.event(background=True)
-    async def run_continuous(self) -> None:
+    async def run_continuous(self) -> AsyncGenerator[Any, None]:
         """Run simulations in a continuous loop until continuous_mode is False.
 
         Each iteration picks up the terminal neuron state (voltage, gating
@@ -1427,7 +1428,7 @@ class AppState(rx.State):
             yield rx.call_script(_LOG_SCROLL_JS)
 
     @rx.event(background=True)
-    async def run_simulation(self) -> None:
+    async def run_simulation(self) -> AsyncGenerator[Any, None]:
         """Build protocol and run the simulation asynchronously.
 
         Uses background=True so the UI stays responsive during long runs.
