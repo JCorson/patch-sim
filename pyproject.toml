@@ -23,23 +23,14 @@ convention = "google"
 [tool.uv.sources]
 patch_sim = {path = "./patch_sim", editable = true}
 
-[tool.mypy]
-exclude = ["scratch/"]
+[tool.ty.src]
+include = ["./patch_sim", "./patch_sim_ui", "./tests"]
 
-[[tool.mypy.overrides]]
-# test_state.py uses Reflex internals (_reflex_internal_init) and accesses
-# dynamically-generated AppState attributes (set_duration, set_show_voltage,
-# etc.) that mypy cannot resolve from the class definition alone.
-# test_plotting.py imports plotly directly; plotly has no type stubs.
-module = [
-    "patch_sim_ui.*",
-    "reflex.*",
-    "plotly.*",
-    "rxconfig",
-    "tests.test_state",
-    "tests.test_plotting",
-    ]
-ignore_errors = true
+[[tool.ty.overrides]]
+include = ["patch_sim_ui/**", "tests/test_state.py", "tests/test_plotting.py"]
+
+[tool.ty.overrides.analysis]
+replace-imports-with-any = ["reflex.**", "plotly.**", "patch_sim_ui.**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -49,7 +40,6 @@ filterwarnings = [
 
 [dependency-groups]
 dev = [
-    "mypy>=1.19.1",
     "pytest>=7",
     "pytest-cov>=7.0.0",
     "ruff>=0.1",
