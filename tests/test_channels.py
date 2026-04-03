@@ -322,6 +322,7 @@ def test_current_clamp_no_additional_channels_identical_columns(hh_model):
         "m",
         "h",
     }
+    assert result.dtype.names is not None
     assert set(result.dtype.names) == expected
 
 
@@ -347,6 +348,7 @@ def test_voltage_clamp_no_additional_channels_identical_columns(hh_model):
         "m",
         "h",
     }
+    assert result.dtype.names is not None
     assert set(result.dtype.names) == expected
 
 
@@ -380,6 +382,7 @@ def test_current_clamp_with_ih_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     assert "Ih" in result.dtype.names
     assert "r" in result.dtype.names
 
@@ -411,6 +414,7 @@ def test_voltage_clamp_with_ih_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_voltage_clamp(neuron, prot)
+    assert result.dtype.names is not None
     assert "Ih" in result.dtype.names
     assert "r" in result.dtype.names
 
@@ -452,6 +456,7 @@ def test_multiple_optional_channels_coexist():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     assert "Ih" in result.dtype.names
     assert "Iq" in result.dtype.names
     assert "r" in result.dtype.names
@@ -549,6 +554,7 @@ def test_current_clamp_with_ika_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     assert "IKa" in result.dtype.names
     assert "a" in result.dtype.names
     assert "b" in result.dtype.names
@@ -583,6 +589,7 @@ def test_voltage_clamp_with_ika_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_voltage_clamp(neuron, prot)
+    assert result.dtype.names is not None
     assert "IKa" in result.dtype.names
     assert "a" in result.dtype.names
     assert "b" in result.dtype.names
@@ -599,6 +606,7 @@ def test_ika_and_ih_coexist():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     assert "IKa" in result.dtype.names
     assert "Ih" in result.dtype.names
     assert "a" in result.dtype.names
@@ -696,6 +704,7 @@ def test_current_clamp_with_inap_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     assert "INaP" in result.dtype.names
     assert "p" in result.dtype.names
 
@@ -712,6 +721,7 @@ def test_voltage_clamp_with_inap_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_voltage_clamp(neuron, prot)
+    assert result.dtype.names is not None
     assert "INaP" in result.dtype.names
     assert "p" in result.dtype.names
 
@@ -839,6 +849,7 @@ def test_current_clamp_with_inar_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     assert "INaR" in result.dtype.names
     assert "s" in result.dtype.names
     assert "hr" in result.dtype.names
@@ -856,6 +867,7 @@ def test_voltage_clamp_with_inar_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_voltage_clamp(neuron, prot)
+    assert result.dtype.names is not None
     assert "INaR" in result.dtype.names
     assert "s" in result.dtype.names
     assert "hr" in result.dtype.names
@@ -891,6 +903,7 @@ def test_inap_and_inar_coexist():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     assert "INaP" in result.dtype.names
     assert "INaR" in result.dtype.names
     assert "p" in result.dtype.names
@@ -922,6 +935,7 @@ def test_all_additional_channels_coexist():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     for col in (
         "Ih",
         "IKa",
@@ -1017,6 +1031,7 @@ def test_current_clamp_with_im_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     assert "IM" in result.dtype.names
     assert "w" in result.dtype.names
 
@@ -1033,6 +1048,7 @@ def test_voltage_clamp_with_im_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_voltage_clamp(neuron, prot)
+    assert result.dtype.names is not None
     assert "IM" in result.dtype.names
     assert "w" in result.dtype.names
 
@@ -1134,6 +1150,7 @@ def test_current_clamp_with_ikir_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     assert "IKir" in result.dtype.names
     assert "kir" in result.dtype.names
 
@@ -1150,6 +1167,7 @@ def test_voltage_clamp_with_ikir_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_voltage_clamp(neuron, prot)
+    assert result.dtype.names is not None
     assert "IKir" in result.dtype.names
     assert "kir" in result.dtype.names
 
@@ -1207,6 +1225,7 @@ def test_calcium_gating_variable_in_integrator():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     assert "ITest" in result.dtype.names
     assert "q_test" in result.dtype.names
 
@@ -1240,6 +1259,7 @@ def test_existing_channels_unaffected_by_calcium_gating_infra():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     assert "Ih" in result.dtype.names
     assert "IKa" in result.dtype.names
     assert result["r"].min() >= 0.0
@@ -1354,6 +1374,7 @@ def test_current_clamp_with_ikca():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     assert "IKCa" in result.dtype.names
     assert "q" in result.dtype.names
 
@@ -1444,6 +1465,7 @@ def test_current_clamp_with_ical_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     assert "ICaL" in result.dtype.names
     assert "d" in result.dtype.names
     assert "f" in result.dtype.names
@@ -1488,6 +1510,7 @@ def test_voltage_clamp_with_ical_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_voltage_clamp(neuron, prot)
+    assert result.dtype.names is not None
     assert "ICaL" in result.dtype.names
     assert "d" in result.dtype.names
     assert "f" in result.dtype.names
@@ -1559,6 +1582,7 @@ def test_current_clamp_with_icat_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     assert "ICaT" in result.dtype.names
     assert "dt" in result.dtype.names
     assert "ft" in result.dtype.names
@@ -1603,6 +1627,7 @@ def test_voltage_clamp_with_icat_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_voltage_clamp(neuron, prot)
+    assert result.dtype.names is not None
     assert "ICaT" in result.dtype.names
     assert "dt" in result.dtype.names
     assert "ft" in result.dtype.names
@@ -1674,6 +1699,7 @@ def test_current_clamp_with_ican_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
     assert "ICaN" in result.dtype.names
     assert "dn" in result.dtype.names
     assert "fn" in result.dtype.names
@@ -1718,6 +1744,7 @@ def test_voltage_clamp_with_ican_extra_columns():
         sampling_frequency=40000.0,
     )
     result = simulate_voltage_clamp(neuron, prot)
+    assert result.dtype.names is not None
     assert "ICaN" in result.dtype.names
     assert "dn" in result.dtype.names
     assert "fn" in result.dtype.names
