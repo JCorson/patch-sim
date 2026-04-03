@@ -36,7 +36,7 @@ Key features:
 ### Installing the UI
 
 ```
-uv sync --frozen --extra=ui
+uv sync --frozen --group=ui
 ```
 
 ### Running the UI
@@ -66,7 +66,7 @@ you are at the top level of the repository.
 #### Installing the development environment
 
 ```
-uv sync --frozen --extra=dev
+uv sync --frozen --group=dev
 ```
 
 This creates a Python `venv` virtual environment under the name `.venv`

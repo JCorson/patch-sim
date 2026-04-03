@@ -56,7 +56,7 @@ def example(x: float, y: int) -> str:
 
 ## Type checking
 
-mypy only enforces types in `patch_sim/` (core library). UI code (`patch_sim_ui/`) is excluded — see the `[[tool.mypy.overrides]]` section in `pyproject.toml`. Do not spend time fixing mypy errors in UI code.
+ty enforces types in `patch_sim/` (core library) and UI code (`patch_sim_ui/`). Reflex, Plotly, and `patch_sim_ui` imports are replaced with `Any` for UI files and selected test files — see the `[[tool.ty.overrides]]` section in `pyproject.toml`. Do not spend time fixing ty errors in UI code.
 
 ## GitHub CLI conventions
 
