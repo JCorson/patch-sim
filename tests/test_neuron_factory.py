@@ -15,7 +15,8 @@ from patch_sim.constants import (
     THALAMIC_RELAY,
     TRN,
 )
-from patch_sim.hodgkin_huxley import HodgkinHuxley
+from patch_sim.channels import IonChannel
+from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import ChannelConfig, NeuronConfig, make_neuron
 from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
 
@@ -43,10 +44,10 @@ _NON_CALCIUM_PRESETS = set(NEURON_PRESET_NAMES) - _CALCIUM_PRESETS
 
 @pytest.mark.parametrize("preset_name", NEURON_PRESET_NAMES)
 def test_make_neuron_each_preset(preset_name: str) -> None:
-    """make_neuron returns a HodgkinHuxley instance for every built-in preset."""
+    """make_neuron returns a Neuron instance for every built-in preset."""
     config = NEURON_PRESETS[preset_name]
     model = make_neuron(config)
-    assert isinstance(model, HodgkinHuxley)
+    assert isinstance(model, Neuron)
 
 
 # ---------------------------------------------------------------------------
@@ -97,7 +98,7 @@ def test_make_neuron_custom_conductances() -> None:
     """Custom conductances from NeuronConfig are reflected on the HH model."""
     config = NeuronConfig(g_Na=150.0, g_K=50.0, g_L=0.2)
     model = make_neuron(config)
-    assert isinstance(model, HodgkinHuxley)
+    assert isinstance(model, Neuron)
     assert model.g_Na == pytest.approx(150.0)
     assert model.g_K == pytest.approx(50.0)
     assert model.g_L == pytest.approx(0.2)
@@ -116,3 +117,66 @@ def test_make_neuron_additional_channels_attached() -> None:
     config = NeuronConfig(channels=(ChannelConfig(make_icat_channel, g_max=2.0),))
     model = make_neuron(config)
     assert len(model.additional_channels) == 1
+
+
+# ---------------------------------------------------------------------------
+# Core channel factory pass-through
+# ---------------------------------------------------------------------------
+
+
+def test_make_neuron_passes_na_factory() -> None:
+    """make_neuron forwards na_channel_factory from NeuronConfig to Neuron."""
+    from patch_sim.core_channels import make_na_channel
+
+    calls: list[float] = []
+
+    def recording_factory(g_max: float) -> IonChannel:
+        """Na factory that records invocations."""
+        calls.append(g_max)
+        return make_na_channel(g_max)
+
+    config = NeuronConfig(g_Na=88.0, na_channel_factory=recording_factory)
+    model = make_neuron(config)
+    assert model.na_channel_factory is recording_factory
+    _ = model.core_channels
+    assert calls == [88.0]
+
+
+def test_make_neuron_passes_k_factory() -> None:
+    """make_neuron forwards k_channel_factory from NeuronConfig to Neuron."""
+    from patch_sim.core_channels import make_k_channel
+
+    def alt_k(g_max: float) -> IonChannel:
+        """Alternate K factory."""
+        return make_k_channel(g_max)
+
+    config = NeuronConfig(k_channel_factory=alt_k)
+    model = make_neuron(config)
+    assert model.k_channel_factory is alt_k
+
+
+def test_make_neuron_passes_leak_factory() -> None:
+    """make_neuron forwards leak_channel_factory from NeuronConfig to Neuron."""
+    from patch_sim.core_channels import make_leak_channel
+
+    def alt_leak(g_max: float) -> IonChannel:
+        """Alternate leak factory."""
+        return make_leak_channel(g_max)
+
+    config = NeuronConfig(leak_channel_factory=alt_leak)
+    model = make_neuron(config)
+    assert model.leak_channel_factory is alt_leak
+
+
+def test_neuron_config_default_factories_are_hh52() -> None:
+    """NeuronConfig default factories are the HH52 squid axon functions."""
+    from patch_sim.core_channels import (
+        make_k_channel,
+        make_leak_channel,
+        make_na_channel,
+    )
+
+    config = NeuronConfig()
+    assert config.na_channel_factory is make_na_channel
+    assert config.k_channel_factory is make_k_channel
+    assert config.leak_channel_factory is make_leak_channel

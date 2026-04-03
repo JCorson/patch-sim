@@ -14,7 +14,7 @@ from patch_sim.core_channels import (
     make_leak_channel,
     make_na_channel,
 )
-from patch_sim.hodgkin_huxley import HodgkinHuxley
+from patch_sim.neuron import Neuron
 
 # ---------------------------------------------------------------------------
 # Rate function positivity
@@ -175,7 +175,7 @@ def test_make_leak_channel_structure() -> None:
 @pytest.mark.parametrize("V", [-100.0, -80.0, -65.0, -55.0, -40.0, 0.0, 20.0, 40.0])
 def test_na_channel_current_matches_inline(V: float) -> None:
     """Na channel compute_current equals g_Na * m³ * h * (V − E_Na)."""
-    neuron = HodgkinHuxley()
+    neuron = Neuron()
     ch = make_na_channel(g_max=neuron.g_Na)
 
     m = alpha_m(V, 0.0) / (alpha_m(V, 0.0) + beta_m(V, 0.0))
@@ -191,7 +191,7 @@ def test_na_channel_current_matches_inline(V: float) -> None:
 @pytest.mark.parametrize("V", [-100.0, -80.0, -65.0, -55.0, 0.0, 20.0, 40.0])
 def test_k_channel_current_matches_inline(V: float) -> None:
     """K channel compute_current equals g_K * n⁴ * (V − E_K)."""
-    neuron = HodgkinHuxley()
+    neuron = Neuron()
     ch = make_k_channel(g_max=neuron.g_K)
 
     n = alpha_n(V, 0.0) / (alpha_n(V, 0.0) + beta_n(V, 0.0))
@@ -206,7 +206,7 @@ def test_k_channel_current_matches_inline(V: float) -> None:
 @pytest.mark.parametrize("V", [-100.0, -65.0, 0.0, 40.0])
 def test_leak_channel_current_matches_inline(V: float) -> None:
     """Leak channel compute_current equals g_L * (V − E_L)."""
-    neuron = HodgkinHuxley()
+    neuron = Neuron()
     ch = make_leak_channel(g_max=neuron.g_L)
 
     result = ch.compute_current(V, {}, neuron)

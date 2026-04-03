@@ -50,7 +50,7 @@ from .core_channels import (
     make_na_channel,
 )
 from .electrochemistry import goldman_potential, nernst_potential
-from .hodgkin_huxley import HodgkinHuxley
+from .neuron import Neuron
 from .neuron_factory import (
     CHANNEL_REGISTRY,
     ChannelConfig,
@@ -92,7 +92,7 @@ __all__ = [
     "IonChannel",
     "IonSpecies",
     "NernstSpec",
-    "HodgkinHuxley",
+    "Neuron",
     "CHANNEL_REGISTRY",
     "ChannelConfig",
     "NeuronConfig",

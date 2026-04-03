@@ -1,7 +1,7 @@
 """NeuronConfig/ChannelConfig dataclasses and make_neuron() factory.
 
-Provides a declarative, UI-free way to describe and instantiate HH neurons
-with optional additional channels.
+Provides a declarative, UI-free way to describe and instantiate conductance-based
+neurons with optional additional channels.
 """
 
 from __future__ import annotations
@@ -39,7 +39,8 @@ from .constants import (
     DEFAULT_T,
     DEFAULT_V_REST,
 )
-from .hodgkin_huxley import HodgkinHuxley
+from .core_channels import make_k_channel, make_leak_channel, make_na_channel
+from .neuron import Neuron
 
 
 @dataclass(frozen=True)
@@ -59,9 +60,9 @@ class ChannelConfig:
 
 @dataclass(frozen=True)
 class NeuronConfig:
-    """Declarative description of a full HH neuron configuration.
+    """Declarative description of a conductance-based neuron configuration.
 
-    All fields mirror the corresponding ``HodgkinHuxley`` constructor
+    All fields mirror the corresponding :class:`~patch_sim.Neuron` constructor
     parameters.  ``channels`` holds zero or more :class:`ChannelConfig`
     entries describing the additional channels to attach.
 
@@ -80,6 +81,12 @@ class NeuronConfig:
         Ca_out: Extracellular calcium concentration in mM.
         Ca_in: Intracellular calcium concentration in mM.
         T: Temperature in Kelvin.
+        na_channel_factory: Factory for the Na⁺ core channel. Defaults to HH52
+            squid axon kinetics.
+        k_channel_factory: Factory for the K⁺ core channel. Defaults to HH52
+            squid axon kinetics.
+        leak_channel_factory: Factory for the leak core channel. Defaults to
+            HH52 squid axon kinetics.
         channels: Tuple of additional channel configs to include.
     """
 
@@ -97,6 +104,11 @@ class NeuronConfig:
     Ca_out: float = DEFAULT_CA_OUT
     Ca_in: float = DEFAULT_CA_IN
     T: float = DEFAULT_T
+    na_channel_factory: Callable[[float], IonChannel] = field(default=make_na_channel)
+    k_channel_factory: Callable[[float], IonChannel] = field(default=make_k_channel)
+    leak_channel_factory: Callable[[float], IonChannel] = field(
+        default=make_leak_channel
+    )
     channels: tuple[ChannelConfig, ...] = ()
 
 
@@ -135,8 +147,8 @@ def _needs_calcium(channels: tuple[IonChannel, ...]) -> bool:
     return False
 
 
-def make_neuron(config: NeuronConfig) -> HodgkinHuxley:
-    """Build a :class:`HodgkinHuxley` neuron from a :class:`NeuronConfig`.
+def make_neuron(config: NeuronConfig) -> Neuron:
+    """Build a :class:`~patch_sim.Neuron` from a :class:`NeuronConfig`.
 
     Automatically detects whether any additional channel requires calcium
     dynamics and attaches a :class:`CalciumDynamics` instance when needed.
@@ -145,13 +157,13 @@ def make_neuron(config: NeuronConfig) -> HodgkinHuxley:
         config: Declarative neuron configuration.
 
     Returns:
-        A fully constructed :class:`HodgkinHuxley` instance.
+        A fully constructed :class:`~patch_sim.Neuron` instance.
     """
     built_channels = tuple(
         cc.factory(g_max=cc.g_max, **cc.extra_kwargs) for cc in config.channels
     )
     calcium_dynamics = CalciumDynamics() if _needs_calcium(built_channels) else None
-    return HodgkinHuxley(
+    return Neuron(
         g_Na=config.g_Na,
         g_K=config.g_K,
         g_L=config.g_L,
@@ -166,6 +178,9 @@ def make_neuron(config: NeuronConfig) -> HodgkinHuxley:
         Ca_out=config.Ca_out,
         Ca_in=config.Ca_in,
         T=config.T,
+        na_channel_factory=config.na_channel_factory,
+        k_channel_factory=config.k_channel_factory,
+        leak_channel_factory=config.leak_channel_factory,
         additional_channels=built_channels,
         calcium_dynamics=calcium_dynamics,
     )

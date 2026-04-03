@@ -17,7 +17,7 @@ import numpy as np
 if TYPE_CHECKING:
     from typing import Any
 
-    from .hodgkin_huxley import HodgkinHuxley
+    from .neuron import Neuron
 
     class _StructuredDtype:
         """Dtype stub for structured arrays — ``names`` is always set."""
@@ -85,7 +85,7 @@ def _setup_simulation(
 
 
 def _initialize_gating_variables(
-    neuron: "HodgkinHuxley",
+    neuron: "Neuron",
     initial_voltage: float,
     ca_i: float = 0.0,
 ) -> dict[str, float]:
@@ -111,7 +111,7 @@ def _initialize_gating_variables(
 
 
 def _gating_derivatives(
-    neuron: "HodgkinHuxley",
+    neuron: "Neuron",
     V: float,
     gating_state: dict[str, float],
     ca_i: float = 0.0,
@@ -145,7 +145,7 @@ def _gating_derivatives(
 
 
 def _hh_derivatives(
-    neuron: "HodgkinHuxley",
+    neuron: "Neuron",
     V: float,
     gating_state: dict[str, float],
     I_ext: float,
@@ -207,7 +207,7 @@ def _clip_state(state: dict[str, float]) -> dict[str, float]:
 
 
 def _rk4_step_voltage_clamp(
-    neuron: "HodgkinHuxley",
+    neuron: "Neuron",
     V: float,
     gating_state: dict[str, float],
     dt: float,
@@ -247,7 +247,7 @@ def _rk4_step_voltage_clamp(
 
 
 def _rk4_step_current_clamp(
-    neuron: "HodgkinHuxley",
+    neuron: "Neuron",
     V: float,
     gating_state: dict[str, float],
     I_ext: float,
@@ -295,7 +295,7 @@ def _rk4_step_current_clamp(
 
 
 def _simulate_voltage_clamp_core(
-    neuron: "HodgkinHuxley",
+    neuron: "Neuron",
     voltage_protocol: np.ndarray,
     gating_state: dict[str, float],
     ca_i: float,
@@ -408,7 +408,7 @@ def _simulate_voltage_clamp_core(
 
 
 def _simulate_current_clamp_core(
-    neuron: "HodgkinHuxley",
+    neuron: "Neuron",
     current_external: np.ndarray,
     initial_V: float,
     gating_state: dict[str, float],
@@ -524,7 +524,7 @@ def _simulate_current_clamp_core(
 
 
 def simulate_voltage_clamp(
-    neuron: "HodgkinHuxley",
+    neuron: "Neuron",
     voltage_protocol: np.ndarray,
 ) -> SimulationResult:
     """Simulate a voltage clamp experiment using the Hodgkin-Huxley model.
@@ -568,7 +568,7 @@ def simulate_voltage_clamp(
 
 
 def simulate_current_clamp(
-    neuron: "HodgkinHuxley",
+    neuron: "Neuron",
     current_external: np.ndarray,
 ) -> SimulationResult:
     """Simulate a current clamp experiment using the Hodgkin-Huxley model.
@@ -614,7 +614,7 @@ def simulate_current_clamp(
 
 
 def simulate_voltage_clamp_from_state(
-    neuron: "HodgkinHuxley",
+    neuron: "Neuron",
     voltage_protocol: np.ndarray,
     initial_gating_state: dict[str, float],
     initial_ca_i: float = 0.0,
@@ -660,7 +660,7 @@ def simulate_voltage_clamp_from_state(
 
 
 def simulate_current_clamp_from_state(
-    neuron: "HodgkinHuxley",
+    neuron: "Neuron",
     current_external: np.ndarray,
     initial_V: float,
     initial_gating_state: dict[str, float],
@@ -708,10 +708,10 @@ def simulate_current_clamp_from_state(
 
 
 def simulate_batch(
-    neuron: "HodgkinHuxley",
+    neuron: "Neuron",
     protocols: Sequence[np.ndarray],
     simulate_fn: Callable[
-        ["HodgkinHuxley", np.ndarray], SimulationResult
+        ["Neuron", np.ndarray], SimulationResult
     ] = simulate_voltage_clamp,
     max_workers: int | None = None,
 ) -> Iterator[SimulationResult]:

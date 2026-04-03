@@ -1,7 +1,7 @@
 """Concrete additional ion channel implementations.
 
-These channels can be added to a HodgkinHuxley model via the
-``additional_channels`` argument to extend the classic three-channel HH model
+These channels can be added to a :class:`~patch_sim.Neuron` via the
+``additional_channels`` argument to extend the classic three-channel model
 with additional biophysical mechanisms.
 """
 
@@ -577,7 +577,7 @@ def make_ical_channel(
     (activation, power 2) and ``f`` (inactivation, power 1).
 
     Because ICaL carries Ca²⁺, ``carries_calcium=True`` is set so that
-    :meth:`~patch_sim.hodgkin_huxley.HodgkinHuxley.calcium_current` sums its
+    :meth:`~patch_sim.neuron.Neuron.calcium_current` sums its
     contribution automatically.
 
     Kinetics use Boltzmann-cosh rate functions with activation centred at

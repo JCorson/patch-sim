@@ -214,11 +214,11 @@ def test_patch_sim_child_logger_captured():
 
     setup_logging()
 
-    child_logger = logging.getLogger("patch_sim.hodgkin_huxley")
+    child_logger = logging.getLogger("patch_sim.neuron")
     child_logger.debug("test core library message")
 
     records = StateLogHandler.drain()
     assert len(records) == 1
     assert records[0].message == "test core library message"
     assert records[0].level == "DEBUG"
-    assert records[0].logger_name == "patch_sim.hodgkin_huxley"
+    assert records[0].logger_name == "patch_sim.neuron"

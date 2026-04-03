@@ -145,7 +145,7 @@ class IonChannel:
             from the neuron's ion concentrations.
         carries_calcium: ``True`` for channels that carry Ca²⁺ ions (e.g.
             ICaL, ICaT, ICaN).  Used by
-            :meth:`~patch_sim.hodgkin_huxley.HodgkinHuxley.calcium_current` to
+            :meth:`~patch_sim.neuron.Neuron.calcium_current` to
             sum Ca²⁺ influx for the intracellular Ca²⁺ ODE.  Defaults to
             ``False``.
 
@@ -195,7 +195,7 @@ class IonChannel:
         :class:`GoldmanSpec`, using the concentrations stored on *neuron*.
 
         Args:
-            neuron: A :class:`~patch_sim.hodgkin_huxley.HodgkinHuxley` instance
+            neuron: A :class:`~patch_sim.neuron.Neuron` instance
                 whose ``ion_concentrations()`` method is used to look up ion
                 concentrations.
 
@@ -231,7 +231,7 @@ class IonChannel:
         Args:
             V: Membrane voltage in mV.
             gating_state: Mapping from gating variable name to current value.
-            neuron: The :class:`~patch_sim.hodgkin_huxley.HodgkinHuxley` model
+            neuron: The :class:`~patch_sim.neuron.Neuron` model
                 used to compute the reversal potential.
 
         Returns:

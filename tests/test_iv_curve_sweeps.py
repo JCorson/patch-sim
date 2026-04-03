@@ -82,7 +82,7 @@ def _make_iv_sweeps(
     Returns:
         List of (protocol_array, result_array) tuples, one per voltage.
     """
-    neuron = patch_sim.HodgkinHuxley()
+    neuron = patch_sim.Neuron()
     sweep_duration = pre_pulse_duration + step_duration + post_pulse_duration
     n_steps = round((voltage_max - voltage_min) / voltage_step) + 1
     voltages = np.linspace(voltage_min, voltage_max, n_steps)
@@ -184,7 +184,7 @@ def test_iv_curve_protocol_peak_voltage_matches_step_voltage() -> None:
 
 def test_batch_matches_sequential() -> None:
     """simulate_batch results are identical to sequential simulate_voltage_clamp."""
-    neuron = patch_sim.HodgkinHuxley()
+    neuron = patch_sim.Neuron()
     _voltages, protocols = _make_iv_protocols(
         voltage_min=-60.0,
         voltage_max=0.0,
@@ -202,7 +202,7 @@ def test_batch_matches_sequential() -> None:
 
 def test_batch_single_sweep() -> None:
     """A single-protocol batch yields exactly one correct DataFrame."""
-    neuron = patch_sim.HodgkinHuxley()
+    neuron = patch_sim.Neuron()
     _voltages, protocols = _make_iv_protocols(
         voltage_min=0.0,
         voltage_max=0.0,
@@ -219,14 +219,14 @@ def test_batch_single_sweep() -> None:
 
 def test_batch_empty_protocols() -> None:
     """An empty protocol list yields no results."""
-    neuron = patch_sim.HodgkinHuxley()
+    neuron = patch_sim.Neuron()
     results = list(patch_sim.simulate_batch(neuron, [], max_workers=2))
     assert results == []
 
 
 def test_batch_preserves_order() -> None:
     """Results come back in voltage order (same order as input protocols)."""
-    neuron = patch_sim.HodgkinHuxley()
+    neuron = patch_sim.Neuron()
     voltages, protocols = _make_iv_protocols(
         voltage_min=-80.0,
         voltage_max=40.0,
@@ -254,7 +254,7 @@ def test_batch_with_calcium_channels() -> None:
     """
     ical = patch_sim.make_ical_channel()
     cd = patch_sim.CalciumDynamics()
-    neuron = patch_sim.HodgkinHuxley(
+    neuron = patch_sim.Neuron(
         additional_channels=(ical,),
         calcium_dynamics=cd,
     )
@@ -288,7 +288,7 @@ def test_batch_with_calcium_channels() -> None:
 
 def test_batch_with_current_clamp() -> None:
     """simulate_batch with simulate_fn=simulate_current_clamp works correctly."""
-    neuron = patch_sim.HodgkinHuxley()
+    neuron = patch_sim.Neuron()
     num_steps = int(_FS * 0.05)  # 50 ms
     stimulus = np.zeros(num_steps)
     stimulus[int(_FS * 0.01) : int(_FS * 0.04)] = 10.0
