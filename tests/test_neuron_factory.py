@@ -7,6 +7,7 @@ import pytest
 
 from patch_sim.additional_channels import make_ical_channel, make_icat_channel
 from patch_sim.calcium import CalciumDynamics
+from patch_sim.channels import IonChannel
 from patch_sim.constants import (
     CA1_PYRAMIDAL,
     PURKINJE,
@@ -15,7 +16,6 @@ from patch_sim.constants import (
     THALAMIC_RELAY,
     TRN,
 )
-from patch_sim.channels import IonChannel
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import ChannelConfig, NeuronConfig, make_neuron
 from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
