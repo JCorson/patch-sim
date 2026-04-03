@@ -24,11 +24,11 @@ jobs:
 
       - name: Lint
         run: |
-          uv tool run ruff check .
-          uv tool run ruff format --check .
+          uvx ruff check .
+          uvx ruff format --check .
 
       - name: Type check
-        run: uv run --frozen -m mypy .
+        run: uvx ty check
 
       - name: Test
         run: uv run --frozen -m pytest --verbose
