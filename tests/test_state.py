@@ -120,7 +120,7 @@ def test_set_float_ignores_none() -> None:
     """_set_float silently ignores None without raising."""
     s = _make_state()
     original = s.stimulus_duration
-    s._set_float("stimulus_duration", None)  # type: ignore[arg-type]
+    s._set_float("stimulus_duration", None)  # ty: ignore[arg-type]
     assert s.stimulus_duration == pytest.approx(original)
 
 
