@@ -97,7 +97,7 @@ def test_custom_initialization() -> None:
 def test_frozen_immutability(hh_model: HodgkinHuxley) -> None:
     """Assigning to a frozen dataclass field must raise FrozenInstanceError."""
     with pytest.raises(dataclasses.FrozenInstanceError):
-        hh_model.g_Na = 999.0  # type: ignore[misc]
+        hh_model.g_Na = 999.0  # ty: ignore[invalid-assignment]
 
 
 def test_reversal_potentials_from_core_channels(hh_model: HodgkinHuxley) -> None:
