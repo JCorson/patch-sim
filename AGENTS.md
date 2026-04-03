@@ -97,9 +97,9 @@ Run all four checks and ensure they pass before marking a task complete:
 
 ```bash
 uv run --frozen -m pytest --verbose          # run the test suite
-uv tool run ruff check .                     # check style
-uv tool run ruff format --check .            # check formatting
-uv run --frozen -m mypy .                    # run mypy type checking
+uvx ruff check .                     # check style
+uvx ruff format --check .            # check formatting
+uvx ty check                                 # run ty type checking
 ```
 
 All four must pass with no errors.
