@@ -110,21 +110,21 @@ black and isort behavior.
 Formatting fixes can be applied using:
 
 ```
-uv tool run ruff format .
-uv tool run ruff check . --fix-only
+uvx ruff format .
+uvx ruff check . --fix-only
 ```
 
 Conformance to the styling rules can be checked with:
 
 ```
-uv tool run ruff check .
-uv tool run ruff format --check .
+uvx ruff check .
+uvx ruff format --check .
 ```
 
 #### Type checking
 
 ```
-uv run --frozen -m mypy .
+uvx ty check
 ```
 
 ---
