@@ -982,8 +982,6 @@ class AppState(rx.State):
             setattr(self, key, value)
         self.active_neuron_type = name
         self.current_sweeps = []
-        self.saved_sweeps = []
-        self.stored_traces = []
         self._cont_has_state = False
 
     def load_protocol_preset(self, name: str) -> None:
@@ -1174,7 +1172,12 @@ class AppState(rx.State):
             idx = len(self.saved_sweeps)
             color = constants.SWEEP_COLORS[idx % len(constants.SWEEP_COLORS)]
             self.saved_sweeps.append(
-                sweep.model_copy(update={"color": color, "label": f"Sweep {idx + 1}"})
+                sweep.model_copy(
+                    update={
+                        "color": color,
+                        "label": f"Sweep {idx + 1} ({self.active_neuron_type})",
+                    }
+                )
             )
         js = self._apply_visibility_js()
         if js:
@@ -1197,7 +1200,7 @@ class AppState(rx.State):
             return
         idx = len(self.stored_traces)
         color = constants.STORED_TRACE_COLORS[idx % len(constants.STORED_TRACE_COLORS)]
-        label = f"Stored {idx + 1}"
+        label = f"Stored {idx + 1} ({self.active_neuron_type})"
         self.stored_traces.append(
             self.current_sweeps[0].model_copy(update={"color": color, "label": label})
         )
