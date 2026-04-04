@@ -17,6 +17,7 @@ from .additional_channels import (
     make_ika_channel,
     make_ikca_channel,
     make_ikir_channel,
+    make_ikv31_channel,
     make_im_channel,
     make_inap_channel,
     make_inar_channel,
@@ -116,6 +117,7 @@ class NeuronConfig:
 CHANNEL_REGISTRY: dict[str, Callable[..., IonChannel]] = {
     "ih": make_ih_channel,
     "ika": make_ika_channel,
+    "ikv31": make_ikv31_channel,
     "inap": make_inap_channel,
     "inar": make_inar_channel,
     "im": make_im_channel,

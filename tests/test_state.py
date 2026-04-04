@@ -301,12 +301,13 @@ def test_load_protocol_preset_unknown_name_is_ignored() -> None:
 
 
 def test_load_neuron_preset_fast_spiking_interneuron() -> None:
-    """Fast-Spiking Interneuron preset enables IKa; protocol fields are unchanged."""
+    """Fast-Spiking Interneuron preset enables IKv31; protocol fields are unchanged."""
     s = _make_state()
     original_duration = s.stimulus_duration
     original_clamp = s.clamp_mode
     s.load_neuron_preset(FAST_SPIKING_INTERNEURON)
-    assert s.ika_enabled is True
+    assert s.ikv31_enabled is True
+    assert s.ika_enabled is False
     assert s.stimulus_duration == pytest.approx(original_duration)
     assert s.clamp_mode == original_clamp
 
@@ -322,9 +323,9 @@ def test_load_neuron_preset_resets_previously_enabled_channels() -> None:
     """Loading a second neuron preset disables channels from the first."""
     s = _make_state()
     s.load_neuron_preset(FAST_SPIKING_INTERNEURON)
-    assert s.ika_enabled is True
+    assert s.ikv31_enabled is True
     s.load_neuron_preset(CORTICAL_PYRAMIDAL)
-    assert s.ika_enabled is False
+    assert s.ikv31_enabled is False
 
 
 def test_load_neuron_preset_pyramidal_neuron() -> None:

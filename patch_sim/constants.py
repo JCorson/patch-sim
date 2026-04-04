@@ -21,6 +21,7 @@ DEFAULT_G_IH: float = 0.1  # HCN/Ih maximum conductance in mS/cm²
 # Ih Na+ permeability relative to K+ (GHK); yields ~-30 mV at default concentrations
 DEFAULT_IH_P_NA: float = 0.289
 DEFAULT_G_IKA: float = 5.0  # A-type K+ maximum conductance in mS/cm²
+DEFAULT_G_IKV31: float = 40.0  # Kv3.1-type K+ maximum conductance in mS/cm²
 DEFAULT_G_NAP: float = 0.5  # Persistent Na+ maximum conductance in mS/cm²
 DEFAULT_G_NAR: float = 0.3  # Resurgent Na+ maximum conductance in mS/cm²
 DEFAULT_G_IM: float = 0.5  # Muscarinic K+ maximum conductance in mS/cm²
