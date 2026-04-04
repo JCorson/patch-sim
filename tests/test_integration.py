@@ -8,7 +8,7 @@ the full end-to-end workflow rather than either component in isolation.
 import numpy as np
 
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
-from patch_sim.hodgkin_huxley import HodgkinHuxley
+from patch_sim.neuron import Neuron
 from patch_sim.protocols import (
     chirp_current,
     noise_current,
@@ -96,7 +96,7 @@ def _count_action_potentials(voltage: np.ndarray, threshold: float = 0.0) -> int
 # ---------------------------------------------------------------------------
 
 
-def test_step_current_to_simulation(hh_model: HodgkinHuxley) -> None:
+def test_step_current_to_simulation(hh_model: Neuron) -> None:
     """step_current → simulate_current_clamp: structural checks and AP generation."""
     protocol = step_current(duration=50.0, current_amplitude=15.0)
     result = simulate_current_clamp(hh_model, current_external=protocol)
@@ -108,7 +108,7 @@ def test_step_current_to_simulation(hh_model: HodgkinHuxley) -> None:
     assert result["voltage"].max() > 0.0
 
 
-def test_ramp_current_to_simulation(hh_model: HodgkinHuxley) -> None:
+def test_ramp_current_to_simulation(hh_model: Neuron) -> None:
     """ramp_current → simulate_current_clamp: structural checks."""
     protocol = ramp_current(duration=50.0, start_current=0.0, end_current=30.0)
     result = simulate_current_clamp(hh_model, current_external=protocol)
@@ -120,7 +120,7 @@ def test_ramp_current_to_simulation(hh_model: HodgkinHuxley) -> None:
     assert result["voltage"].max() - result["voltage"].min() > 5.0
 
 
-def test_pulse_train_current_to_simulation(hh_model: HodgkinHuxley) -> None:
+def test_pulse_train_current_to_simulation(hh_model: Neuron) -> None:
     """pulse_train → simulate_current_clamp: multiple APs expected."""
     protocol = pulse_train(
         duration=100.0,
@@ -138,7 +138,7 @@ def test_pulse_train_current_to_simulation(hh_model: HodgkinHuxley) -> None:
     assert ap_count >= 2
 
 
-def test_sinusoidal_current_to_simulation(hh_model: HodgkinHuxley) -> None:
+def test_sinusoidal_current_to_simulation(hh_model: Neuron) -> None:
     """sinusoidal_current → simulate_current_clamp: structural checks."""
     protocol = sinusoidal_current(
         duration=50.0,
@@ -169,9 +169,9 @@ def test_noise_current_to_simulation() -> None:
     )
 
     # Use separate model instances so tests are not order-dependent
-    result_a = simulate_current_clamp(HodgkinHuxley(), current_external=protocol_a)
-    result_b = simulate_current_clamp(HodgkinHuxley(), current_external=protocol_b)
-    result_c = simulate_current_clamp(HodgkinHuxley(), current_external=protocol_c)
+    result_a = simulate_current_clamp(Neuron(), current_external=protocol_a)
+    result_b = simulate_current_clamp(Neuron(), current_external=protocol_b)
+    result_c = simulate_current_clamp(Neuron(), current_external=protocol_c)
 
     _assert_current_clamp_result(result_a)
 
@@ -184,7 +184,7 @@ def test_noise_current_to_simulation() -> None:
     assert not np.array_equal(result_a["voltage"], result_c["voltage"])
 
 
-def test_chirp_current_to_simulation(hh_model: HodgkinHuxley) -> None:
+def test_chirp_current_to_simulation(hh_model: Neuron) -> None:
     """chirp_current → simulate_current_clamp: structural checks with DC offset."""
     protocol = chirp_current(
         duration=50.0,
@@ -208,7 +208,7 @@ def test_chirp_current_to_simulation(hh_model: HodgkinHuxley) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_step_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
+def test_step_voltage_to_simulation(hh_model: Neuron) -> None:
     """step_voltage → simulate_voltage_clamp: Na⁺ inward current during step."""
     protocol = step_voltage(
         duration=20.0,
@@ -227,7 +227,7 @@ def test_step_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
     assert result["INa"][step_mask].min() < -10.0
 
 
-def test_ramp_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
+def test_ramp_voltage_to_simulation(hh_model: Neuron) -> None:
     """ramp_voltage → simulate_voltage_clamp: K⁺ current higher in second half."""
     protocol = ramp_voltage(
         duration=20.0,
@@ -250,7 +250,7 @@ def test_ramp_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
     assert k_second_half > k_first_half
 
 
-def test_pulse_train_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
+def test_pulse_train_voltage_to_simulation(hh_model: Neuron) -> None:
     """pulse_train_voltage → simulate_voltage_clamp: repeated Na⁺ transients."""
     protocol = pulse_train_voltage(
         duration=50.0,
@@ -274,7 +274,7 @@ def test_pulse_train_voltage_to_simulation(hh_model: HodgkinHuxley) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_action_potential_with_step_current(hh_model: HodgkinHuxley) -> None:
+def test_action_potential_with_step_current(hh_model: Neuron) -> None:
     """Suprathreshold step current produces a full action potential."""
     protocol = step_current(duration=50.0, current_amplitude=15.0)
     result = simulate_current_clamp(hh_model, current_external=protocol)
@@ -290,7 +290,7 @@ def test_action_potential_with_step_current(hh_model: HodgkinHuxley) -> None:
     assert float(post_peak_voltage.min()) < -50.0
 
 
-def test_no_ap_below_threshold_current(hh_model: HodgkinHuxley) -> None:
+def test_no_ap_below_threshold_current(hh_model: Neuron) -> None:
     """Sub-threshold step current should not trigger an action potential."""
     protocol = step_current(duration=50.0, current_amplitude=5.0)
     result = simulate_current_clamp(hh_model, current_external=protocol)

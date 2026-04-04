@@ -1,10 +1,10 @@
-"""Tests for the current clamp simulation in the Hodgkin-Huxley model."""
+"""Tests for the current clamp simulation."""
 
 import numpy as np
 import pytest
 
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
-from patch_sim.hodgkin_huxley import HodgkinHuxley
+from patch_sim.neuron import Neuron
 
 
 def test_simulate_current_clamp_returns_structured_array(hh_model):
@@ -50,7 +50,7 @@ def test_simulate_current_clamp_returns_structured_array(hh_model):
 def test_simulation_dynamics():
     """Test that the simulation shows expected dynamics."""
     # Create model for testing
-    custom_model = HodgkinHuxley()
+    custom_model = Neuron()
 
     # Create current array for a 50ms simulation
     duration = 50  # ms
@@ -117,7 +117,7 @@ def test_simulate_current_clamp_with_non_zero_currents(current_amplitude: float)
     duration = 10  # ms
 
     # Create a model for testing
-    custom_model = HodgkinHuxley()
+    custom_model = Neuron()
     num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
 
     # Create constant current array for the given amplitude
@@ -172,7 +172,7 @@ def test_physiological_limits_and_action_potentials():
     ap_threshold = 0  # mV, voltage threshold for counting action potentials
 
     # Create a model for testing
-    custom_model = HodgkinHuxley()
+    custom_model = Neuron()
     num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
 
     ap_counts = []
@@ -221,7 +221,7 @@ def test_simulate_current_clamp_with_different_currents():
     dt = 1000.0 / SIM_SAMPLING_FREQ  # ms per step
 
     # Create a custom model for testing
-    custom_model = HodgkinHuxley()
+    custom_model = Neuron()
 
     # Calculate the number of time steps
     num_time_steps = int(duration / dt) + 1
@@ -267,7 +267,7 @@ def test_simulate_current_clamp_with_different_currents():
 def test_simulation_time_from_current_waveform():
     """Test that simulation time is derived from the current waveform length."""
     dt = 1000.0 / SIM_SAMPLING_FREQ  # ms per step
-    custom_model = HodgkinHuxley()
+    custom_model = Neuron()
 
     # Create a current waveform of specific length
     duration = 75.0  # ms

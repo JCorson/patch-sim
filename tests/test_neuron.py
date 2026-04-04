@@ -1,15 +1,19 @@
-"""Tests for the core Hodgkin-Huxley model functionality."""
+"""Tests for the core Neuron model functionality."""
 
 import dataclasses
 
 import pytest
 
 from patch_sim.channels import IonChannel, IonSpecies
-from patch_sim.core_channels import make_na_channel
-from patch_sim.hodgkin_huxley import HodgkinHuxley
+from patch_sim.core_channels import (
+    make_k_channel,
+    make_leak_channel,
+    make_na_channel,
+)
+from patch_sim.neuron import Neuron
 
 
-def test_initialization(hh_model: HodgkinHuxley) -> None:
+def test_initialization(hh_model: Neuron) -> None:
     """Test that the model is initialized with correct parameters."""
     assert hh_model.C_m == pytest.approx(1.0)
     assert hh_model.g_Na == pytest.approx(120.0)
@@ -17,7 +21,7 @@ def test_initialization(hh_model: HodgkinHuxley) -> None:
     assert hh_model.g_L == pytest.approx(0.3)
 
 
-def test_core_channels_structure(hh_model: HodgkinHuxley) -> None:
+def test_core_channels_structure(hh_model: Neuron) -> None:
     """core_channels returns (Na, K, leak) IonChannel tuple in that order."""
     chs = hh_model.core_channels
     assert len(chs) == 3
@@ -27,7 +31,7 @@ def test_core_channels_structure(hh_model: HodgkinHuxley) -> None:
     assert all(isinstance(ch, IonChannel) for ch in chs)
 
 
-def test_core_channels_conductances(hh_model: HodgkinHuxley) -> None:
+def test_core_channels_conductances(hh_model: Neuron) -> None:
     """core_channels channels carry the constructor g_max values."""
     chs = hh_model.core_channels
     assert chs[0].g_max == pytest.approx(hh_model.g_Na)
@@ -35,7 +39,7 @@ def test_core_channels_conductances(hh_model: HodgkinHuxley) -> None:
     assert chs[2].g_max == pytest.approx(hh_model.g_L)
 
 
-def test_all_channels_no_additional(hh_model: HodgkinHuxley) -> None:
+def test_all_channels_no_additional(hh_model: Neuron) -> None:
     """all_channels equals core_channels when there are no additional channels."""
     assert hh_model.all_channels == hh_model.core_channels
 
@@ -44,12 +48,12 @@ def test_all_channels_with_additional() -> None:
     """all_channels appends additional channels after the core three."""
     extra = make_na_channel(g_max=5.0)
     extra_named = dataclasses.replace(extra, name="NaExtra")
-    neuron = HodgkinHuxley(additional_channels=(extra_named,))
+    neuron = Neuron(additional_channels=(extra_named,))
     assert len(neuron.all_channels) == 4
     assert neuron.all_channels[3].name == "NaExtra"
 
 
-def test_all_gating_variables_no_additional(hh_model: HodgkinHuxley) -> None:
+def test_all_gating_variables_no_additional(hh_model: Neuron) -> None:
     """all_gating_variables has exactly 3 variables for the default HH model."""
     gvs = hh_model.all_gating_variables
     names = [gv.name for gv in gvs]
@@ -74,7 +78,7 @@ def test_all_gating_variables_with_additional() -> None:
         gating_variables=(gv_new,),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )
-    neuron = HodgkinHuxley(additional_channels=(extra_ch2,))
+    neuron = Neuron(additional_channels=(extra_ch2,))
     gvs = neuron.all_gating_variables
     names = [gv.name for gv in gvs]
     assert "kextra_activation" in names
@@ -84,7 +88,7 @@ def test_all_gating_variables_with_additional() -> None:
 def test_custom_initialization() -> None:
     """Test that the model can be initialized with custom parameters."""
     custom_g_Na = 100.0
-    custom_model = HodgkinHuxley(g_Na=custom_g_Na)
+    custom_model = Neuron(g_Na=custom_g_Na)
 
     assert custom_model.g_Na == pytest.approx(custom_g_Na)
 
@@ -94,13 +98,13 @@ def test_custom_initialization() -> None:
     assert custom_model.g_L == pytest.approx(0.3)
 
 
-def test_frozen_immutability(hh_model: HodgkinHuxley) -> None:
+def test_frozen_immutability(hh_model: Neuron) -> None:
     """Assigning to a frozen dataclass field must raise FrozenInstanceError."""
     with pytest.raises(dataclasses.FrozenInstanceError):
         hh_model.g_Na = 999.0  # ty: ignore[invalid-assignment]
 
 
-def test_reversal_potentials_from_core_channels(hh_model: HodgkinHuxley) -> None:
+def test_reversal_potentials_from_core_channels(hh_model: Neuron) -> None:
     """Core channel reversal potentials match direct Nernst calculation."""
     from patch_sim.electrochemistry import nernst_potential
 
@@ -114,7 +118,7 @@ def test_reversal_potentials_from_core_channels(hh_model: HodgkinHuxley) -> None
     assert leak_ch.reversal_potential(hh_model) == pytest.approx(expected_E_L)
 
 
-def test_reversal_potentials_in_physiological_range(hh_model: HodgkinHuxley) -> None:
+def test_reversal_potentials_in_physiological_range(hh_model: Neuron) -> None:
     """Core channel reversal potentials are in expected physiological ranges."""
     na_ch, k_ch, leak_ch = hh_model.core_channels
     assert 60.0 < na_ch.reversal_potential(hh_model) < 65.0
@@ -126,8 +130,8 @@ def test_custom_ion_concentrations_shift_reversal_potentials() -> None:
     """Changing ion concentrations must produce shifted reversal potentials."""
     from patch_sim.electrochemistry import nernst_potential
 
-    custom_model = HodgkinHuxley(Na_out=200.0, K_in=100.0, T=293.15)
-    default_model = HodgkinHuxley()
+    custom_model = Neuron(Na_out=200.0, K_in=100.0, T=293.15)
+    default_model = Neuron()
 
     na_custom, k_custom, _ = custom_model.core_channels
     na_default, k_default, _ = default_model.core_channels
@@ -156,7 +160,7 @@ def test_calcium_reversal_potential() -> None:
     from patch_sim.channels import IonChannel, NernstSpec
     from patch_sim.electrochemistry import nernst_potential
 
-    model = HodgkinHuxley()
+    model = Neuron()
     ca_ch = IonChannel(
         name="CaTest",
         g_max=1.0,
@@ -177,35 +181,35 @@ def test_calcium_reversal_potential() -> None:
 def test_negative_g_Na_raises(g_Na: float) -> None:
     """Negative sodium conductance must raise ValueError."""
     with pytest.raises(ValueError, match="g_Na"):
-        HodgkinHuxley(g_Na=g_Na)
+        Neuron(g_Na=g_Na)
 
 
 @pytest.mark.parametrize("g_K", [-1.0, -0.001])
 def test_negative_g_K_raises(g_K: float) -> None:
     """Negative potassium conductance must raise ValueError."""
     with pytest.raises(ValueError, match="g_K"):
-        HodgkinHuxley(g_K=g_K)
+        Neuron(g_K=g_K)
 
 
 @pytest.mark.parametrize("g_L", [-1.0, -0.001])
 def test_negative_g_L_raises(g_L: float) -> None:
     """Negative leak conductance must raise ValueError."""
     with pytest.raises(ValueError, match="g_L"):
-        HodgkinHuxley(g_L=g_L)
+        Neuron(g_L=g_L)
 
 
 @pytest.mark.parametrize("C_m", [0.0, -1.0])
 def test_non_positive_capacitance_raises(C_m: float) -> None:
     """Non-positive membrane capacitance must raise ValueError."""
     with pytest.raises(ValueError, match="C_m"):
-        HodgkinHuxley(C_m=C_m)
+        Neuron(C_m=C_m)
 
 
 @pytest.mark.parametrize("T", [0.0, -1.0])
 def test_non_positive_temperature_raises(T: float) -> None:
     """Non-positive temperature must raise ValueError."""
     with pytest.raises(ValueError, match="Temperature"):
-        HodgkinHuxley(T=T)
+        Neuron(T=T)
 
 
 @pytest.mark.parametrize(
@@ -232,7 +236,7 @@ def test_non_positive_temperature_raises(T: float) -> None:
 def test_non_positive_ion_concentration_raises(kwargs: dict) -> None:
     """Non-positive ion concentration must raise ValueError."""
     with pytest.raises(ValueError, match="concentration"):
-        HodgkinHuxley(**kwargs)
+        Neuron(**kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -250,7 +254,7 @@ def test_non_positive_ion_concentration_raises(kwargs: dict) -> None:
     ],
 )
 def test_ion_concentrations_returns_correct_pair(
-    hh_model: HodgkinHuxley,
+    hh_model: Neuron,
     species: IonSpecies,
     expected_out_attr: str,
     expected_in_attr: str,
@@ -263,8 +267,92 @@ def test_ion_concentrations_returns_correct_pair(
 
 def test_ion_concentrations_reflects_custom_values() -> None:
     """ion_concentrations must return user-supplied concentration values."""
-    model = HodgkinHuxley(Na_out=200.0, K_in=100.0, Ca_out=5.0, Cl_in=20.0)
+    model = Neuron(Na_out=200.0, K_in=100.0, Ca_out=5.0, Cl_in=20.0)
     assert model.ion_concentrations(IonSpecies.SODIUM) == pytest.approx((200.0, 15.0))
     assert model.ion_concentrations(IonSpecies.POTASSIUM) == pytest.approx((5.0, 100.0))
     assert model.ion_concentrations(IonSpecies.CALCIUM) == pytest.approx((5.0, 0.0001))
     assert model.ion_concentrations(IonSpecies.CHLORIDE) == pytest.approx((120.0, 20.0))
+
+
+# ---------------------------------------------------------------------------
+# Core channel factory fields
+# ---------------------------------------------------------------------------
+
+
+def test_default_factories_are_hh52() -> None:
+    """Default core channel factories are the HH52 squid axon functions."""
+    model = Neuron()
+    assert model.na_channel_factory is make_na_channel
+    assert model.k_channel_factory is make_k_channel
+    assert model.leak_channel_factory is make_leak_channel
+
+
+def test_custom_na_factory_is_used() -> None:
+    """A custom na_channel_factory is called when building core_channels."""
+    calls: list[float] = []
+
+    def recording_na_factory(g_max: float) -> IonChannel:
+        """Na factory that records g_max and delegates to the default."""
+        calls.append(g_max)
+        return make_na_channel(g_max)
+
+    model = Neuron(g_Na=99.0, na_channel_factory=recording_na_factory)
+    _ = model.core_channels
+    assert calls == [99.0]
+    assert model.core_channels[0].name == "Na"
+    assert model.core_channels[0].g_max == pytest.approx(99.0)
+
+
+def test_custom_k_factory_is_used() -> None:
+    """A custom k_channel_factory is called when building core_channels."""
+    calls: list[float] = []
+
+    def recording_k_factory(g_max: float) -> IonChannel:
+        """K factory that records g_max and delegates to the default."""
+        calls.append(g_max)
+        return make_k_channel(g_max)
+
+    model = Neuron(g_K=77.0, k_channel_factory=recording_k_factory)
+    _ = model.core_channels
+    assert calls == [77.0]
+    assert model.core_channels[1].name == "K"
+    assert model.core_channels[1].g_max == pytest.approx(77.0)
+
+
+def test_custom_leak_factory_is_used() -> None:
+    """A custom leak_channel_factory is called when building core_channels."""
+    calls: list[float] = []
+
+    def recording_leak_factory(g_max: float) -> IonChannel:
+        """Leak factory that records g_max and delegates to the default."""
+        calls.append(g_max)
+        return make_leak_channel(g_max)
+
+    model = Neuron(g_L=0.5, leak_channel_factory=recording_leak_factory)
+    _ = model.core_channels
+    assert calls == [0.5]
+    assert model.core_channels[2].name == "leak"
+    assert model.core_channels[2].g_max == pytest.approx(0.5)
+
+
+def test_custom_factory_replaces_all_three_core_channels() -> None:
+    """Replacing all three factories produces the expected channel names."""
+
+    def alt_na(g_max: float) -> IonChannel:
+        """Alternate Na factory returning HH52 channel."""
+        return make_na_channel(g_max)
+
+    def alt_k(g_max: float) -> IonChannel:
+        """Alternate K factory returning HH52 channel."""
+        return make_k_channel(g_max)
+
+    def alt_leak(g_max: float) -> IonChannel:
+        """Alternate leak factory returning HH52 channel."""
+        return make_leak_channel(g_max)
+
+    model = Neuron(
+        na_channel_factory=alt_na,
+        k_channel_factory=alt_k,
+        leak_channel_factory=alt_leak,
+    )
+    assert [ch.name for ch in model.core_channels] == ["Na", "K", "leak"]

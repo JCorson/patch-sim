@@ -1204,8 +1204,8 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     # Simulation helpers (called while holding the state lock)          #
     # ------------------------------------------------------------------ #
-    def _build_neuron(self) -> "patch_sim.HodgkinHuxley":
-        """Construct a HodgkinHuxley neuron from current state parameters."""
+    def _build_neuron(self) -> "patch_sim.Neuron":
+        """Construct a Neuron from current state parameters."""
         channels = tuple(
             patch_sim.ChannelConfig(factory, g_max=getattr(self, f"{name}_g_max"))
             for name, factory in patch_sim.CHANNEL_REGISTRY.items()

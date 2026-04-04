@@ -2,10 +2,10 @@
 
 import pytest
 
-from patch_sim.hodgkin_huxley import HodgkinHuxley
+from patch_sim.neuron import Neuron
 
 
 @pytest.fixture
-def hh_model() -> HodgkinHuxley:
-    """Default Hodgkin-Huxley neuron instance for all tests."""
-    return HodgkinHuxley()
+def hh_model() -> Neuron:
+    """Default conductance-based neuron instance for all tests."""
+    return Neuron()
