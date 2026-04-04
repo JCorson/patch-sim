@@ -620,6 +620,75 @@ def test_public_api_exports_ika():
 
 
 # ---------------------------------------------------------------------------
+# IKv31 (Kv3.1-type K+)
+# ---------------------------------------------------------------------------
+
+
+def test_ikv31_gating_steady_state_in_bounds():
+    """IKv31 gating variable nk_inf is in [0, 1] for physiological voltages."""
+    from patch_sim.additional_channels import _ikv31_alpha_nk, _ikv31_beta_nk
+
+    for V in range(-100, 61):
+        alpha = _ikv31_alpha_nk(float(V), 0.0)
+        beta = _ikv31_beta_nk(float(V), 0.0)
+        nk_inf = alpha / (alpha + beta)
+        assert 0.0 <= nk_inf <= 1.0, f"nk_inf={nk_inf} out of bounds at V={V}"
+
+
+def test_ikv31_near_zero_activation_at_rest():
+    """IKv31 nk_inf is near zero at resting potential (-65 mV).
+
+    The high activation threshold of Kv3.1 means virtually no outward current
+    at rest — this is the key property that fixes issue #155.
+    """
+    from patch_sim.additional_channels import _ikv31_alpha_nk, _ikv31_beta_nk
+
+    alpha = _ikv31_alpha_nk(-65.0, 0.0)
+    beta = _ikv31_beta_nk(-65.0, 0.0)
+    nk_inf = alpha / (alpha + beta)
+    assert nk_inf < 0.02, f"nk_inf={nk_inf} should be near zero at -65 mV"
+
+
+def test_ikv31_strong_activation_depolarized():
+    """IKv31 nk_inf is well above 0.5 at 0 mV (depolarized)."""
+    from patch_sim.additional_channels import _ikv31_alpha_nk, _ikv31_beta_nk
+
+    alpha = _ikv31_alpha_nk(0.0, 0.0)
+    beta = _ikv31_beta_nk(0.0, 0.0)
+    nk_inf = alpha / (alpha + beta)
+    assert nk_inf > 0.5, f"nk_inf={nk_inf} should be above 0.5 at 0 mV"
+
+
+def test_make_ikv31_channel_defaults():
+    """make_ikv31_channel() produces a channel with the expected defaults."""
+    from patch_sim.additional_channels import make_ikv31_channel
+    from patch_sim.constants import DEFAULT_G_IKV31
+
+    ch = make_ikv31_channel()
+    assert ch.name == "Kv31"
+    assert ch.g_max == pytest.approx(DEFAULT_G_IKV31)
+    assert len(ch.gating_variables) == 1
+    assert ch.gating_variables[0].name == "nk"
+    assert ch.gating_variables[0].power == 2
+
+
+def test_current_clamp_with_ikv31():
+    """Current clamp with IKv31 channel adds Kv31 and nk columns."""
+    from patch_sim.additional_channels import make_ikv31_channel
+
+    neuron = Neuron(additional_channels=(make_ikv31_channel(),))
+    stimulus = np.zeros(int(40_000 * 0.05))
+    result = simulate_current_clamp(neuron=neuron, current_external=stimulus)
+    assert "IKv31" in result.dtype.names
+    assert "nk" in result.dtype.names
+
+
+def test_public_api_exports_ikv31():
+    """make_ikv31_channel is exported from the patch_sim public API."""
+    assert hasattr(patch_sim, "make_ikv31_channel")
+
+
+# ---------------------------------------------------------------------------
 # INaP rate functions
 # ---------------------------------------------------------------------------
 

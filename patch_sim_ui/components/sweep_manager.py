@@ -103,6 +103,16 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
         AppState.set_show_ika_gating,
     ),
     (
+        "IKv31 (Kv3.1-type K\u207a)",
+        AppState.ikv31_enabled,
+        "I_IKv31",
+        AppState.show_ikv31_current,
+        AppState.set_show_ikv31_current,
+        "IKv31 gating (nk)",
+        AppState.show_ikv31_gating,
+        AppState.set_show_ikv31_gating,
+    ),
+    (
         "INaP (Persistent Na\u207a)",
         AppState.inap_enabled,
         "I_INaP",

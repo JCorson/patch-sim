@@ -138,6 +138,14 @@ _ADDITIONAL_CHANNEL_ROW_SPECS = [
         "ika_g_max",
     ),
     (
+        "IKv31 (Kv3.1-type K\u207a)",
+        AppState.ikv31_enabled,
+        AppState.set_ikv31_enabled,
+        AppState.ikv31_g_max,
+        AppState.set_ikv31_g_max,
+        "ikv31_g_max",
+    ),
+    (
         "INaP (Persistent Na\u207a)",
         AppState.inap_enabled,
         AppState.set_inap_enabled,

@@ -20,6 +20,7 @@ from .constants import (
     DEFAULT_G_IKA,
     DEFAULT_G_IKCA,
     DEFAULT_G_IKIR,
+    DEFAULT_G_IKV31,
     DEFAULT_G_IM,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
@@ -154,6 +155,58 @@ def make_ika_channel(
         name="Ka",
         g_max=g_max,
         gating_variables=(a_var, b_var),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
+
+
+_ikv31_alpha_nk, _ikv31_beta_nk = boltzmann_cosh_rates(
+    half=-12.4,
+    slope=11.8,
+    tau_scale=4.0,
+    tau_floor=0.2,
+)
+
+
+def make_ikv31_channel(
+    g_max: float = DEFAULT_G_IKV31,
+) -> IonChannel:
+    """Create an IKv31 (Kv3.1-type K⁺) ion channel.
+
+    IKv31 is a high-threshold, fast-deactivating delayed-rectifier K⁺ current
+    that is the hallmark conductance of fast-spiking interneurons.  Its high
+    activation threshold (~−12 mV V₁/₂) means it is virtually closed at rest,
+    preventing the spurious hyperpolarization that a low-threshold K⁺ channel
+    would produce.  Fast deactivation enables rapid repolarization and supports
+    high-frequency firing without adaptation.
+
+    Uses a single activation gate ``nk`` with power 2 (n-squared kinetics from
+    Erisir et al. 1999).  The reversal potential is computed dynamically from
+    the neuron's K⁺ concentrations via the Nernst equation.
+
+    Kinetics follow Erisir et al. (1999), J. Neurophysiol. 82:2476, expressed
+    with Boltzmann/cosh rate functions:
+
+    * V₁/₂ = −12.4 mV, slope = 11.8 mV
+    * τ_scale = 4.0 ms, τ_floor = 0.2 ms
+
+    Args:
+        g_max: Maximum conductance in mS/cm². Must be non-negative.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_IKV31`.
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the IKv31
+        current.
+    """
+    nk_var = GatingVariable(
+        name="nk",
+        power=2,
+        alpha=_ikv31_alpha_nk,
+        beta=_ikv31_beta_nk,
+    )
+    return IonChannel(
+        name="Kv31",
+        g_max=g_max,
+        gating_variables=(nk_var,),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )
 

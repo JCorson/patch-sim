@@ -28,6 +28,7 @@ PARAM_RANGES: dict[str, tuple[float, float, float]] = {
     # Additional channel conductances
     "ih_g_max": (0.0, 1.0, 0.01),
     "ika_g_max": (0.0, 100.0, 0.1),
+    "ikv31_g_max": (0.0, 100.0, 0.5),
     "inap_g_max": (0.0, 5.0, 0.01),
     "inar_g_max": (0.0, 5.0, 0.01),
     "im_g_max": (0.0, 5.0, 0.01),
@@ -56,6 +57,7 @@ CHANNEL_COLORS: dict[str, str] = {
     "leak_current": "#7f7f7f",  # grey
     "Ih": "#d62728",  # red
     "IKa": "#9467bd",  # purple
+    "IKv31": "#DAA520",  # goldenrod
     "INaP": "#e377c2",  # pink
     "INaR": "#bcbd22",  # olive
     "IM": "#17becf",  # cyan
@@ -78,6 +80,8 @@ GATING_VAR_COLORS: dict[str, str] = {
     # IKa
     "a": "#8c564b",  # brown
     "b": "#e377c2",  # pink
+    # IKv31
+    "nk": "#DAA520",  # goldenrod
     # INaP
     "p": "#7f7f7f",  # grey
     # INaR

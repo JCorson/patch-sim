@@ -17,6 +17,7 @@ from .additional_channels import (
     make_ih_channel,
     make_ika_channel,
     make_ikca_channel,
+    make_ikv31_channel,
     make_im_channel,
     make_inap_channel,
 )
@@ -46,12 +47,23 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Ref: Hodgkin & Huxley (1952), J. Physiol. 117:500
     ),
     FAST_SPIKING_INTERNEURON: NeuronConfig(
-        # High g_Na/g_K for narrow spikes; IKa shapes inter-spike interval.
-        # Refs: Wang & Buzsáki (1996), J. Neurosci. 16:6402;
-        #       Pospischil et al. (2008), Biol. Cybern. 99:427
+        # High g_Na drives rapid depolarization; IKv31 (Kv3.1-type, high
+        # threshold, fast deactivation) repolarizes quickly and enables
+        # non-adapting high-frequency firing.  The HH delayed-rectifier is
+        # retained at elevated conductance to match the overall fast spike.
+        # Refs: Erisir et al. (1999), J. Neurophysiol. 82:2476;
+        #       Wang & Buzsáki (1996), J. Neurosci. 16:6402
+        #
+        # v_rest is set to -72 mV (the true zero-current fixed point).  The
+        # elevated g_K = 50 mS/cm² produces a larger outward K⁺ current at
+        # rest than the chloride-based leak can compensate near -65 mV
+        # (E_Cl ≈ -66 mV), shifting the equilibrium to ~-72 mV.  Starting
+        # here avoids the visible pre-stimulus drift that would otherwise
+        # appear in current-clamp traces.
         g_Na=150.0,
         g_K=50.0,
-        channels=(ChannelConfig(make_ika_channel, g_max=5.0),),
+        v_rest=-72.0,
+        channels=(ChannelConfig(make_ikv31_channel, g_max=40.0),),
     ),
     CORTICAL_PYRAMIDAL: NeuronConfig(
         # Ih produces voltage sag on hyperpolarization; INaP amplifies
@@ -246,10 +258,16 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
 # Structure: neuron_preset_name → protocol_preset_name → {field: value, …}
 NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
     FAST_SPIKING_INTERNEURON: {
-        # High-amplitude, standard-length step to drive rapid non-adapting firing.
+        # Moderate amplitude to evoke a single narrow spike.
+        "Action Potential": {
+            "min_stimulus": 15.0,
+            "max_stimulus": 15.0,
+        },
+        # Higher amplitude needed for non-adapting high-frequency firing with
+        # the elevated Kv3.1 conductance.
         "Repetitive Firing": {
-            "min_stimulus": 20.0,
-            "max_stimulus": 20.0,
+            "min_stimulus": 25.0,
+            "max_stimulus": 25.0,
             "stimulus_duration": 180.0,
         },
     },

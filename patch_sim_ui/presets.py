@@ -16,6 +16,7 @@ from patch_sim.constants import (
     DEFAULT_G_IKA,
     DEFAULT_G_IKCA,
     DEFAULT_G_IKIR,
+    DEFAULT_G_IKV31,
     DEFAULT_G_IM,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
@@ -27,6 +28,7 @@ from patch_sim.presets import NEURON_PRESETS
 _DEFAULT_G_MAX: dict[str, float] = {
     "ih": DEFAULT_G_IH,
     "ika": DEFAULT_G_IKA,
+    "ikv31": DEFAULT_G_IKV31,
     "inap": DEFAULT_G_NAP,
     "inar": DEFAULT_G_NAR,
     "im": DEFAULT_G_IM,

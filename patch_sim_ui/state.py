@@ -30,6 +30,7 @@ from patch_sim.constants import (
     DEFAULT_G_IKA,
     DEFAULT_G_IKCA,
     DEFAULT_G_IKIR,
+    DEFAULT_G_IKV31,
     DEFAULT_G_IM,
     DEFAULT_G_K,
     DEFAULT_G_L,
@@ -71,6 +72,7 @@ logger = logging.getLogger("patch_sim_ui.state")
 _ADDITIONAL_CURRENT_FIELD_MAP: dict[str, str] = {
     "Ih": "show_ih_current",
     "IKa": "show_ika_current",
+    "IKv31": "show_ikv31_current",
     "INaP": "show_inap_current",
     "INaR": "show_inar_current",
     "IM": "show_im_current",
@@ -85,6 +87,7 @@ _ADDITIONAL_GATING_FIELD_MAP: dict[str, str] = {
     "r": "show_ih_gating",
     "a": "show_ika_gating",
     "b": "show_ika_gating",
+    "nk": "show_ikv31_gating",
     "p": "show_inap_gating",
     "s": "show_inar_gating",
     "hr": "show_inar_gating",
@@ -150,6 +153,7 @@ _FLOAT_FIELDS: list[str] = [
     # Additional channel params
     "ih_g_max",
     "ika_g_max",
+    "ikv31_g_max",
     "inap_g_max",
     "inar_g_max",
     "im_g_max",
@@ -176,6 +180,8 @@ _VISIBILITY_FIELDS: list[str] = [
     "show_ih_gating",
     "show_ika_current",
     "show_ika_gating",
+    "show_ikv31_current",
+    "show_ikv31_gating",
     "show_inap_current",
     "show_inap_gating",
     "show_inar_current",
@@ -198,6 +204,7 @@ _VISIBILITY_FIELDS: list[str] = [
 _NON_VISIBILITY_BOOL_FIELDS: list[str] = [
     "ih_enabled",
     "ika_enabled",
+    "ikv31_enabled",
     "inap_enabled",
     "inar_enabled",
     "im_enabled",
@@ -625,6 +632,8 @@ class AppState(rx.State):
     ih_g_max: float = DEFAULT_G_IH
     ika_enabled: bool = False
     ika_g_max: float = DEFAULT_G_IKA
+    ikv31_enabled: bool = False
+    ikv31_g_max: float = DEFAULT_G_IKV31
     inap_enabled: bool = False
     inap_g_max: float = DEFAULT_G_NAP
     inar_enabled: bool = False
@@ -704,6 +713,8 @@ class AppState(rx.State):
     show_ih_gating: bool = True
     show_ika_current: bool = True
     show_ika_gating: bool = True
+    show_ikv31_current: bool = True
+    show_ikv31_gating: bool = True
     show_inap_current: bool = True
     show_inap_gating: bool = True
     show_inar_current: bool = True
