@@ -53,8 +53,16 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # retained at elevated conductance to match the overall fast spike.
         # Refs: Erisir et al. (1999), J. Neurophysiol. 82:2476;
         #       Wang & Buzsáki (1996), J. Neurosci. 16:6402
+        #
+        # v_rest is set to -72 mV (the true zero-current fixed point).  The
+        # elevated g_K = 50 mS/cm² produces a larger outward K⁺ current at
+        # rest than the chloride-based leak can compensate near -65 mV
+        # (E_Cl ≈ -66 mV), shifting the equilibrium to ~-72 mV.  Starting
+        # here avoids the visible pre-stimulus drift that would otherwise
+        # appear in current-clamp traces.
         g_Na=150.0,
         g_K=50.0,
+        v_rest=-72.0,
         channels=(ChannelConfig(make_ikv31_channel, g_max=40.0),),
     ),
     CORTICAL_PYRAMIDAL: NeuronConfig(
