@@ -1,6 +1,6 @@
 """Patch Clamp Simulator.
 
-A package for simulating patch clamp experiments using the Hodgkin-Huxley model.
+A package for simulating patch clamp experiments using conductance-based neuron models.
 """
 
 from . import constants

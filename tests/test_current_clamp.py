@@ -1,4 +1,4 @@
-"""Tests for the current clamp simulation in the Hodgkin-Huxley model."""
+"""Tests for the current clamp simulation."""
 
 import numpy as np
 import pytest

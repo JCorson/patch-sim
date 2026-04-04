@@ -1,4 +1,4 @@
-"""Intracellular calcium dynamics for the Hodgkin-Huxley model.
+"""Intracellular calcium dynamics for conductance-based neuron models.
 
 Provides the CalciumDynamics dataclass which encapsulates the ODE for
 tracking intracellular Ca2+ concentration ([Ca2+]_i).

@@ -1,4 +1,4 @@
-"""Ion channel abstractions for the Hodgkin-Huxley simulator.
+"""Ion channel abstractions for the conductance-based neuron simulator.
 
 Provides the building blocks for defining additional ion channels that can be
 added on top of the classic Na, K, and leak channels.

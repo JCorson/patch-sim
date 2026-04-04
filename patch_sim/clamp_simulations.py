@@ -1,7 +1,7 @@
-"""Clamp simulation functions for the Hodgkin-Huxley model.
+"""Clamp simulation functions for the conductance-based neuron model.
 
 This module contains functions for voltage clamp and current clamp experiments
-that can be performed on Hodgkin-Huxley neuron objects.
+that can be performed on :class:`~patch_sim.Neuron` objects.
 
 Both clamp modes use a unified gating-state dictionary that covers all channels
 (core Na/K/leak and any additional channels) and a single RK4 integrator path.
@@ -40,7 +40,7 @@ else:
 logger = logging.getLogger(__name__)
 
 #: Fixed simulation sampling frequency (Hz). dt = 1000 / SIM_SAMPLING_FREQ ms.
-#: 40 kHz (dt = 0.025 ms) is standard for Hodgkin-Huxley models.
+#: 40 kHz (dt = 0.025 ms) is standard for conductance-based neuron models.
 SIM_SAMPLING_FREQ: float = 40_000.0
 
 #: Voltage clamp bounds for the current-clamp RK4 integrator (mV).
@@ -95,7 +95,7 @@ def _initialize_gating_variables(
     to its infinite-time steady-state value at *initial_voltage*.
 
     Args:
-        neuron: The Hodgkin-Huxley neuron model.
+        neuron: The conductance-based neuron model.
         initial_voltage: Initial membrane voltage in mV.
         ca_i: Initial intracellular Ca²⁺ concentration in mM.
 
@@ -123,7 +123,7 @@ def _gating_derivatives(
     calcium dynamics are active.
 
     Args:
-        neuron: The Hodgkin-Huxley neuron model.
+        neuron: The conductance-based neuron model.
         V: Membrane voltage in mV.
         gating_state: Current gating state mapping variable name → value.
         ca_i: Current intracellular Ca²⁺ concentration in mM.
@@ -157,7 +157,7 @@ def _hh_derivatives(
     then delegates to :func:`_gating_derivatives` for the gating and Ca²⁺ ODEs.
 
     Args:
-        neuron: The Hodgkin-Huxley neuron model.
+        neuron: The conductance-based neuron model.
         V: Membrane voltage in mV.
         gating_state: Current gating state mapping variable name → value.
         I_ext: External current in µA/cm².
@@ -219,7 +219,7 @@ def _rk4_step_voltage_clamp(
     Ca²⁺ concentration evolve.
 
     Args:
-        neuron: The Hodgkin-Huxley neuron model.
+        neuron: The conductance-based neuron model.
         V: Prescribed membrane voltage in mV.
         gating_state: Current gating state mapping variable name → value.
         dt: Time step in milliseconds.
@@ -259,7 +259,7 @@ def _rk4_step_current_clamp(
     Both the membrane voltage and the gating variables evolve together.
 
     Args:
-        neuron: The Hodgkin-Huxley neuron model.
+        neuron: The conductance-based neuron model.
         V: Membrane voltage in mV.
         gating_state: Current gating state mapping variable name → value.
         I_ext: External current in µA/cm², held constant over the step.
@@ -307,7 +307,7 @@ def _simulate_voltage_clamp_core(
     (caller-provided initialization).
 
     Args:
-        neuron: The Hodgkin-Huxley neuron object to simulate.
+        neuron: The conductance-based neuron model to simulate.
         voltage_protocol: Voltage values in mV to clamp the membrane at for each
             time step. Must be non-empty and finite.
         gating_state: Initial gating variable values, keyed by variable name.
@@ -421,7 +421,7 @@ def _simulate_current_clamp_core(
     (caller-provided initialization).
 
     Args:
-        neuron: The Hodgkin-Huxley neuron object to simulate.
+        neuron: The conductance-based neuron model to simulate.
         current_external: External current in µA/cm² waveform. Must be non-empty
             and finite.
         initial_V: Initial membrane voltage in mV.
@@ -527,7 +527,7 @@ def simulate_voltage_clamp(
     neuron: "Neuron",
     voltage_protocol: np.ndarray,
 ) -> SimulationResult:
-    """Simulate a voltage clamp experiment using the Hodgkin-Huxley model.
+    """Simulate a voltage clamp experiment using the conductance-based neuron model.
 
     In a voltage clamp experiment, the membrane potential is held at specified
     values and the current required to maintain those voltages is measured. This
@@ -545,7 +545,7 @@ def simulate_voltage_clamp(
     containing intracellular Ca²⁺ concentration in mM is included.
 
     Args:
-        neuron: The Hodgkin-Huxley neuron object to simulate.
+        neuron: The conductance-based neuron model to simulate.
         voltage_protocol: Voltage values in mV to clamp the membrane at for each
             time step. The length of the array determines the simulation duration.
 
@@ -571,7 +571,7 @@ def simulate_current_clamp(
     neuron: "Neuron",
     current_external: np.ndarray,
 ) -> SimulationResult:
-    """Simulate a current clamp experiment using the Hodgkin-Huxley model.
+    """Simulate a current clamp experiment using the conductance-based neuron model.
 
     In a current clamp experiment, current is injected into the cell membrane and
     the resulting voltage changes are recorded. This function simulates this process
@@ -589,7 +589,7 @@ def simulate_current_clamp(
     containing intracellular Ca²⁺ concentration in mM is included.
 
     Args:
-        neuron: The Hodgkin-Huxley neuron object to simulate.
+        neuron: The conductance-based neuron model to simulate.
         current_external: External current in µA/cm² for a time-varying current
             waveform. The length of the array determines the simulation duration.
 
@@ -627,7 +627,7 @@ def simulate_voltage_clamp_from_state(
     by continuous simulation mode to carry neuron state across loop iterations.
 
     Args:
-        neuron: The Hodgkin-Huxley neuron object to simulate.
+        neuron: The conductance-based neuron model to simulate.
         voltage_protocol: Voltage values in mV to clamp the membrane at for
             each time step.
         initial_gating_state: Gating variable values at the start of the run,
@@ -674,7 +674,7 @@ def simulate_current_clamp_from_state(
     continuous simulation mode to carry neuron state across loop iterations.
 
     Args:
-        neuron: The Hodgkin-Huxley neuron object to simulate.
+        neuron: The conductance-based neuron model to simulate.
         current_external: External current in µA/cm² for a time-varying current
             waveform.
         initial_V: Initial membrane voltage in mV.
@@ -726,7 +726,7 @@ def simulate_batch(
     the pool.
 
     Args:
-        neuron: The Hodgkin-Huxley neuron model to simulate.
+        neuron: The conductance-based neuron model to simulate.
         protocols: Sequence of protocol arrays, each passed individually to
             *simulate_fn*.
         simulate_fn: The simulation function to apply to each protocol.
