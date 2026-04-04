@@ -9,7 +9,11 @@ import numpy as np
 import pytest
 
 import patch_sim
-from patch_sim.constants import DOPAMINERGIC, SQUID_GIANT_AXON
+from patch_sim.constants import CORTICAL_PYRAMIDAL, DOPAMINERGIC, SQUID_GIANT_AXON
+from patch_sim.core_channels import (
+    make_pospischil_k_channel,
+    make_pospischil_na_channel,
+)
 from patch_sim.presets import (
     NEURON_PRESET_NAMES,
     NEURON_PRESETS,
@@ -176,3 +180,20 @@ def test_build_protocol_from_preset_exported_from_patch_sim() -> None:
         "Action Potential", sampling_frequency=SAMPLING_FREQUENCY
     )
     assert isinstance(result, list) and len(result) == 1
+
+
+# ---------------------------------------------------------------------------
+# Cortical Pyramidal preset uses Pospischil factories
+# ---------------------------------------------------------------------------
+
+
+def test_cortical_pyramidal_uses_pospischil_na_factory() -> None:
+    """Cortical Pyramidal preset wires the Pospischil Na⁺ channel factory."""
+    config = NEURON_PRESETS[CORTICAL_PYRAMIDAL]
+    assert config.na_channel_factory is make_pospischil_na_channel
+
+
+def test_cortical_pyramidal_uses_pospischil_k_factory() -> None:
+    """Cortical Pyramidal preset wires the Pospischil K⁺ channel factory."""
+    config = NEURON_PRESETS[CORTICAL_PYRAMIDAL]
+    assert config.k_channel_factory is make_pospischil_k_channel
