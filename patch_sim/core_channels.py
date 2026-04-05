@@ -362,3 +362,191 @@ def make_pospischil_k_channel(g_max: float) -> IonChannel:
         ),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )
+
+
+# ---------------------------------------------------------------------------
+# Otsuka et al. (2004) STN channel kinetics
+# ---------------------------------------------------------------------------
+# Reference: Otsuka, T. et al. (2004). Conductance-based model of the
+# voltage-dependent generation of a plateau potential in subthalamic neurons.
+# J. Neurophysiol. 92, 255–264.
+#
+# All rate functions are derived from steady-state (x_inf) and time-constant
+# (tau_x) formulations via:
+#   alpha_x = x_inf / tau_x
+#   beta_x  = (1 − x_inf) / tau_x
+
+
+def _stn_alpha_m(V: float, ca_i: float) -> float:
+    """Forward rate for STN Na⁺ activation gate m (Otsuka et al. 2004).
+
+    Derived from m_inf(V) = 1/(1 + exp(−(V + 40)/8)) and τ_m = 0.2 ms.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    m_inf = 1.0 / (1.0 + safe_exp(-(V + 40.0) / 8.0))
+    return m_inf / 0.2
+
+
+def _stn_beta_m(V: float, ca_i: float) -> float:
+    """Backward rate for STN Na⁺ activation gate m (Otsuka et al. 2004).
+
+    Derived from m_inf(V) = 1/(1 + exp(−(V + 40)/8)) and τ_m = 0.2 ms.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    m_inf = 1.0 / (1.0 + safe_exp(-(V + 40.0) / 8.0))
+    return (1.0 - m_inf) / 0.2
+
+
+def _stn_alpha_h(V: float, ca_i: float) -> float:
+    """Forward rate for STN Na⁺ inactivation gate h (Otsuka et al. 2004).
+
+    Derived from:
+      h_inf(V)   = 1/(1 + exp((V + 45.5)/6.4))
+      1/τ_h(V)   = 0.128·exp(−(V + 38)/18) + 4/(1 + exp(−(V + 15)/5))
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    h_inf = 1.0 / (1.0 + safe_exp((V + 45.5) / 6.4))
+    inv_tau_h = 0.128 * safe_exp(-(V + 38.0) / 18.0) + 4.0 / (
+        1.0 + safe_exp(-(V + 15.0) / 5.0)
+    )
+    return h_inf * inv_tau_h
+
+
+def _stn_beta_h(V: float, ca_i: float) -> float:
+    """Backward rate for STN Na⁺ inactivation gate h (Otsuka et al. 2004).
+
+    Derived from:
+      h_inf(V)   = 1/(1 + exp((V + 45.5)/6.4))
+      1/τ_h(V)   = 0.128·exp(−(V + 38)/18) + 4/(1 + exp(−(V + 15)/5))
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    h_inf = 1.0 / (1.0 + safe_exp((V + 45.5) / 6.4))
+    inv_tau_h = 0.128 * safe_exp(-(V + 38.0) / 18.0) + 4.0 / (
+        1.0 + safe_exp(-(V + 15.0) / 5.0)
+    )
+    return (1.0 - h_inf) * inv_tau_h
+
+
+def _stn_alpha_n(V: float, ca_i: float) -> float:
+    """Forward rate for STN K⁺ DR activation gate n (Otsuka et al. 2004).
+
+    Derived from:
+      n_inf(V) = 1/(1 + exp(−(V + 41)/14))
+      τ_n(V)   = 0.25 + 10.75/(exp(−(V + 51)/12) + exp((V + 51)/15))
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    n_inf = 1.0 / (1.0 + safe_exp(-(V + 41.0) / 14.0))
+    tau_n = 0.25 + 10.75 / (safe_exp(-(V + 51.0) / 12.0) + safe_exp((V + 51.0) / 15.0))
+    return n_inf / tau_n
+
+
+def _stn_beta_n(V: float, ca_i: float) -> float:
+    """Backward rate for STN K⁺ DR activation gate n (Otsuka et al. 2004).
+
+    Derived from:
+      n_inf(V) = 1/(1 + exp(−(V + 41)/14))
+      τ_n(V)   = 0.25 + 10.75/(exp(−(V + 51)/12) + exp((V + 51)/15))
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    n_inf = 1.0 / (1.0 + safe_exp(-(V + 41.0) / 14.0))
+    tau_n = 0.25 + 10.75 / (safe_exp(-(V + 51.0) / 12.0) + safe_exp((V + 51.0) / 15.0))
+    return (1.0 - n_inf) / tau_n
+
+
+def make_stn_na_channel(g_max: float) -> IonChannel:
+    """Create the STN high-threshold sodium channel (Otsuka et al. 2004).
+
+    Uses high-threshold activation kinetics specific to subthalamic nucleus
+    neurons.  Compared with the classic HH52 channel, the activation half-point
+    is the same (−40 mV) but the slope is gentler (8 mV vs ~10 mV in HH52) and
+    τ_m is fixed at 0.2 ms, giving a faster, more sharply threshold-dependent
+    activation.  The inactivation half-point shifts to −45.5 mV with a 6.4 mV
+    slope.
+
+    Gating variable names are ``"m"`` (activation, power 3) and ``"h"``
+    (inactivation, power 1), matching the simulation result fields.
+
+    Reference: Otsuka et al. (2004), J. Neurophysiol. 92, 255–264, Table 1.
+
+    Args:
+        g_max: Maximum conductance in mS/cm².
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the STN Na⁺
+        channel.
+    """
+    return IonChannel(
+        name="Na",
+        g_max=g_max,
+        gating_variables=(
+            GatingVariable(name="m", power=3, alpha=_stn_alpha_m, beta=_stn_beta_m),
+            GatingVariable(name="h", power=1, alpha=_stn_alpha_h, beta=_stn_beta_h),
+        ),
+        reversal_spec=NernstSpec(IonSpecies.SODIUM),
+    )
+
+
+def make_stn_k_channel(g_max: float) -> IonChannel:
+    """Create the STN fast delayed-rectifier potassium channel (Otsuka et al. 2004).
+
+    Uses fast DR kinetics specific to subthalamic nucleus neurons.  The
+    activation half-point is −41 mV (vs −55 mV in HH52) with a slope of
+    14 mV, and the voltage-dependent time constant peaks at ~5.6 ms near
+    −51 mV and decays at more depolarised or hyperpolarised potentials.
+
+    Uses a single activation gate ``"n"`` with power 4, matching the simulation
+    result field used throughout the simulator.
+
+    Reference: Otsuka et al. (2004), J. Neurophysiol. 92, 255–264, Table 1.
+
+    Args:
+        g_max: Maximum conductance in mS/cm².
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the STN K⁺ DR
+        channel.
+    """
+    return IonChannel(
+        name="K",
+        g_max=g_max,
+        gating_variables=(
+            GatingVariable(name="n", power=4, alpha=_stn_alpha_n, beta=_stn_beta_n),
+        ),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )

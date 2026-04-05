@@ -35,7 +35,12 @@ from .constants import (
     TRN,
     VOLTAGE_CLAMP,
 )
-from .core_channels import make_pospischil_k_channel, make_pospischil_na_channel
+from .core_channels import (
+    make_pospischil_k_channel,
+    make_pospischil_na_channel,
+    make_stn_k_channel,
+    make_stn_na_channel,
+)
 from .neuron_factory import ChannelConfig, NeuronConfig
 
 # ---------------------------------------------------------------------------
@@ -128,13 +133,17 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         ),
     ),
     STN: NeuronConfig(
-        # High g_Na/g_K sustain autonomous tonic firing at 5–50 Hz;
-        # prominent ICaT (g_T = 5 mS/cm²) drives rebound bursts after
-        # hyperpolarization; IKCa limits burst duration; Ih provides
-        # pacemaker depolarization.
-        # Refs: Otsuka et al. (2004); Farries & Wilson (2012), J. Neurophysiol.
+        # High-threshold Na⁺ (Otsuka 2004) and fast K⁺ DR replace the default
+        # HH52 kinetics; g_Na/g_K from the original paper sustain autonomous
+        # tonic firing at 5–50 Hz.  Prominent ICaT (g_T = 5 mS/cm²) drives
+        # rebound bursts after hyperpolarization; IKCa limits burst duration;
+        # Ih provides pacemaker depolarization.
+        # Refs: Otsuka et al. (2004), J. Neurophysiol. 92:255;
+        #       Farries & Wilson (2012), J. Neurophysiol.
         g_Na=49.0,
         g_K=57.0,
+        na_channel_factory=make_stn_na_channel,
+        k_channel_factory=make_stn_k_channel,
         channels=(
             ChannelConfig(make_icat_channel, g_max=5.0),
             ChannelConfig(make_ical_channel, g_max=0.5),

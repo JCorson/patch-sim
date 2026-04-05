@@ -1,10 +1,18 @@
 """Tests for the core HH channel factory functions in core_channels.py."""
 
+import math
+
 import pytest
 
 from patch_sim.channels import IonChannel, IonSpecies, NernstSpec
 from patch_sim.core_channels import (
     POSPISCHIL_VT,
+    _stn_alpha_h,
+    _stn_alpha_m,
+    _stn_alpha_n,
+    _stn_beta_h,
+    _stn_beta_m,
+    _stn_beta_n,
     alpha_h,
     alpha_m,
     alpha_n,
@@ -16,6 +24,8 @@ from patch_sim.core_channels import (
     make_na_channel,
     make_pospischil_k_channel,
     make_pospischil_na_channel,
+    make_stn_k_channel,
+    make_stn_na_channel,
     pospischil_alpha_h,
     pospischil_alpha_m,
     pospischil_alpha_n,
@@ -459,3 +469,129 @@ def test_pospischil_k_channel_current_matches_inline(V: float) -> None:
     E_K = ch.reversal_potential(neuron)
     expected = neuron.g_K * (n**4) * (V - E_K)
     assert result == pytest.approx(expected)
+
+
+# ---------------------------------------------------------------------------
+# Otsuka et al. (2004) STN channel kinetics
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, -40.0, 0.0, 40.0])
+def test_stn_na_rate_functions_positive(V: float) -> None:
+    """All STN Na⁺ rate functions are strictly positive at physiological voltages."""
+    assert _stn_alpha_m(V, 0.0) > 0
+    assert _stn_beta_m(V, 0.0) > 0
+    assert _stn_alpha_h(V, 0.0) > 0
+    assert _stn_beta_h(V, 0.0) > 0
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, -41.0, 0.0, 40.0])
+def test_stn_k_rate_functions_positive(V: float) -> None:
+    """All STN K⁺ DR rate functions are strictly positive at physiological voltages."""
+    assert _stn_alpha_n(V, 0.0) > 0
+    assert _stn_beta_n(V, 0.0) > 0
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, -40.0, 0.0, 40.0])
+def test_stn_na_steady_state_bounds(V: float) -> None:
+    """STN Na⁺ steady-state gating variables are in [0, 1]."""
+    m_inf = _stn_alpha_m(V, 0.0) / (_stn_alpha_m(V, 0.0) + _stn_beta_m(V, 0.0))
+    h_inf = _stn_alpha_h(V, 0.0) / (_stn_alpha_h(V, 0.0) + _stn_beta_h(V, 0.0))
+    assert 0.0 <= m_inf <= 1.0
+    assert 0.0 <= h_inf <= 1.0
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, -41.0, 0.0, 40.0])
+def test_stn_k_steady_state_bounds(V: float) -> None:
+    """STN K⁺ DR steady-state gating variable is in [0, 1]."""
+    n_inf = _stn_alpha_n(V, 0.0) / (_stn_alpha_n(V, 0.0) + _stn_beta_n(V, 0.0))
+    assert 0.0 <= n_inf <= 1.0
+
+
+@pytest.mark.parametrize(
+    "V, expected_m_inf",
+    [
+        (-80.0, 1.0 / (1.0 + math.exp(-(-80.0 + 40.0) / 8.0))),
+        (-40.0, 0.5),  # V_half of m
+        (0.0, 1.0 / (1.0 + math.exp(-(0.0 + 40.0) / 8.0))),
+    ],
+)
+def test_stn_na_m_inf_matches_boltzmann(V: float, expected_m_inf: float) -> None:
+    """STN Na⁺ m steady-state matches 1/(1+exp(-(V+40)/8))."""
+    m_inf = _stn_alpha_m(V, 0.0) / (_stn_alpha_m(V, 0.0) + _stn_beta_m(V, 0.0))
+    assert m_inf == pytest.approx(expected_m_inf, rel=1e-6)
+
+
+@pytest.mark.parametrize(
+    "V, expected_h_inf",
+    [
+        (-80.0, 1.0 / (1.0 + math.exp((-80.0 + 45.5) / 6.4))),
+        (-45.5, 0.5),  # V_half of h
+        (-20.0, 1.0 / (1.0 + math.exp((-20.0 + 45.5) / 6.4))),
+    ],
+)
+def test_stn_na_h_inf_matches_boltzmann(V: float, expected_h_inf: float) -> None:
+    """STN Na⁺ h steady-state matches 1/(1+exp((V+45.5)/6.4))."""
+    h_inf = _stn_alpha_h(V, 0.0) / (_stn_alpha_h(V, 0.0) + _stn_beta_h(V, 0.0))
+    assert h_inf == pytest.approx(expected_h_inf, rel=1e-6)
+
+
+@pytest.mark.parametrize(
+    "V, expected_n_inf",
+    [
+        (-80.0, 1.0 / (1.0 + math.exp(-(-80.0 + 41.0) / 14.0))),
+        (-41.0, 0.5),  # V_half of n
+        (0.0, 1.0 / (1.0 + math.exp(-(0.0 + 41.0) / 14.0))),
+    ],
+)
+def test_stn_k_n_inf_matches_boltzmann(V: float, expected_n_inf: float) -> None:
+    """STN K⁺ n steady-state matches 1/(1+exp(-(V+41)/14))."""
+    n_inf = _stn_alpha_n(V, 0.0) / (_stn_alpha_n(V, 0.0) + _stn_beta_n(V, 0.0))
+    assert n_inf == pytest.approx(expected_n_inf, rel=1e-6)
+
+
+def test_stn_na_m_tau_is_0p2_ms() -> None:
+    """STN Na⁺ activation time constant is 0.2 ms at all voltages."""
+    for V in (-80.0, -40.0, 0.0, 40.0):
+        tau = 1.0 / (_stn_alpha_m(V, 0.0) + _stn_beta_m(V, 0.0))
+        assert tau == pytest.approx(0.2, rel=1e-6)
+
+
+def test_make_stn_na_channel_structure() -> None:
+    """make_stn_na_channel returns correct gates and Na⁺ reversal spec."""
+    ch = make_stn_na_channel(g_max=49.0)
+    assert isinstance(ch, IonChannel)
+    assert ch.name == "Na"
+    assert ch.g_max == pytest.approx(49.0)
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "m"
+    assert ch.gating_variables[0].power == 3
+    assert ch.gating_variables[1].name == "h"
+    assert ch.gating_variables[1].power == 1
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.SODIUM
+    assert not ch.carries_calcium
+
+
+def test_make_stn_k_channel_structure() -> None:
+    """make_stn_k_channel returns a channel with correct gate and K⁺ reversal spec."""
+    ch = make_stn_k_channel(g_max=57.0)
+    assert isinstance(ch, IonChannel)
+    assert ch.name == "K"
+    assert ch.g_max == pytest.approx(57.0)
+    assert len(ch.gating_variables) == 1
+    assert ch.gating_variables[0].name == "n"
+    assert ch.gating_variables[0].power == 4
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
+    assert not ch.carries_calcium
+
+
+def test_stn_preset_uses_otsuka_factories() -> None:
+    """STN preset uses make_stn_na_channel and make_stn_k_channel factories."""
+    from patch_sim.constants import STN
+    from patch_sim.presets import NEURON_PRESETS
+
+    config = NEURON_PRESETS[STN]
+    assert config.na_channel_factory is make_stn_na_channel
+    assert config.k_channel_factory is make_stn_k_channel
