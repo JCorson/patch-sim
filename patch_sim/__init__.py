@@ -40,6 +40,7 @@ from .constants import (
     VOLTAGE_PROTOCOLS,
 )
 from .core_channels import (
+    POSPISCHIL_VT,
     alpha_h,
     alpha_m,
     alpha_n,
@@ -49,6 +50,14 @@ from .core_channels import (
     make_k_channel,
     make_leak_channel,
     make_na_channel,
+    make_pospischil_k_channel,
+    make_pospischil_na_channel,
+    pospischil_alpha_h,
+    pospischil_alpha_m,
+    pospischil_alpha_n,
+    pospischil_beta_h,
+    pospischil_beta_m,
+    pospischil_beta_n,
 )
 from .electrochemistry import goldman_potential, nernst_potential
 from .neuron import Neuron
@@ -124,6 +133,15 @@ __all__ = [
     "make_k_channel",
     "make_leak_channel",
     "make_na_channel",
+    "POSPISCHIL_VT",
+    "make_pospischil_k_channel",
+    "make_pospischil_na_channel",
+    "pospischil_alpha_h",
+    "pospischil_alpha_m",
+    "pospischil_alpha_n",
+    "pospischil_beta_h",
+    "pospischil_beta_m",
+    "pospischil_beta_n",
     "SimulationResult",
     "simulate_voltage_clamp",
     "simulate_current_clamp",

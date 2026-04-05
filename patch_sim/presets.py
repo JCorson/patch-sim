@@ -35,6 +35,7 @@ from .constants import (
     TRN,
     VOLTAGE_CLAMP,
 )
+from .core_channels import make_pospischil_k_channel, make_pospischil_na_channel
 from .neuron_factory import ChannelConfig, NeuronConfig
 
 # ---------------------------------------------------------------------------
@@ -66,10 +67,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         channels=(ChannelConfig(make_ikv31_channel, g_max=40.0),),
     ),
     CORTICAL_PYRAMIDAL: NeuronConfig(
+        # Pospischil et al. (2008) Traub-Miles Na⁺/K⁺ kinetics (VT = −56.2 mV)
+        # replace the default HH52 core channels to match the RS neuron model.
         # Ih produces voltage sag on hyperpolarization; INaP amplifies
         # subthreshold inputs; IM provides spike-frequency adaptation.
-        # Refs: Mainen & Sejnowski (1996);
-        #       Pospischil et al. (2008), Biol. Cybern. 99:427
+        # Ref: Pospischil et al. (2008), Biol. Cybern. 99:427
+        na_channel_factory=make_pospischil_na_channel,
+        k_channel_factory=make_pospischil_k_channel,
         channels=(
             ChannelConfig(make_ih_channel, g_max=1.5),
             ChannelConfig(make_inap_channel, g_max=0.5),
