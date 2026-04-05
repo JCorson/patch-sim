@@ -378,6 +378,45 @@ def test_load_neuron_preset_unknown_name_is_ignored() -> None:
     assert s.active_neuron_type == before
 
 
+def test_load_neuron_preset_preserves_saved_sweeps() -> None:
+    """load_neuron_preset retains saved sweeps so neuron types can be compared."""
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    s.add_sweep()
+    assert len(s.saved_sweeps) == 1
+    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert len(s.saved_sweeps) == 1
+
+
+def test_load_neuron_preset_preserves_stored_traces() -> None:
+    """load_neuron_preset retains stored traces so neuron types can be compared."""
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    s.store_trace()
+    assert len(s.stored_traces) == 1
+    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert len(s.stored_traces) == 1
+
+
+def test_add_sweep_label_includes_neuron_type() -> None:
+    """add_sweep includes the active neuron type in the sweep label."""
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    s.load_neuron_preset(FAST_SPIKING_INTERNEURON)
+    s.current_sweeps = [_make_sweep()]
+    s.add_sweep()
+    assert FAST_SPIKING_INTERNEURON in s.saved_sweeps[0].label
+
+
+def test_store_trace_label_includes_neuron_type() -> None:
+    """store_trace includes the active neuron type in the stored trace label."""
+    s = _make_state()
+    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    s.current_sweeps = [_make_sweep()]
+    s.store_trace()
+    assert CORTICAL_PYRAMIDAL in s.stored_traces[0].label
+
+
 # ---------------------------------------------------------------------------
 # Neuron-type protocol adjustments
 # ---------------------------------------------------------------------------
@@ -429,21 +468,21 @@ def test_store_trace_appends_to_stored_traces() -> None:
 
 
 def test_store_trace_sets_stored_label() -> None:
-    """store_trace labels the stored entry 'Stored 1'."""
+    """store_trace labels the stored entry with index and neuron type."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     s.store_trace()
-    assert s.stored_traces[0].label == "Stored 1"
+    assert s.stored_traces[0].label == f"Stored 1 ({s.active_neuron_type})"
 
 
 def test_store_trace_twice_increments_label() -> None:
-    """Calling store_trace twice creates 'Stored 1' and 'Stored 2'."""
+    """Calling store_trace twice creates sequentially numbered labels."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     s.store_trace()
     s.store_trace()
     assert len(s.stored_traces) == 2
-    assert s.stored_traces[1].label == "Stored 2"
+    assert s.stored_traces[1].label == f"Stored 2 ({s.active_neuron_type})"
 
 
 def test_store_trace_does_nothing_when_no_result() -> None:
