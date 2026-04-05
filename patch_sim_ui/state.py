@@ -1245,7 +1245,11 @@ class AppState(rx.State):
         return patch_sim.make_neuron(config=config)
 
     def _build_protocols(self) -> "list[tuple[np.ndarray, str]]":
-        """Build stimulus arrays from current protocol state.
+        """Build stimulus arrays from current protocol state with sweep labels.
+
+        Labels are generated here in the UI layer: multi-sweep Step protocols
+        produce descriptive labels per sweep; all other protocols use an empty
+        string.
 
         Returns:
             List of (stimulus_array, sweep_label) pairs. Single-sweep protocols
@@ -1253,8 +1257,13 @@ class AppState(rx.State):
             (e.g. I-V Curve) return one entry per sweep with a descriptive label.
         """
         fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
+        is_multi_step = (
+            self.protocol_type == "Step"
+            and self.min_stimulus != self.max_stimulus
+            and self.stimulus_step > 0.0
+        )
         if self.clamp_mode == "Current Clamp":
-            return build_current_protocol(
+            arrays = build_current_protocol(
                 protocol_type=self.protocol_type,
                 sampling_frequency=fs,
                 pre_stimulus_duration=self.pre_stimulus_duration,
@@ -1276,8 +1285,16 @@ class AppState(rx.State):
                 mean_current=self.mean_current,
                 std_current=self.std_current,
             )
+            if is_multi_step:
+                n_steps = (
+                    round((self.max_stimulus - self.min_stimulus) / self.stimulus_step)
+                    + 1
+                )
+                currents = np.linspace(self.min_stimulus, self.max_stimulus, n_steps)
+                return [(arr, f"{c:+.1f} µA/cm²") for arr, c in zip(arrays, currents)]
+            return [(arr, "") for arr in arrays]
         else:
-            return build_voltage_protocol(
+            arrays = build_voltage_protocol(
                 protocol_type=self.protocol_type,
                 sampling_frequency=fs,
                 pre_stimulus_duration=self.pre_stimulus_duration,
@@ -1293,6 +1310,14 @@ class AppState(rx.State):
                 max_stimulus=self.max_stimulus,
                 stimulus_step=self.stimulus_step,
             )
+            if is_multi_step:
+                n_steps = (
+                    round((self.max_stimulus - self.min_stimulus) / self.stimulus_step)
+                    + 1
+                )
+                voltages = np.linspace(self.min_stimulus, self.max_stimulus, n_steps)
+                return [(arr, f"{v:+.0f} mV") for arr, v in zip(arrays, voltages)]
+            return [(arr, "") for arr in arrays]
 
     # ------------------------------------------------------------------ #
     # Continuous simulation mode                                        #

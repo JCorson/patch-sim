@@ -17,16 +17,13 @@ from patch_sim.protocols.builders import (
 SAMPLING_FREQUENCY = 10_000.0  # Hz
 
 
-def _is_valid_protocol_list(result: list[tuple[np.ndarray, str]]) -> bool:
-    """Return True if result is a non-empty list of (finite ndarray, str) pairs."""
+def _is_valid_protocol_list(result: list[np.ndarray]) -> bool:
+    """Return True if result is a non-empty list of finite ndarrays."""
     if not isinstance(result, list) or len(result) == 0:
         return False
     return all(
-        isinstance(arr, np.ndarray)
-        and arr.size > 0
-        and bool(np.all(np.isfinite(arr)))
-        and isinstance(label, str)
-        for arr, label in result
+        isinstance(arr, np.ndarray) and arr.size > 0 and bool(np.all(np.isfinite(arr)))
+        for arr in result
     )
 
 
@@ -47,7 +44,6 @@ def test_current_protocol_types(protocol_type: str) -> None:
     )
     assert _is_valid_protocol_list(result)
     assert len(result) == 1
-    assert result[0][1] == ""
 
 
 @pytest.mark.parametrize(
@@ -62,7 +58,6 @@ def test_voltage_protocol_types(protocol_type: str) -> None:
     )
     assert _is_valid_protocol_list(result)
     assert len(result) == 1
-    assert result[0][1] == ""
 
 
 # ---------------------------------------------------------------------------
@@ -118,14 +113,13 @@ def test_build_protocol_from_preset_multi_sweep() -> None:
 
 
 def test_build_protocol_from_preset_voltage_clamp() -> None:
-    """I-V Curve preset (voltage clamp) produces multiple sweeps with mV labels."""
+    """I-V Curve preset (voltage clamp) produces multiple sweeps."""
     result = patch_sim.build_protocol_from_preset(
         "I-V Curve",
         sampling_frequency=SAMPLING_FREQUENCY,
     )
     assert _is_valid_protocol_list(result)
     assert len(result) > 1
-    assert all("mV" in label for _, label in result)
 
 
 def test_build_protocol_from_preset_unknown_raises() -> None:

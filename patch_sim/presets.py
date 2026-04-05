@@ -385,7 +385,7 @@ def build_protocol_from_preset(
     neuron_preset: str | None = None,
     sampling_frequency: float = 40_000.0,
     **overrides: Any,
-) -> list[tuple[np.ndarray, str]]:
+) -> list[np.ndarray]:
     """Build a protocol array list from a named preset.
 
     Looks up *preset_name* in :data:`PROTOCOL_PRESETS`, applies any
@@ -406,7 +406,7 @@ def build_protocol_from_preset(
             (e.g. ``min_stimulus``, ``stimulus_step``).
 
     Returns:
-        List of (stimulus_array, sweep_label) pairs.
+        List of stimulus arrays.
 
     Raises:
         KeyError: If *preset_name* is not in :data:`PROTOCOL_PRESETS`.
