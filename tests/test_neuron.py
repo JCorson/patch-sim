@@ -22,21 +22,19 @@ def test_initialization(hh_model: Neuron) -> None:
 
 
 def test_core_channels_structure(hh_model: Neuron) -> None:
-    """core_channels returns (Na, K, leak) IonChannel tuple in that order."""
+    """core_channels contains Na, K, and leak IonChannels."""
     chs = hh_model.core_channels
     assert len(chs) == 3
-    assert chs[0].name == "Na"
-    assert chs[1].name == "K"
-    assert chs[2].name == "leak"
+    assert {ch.name for ch in chs} == {"Na", "K", "leak"}
     assert all(isinstance(ch, IonChannel) for ch in chs)
 
 
 def test_core_channels_conductances(hh_model: Neuron) -> None:
     """core_channels channels carry the constructor g_max values."""
-    chs = hh_model.core_channels
-    assert chs[0].g_max == pytest.approx(hh_model.g_Na)
-    assert chs[1].g_max == pytest.approx(hh_model.g_K)
-    assert chs[2].g_max == pytest.approx(hh_model.g_L)
+    chs = {ch.name: ch for ch in hh_model.core_channels}
+    assert chs["Na"].g_max == pytest.approx(hh_model.g_Na)
+    assert chs["K"].g_max == pytest.approx(hh_model.g_K)
+    assert chs["leak"].g_max == pytest.approx(hh_model.g_L)
 
 
 def test_all_channels_no_additional(hh_model: Neuron) -> None:

@@ -32,6 +32,19 @@ include = ["patch_sim_ui/**", "tests/test_state.py", "tests/test_plotting.py"]
 [tool.ty.overrides.analysis]
 replace-imports-with-any = ["reflex.**", "plotly.**", "patch_sim_ui.**"]
 
+# NumPy structured arrays use string-key subscript assignment which ty does not
+# model. Suppress the false-positive invalid-assignment errors in files that
+# build or read structured arrays.
+[[tool.ty.overrides]]
+include = [
+    "patch_sim/clamp_simulations.py",
+    "tests/test_plotting.py",
+    "tests/test_state.py",
+]
+
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 filterwarnings = [
