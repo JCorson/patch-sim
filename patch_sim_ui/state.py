@@ -1244,8 +1244,36 @@ class AppState(rx.State):
         )
         return patch_sim.make_neuron(config=config)
 
+    def _attach_step_labels(
+        self, arrays: "np.ndarray", fmt: str
+    ) -> "list[tuple[np.ndarray, str]]":
+        """Pair rows of a 2-D stimulus array with formatted step labels.
+
+        Re-derives the stimulus values from ``min_stimulus``, ``max_stimulus``,
+        and ``stimulus_step`` using the same formula as the builder, so the
+        labels always match the arrays.
+
+        Args:
+            arrays: 2-D stimulus array of shape ``(n_sweeps, n_samples)``
+                returned by a builder function.
+            fmt: Format string applied to each stimulus value (e.g.
+                ``"{:+.1f} µA/cm²"``).
+
+        Returns:
+            List of (array, label) pairs with one entry per sweep.
+        """
+        n_steps = (
+            round((self.max_stimulus - self.min_stimulus) / self.stimulus_step) + 1
+        )
+        values = np.linspace(self.min_stimulus, self.max_stimulus, n_steps)
+        return [(row, fmt.format(v)) for row, v in zip(arrays, values)]
+
     def _build_protocols(self) -> "list[tuple[np.ndarray, str]]":
-        """Build stimulus arrays from current protocol state.
+        """Build stimulus arrays from current protocol state with sweep labels.
+
+        Labels are generated here in the UI layer: multi-sweep Step protocols
+        produce descriptive labels per sweep; all other protocols use an empty
+        string.
 
         Returns:
             List of (stimulus_array, sweep_label) pairs. Single-sweep protocols
@@ -1254,7 +1282,7 @@ class AppState(rx.State):
         """
         fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
         if self.clamp_mode == "Current Clamp":
-            return build_current_protocol(
+            arrays = build_current_protocol(
                 protocol_type=self.protocol_type,
                 sampling_frequency=fs,
                 pre_stimulus_duration=self.pre_stimulus_duration,
@@ -1276,8 +1304,11 @@ class AppState(rx.State):
                 mean_current=self.mean_current,
                 std_current=self.std_current,
             )
+            if arrays.shape[0] > 1:
+                return self._attach_step_labels(arrays, "{:+.1f} µA/cm²")
+            return [(arrays[0], "")]
         else:
-            return build_voltage_protocol(
+            arrays = build_voltage_protocol(
                 protocol_type=self.protocol_type,
                 sampling_frequency=fs,
                 pre_stimulus_duration=self.pre_stimulus_duration,
@@ -1293,6 +1324,9 @@ class AppState(rx.State):
                 max_stimulus=self.max_stimulus,
                 stimulus_step=self.stimulus_step,
             )
+            if arrays.shape[0] > 1:
+                return self._attach_step_labels(arrays, "{:+.0f} mV")
+            return [(arrays[0], "")]
 
     # ------------------------------------------------------------------ #
     # Continuous simulation mode                                        #

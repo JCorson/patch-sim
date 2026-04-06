@@ -17,16 +17,13 @@ from patch_sim.protocols.builders import (
 SAMPLING_FREQUENCY = 10_000.0  # Hz
 
 
-def _is_valid_protocol_list(result: list[tuple[np.ndarray, str]]) -> bool:
-    """Return True if result is a non-empty list of (finite ndarray, str) pairs."""
-    if not isinstance(result, list) or len(result) == 0:
-        return False
-    return all(
-        isinstance(arr, np.ndarray)
-        and arr.size > 0
-        and bool(np.all(np.isfinite(arr)))
-        and isinstance(label, str)
-        for arr, label in result
+def _is_valid_protocol_array(result: np.ndarray) -> bool:
+    """Return True if result is a non-empty 2-D finite ndarray."""
+    return (
+        isinstance(result, np.ndarray)
+        and result.ndim == 2
+        and result.size > 0
+        and bool(np.all(np.isfinite(result)))
     )
 
 
@@ -45,9 +42,8 @@ def test_current_protocol_types(protocol_type: str) -> None:
         protocol_type=protocol_type,
         sampling_frequency=SAMPLING_FREQUENCY,
     )
-    assert _is_valid_protocol_list(result)
-    assert len(result) == 1
-    assert result[0][1] == ""
+    assert _is_valid_protocol_array(result)
+    assert result.shape[0] == 1
 
 
 @pytest.mark.parametrize(
@@ -60,9 +56,8 @@ def test_voltage_protocol_types(protocol_type: str) -> None:
         protocol_type=protocol_type,
         sampling_frequency=SAMPLING_FREQUENCY,
     )
-    assert _is_valid_protocol_list(result)
-    assert len(result) == 1
-    assert result[0][1] == ""
+    assert _is_valid_protocol_array(result)
+    assert result.shape[0] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +72,7 @@ def test_build_protocol_from_preset_base(preset_name: str) -> None:
         preset_name,
         sampling_frequency=SAMPLING_FREQUENCY,
     )
-    assert _is_valid_protocol_list(result), (
+    assert _is_valid_protocol_array(result), (
         f"Preset '{preset_name}' produced an invalid protocol list"
     )
 
@@ -92,7 +87,7 @@ def test_build_protocol_from_preset_repetitive_firing_with_neuron(
         neuron_preset=neuron_name,
         sampling_frequency=SAMPLING_FREQUENCY,
     )
-    assert _is_valid_protocol_list(result)
+    assert _is_valid_protocol_array(result)
 
 
 def test_build_protocol_from_preset_overrides_applied() -> None:
@@ -103,8 +98,8 @@ def test_build_protocol_from_preset_overrides_applied() -> None:
         min_stimulus=5.0,
         max_stimulus=5.0,
     )
-    assert _is_valid_protocol_list(result)
-    assert len(result) == 1
+    assert _is_valid_protocol_array(result)
+    assert result.shape[0] == 1
 
 
 def test_build_protocol_from_preset_multi_sweep() -> None:
@@ -113,19 +108,18 @@ def test_build_protocol_from_preset_multi_sweep() -> None:
         "F-I Curve",
         sampling_frequency=SAMPLING_FREQUENCY,
     )
-    assert _is_valid_protocol_list(result)
-    assert len(result) > 1
+    assert _is_valid_protocol_array(result)
+    assert result.shape[0] > 1
 
 
 def test_build_protocol_from_preset_voltage_clamp() -> None:
-    """I-V Curve preset (voltage clamp) produces multiple sweeps with mV labels."""
+    """I-V Curve preset (voltage clamp) produces multiple sweeps."""
     result = patch_sim.build_protocol_from_preset(
         "I-V Curve",
         sampling_frequency=SAMPLING_FREQUENCY,
     )
-    assert _is_valid_protocol_list(result)
-    assert len(result) > 1
-    assert all("mV" in label for _, label in result)
+    assert _is_valid_protocol_array(result)
+    assert result.shape[0] > 1
 
 
 def test_build_protocol_from_preset_unknown_raises() -> None:
