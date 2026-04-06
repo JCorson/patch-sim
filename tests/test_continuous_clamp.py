@@ -59,13 +59,14 @@ def test_cc_from_state_voltage_continuity(hh_model):
 
     df1 = simulate_current_clamp(hh_model, stimulus)
 
-    last_V = float(df1["voltage"].iloc[-1])
+    last_V = float(df1["voltage"][-1])
+    assert df1.dtype.names is not None
     gating_cols = [
         col
-        for col in df1.columns
+        for col in df1.dtype.names
         if col in {gv.name for gv in hh_model.all_gating_variables}
     ]
-    last_gating = {col: float(df1[col].iloc[-1]) for col in gating_cols}
+    last_gating = {col: float(df1[col][-1]) for col in gating_cols}
 
     df2 = simulate_current_clamp_from_state(
         hh_model,
@@ -74,7 +75,7 @@ def test_cc_from_state_voltage_continuity(hh_model):
         initial_gating_state=last_gating,
     )
 
-    assert df2["voltage"].iloc[0] == pytest.approx(last_V)
+    assert df2["voltage"][0] == pytest.approx(last_V)
 
 
 def test_cc_from_state_gating_continuity(hh_model):
@@ -88,22 +89,23 @@ def test_cc_from_state_gating_continuity(hh_model):
     df1 = simulate_current_clamp(hh_model, stimulus)
 
     # Map HH variable names as column names
+    assert df1.dtype.names is not None
     gating_cols = [
         col
-        for col in df1.columns
+        for col in df1.dtype.names
         if col in {gv.name for gv in hh_model.all_gating_variables}
     ]
-    last_gating = {col: float(df1[col].iloc[-1]) for col in gating_cols}
+    last_gating = {col: float(df1[col][-1]) for col in gating_cols}
 
     df2 = simulate_current_clamp_from_state(
         hh_model,
         stimulus,
-        initial_V=float(df1["voltage"].iloc[-1]),
+        initial_V=float(df1["voltage"][-1]),
         initial_gating_state=last_gating,
     )
 
     for col, val in last_gating.items():
-        assert df2[col].iloc[0] == pytest.approx(val, abs=1e-9)
+        assert df2[col][0] == pytest.approx(val, abs=1e-9)
 
 
 def test_cc_from_state_split_matches_full_run(hh_model):
@@ -119,26 +121,25 @@ def test_cc_from_state_split_matches_full_run(hh_model):
     df_full = simulate_current_clamp(hh_model, full)
 
     df1 = simulate_current_clamp(hh_model, half)
+    assert df1.dtype.names is not None
     gating_cols = [
         col
-        for col in df1.columns
+        for col in df1.dtype.names
         if col in {gv.name for gv in hh_model.all_gating_variables}
     ]
-    last_gating = {col: float(df1[col].iloc[-1]) for col in gating_cols}
+    last_gating = {col: float(df1[col][-1]) for col in gating_cols}
 
     df2 = simulate_current_clamp_from_state(
         hh_model,
         half,
-        initial_V=float(df1["voltage"].iloc[-1]),
+        initial_V=float(df1["voltage"][-1]),
         initial_gating_state=last_gating,
     )
 
     # The terminal values of the split run and the full run must match.
-    assert df2["voltage"].iloc[-1] == pytest.approx(
-        df_full["voltage"].iloc[-1], abs=1e-6
-    )
+    assert df2["voltage"][-1] == pytest.approx(df_full["voltage"][-1], abs=1e-6)
     for col in gating_cols:
-        assert df2[col].iloc[-1] == pytest.approx(df_full[col].iloc[-1], abs=1e-6)
+        assert df2[col][-1] == pytest.approx(df_full[col][-1], abs=1e-6)
 
 
 def test_cc_from_state_empty_raises(hh_model):
@@ -171,12 +172,13 @@ def test_vc_from_state_gating_continuity(hh_model):
 
     df1 = simulate_voltage_clamp(hh_model, protocol)
 
+    assert df1.dtype.names is not None
     gating_cols = [
         col
-        for col in df1.columns
+        for col in df1.dtype.names
         if col in {gv.name for gv in hh_model.all_gating_variables}
     ]
-    last_gating = {col: float(df1[col].iloc[-1]) for col in gating_cols}
+    last_gating = {col: float(df1[col][-1]) for col in gating_cols}
 
     df2 = simulate_voltage_clamp_from_state(
         hh_model,
@@ -185,7 +187,7 @@ def test_vc_from_state_gating_continuity(hh_model):
     )
 
     for col, val in last_gating.items():
-        assert df2[col].iloc[0] == pytest.approx(val, abs=1e-9)
+        assert df2[col][0] == pytest.approx(val, abs=1e-9)
 
 
 def test_vc_from_state_split_matches_full_run(hh_model):
@@ -201,12 +203,13 @@ def test_vc_from_state_split_matches_full_run(hh_model):
     df_full = simulate_voltage_clamp(hh_model, full)
 
     df1 = simulate_voltage_clamp(hh_model, half)
+    assert df1.dtype.names is not None
     gating_cols = [
         col
-        for col in df1.columns
+        for col in df1.dtype.names
         if col in {gv.name for gv in hh_model.all_gating_variables}
     ]
-    last_gating = {col: float(df1[col].iloc[-1]) for col in gating_cols}
+    last_gating = {col: float(df1[col][-1]) for col in gating_cols}
 
     df2 = simulate_voltage_clamp_from_state(
         hh_model,
@@ -215,7 +218,7 @@ def test_vc_from_state_split_matches_full_run(hh_model):
     )
 
     for col in gating_cols:
-        assert df2[col].iloc[-1] == pytest.approx(df_full[col].iloc[-1], abs=1e-6)
+        assert df2[col][-1] == pytest.approx(df_full[col][-1], abs=1e-6)
 
 
 def test_vc_from_state_empty_raises(hh_model):
@@ -242,11 +245,11 @@ def _extract_terminal_cc_state(df, hh_model):
     """Return (last_V, last_gating_dict) from a current-clamp result DataFrame."""
     gating_cols = [
         col
-        for col in df.columns
+        for col in df.dtype.names
         if col in {gv.name for gv in hh_model.all_gating_variables}
     ]
-    last_V = float(df["voltage"].iloc[-1])
-    last_gating = {col: float(df[col].iloc[-1]) for col in gating_cols}
+    last_V = float(df["voltage"][-1])
+    last_gating = {col: float(df[col][-1]) for col in gating_cols}
     return last_V, last_gating
 
 
@@ -254,10 +257,10 @@ def _extract_terminal_vc_state(df, hh_model):
     """Return last_gating_dict from a voltage-clamp result DataFrame."""
     gating_cols = [
         col
-        for col in df.columns
+        for col in df.dtype.names
         if col in {gv.name for gv in hh_model.all_gating_variables}
     ]
-    return {col: float(df[col].iloc[-1]) for col in gating_cols}
+    return {col: float(df[col][-1]) for col in gating_cols}
 
 
 def test_cc_three_iteration_loop_state_continuity(hh_model):
@@ -277,9 +280,9 @@ def test_cc_three_iteration_loop_state_continuity(hh_model):
     df2 = simulate_current_clamp_from_state(
         hh_model, stimulus, initial_V=last_V1, initial_gating_state=last_gating1
     )
-    assert df2["voltage"].iloc[0] == pytest.approx(last_V1)
+    assert df2["voltage"][0] == pytest.approx(last_V1)
     for col, val in last_gating1.items():
-        assert df2[col].iloc[0] == pytest.approx(val, abs=1e-9)
+        assert df2[col][0] == pytest.approx(val, abs=1e-9)
 
     last_V2, last_gating2 = _extract_terminal_cc_state(df2, hh_model)
 
@@ -287,9 +290,9 @@ def test_cc_three_iteration_loop_state_continuity(hh_model):
     df3 = simulate_current_clamp_from_state(
         hh_model, stimulus, initial_V=last_V2, initial_gating_state=last_gating2
     )
-    assert df3["voltage"].iloc[0] == pytest.approx(last_V2)
+    assert df3["voltage"][0] == pytest.approx(last_V2)
     for col, val in last_gating2.items():
-        assert df3[col].iloc[0] == pytest.approx(val, abs=1e-9)
+        assert df3[col][0] == pytest.approx(val, abs=1e-9)
 
 
 def test_cc_three_iteration_loop_matches_full_run(hh_model):
@@ -318,11 +321,9 @@ def test_cc_three_iteration_loop_matches_full_run(hh_model):
     last_V3, last_gating3 = _extract_terminal_cc_state(df3, hh_model)
 
     gating_cols = list(last_gating3.keys())
-    assert last_V3 == pytest.approx(float(df_full["voltage"].iloc[-1]), abs=1e-6)
+    assert last_V3 == pytest.approx(float(df_full["voltage"][-1]), abs=1e-6)
     for col in gating_cols:
-        assert last_gating3[col] == pytest.approx(
-            float(df_full[col].iloc[-1]), abs=1e-6
-        )
+        assert last_gating3[col] == pytest.approx(float(df_full[col][-1]), abs=1e-6)
 
 
 def test_vc_three_iteration_loop_state_continuity(hh_model):
@@ -343,7 +344,7 @@ def test_vc_three_iteration_loop_state_continuity(hh_model):
         hh_model, protocol, initial_gating_state=last_gating1
     )
     for col, val in last_gating1.items():
-        assert df2[col].iloc[0] == pytest.approx(val, abs=1e-9)
+        assert df2[col][0] == pytest.approx(val, abs=1e-9)
 
     last_gating2 = _extract_terminal_vc_state(df2, hh_model)
 
@@ -352,7 +353,7 @@ def test_vc_three_iteration_loop_state_continuity(hh_model):
         hh_model, protocol, initial_gating_state=last_gating2
     )
     for col, val in last_gating2.items():
-        assert df3[col].iloc[0] == pytest.approx(val, abs=1e-9)
+        assert df3[col][0] == pytest.approx(val, abs=1e-9)
 
 
 def test_vc_three_iteration_loop_matches_full_run(hh_model):
@@ -382,6 +383,4 @@ def test_vc_three_iteration_loop_matches_full_run(hh_model):
     last_gating3 = _extract_terminal_vc_state(df3, hh_model)
 
     for col in last_gating3:
-        assert last_gating3[col] == pytest.approx(
-            float(df_full[col].iloc[-1]), abs=1e-6
-        )
+        assert last_gating3[col] == pytest.approx(float(df_full[col][-1]), abs=1e-6)

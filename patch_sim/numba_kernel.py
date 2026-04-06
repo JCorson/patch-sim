@@ -1,4 +1,4 @@
-"""Numba JIT-compiled simulation kernels for the Hodgkin-Huxley model.
+"""Numba JIT-compiled simulation kernels for the conductance-based neuron model.
 
 This module provides ``@numba.njit``-compiled inner loops for voltage-clamp
 and current-clamp simulations.  It is **optional** — ``clamp_simulations``
@@ -8,7 +8,7 @@ numba is not installed.
 The six standard Hodgkin-Huxley rate functions (alpha/beta for n, m, h) are
 inlined as pure math inside the JIT boundary using integer dispatch IDs that
 correspond to the values stored in
-:attr:`~patch_sim.hodgkin_huxley.HodgkinHuxley._rate_func_ids`.
+:attr:`~patch_sim.neuron.Neuron._rate_func_ids`.
 
 Rate-function ID table
 ----------------------
@@ -33,6 +33,31 @@ _EXP_CLIP: float = 100.0
 
 #: Singularity threshold for near-zero denominators in HH rate functions.
 _SING: float = 1e-6
+
+#: Voltage clamp bounds for the current-clamp RK4 integrator (mV).
+#: Must match ``_V_CLAMP_MIN`` / ``_V_CLAMP_MAX`` in ``clamp_simulations``.
+_V_MIN: float = -150.0
+_V_MAX: float = 150.0
+
+
+@numba.njit(cache=True)  # type: ignore[misc]
+def _clamp_v_jit(v: float) -> float:
+    """Clamp membrane voltage to the numerical safety range.
+
+    Prevents runaway integration when extreme external currents are applied.
+    Mirrors the pure-Python ``_clamp_v`` in ``clamp_simulations``.
+
+    Args:
+        v: Membrane voltage in mV.
+
+    Returns:
+        Voltage clamped to [_V_MIN, _V_MAX] in mV.
+    """
+    if v < _V_MIN:
+        return _V_MIN
+    if v > _V_MAX:
+        return _V_MAX
+    return v
 
 
 @numba.njit(cache=True)  # type: ignore[misc]
@@ -390,7 +415,7 @@ def _jit_rk4_cc_loop(
             powers_flat,
         )
         dV2, d2 = _jit_hh_derivatives(
-            V + dt_half * dV1,
+            _clamp_v_jit(V + dt_half * dV1),
             state + dt_half * d1,
             I_ext,
             C_m,
@@ -403,7 +428,7 @@ def _jit_rk4_cc_loop(
             powers_flat,
         )
         dV3, d3 = _jit_hh_derivatives(
-            V + dt_half * dV2,
+            _clamp_v_jit(V + dt_half * dV2),
             state + dt_half * d2,
             I_ext,
             C_m,
@@ -416,7 +441,7 @@ def _jit_rk4_cc_loop(
             powers_flat,
         )
         dV4, d4 = _jit_hh_derivatives(
-            V + dt * dV3,
+            _clamp_v_jit(V + dt * dV3),
             state + dt * d3,
             I_ext,
             C_m,
@@ -429,7 +454,7 @@ def _jit_rk4_cc_loop(
             powers_flat,
         )
 
-        V = V + dt_6 * (dV1 + 2.0 * dV2 + 2.0 * dV3 + dV4)
+        V = _clamp_v_jit(V + dt_6 * (dV1 + 2.0 * dV2 + 2.0 * dV3 + dV4))
         new_state = state + dt_6 * (d1 + 2.0 * d2 + 2.0 * d3 + d4)
         for k in range(n_gates):
             if new_state[k] < 0.0:

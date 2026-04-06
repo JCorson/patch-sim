@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import time
+from typing import Any, AsyncGenerator
 
 import numpy as np
 import plotly.graph_objects as go
@@ -15,20 +16,21 @@ import reflex as rx
 
 import patch_sim
 import patch_sim.clamp_simulations
-from patch_sim_ui.log_handler import MAX_LOG_ENTRIES, StateLogHandler, UILogRecord
 from patch_sim.constants import (
+    CURRENT_CLAMP,
     DEFAULT_C_M,
     DEFAULT_CA_IN,
     DEFAULT_CA_OUT,
     DEFAULT_CL_IN,
     DEFAULT_CL_OUT,
-    DEFAULT_G_ICAN,
     DEFAULT_G_ICAL,
+    DEFAULT_G_ICAN,
     DEFAULT_G_ICAT,
     DEFAULT_G_IH,
     DEFAULT_G_IKA,
     DEFAULT_G_IKCA,
     DEFAULT_G_IKIR,
+    DEFAULT_G_IKV31,
     DEFAULT_G_IM,
     DEFAULT_G_K,
     DEFAULT_G_L,
@@ -42,51 +44,24 @@ from patch_sim.constants import (
     DEFAULT_T,
     DEFAULT_V_REST,
 )
-from patch_sim.additional_channels import (
-    make_ican_channel,
-    make_ical_channel,
-    make_icat_channel,
-    make_ih_channel,
-    make_ika_channel,
-    make_ikca_channel,
-    make_ikir_channel,
-    make_im_channel,
-    make_inap_channel,
-    make_inar_channel,
+from patch_sim.presets import (
+    NEURON_PROTOCOL_ADJUSTMENTS,
+    PROTOCOL_PRESETS,
+)
+from patch_sim.protocols.builders import (
+    build_current_protocol,
+    build_voltage_protocol,
 )
 from patch_sim_ui import constants, presets
-from patch_sim_ui.constants import CURRENT_CLAMP
+from patch_sim_ui.log_handler import MAX_LOG_ENTRIES, StateLogHandler, UILogRecord
 from patch_sim_ui.plotting import (
     Sweep,
     TraceVisibility,
     build_figure,
     compute_trace_visibility_map,
 )
-from patch_sim_ui.protocol_builders import (
-    build_current_protocol,
-    build_voltage_protocol,
-)
 
 logger = logging.getLogger("patch_sim_ui.state")
-
-# ------------------------------------------------------------------ #
-# Channel registry                                                   #
-# ------------------------------------------------------------------ #
-# Each entry is (enabled_attr, g_max_attr, factory, extra_kwargs).   #
-# extra_kwargs maps kwarg name → state attribute name.               #
-
-_CHANNEL_REGISTRY: list[tuple[str, str, object, dict[str, str]]] = [
-    ("ih_enabled", "ih_g_max", make_ih_channel, {}),
-    ("ika_enabled", "ika_g_max", make_ika_channel, {}),
-    ("inap_enabled", "inap_g_max", make_inap_channel, {}),
-    ("inar_enabled", "inar_g_max", make_inar_channel, {}),
-    ("im_enabled", "im_g_max", make_im_channel, {}),
-    ("ikir_enabled", "ikir_g_max", make_ikir_channel, {}),
-    ("ikca_enabled", "ikca_g_max", make_ikca_channel, {}),
-    ("ical_enabled", "ical_g_max", make_ical_channel, {}),
-    ("icat_enabled", "icat_g_max", make_icat_channel, {}),
-    ("ican_enabled", "ican_g_max", make_ican_channel, {}),
-]
 
 # ------------------------------------------------------------------ #
 # Additional-channel visibility field maps                          #
@@ -97,6 +72,7 @@ _CHANNEL_REGISTRY: list[tuple[str, str, object, dict[str, str]]] = [
 _ADDITIONAL_CURRENT_FIELD_MAP: dict[str, str] = {
     "Ih": "show_ih_current",
     "IKa": "show_ika_current",
+    "IKv31": "show_ikv31_current",
     "INaP": "show_inap_current",
     "INaR": "show_inar_current",
     "IM": "show_im_current",
@@ -111,6 +87,7 @@ _ADDITIONAL_GATING_FIELD_MAP: dict[str, str] = {
     "r": "show_ih_gating",
     "a": "show_ika_gating",
     "b": "show_ika_gating",
+    "nk": "show_ikv31_gating",
     "p": "show_inap_gating",
     "s": "show_inar_gating",
     "hr": "show_inar_gating",
@@ -149,20 +126,16 @@ _FLOAT_FIELDS: list[str] = [
     "Ca_out",
     "Ca_in",
     "T",
-    # Shared protocol params
-    "duration",
+    # Protocol params — shared
+    "pre_stimulus_duration",
+    "stimulus_duration",
+    "post_stimulus_duration",
     # Current clamp protocol params
-    "current_amplitude",
-    "step_start",
-    "step_duration",
     "start_current",
     "end_current",
-    "ramp_start",
-    "ramp_duration",
     "pulse_amplitude",
     "pulse_width",
     "pulse_interval",
-    "train_start",
     "dc_offset",
     "amplitude",
     "frequency",
@@ -171,26 +144,16 @@ _FLOAT_FIELDS: list[str] = [
     "mean_current",
     "std_current",
     # Voltage clamp protocol params
-    "vc_voltage_amplitude",
-    "vc_step_start",
-    "vc_step_duration",
-    "vc_holding_voltage",
+    "holding_voltage",
     "vc_start_voltage",
     "vc_end_voltage",
-    "vc_ramp_start",
-    "vc_ramp_duration",
     "vc_pulse_amplitude",
     "vc_pulse_width",
     "vc_pulse_interval",
-    "vc_train_start",
-    "vc_voltage_min",
-    "vc_voltage_max",
-    "vc_voltage_step",
-    "vc_pre_pulse_duration",
-    "vc_post_pulse_duration",
     # Additional channel params
     "ih_g_max",
     "ika_g_max",
+    "ikv31_g_max",
     "inap_g_max",
     "inar_g_max",
     "im_g_max",
@@ -217,6 +180,8 @@ _VISIBILITY_FIELDS: list[str] = [
     "show_ih_gating",
     "show_ika_current",
     "show_ika_gating",
+    "show_ikv31_current",
+    "show_ikv31_gating",
     "show_inap_current",
     "show_inap_gating",
     "show_inar_current",
@@ -239,6 +204,7 @@ _VISIBILITY_FIELDS: list[str] = [
 _NON_VISIBILITY_BOOL_FIELDS: list[str] = [
     "ih_enabled",
     "ika_enabled",
+    "ikv31_enabled",
     "inap_enabled",
     "inar_enabled",
     "im_enabled",
@@ -262,6 +228,297 @@ _LOG_SCROLL_JS = (
     "'#log-scroll-area [data-radix-scroll-area-viewport]');"
     "if(vp)vp.scrollTop=0;"
 )
+
+# Client-side sweep highlight / selection module.  Injected via
+# rx.call_script() after every figure render in multi-sweep mode.
+_SWEEP_HIGHLIGHT_JS = """
+(function() {
+  // State object persists across re-inits and retries.
+  if (!window._psSweep) window._psSweep = {};
+  var S = window._psSweep;
+
+  // Cancel any pending retry so we don't get duplicate inits.
+  if (S._initTimer) { clearTimeout(S._initTimer); S._initTimer = null; }
+
+  function setup(retries) {
+    var gd = document.querySelector('.js-plotly-plot');
+    // Plotly may not have rendered yet; retry up to 10 times (1 s total).
+    if (!gd || !gd.data || !gd.data.length) {
+      if (retries > 0) {
+        S._initTimer = setTimeout(function() { setup(retries - 1); }, 100);
+      }
+      return;
+    }
+
+    // Build sweep-to-trace index map from meta.sweep.
+    var sweepMap = {};   // sweepIdx -> [traceIdx, ...]
+    var maxSweep = -1;
+    var origOpacity = [];
+    var origWidth = [];
+    var origShowlegend = [];  // original showlegend for each trace
+    for (var i = 0; i < gd.data.length; i++) {
+      var m = gd.data[i].meta;
+      var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
+      origOpacity[i] = (gd.data[i].opacity != null) ? gd.data[i].opacity : 1;
+      origWidth[i] = (gd.data[i].line && gd.data[i].line.width != null)
+                     ? gd.data[i].line.width : 2;
+      origShowlegend[i] = gd.data[i].showlegend === true;
+      if (si >= 0) {
+        if (!sweepMap[si]) sweepMap[si] = [];
+        sweepMap[si].push(i);
+        if (si > maxSweep) maxSweep = si;
+      }
+    }
+    S.sweepMap = sweepMap;
+    S.nSweeps = maxSweep + 1;
+    S.origOpacity = origOpacity;
+    S.origWidth = origWidth;
+    S.origShowlegend = origShowlegend;
+    // legendPositions[p] = true means position p within a sweep's trace list
+    // originally had showlegend=true (based on sweep 0).
+    var legendPositions = {};
+    if (sweepMap[0]) {
+      for (var p = 0; p < sweepMap[0].length; p++) {
+        if (origShowlegend[sweepMap[0][p]]) legendPositions[p] = true;
+      }
+    }
+    S.legendPositions = legendPositions;
+    S.selectedSweep = /*SELECTED_SWEEP*/;
+
+    if (S.nSweeps <= 1) {
+      // Single-sweep mode — remove listeners and bail.
+      if (S._cleanup) { S._cleanup(); S._cleanup = null; }
+      return;
+    }
+
+    function _applySweepStyle(activeSweep, dimOpacity) {
+      if (S.nSweeps <= 1) return;
+      var opacities = new Array(gd.data.length);
+      var widths = new Array(gd.data.length);
+      var showlegends = new Array(gd.data.length);
+      for (var i = 0; i < gd.data.length; i++) {
+        var m = gd.data[i].meta;
+        var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
+        if (si < 0 || gd.data[i].visible === false) {
+          opacities[i] = S.origOpacity[i];
+          widths[i] = S.origWidth[i];
+          showlegends[i] = S.origShowlegend[i];
+        } else if (si === activeSweep) {
+          opacities[i] = 1;
+          widths[i] = S.origWidth[i];
+          // Show legend entry for this trace if it occupies a legend position.
+          var pos = S.sweepMap[si] ? S.sweepMap[si].indexOf(i) : -1;
+          showlegends[i] = pos >= 0 && S.legendPositions[pos] === true;
+        } else {
+          opacities[i] = dimOpacity;
+          widths[i] = /*DIM_WIDTH*/;
+          showlegends[i] = false;
+        }
+      }
+      var indices = [];
+      for (var i = 0; i < gd.data.length; i++) indices.push(i);
+      var styleUpdate = {
+        'opacity': opacities, 'line.width': widths, 'showlegend': showlegends
+      };
+      Plotly.restyle(gd, styleUpdate, indices);
+    }
+
+    function _clearStyle() {
+      var opacities = [];
+      var widths = [];
+      var showlegends = [];
+      for (var i = 0; i < gd.data.length; i++) {
+        opacities.push(S.origOpacity[i]);
+        widths.push(S.origWidth[i]);
+        showlegends.push(S.origShowlegend[i]);
+      }
+      var indices = [];
+      for (var i = 0; i < gd.data.length; i++) indices.push(i);
+      var styleUpdate = {
+        'opacity': opacities, 'line.width': widths, 'showlegend': showlegends
+      };
+      Plotly.restyle(gd, styleUpdate, indices);
+    }
+
+    function _applyHoverHighlight(activeSweep) {
+      if (S.nSweeps <= 1) return;
+      var widths = new Array(gd.data.length);
+      for (var i = 0; i < gd.data.length; i++) {
+        var m = gd.data[i].meta;
+        var si = (m && typeof m.sweep === 'number') ? m.sweep : -1;
+        if (si === activeSweep) {
+          widths[i] = /*HOVER_WIDTH*/;
+        } else {
+          widths[i] = S.origWidth[i];
+        }
+      }
+      var indices = [];
+      for (var i = 0; i < gd.data.length; i++) indices.push(i);
+      Plotly.restyle(gd, {'line.width': widths}, indices);
+    }
+
+    function _selectSweep(idx) {
+      S.selectedSweep = idx;
+      _applySweepStyle(idx, /*DIM_OPACITY*/);
+    }
+
+    function _deselect() {
+      S.selectedSweep = -1;
+      _clearStyle();
+    }
+
+    // Resolve which sweep is nearest to the mouse cursor.
+    // Converts the raw MouseEvent pixel position to data coordinates using
+    // Plotly's internal axis layout, then finds the sweep whose trace value
+    // at that x-position is closest to the cursor's y-position.
+    //
+    // ⚠ Plotly private API (tested against Plotly.js 2.x / 3.x):
+    //   gd._fullLayout  — computed layout with pixel geometry (_size, _offset, _length)
+    //   gd._fullData[i] — fully-resolved trace data with typed arrays decoded
+    // If Plotly restructures these internals in a future release this function
+    // will silently return -1 (no sweep resolved) without breaking anything else.
+    //
+    // Note: gd.data[i].x holds a Plotly v3 binary descriptor {dtype,bdata};
+    // decoded typed arrays live in gd._fullData[i].x.
+    function _resolveSweepFromMouse(evt) {
+      if (!evt || !evt.event || !gd._fullLayout) return -1;
+      var fl = gd._fullLayout;
+      if (!fl._size) return -1;
+      var rect = gd.getBoundingClientRect();
+      // ya._offset is measured from the figure div top, so py must be too.
+      // px is relative to plot area (after left margin) because xa._offset=0.
+      var px = evt.event.clientX - rect.left - fl._size.l;
+      var py = evt.event.clientY - rect.top;
+
+      // Identify which subplot row contains the cursor.
+      var matchedYa = null;
+      var matchedYaKey = null;
+      var yAxisKeys = ['yaxis', 'yaxis2', 'yaxis3'];
+      for (var k = 0; k < yAxisKeys.length; k++) {
+        var ya = fl[yAxisKeys[k]];
+        if (!ya || ya._length == null) continue;
+        if (py >= ya._offset && py <= ya._offset + ya._length) {
+          matchedYa = ya;
+          matchedYaKey = (yAxisKeys[k] === 'yaxis')
+            ? 'y' : yAxisKeys[k].replace('yaxis', 'y');
+          break;
+        }
+      }
+      if (!matchedYa) return -1;
+
+      // Convert pixel X to data X using the shared primary xaxis.
+      var xa = fl.xaxis;
+      if (!xa || !xa._length) return -1;
+      var dataX = xa.range[0]
+        + ((px - (xa._offset || 0)) / xa._length)
+        * (xa.range[1] - xa.range[0]);
+
+      // Convert pixel Y to data Y (screen top = data max).
+      var pyInAxis = py - matchedYa._offset;
+      var dataY = matchedYa.range[1]
+        - (pyInAxis / matchedYa._length)
+        * (matchedYa.range[1] - matchedYa.range[0]);
+
+      // Find the sweep whose trace at dataX is closest to dataY.
+      // Search only in the matched subplot axis — cross-axis comparison is
+      // invalid because each subplot has different units and scale.
+      var bestSweep = -1;
+      var bestDist = Infinity;
+      for (var _i = 0; _i < gd.data.length; _i++) {
+        var _td = gd.data[_i];
+        var _tm = _td.meta;
+        var _tsi = (_tm && typeof _tm.sweep === 'number') ? _tm.sweep : -1;
+        if (_tsi < 0) continue;
+        var _tya = _td.yaxis || 'y';
+        if (_tya !== matchedYaKey) continue;
+        // Include hidden traces — we resolve by data proximity, not visibility.
+        var _fd = gd._fullData[_i];
+        var xArr = _fd && _fd.x;
+        var yArr = _fd && _fd.y;
+        if (!xArr || !yArr || !xArr.length) continue;
+        // Binary search for the nearest x index.
+        // xArr is the simulation time axis — always monotonically increasing.
+        var lo = 0, hi = xArr.length - 1;
+        while (lo < hi) {
+          var mid = (lo + hi) >> 1;
+          if (xArr[mid] < dataX) lo = mid + 1; else hi = mid;
+        }
+        var traceY = yArr[lo];
+        if (traceY == null || traceY !== traceY) continue;  // null or NaN
+        var dist = Math.abs(traceY - dataY);
+        if (dist < bestDist) { bestDist = dist; bestSweep = _tsi; }
+      }
+      return bestSweep;
+    }
+
+    // Re-apply if a sweep was already selected (e.g. after figure rebuild).
+    if (S.selectedSweep >= 0 && S.selectedSweep < S.nSweeps) {
+      _applySweepStyle(S.selectedSweep, /*DIM_OPACITY*/);
+    }
+
+    // Remove old listeners before attaching new ones.
+    if (S._cleanup) { S._cleanup(); S._cleanup = null; }
+
+    function onNativeClick(nativeEvt) {
+      var si = _resolveSweepFromMouse({event: nativeEvt});
+      if (si >= 0) {
+        if (S.selectedSweep === si) { _deselect(); }
+        else { _selectSweep(si); }
+      } else {
+        _deselect();
+      }
+    }
+
+    var _moveTimer = null;
+    function onNativeMousemove(nativeEvt) {
+      if (S.selectedSweep >= 0) return;
+      // Debounce: skip if a frame is already scheduled (~16 ms / one frame).
+      if (_moveTimer) return;
+      _moveTimer = setTimeout(function() { _moveTimer = null; }, 16);
+      var si = _resolveSweepFromMouse({event: nativeEvt});
+      if (si >= 0) { _applyHoverHighlight(si); }
+      else { _clearStyle(); }
+    }
+
+    function onNativeMouseleave() {
+      if (S.selectedSweep >= 0) return;
+      _clearStyle();
+    }
+
+    function onKeydown(evt) {
+      if (S.nSweeps <= 1) return;
+      if (!document.querySelector('.js-plotly-plot')) return;
+      if (evt.key === 'Escape') {
+        _deselect();
+      } else if (evt.key === 'ArrowUp') {
+        evt.preventDefault();
+        var next = (S.selectedSweep < 0) ? 0 : (S.selectedSweep + 1) % S.nSweeps;
+        _selectSweep(next);
+      } else if (evt.key === 'ArrowDown') {
+        evt.preventDefault();
+        var prev = (S.selectedSweep < 0)
+          ? S.nSweeps - 1
+          : (S.selectedSweep - 1 + S.nSweeps) % S.nSweeps;
+        _selectSweep(prev);
+      }
+    }
+
+    gd.addEventListener('click', onNativeClick);
+    gd.addEventListener('mousemove', onNativeMousemove);
+    gd.addEventListener('mouseleave', onNativeMouseleave);
+    document.addEventListener('keydown', onKeydown);
+
+    S._cleanup = function() {
+      gd.removeEventListener('click', onNativeClick);
+      gd.removeEventListener('mousemove', onNativeMousemove);
+      gd.removeEventListener('mouseleave', onNativeMouseleave);
+      document.removeEventListener('keydown', onKeydown);
+    };
+  }
+
+  setup(10);
+})();
+"""
 
 
 def _make_bool_setter(field_name: str):
@@ -375,6 +632,8 @@ class AppState(rx.State):
     ih_g_max: float = DEFAULT_G_IH
     ika_enabled: bool = False
     ika_g_max: float = DEFAULT_G_IKA
+    ikv31_enabled: bool = False
+    ikv31_g_max: float = DEFAULT_G_IKV31
     inap_enabled: bool = False
     inap_g_max: float = DEFAULT_G_NAP
     inar_enabled: bool = False
@@ -395,26 +654,28 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     # Experiment mode                                                     #
     # ------------------------------------------------------------------ #
+    active_neuron_type: str = "Squid Giant Axon (Classic HH)"  # selected preset
     clamp_mode: str = CURRENT_CLAMP  # CURRENT_CLAMP | VOLTAGE_CLAMP
 
     # ------------------------------------------------------------------ #
-    # Protocol parameters — shared                                       #
+    # Protocol parameters                                                #
     # ------------------------------------------------------------------ #
     protocol_type: str = "Step"
-    duration: float = 50.0
+    pre_stimulus_duration: float = 10.0
+    stimulus_duration: float = 30.0
+    post_stimulus_duration: float = 10.0
+
+    # Stimulus amplitude params — shared (units depend on clamp_mode)
+    min_stimulus: float = 10.0
+    max_stimulus: float = 10.0
+    stimulus_step: float = 0.0
 
     # Current clamp protocol params
-    current_amplitude: float = 10.0
-    step_start: float = 10.0
-    step_duration: float = 30.0
     start_current: float = 0.0
     end_current: float = 15.0
-    ramp_start: float = 0.0
-    ramp_duration: float = 40.0
     pulse_amplitude: float = 10.0
     pulse_width: float = 2.0
     pulse_interval: float = 10.0
-    train_start: float = 5.0
     dc_offset: float = 8.0
     amplitude: float = 4.0
     frequency: float = 50.0
@@ -424,23 +685,12 @@ class AppState(rx.State):
     std_current: float = 2.0
 
     # Voltage clamp protocol params
-    vc_voltage_amplitude: float = 0.0
-    vc_step_start: float = 10.0
-    vc_step_duration: float = 30.0
-    vc_holding_voltage: float = -70.0
+    holding_voltage: float = -70.0
     vc_start_voltage: float = -70.0
     vc_end_voltage: float = 40.0
-    vc_ramp_start: float = 0.0
-    vc_ramp_duration: float = 40.0
     vc_pulse_amplitude: float = 20.0
     vc_pulse_width: float = 2.0
     vc_pulse_interval: float = 10.0
-    vc_train_start: float = 5.0
-    vc_voltage_min: float = -100.0
-    vc_voltage_max: float = 60.0
-    vc_voltage_step: float = 10.0
-    vc_pre_pulse_duration: float = 5.0
-    vc_post_pulse_duration: float = 5.0
     # ------------------------------------------------------------------ #
     # Simulation results                                                  #
     # ------------------------------------------------------------------ #
@@ -463,6 +713,8 @@ class AppState(rx.State):
     show_ih_gating: bool = True
     show_ika_current: bool = True
     show_ika_gating: bool = True
+    show_ikv31_current: bool = True
+    show_ikv31_gating: bool = True
     show_inap_current: bool = True
     show_inap_gating: bool = True
     show_inar_current: bool = True
@@ -497,8 +749,19 @@ class AppState(rx.State):
     # UI state                                                           #
     # ------------------------------------------------------------------ #
     is_running: bool = False
-    _cancel_requested: bool = False
     error_message: str = ""
+    show_hover: bool = True  # Whether plot hover tooltips are visible
+    # Index of the last click-selected sweep seeded into the JS on figure
+    # rebuild (-1 = none selected).  Selection state is managed entirely
+    # client-side by ``window._psSweep``; this field is only written by
+    # Python (reset on run/clamp-mode change) so that the correct seed value
+    # is injected when the JS module is re-initialised after a figure rebuild.
+    #
+    # Known limitation: this field is never updated from the client side, so
+    # any figure rebuild triggered by a Python state change (e.g. add_sweep)
+    # while the user has a client-side selection active will re-seed JS with
+    # -1, silently clearing the selection.
+    selected_sweep: int = -1
 
     # ------------------------------------------------------------------ #
     # Log panel state                                                    #
@@ -553,13 +816,27 @@ class AppState(rx.State):
         return self.continuous_mode and self.continuous_loop_running
 
     @rx.var
+    def is_step_single_sweep(self) -> bool:
+        """True when the Step protocol is configured as a single sweep.
+
+        A single sweep is produced whenever min_stimulus == max_stimulus,
+        regardless of the stimulus_step value.
+
+        Returns:
+            True if min_stimulus equals max_stimulus, False otherwise.
+        """
+        return self.min_stimulus == self.max_stimulus
+
+    @rx.var
     def can_run_continuous(self) -> bool:
         """True when the active protocol is compatible with continuous mode.
 
-        Multi-sweep protocols (I-V Curve) are excluded because each of their
-        sweeps uses independent initial conditions.
+        Multi-sweep Step configurations (min_stimulus != max_stimulus) are
+        excluded; all other protocols run as a single sweep and are compatible.
         """
-        return self.protocol_type != "I-V Curve"
+        if self.protocol_type != "Step":
+            return True
+        return self.is_step_single_sweep
 
     @rx.var
     def filtered_log_entries(self) -> list[UILogRecord]:
@@ -581,11 +858,17 @@ class AppState(rx.State):
 
     @rx.var
     def figure_data(self) -> go.Figure:
-        """Plotly figure rebuilt when sweeps or clamp mode change.
+        """Plotly figure rebuilt when sweeps, clamp mode, or hover state change.
 
         All traces are built with full visibility; toggling show_* flags is
-        handled client-side via Plotly.restyle so that figure rebuilds are not
-        triggered by visibility changes.
+        handled client-side via ``Plotly.restyle`` so that figure rebuilds are
+        not triggered by visibility changes.  The ``show_hover`` flag is
+        respected here so that hovermode is baked into the figure data and takes
+        effect immediately, even without a client-side relayout.
+
+        Dark/light theming is applied client-side by the ``rx.plotly``
+        component via its ``layout`` and ``template`` props, so no server-side
+        colour mode state is needed.
         """
         return build_figure(
             current_sweeps=self.current_sweeps,
@@ -593,6 +876,7 @@ class AppState(rx.State):
             visibility=TraceVisibility(),  # all visible; toggling handled client-side
             clamp_mode=self.clamp_mode,
             stored_traces=self.stored_traces,
+            show_hover=self.show_hover,
         )
 
     # ------------------------------------------------------------------ #
@@ -647,17 +931,79 @@ class AppState(rx.State):
         self.saved_sweeps = []
         self.stored_traces = []
         self._cont_has_state = False
+        self.selected_sweep = -1
 
     def reset_to_defaults(self) -> None:
         """Reset all parameters and sweeps to their class-level defaults."""
         self.reset()
 
-    def load_preset(self, name: str) -> None:
-        """Load a named preset configuration."""
-        if name not in presets.PRESETS:
+    def toggle_hover(self):
+        """Toggle plot hover tooltips on or off.
+
+        Flips ``show_hover`` and issues a client-side ``Plotly.relayout`` call
+        to update the figure's ``hovermode`` without triggering a full rebuild.
+        When hover is disabled, ``hovermode`` is set to ``false``.  When
+        re-enabled it is restored to ``"x unified"`` for single-sweep traces or
+        ``"x"`` for multi-sweep (I-V Curve) results.
+
+        Returns:
+            A ``rx.call_script`` event that applies the relayout in-browser.
+        """
+        self.show_hover = not self.show_hover
+        if self.show_hover:
+            hovermode = "x" if len(self.current_sweeps) > 1 else "x unified"
+            hovermode_js = f'"{hovermode}"'
+        else:
+            hovermode_js = "false"
+        js = (
+            f"{_PLOTLY_GD_JS}"
+            f"if(gd&&gd.layout)Plotly.relayout(gd,{{hovermode:{hovermode_js}}})"
+        )
+        return rx.call_script(js)
+
+    def load_neuron_preset(self, name: str) -> None:
+        """Load a neuron-type preset, updating only neuron parameters.
+
+        Sets conductances and auxiliary channel configuration for the selected
+        neuron type without touching any protocol settings.  Records the active
+        neuron type so that subsequent protocol preset loads can apply
+        neuron-specific adjustments via NEURON_PROTOCOL_ADJUSTMENTS.
+
+        Args:
+            name: Key into ``patch_sim_ui.presets.NEURON_UI_PRESETS``.
+                Ignored if not found.
+        """
+        if name not in presets.NEURON_UI_PRESETS:
+            logger.debug("load_neuron_preset: unknown preset %r ignored", name)
             return
-        logger.info("Loaded preset: %s", name)
-        config = presets.PRESETS[name]
+        logger.info("Loaded neuron preset: %s", name)
+        config = presets.NEURON_UI_PRESETS[name]
+        for key, value in config.items():
+            setattr(self, key, value)
+        self.active_neuron_type = name
+        self.current_sweeps = []
+        self._cont_has_state = False
+
+    def load_protocol_preset(self, name: str) -> None:
+        """Load a protocol preset, applying neuron-type adjustments if active.
+
+        Applies the base protocol preset, then overlays any entries from
+        NEURON_PROTOCOL_ADJUSTMENTS for the currently active neuron type so
+        that the stimulus parameters suit the selected cell type.
+
+        Args:
+            name: Key into PROTOCOL_PRESETS.  Ignored if not found.
+        """
+        if name not in PROTOCOL_PRESETS:
+            logger.debug("load_protocol_preset: unknown preset %r ignored", name)
+            return
+        logger.info("Loaded protocol preset: %s", name)
+        config = dict(PROTOCOL_PRESETS[name])
+        adjustments = NEURON_PROTOCOL_ADJUSTMENTS.get(self.active_neuron_type, {}).get(
+            name, {}
+        )
+        config.update(adjustments)
+        config.update(presets.PROTOCOL_NEURON_OVERRIDES.get(name, {}))
         for key, value in config.items():
             setattr(self, key, value)
         self.current_sweeps = []
@@ -686,6 +1032,61 @@ class AppState(rx.State):
     for _f in _FLOAT_FIELDS:
         vars()[f"set_{_f}"] = _make_float_setter(_f)
 
+    # Stimulus range setters — custom logic to keep stimulus_step valid.
+    def set_min_stimulus(self, value: str | float) -> None:
+        """Set min_stimulus, auto-setting stimulus_step when a range is opened.
+
+        If the new min_stimulus differs from max_stimulus and stimulus_step is
+        currently 0, stimulus_step is set to 1.0 so the Step protocol remains
+        in a valid multi-sweep state without requiring a separate user action.
+
+        Args:
+            value: Raw input value from the UI field.
+        """
+        self._set_float("min_stimulus", value)
+        if self.min_stimulus != self.max_stimulus and self.stimulus_step == 0.0:
+            self.stimulus_step = 1.0
+
+    def set_max_stimulus(self, value: str | float) -> None:
+        """Set max_stimulus, auto-setting stimulus_step when a range is opened.
+
+        If the new max_stimulus differs from min_stimulus and stimulus_step is
+        currently 0, stimulus_step is set to 1.0 so the Step protocol remains
+        in a valid multi-sweep state without requiring a separate user action.
+
+        Args:
+            value: Raw input value from the UI field.
+        """
+        self._set_float("max_stimulus", value)
+        if self.min_stimulus != self.max_stimulus and self.stimulus_step == 0.0:
+            self.stimulus_step = 1.0
+
+    def set_stimulus_step(self, value: str | float) -> None:
+        """Set stimulus_step, rejecting non-positive values when min != max.
+
+        When min_stimulus differs from max_stimulus a step of 0 (or negative)
+        would produce an invalid multi-sweep configuration.  Such values are
+        ignored, leaving the previous step unchanged.  When
+        min_stimulus == max_stimulus (single-sweep mode) any value is accepted.
+
+        Args:
+            value: Raw input value from the UI text field.
+        """
+        try:
+            parsed = float(value)
+        except (ValueError, TypeError):
+            logger.debug("set_stimulus_step: could not parse %r as float", value)
+            return
+        if self.min_stimulus != self.max_stimulus and parsed <= 0.0:
+            logger.debug(
+                "set_stimulus_step: rejected value %s"
+                " (non-positive step in multi-sweep mode)",
+                parsed,
+            )
+            self.stimulus_step = 1.0
+            return
+        self.stimulus_step = parsed
+
     # Non-visibility bool setters (channel enable/disable).
     for _f in _NON_VISIBILITY_BOOL_FIELDS:
         vars()[f"set_{_f}"] = _make_bool_setter(_f)
@@ -698,15 +1099,17 @@ class AppState(rx.State):
     # Sweep management                                                   #
     # ------------------------------------------------------------------ #
     def _apply_visibility_js(self) -> str | None:
-        """Build a JS snippet to re-apply hidden traces after a figure rebuild.
+        """Build a JS snippet to re-apply trace visibility, hover, and sweep highlight.
 
         Called after any operation that triggers a full figure rebuild (run
         simulation, add sweep, clear sweeps) so that traces the user has
-        toggled off are correctly hidden again.
+        toggled off are correctly hidden again, the hover mode matches the
+        current ``show_hover`` flag, and sweep highlight listeners are
+        (re-)attached in multi-sweep mode.
 
         Returns:
-            A ``Plotly.restyle`` JS string targeting all currently-hidden
-            trace indices, or ``None`` when every trace is visible.
+            A JS string that re-applies trace visibility, hover mode, and
+            sweep highlight, or ``None`` when nothing needs to be applied.
         """
         trace_map = compute_trace_visibility_map(
             current_sweeps=self.current_sweeps,
@@ -720,12 +1123,44 @@ class AppState(rx.State):
         for field_name, indices in trace_map.items():
             if not getattr(self, field_name):
                 hidden.extend(indices)
-        if not hidden:
+
+        parts: list[str] = []
+        if hidden:
+            parts.append(
+                f"if(gd&&gd.data)Plotly.restyle(gd,"
+                f"{{visible:false}},{json.dumps(hidden)});"
+            )
+        if not self.show_hover:
+            parts.append("if(gd&&gd.layout)Plotly.relayout(gd,{hovermode:false});")
+
+        # Inject sweep highlight listeners in multi-sweep mode.
+        is_multi = len(self.current_sweeps) > 1
+        if is_multi:
+            parts.append(self._sweep_highlight_js())
+
+        if not parts:
             return None
+        body = "".join(parts)
         return (
-            f"setTimeout(function(){{var gd=document.querySelector('.js-plotly-plot');"
-            f"if(gd&&gd.data)Plotly.restyle(gd,"
-            f"{{visible:false}},{json.dumps(hidden)})}},0)"
+            f"setTimeout(function(){{"
+            f"var gd=document.querySelector('.js-plotly-plot');"
+            f"{body}"
+            f"}},0)"
+        )
+
+    def _sweep_highlight_js(self) -> str:
+        """Return the sweep highlight JS with styling constants substituted.
+
+        Returns:
+            A self-executing JS function string.
+        """
+        return (
+            _SWEEP_HIGHLIGHT_JS.replace(
+                "/*DIM_OPACITY*/", str(constants.HIGHLIGHT_DIM_OPACITY)
+            )
+            .replace("/*HOVER_WIDTH*/", str(constants.HIGHLIGHT_HOVER_WIDTH))
+            .replace("/*DIM_WIDTH*/", str(constants.HIGHLIGHT_DIM_WIDTH))
+            .replace("/*SELECTED_SWEEP*/", str(self.selected_sweep))
         )
 
     def add_sweep(self):
@@ -737,7 +1172,12 @@ class AppState(rx.State):
             idx = len(self.saved_sweeps)
             color = constants.SWEEP_COLORS[idx % len(constants.SWEEP_COLORS)]
             self.saved_sweeps.append(
-                sweep.model_copy(update={"color": color, "label": f"Sweep {idx + 1}"})
+                sweep.model_copy(
+                    update={
+                        "color": color,
+                        "label": f"Sweep {idx + 1} ({self.active_neuron_type})",
+                    }
+                )
             )
         js = self._apply_visibility_js()
         if js:
@@ -760,7 +1200,7 @@ class AppState(rx.State):
             return
         idx = len(self.stored_traces)
         color = constants.STORED_TRACE_COLORS[idx % len(constants.STORED_TRACE_COLORS)]
-        label = f"Stored {idx + 1}"
+        label = f"Stored {idx + 1} ({self.active_neuron_type})"
         self.stored_traces.append(
             self.current_sweeps[0].model_copy(update={"color": color, "label": label})
         )
@@ -778,23 +1218,14 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     # Simulation helpers (called while holding the state lock)          #
     # ------------------------------------------------------------------ #
-    def _build_neuron(self) -> "patch_sim.HodgkinHuxley":
-        """Construct a HodgkinHuxley neuron from current state parameters."""
-        additional_channels = []
-        for enabled_attr, g_max_attr, factory, extra_kwargs in _CHANNEL_REGISTRY:
-            if getattr(self, enabled_attr):
-                kwargs = {k: getattr(self, v) for k, v in extra_kwargs.items()}
-                additional_channels.append(
-                    factory(g_max=getattr(self, g_max_attr), **kwargs)  # type: ignore[operator]
-                )
-        needs_calcium = (
-            self.ikca_enabled
-            or self.ical_enabled
-            or self.icat_enabled
-            or self.ican_enabled
+    def _build_neuron(self) -> "patch_sim.Neuron":
+        """Construct a Neuron from current state parameters."""
+        channels = tuple(
+            patch_sim.ChannelConfig(factory, g_max=getattr(self, f"{name}_g_max"))
+            for name, factory in patch_sim.CHANNEL_REGISTRY.items()
+            if getattr(self, f"{name}_enabled")
         )
-        calcium_dynamics = patch_sim.CalciumDynamics() if needs_calcium else None
-        return patch_sim.HodgkinHuxley(
+        config = patch_sim.NeuronConfig(
             g_Na=self.g_Na,
             g_K=self.g_K,
             g_L=self.g_L,
@@ -809,29 +1240,62 @@ class AppState(rx.State):
             Ca_out=self.Ca_out,
             Ca_in=self.Ca_in,
             T=self.T,
-            additional_channels=tuple(additional_channels),
-            calcium_dynamics=calcium_dynamics,
+            channels=channels,
         )
+        return patch_sim.make_neuron(config=config)
 
-    def _build_protocol(self) -> "np.ndarray":
-        """Build the stimulus array from current protocol state."""
+    def _attach_step_labels(
+        self, arrays: "np.ndarray", fmt: str
+    ) -> "list[tuple[np.ndarray, str]]":
+        """Pair rows of a 2-D stimulus array with formatted step labels.
+
+        Re-derives the stimulus values from ``min_stimulus``, ``max_stimulus``,
+        and ``stimulus_step`` using the same formula as the builder, so the
+        labels always match the arrays.
+
+        Args:
+            arrays: 2-D stimulus array of shape ``(n_sweeps, n_samples)``
+                returned by a builder function.
+            fmt: Format string applied to each stimulus value (e.g.
+                ``"{:+.1f} µA/cm²"``).
+
+        Returns:
+            List of (array, label) pairs with one entry per sweep.
+        """
+        n_steps = (
+            round((self.max_stimulus - self.min_stimulus) / self.stimulus_step) + 1
+        )
+        values = np.linspace(self.min_stimulus, self.max_stimulus, n_steps)
+        return [(row, fmt.format(v)) for row, v in zip(arrays, values)]
+
+    def _build_protocols(self) -> "list[tuple[np.ndarray, str]]":
+        """Build stimulus arrays from current protocol state with sweep labels.
+
+        Labels are generated here in the UI layer: multi-sweep Step protocols
+        produce descriptive labels per sweep; all other protocols use an empty
+        string.
+
+        Returns:
+            List of (stimulus_array, sweep_label) pairs. Single-sweep protocols
+            return a one-element list with an empty label; multi-sweep protocols
+            (e.g. I-V Curve) return one entry per sweep with a descriptive label.
+        """
         fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
         if self.clamp_mode == "Current Clamp":
-            return build_current_protocol(
+            arrays = build_current_protocol(
                 protocol_type=self.protocol_type,
-                duration=self.duration,
                 sampling_frequency=fs,
-                current_amplitude=self.current_amplitude,
-                step_start=self.step_start,
-                step_duration=self.step_duration,
+                pre_stimulus_duration=self.pre_stimulus_duration,
+                stimulus_duration=self.stimulus_duration,
+                post_stimulus_duration=self.post_stimulus_duration,
+                min_stimulus=self.min_stimulus,
+                max_stimulus=self.max_stimulus,
+                stimulus_step=self.stimulus_step,
                 start_current=self.start_current,
                 end_current=self.end_current,
-                ramp_start=self.ramp_start,
-                ramp_duration=self.ramp_duration,
                 pulse_amplitude=self.pulse_amplitude,
                 pulse_width=self.pulse_width,
                 pulse_interval=self.pulse_interval,
-                train_start=self.train_start,
                 dc_offset=self.dc_offset,
                 amplitude=self.amplitude,
                 frequency=self.frequency,
@@ -840,37 +1304,29 @@ class AppState(rx.State):
                 mean_current=self.mean_current,
                 std_current=self.std_current,
             )
+            if arrays.shape[0] > 1:
+                return self._attach_step_labels(arrays, "{:+.1f} µA/cm²")
+            return [(arrays[0], "")]
         else:
-            return build_voltage_protocol(
+            arrays = build_voltage_protocol(
                 protocol_type=self.protocol_type,
-                duration=self.duration,
                 sampling_frequency=fs,
-                vc_holding_voltage=self.vc_holding_voltage,
-                vc_voltage_amplitude=self.vc_voltage_amplitude,
-                vc_step_start=self.vc_step_start,
-                vc_step_duration=self.vc_step_duration,
-                vc_start_voltage=self.vc_start_voltage,
-                vc_end_voltage=self.vc_end_voltage,
-                vc_ramp_start=self.vc_ramp_start,
-                vc_ramp_duration=self.vc_ramp_duration,
-                vc_pulse_amplitude=self.vc_pulse_amplitude,
-                vc_pulse_width=self.vc_pulse_width,
-                vc_pulse_interval=self.vc_pulse_interval,
-                vc_train_start=self.vc_train_start,
-                vc_voltage_min=self.vc_voltage_min,
-                vc_voltage_max=self.vc_voltage_max,
-                vc_voltage_step=self.vc_voltage_step,
-                vc_pre_pulse_duration=self.vc_pre_pulse_duration,
-                vc_post_pulse_duration=self.vc_post_pulse_duration,
+                pre_stimulus_duration=self.pre_stimulus_duration,
+                stimulus_duration=self.stimulus_duration,
+                post_stimulus_duration=self.post_stimulus_duration,
+                holding_voltage=self.holding_voltage,
+                start_voltage=self.vc_start_voltage,
+                end_voltage=self.vc_end_voltage,
+                pulse_amplitude=self.vc_pulse_amplitude,
+                pulse_width=self.vc_pulse_width,
+                pulse_interval=self.vc_pulse_interval,
+                min_stimulus=self.min_stimulus,
+                max_stimulus=self.max_stimulus,
+                stimulus_step=self.stimulus_step,
             )
-
-    # ------------------------------------------------------------------ #
-    # Single-shot simulation cancellation                               #
-    # ------------------------------------------------------------------ #
-    async def cancel_simulation(self) -> None:
-        """Request cancellation of the current single-shot simulation."""
-        async with self:
-            self._cancel_requested = True
+            if arrays.shape[0] > 1:
+                return self._attach_step_labels(arrays, "{:+.0f} mV")
+            return [(arrays[0], "")]
 
     # ------------------------------------------------------------------ #
     # Continuous simulation mode                                        #
@@ -885,7 +1341,7 @@ class AppState(rx.State):
             return AppState.run_continuous  # type: ignore[return-value]
 
     @rx.event(background=True)
-    async def run_continuous(self) -> None:
+    async def run_continuous(self) -> AsyncGenerator[Any, None]:
         """Run simulations in a continuous loop until continuous_mode is False.
 
         Each iteration picks up the terminal neuron state (voltage, gating
@@ -914,7 +1370,7 @@ class AppState(rx.State):
                     mode = self.clamp_mode
                     ptype = self.protocol_type
                     neuron = self._build_neuron()
-                    stimulus = self._build_protocol()
+                    stimulus = self._build_protocols()[0][0]
                     use_prior_state = self._cont_has_state
                     prior_V = self._cont_V
                     prior_gating = dict(self._cont_gating)
@@ -935,7 +1391,7 @@ class AppState(rx.State):
                 try:
                     if mode == CURRENT_CLAMP:
                         if use_prior_state:
-                            df = await loop.run_in_executor(
+                            result = await loop.run_in_executor(
                                 None,
                                 patch_sim.simulate_current_clamp_from_state,
                                 neuron,
@@ -945,7 +1401,7 @@ class AppState(rx.State):
                                 prior_ca_i,
                             )
                         else:
-                            df = await loop.run_in_executor(
+                            result = await loop.run_in_executor(
                                 None,
                                 patch_sim.simulate_current_clamp,
                                 neuron,
@@ -953,7 +1409,7 @@ class AppState(rx.State):
                             )
                     else:
                         if use_prior_state:
-                            df = await loop.run_in_executor(
+                            result = await loop.run_in_executor(
                                 None,
                                 patch_sim.simulate_voltage_clamp_from_state,
                                 neuron,
@@ -962,7 +1418,7 @@ class AppState(rx.State):
                                 prior_ca_i,
                             )
                         else:
-                            df = await loop.run_in_executor(
+                            result = await loop.run_in_executor(
                                 None,
                                 patch_sim.simulate_voltage_clamp,
                                 neuron,
@@ -976,13 +1432,15 @@ class AppState(rx.State):
                     break
 
                 # Extract terminal state for next iteration.
-                last_V = float(df["voltage"].iloc[-1])
+                last_V = float(result["voltage"][-1])
                 gating_vars = {gv.name for gv in neuron.all_gating_variables}
-                gating_cols = [col for col in df.columns if col in gating_vars]
-                last_gating = {col: float(df[col].iloc[-1]) for col in gating_cols}
-                last_ca_i = float(df["ca_i"].iloc[-1]) if "ca_i" in df.columns else 0.0
+                gating_cols = [col for col in result.dtype.names if col in gating_vars]
+                last_gating = {col: float(result[col][-1]) for col in gating_cols}
+                last_ca_i = (
+                    float(result["ca_i"][-1]) if "ca_i" in result.dtype.names else 0.0
+                )
 
-                sweep = Sweep.from_dataframe(df, stimulus, "", "", mode)
+                sweep = Sweep.from_result(result, stimulus, "", "", mode)
 
                 async with self:
                     if not self.continuous_mode:
@@ -1018,99 +1476,79 @@ class AppState(rx.State):
             yield rx.call_script(_LOG_SCROLL_JS)
 
     @rx.event(background=True)
-    async def run_simulation(self) -> None:
+    async def run_simulation(self) -> AsyncGenerator[Any, None]:
         """Build protocol and run the simulation asynchronously.
 
         Uses background=True so the UI stays responsive during long runs.
+        State is snapshotted inside the lock before any blocking work begins,
+        and all blocking simulation calls are offloaded via run_in_executor so
+        the event loop can flush the is_running=True update to the client
+        before the computation starts.
         """
         async with self:
             self.is_running = True
-            self._cancel_requested = False
             self.error_message = ""
+            self.selected_sweep = -1
+            neuron = self._build_neuron()
+            mode = self.clamp_mode
+            ptype = self.protocol_type
+            try:
+                protocols = self._build_protocols()
+            except ValueError as exc:
+                logger.exception("Simulation error: %s", exc)
+                self.error_message = str(exc)
+                self.is_running = False
+                return
 
         _start_ms = time.monotonic() * 1000
         logger.info(
             "Simulation started: mode=%s, protocol=%s",
-            self.clamp_mode,
-            self.protocol_type,
+            mode,
+            ptype,
         )
+        loop = asyncio.get_running_loop()
+        sim_fn = (
+            patch_sim.simulate_current_clamp
+            if mode == CURRENT_CLAMP
+            else patch_sim.simulate_voltage_clamp
+        )
+        is_multi = len(protocols) > 1
         try:
-            neuron = self._build_neuron()
-            mode = self.clamp_mode
-            ptype = self.protocol_type
-            fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
-
-            if mode == CURRENT_CLAMP:
-                stimulus = self._build_protocol()
-                for df in patch_sim.simulate_batch(
-                    neuron, [stimulus], simulate_fn=patch_sim.simulate_current_clamp
-                ):
-                    async with self:
-                        # Check before updating so the result is discarded on cancel.
-                        if self._cancel_requested:
-                            break
-                        self.current_sweeps = [
-                            Sweep.from_dataframe(df, stimulus, "", "", mode)
-                        ]
-
-            elif ptype == "I-V Curve":
-                # Run each voltage step as an independent sweep so that
-                # gating variables are reset between steps — matching real
-                # patch-clamp I-V curve experiments.
-                sweep_duration = (
-                    self.vc_pre_pulse_duration
-                    + self.duration
-                    + self.vc_post_pulse_duration
-                )
-                voltage_range = self.vc_voltage_max - self.vc_voltage_min
-                n_steps = round(voltage_range / self.vc_voltage_step) + 1
-                voltages = np.linspace(
-                    self.vc_voltage_min, self.vc_voltage_max, n_steps
-                )
-                protocols = [
-                    patch_sim.step_voltage(
-                        duration=sweep_duration,
-                        voltage_amplitude=float(voltage),
-                        step_start=self.vc_pre_pulse_duration,
-                        step_duration=self.duration,
-                        holding_voltage=self.vc_holding_voltage,
-                        sampling_frequency=fs,
-                    )
-                    for voltage in voltages
-                ]
-                new_sweeps: list[Sweep] = []
-                for sweep_df, voltage, protocol in zip(
-                    patch_sim.simulate_batch(neuron, protocols),
-                    voltages,
-                    protocols,
-                ):
-                    label = f"{voltage:+.0f} mV"
-                    color_index = len(new_sweeps) % len(constants.SWEEP_COLORS)
-                    new_sweeps.append(
-                        Sweep.from_dataframe(
-                            sweep_df,
-                            protocol,
-                            label,
-                            constants.SWEEP_COLORS[color_index],
-                            mode,
+            if is_multi:
+                # Run each sweep independently so gating variables are reset
+                # between steps — matching real patch-clamp I-V experiments.
+                def _run_batch() -> list[Sweep]:
+                    """Run all sweeps via simulate_batch and assemble Sweep list."""
+                    new_sweeps: list[Sweep] = []
+                    for sweep_result, (protocol, label) in zip(
+                        patch_sim.simulate_batch(
+                            neuron, [p for p, _ in protocols], sim_fn
+                        ),
+                        protocols,
+                    ):
+                        color_index = len(new_sweeps) % len(constants.SWEEP_COLORS)
+                        new_sweeps.append(
+                            Sweep.from_result(
+                                sweep_result,
+                                protocol,
+                                label,
+                                constants.SWEEP_COLORS[color_index],
+                                mode,
+                            )
                         )
-                    )
-                    async with self:
-                        if self._cancel_requested:
-                            break
+                    return new_sweeps
+
+                new_sweeps = await loop.run_in_executor(None, _run_batch)
                 async with self:
-                    self.current_sweeps = list(new_sweeps)
+                    self.current_sweeps = new_sweeps
 
             else:
-                stimulus = self._build_protocol()
-                for df in patch_sim.simulate_batch(neuron, [stimulus]):
-                    async with self:
-                        # Check before updating so the result is discarded on cancel.
-                        if self._cancel_requested:
-                            break
-                        self.current_sweeps = [
-                            Sweep.from_dataframe(df, stimulus, "", "", mode)
-                        ]
+                stimulus, _ = protocols[0]
+                result = await loop.run_in_executor(None, sim_fn, neuron, stimulus)
+                async with self:
+                    self.current_sweeps = [
+                        Sweep.from_result(result, stimulus, "", "", mode)
+                    ]
 
         except ValueError as exc:
             logger.exception("Simulation error: %s", exc)
@@ -1122,7 +1560,6 @@ class AppState(rx.State):
         finally:
             async with self:
                 self.is_running = False
-                self._cancel_requested = False
                 self._refresh_logs()
             js = self._apply_visibility_js()
             if js:

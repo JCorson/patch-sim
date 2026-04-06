@@ -1,77 +1,104 @@
-"""Built-in preset configurations for the patch_sim web UI."""
+"""Built-in preset configurations for the patch_sim web UI.
+
+Only the UI-specific neuron preset format (mapping state variable names to
+values) is defined here.  All protocol presets, adjustments, and name lists
+live in the core library and should be imported from ``patch_sim.presets``
+directly.
+"""
 
 from typing import Any
 
-from patch_sim.constants import DEFAULT_NEURON_PARAMS
-from patch_sim_ui.constants import CURRENT_CLAMP, VOLTAGE_CLAMP
+from patch_sim.constants import (
+    DEFAULT_G_ICAL,
+    DEFAULT_G_ICAN,
+    DEFAULT_G_ICAT,
+    DEFAULT_G_IH,
+    DEFAULT_G_IKA,
+    DEFAULT_G_IKCA,
+    DEFAULT_G_IKIR,
+    DEFAULT_G_IKV31,
+    DEFAULT_G_IM,
+    DEFAULT_G_NAP,
+    DEFAULT_G_NAR,
+)
+from patch_sim.neuron_factory import CHANNEL_REGISTRY, NeuronConfig
+from patch_sim.presets import NEURON_PRESETS
 
-# Each preset is a dict of state variable names → values.
-# Keys must match field names in AppState exactly.
-PRESETS: dict[str, dict[str, Any]] = {
-    "Action Potential": {
-        **DEFAULT_NEURON_PARAMS,
-        # Experiment
-        "clamp_mode": CURRENT_CLAMP,
-        # Protocol
-        "protocol_type": "Step",
-        "duration": 50.0,
-        "current_amplitude": 10.0,
-        "step_start": 10.0,
-        "step_duration": 30.0,
-    },
-    "Subthreshold Response": {
-        **DEFAULT_NEURON_PARAMS,
-        "clamp_mode": CURRENT_CLAMP,
-        "protocol_type": "Step",
-        "duration": 50.0,
-        "current_amplitude": 4.0,
-        "step_start": 10.0,
-        "step_duration": 30.0,
-    },
-    "Repetitive Firing": {
-        **DEFAULT_NEURON_PARAMS,
-        "clamp_mode": CURRENT_CLAMP,
-        "protocol_type": "Step",
-        "duration": 200.0,
-        "current_amplitude": 15.0,
-        "step_start": 10.0,
-        "step_duration": 180.0,
-    },
-    "I-V Curve": {
-        **DEFAULT_NEURON_PARAMS,
-        "clamp_mode": VOLTAGE_CLAMP,
-        "protocol_type": "I-V Curve",
-        "duration": 20.0,
-        "vc_voltage_min": -100.0,
-        "vc_voltage_max": 60.0,
-        "vc_voltage_step": 10.0,
-        "vc_pre_pulse_duration": 5.0,
-        "vc_post_pulse_duration": 5.0,
-        "vc_holding_voltage": -70.0,
-    },
-    "Na+ Channel Activation": {
-        **DEFAULT_NEURON_PARAMS,
-        "g_K": 0.0,  # override: block K+ channels to isolate Na+ current
-        "clamp_mode": VOLTAGE_CLAMP,
-        "protocol_type": "I-V Curve",
-        "duration": 20.0,
-        "vc_holding_voltage": -70.0,
-        "vc_voltage_min": -60.0,
-        "vc_voltage_max": 60.0,
-        "vc_voltage_step": 10.0,
-        "vc_pre_pulse_duration": 5.0,
-        "vc_post_pulse_duration": 5.0,
-    },
-    "Frequency Response": {
-        **DEFAULT_NEURON_PARAMS,
-        "clamp_mode": CURRENT_CLAMP,
-        "protocol_type": "Chirp",
-        "duration": 500.0,
-        "dc_offset": 8.0,
-        "amplitude": 4.0,
-        "start_frequency": 1.0,
-        "end_frequency": 100.0,
-    },
+# Default conductances for each auxiliary channel, keyed by channel name.
+_DEFAULT_G_MAX: dict[str, float] = {
+    "ih": DEFAULT_G_IH,
+    "ika": DEFAULT_G_IKA,
+    "ikv31": DEFAULT_G_IKV31,
+    "inap": DEFAULT_G_NAP,
+    "inar": DEFAULT_G_NAR,
+    "im": DEFAULT_G_IM,
+    "ikir": DEFAULT_G_IKIR,
+    "ikca": DEFAULT_G_IKCA,
+    "ical": DEFAULT_G_ICAL,
+    "icat": DEFAULT_G_ICAT,
+    "ican": DEFAULT_G_ICAN,
 }
 
-PRESET_NAMES: list[str] = list(PRESETS.keys())
+# Reverse map: factory function → channel name.
+_FACTORY_TO_NAME: dict[Any, str] = {v: k for k, v in CHANNEL_REGISTRY.items()}
+
+
+def neuron_config_to_ui_state(config: NeuronConfig) -> dict[str, Any]:
+    """Convert a :class:`~patch_sim.NeuronConfig` to a flat AppState dict.
+
+    Produces a mapping whose keys exactly match ``AppState`` field names so
+    that it can be unpacked with ``setattr`` in ``load_neuron_preset``.
+
+    All auxiliary channels that are absent from *config.channels* are set to
+    disabled with their default maximum conductances, so that loading a preset
+    never leaves channels enabled that were set by a previous preset.
+
+    Args:
+        config: Core neuron configuration to convert.
+
+    Returns:
+        Flat dict of ``{field_name: value}`` pairs for ``AppState``.
+    """
+    state: dict[str, Any] = {
+        "g_Na": config.g_Na,
+        "g_K": config.g_K,
+        "g_L": config.g_L,
+        "C_m": config.C_m,
+        "v_rest": config.v_rest,
+        "Na_out": config.Na_out,
+        "Na_in": config.Na_in,
+        "K_out": config.K_out,
+        "K_in": config.K_in,
+        "Cl_out": config.Cl_out,
+        "Cl_in": config.Cl_in,
+        "Ca_out": config.Ca_out,
+        "Ca_in": config.Ca_in,
+        "T": config.T,
+    }
+
+    # Disable all auxiliary channels with default conductances.
+    for name in CHANNEL_REGISTRY:
+        state[f"{name}_enabled"] = False
+        state[f"{name}_g_max"] = _DEFAULT_G_MAX[name]
+
+    # Enable channels present in config.
+    for cc in config.channels:
+        name = _FACTORY_TO_NAME[cc.factory]
+        state[f"{name}_enabled"] = True
+        state[f"{name}_g_max"] = cc.g_max
+
+    return state
+
+
+# Flat UI-state dicts derived from core NeuronConfig presets.
+NEURON_UI_PRESETS: dict[str, dict[str, Any]] = {
+    name: neuron_config_to_ui_state(cfg) for name, cfg in NEURON_PRESETS.items()
+}
+
+# Neuron-parameter overrides applied when a protocol preset is loaded,
+# regardless of which neuron type is active.  Keys must match AppState field
+# names exactly.
+PROTOCOL_NEURON_OVERRIDES: dict[str, dict[str, Any]] = {
+    # Disable K⁺ channels so only Na⁺ current is visible.
+    "Na+ Channel Activation": {"g_K": 0.0},
+}

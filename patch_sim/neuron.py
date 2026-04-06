@@ -1,9 +1,10 @@
-"""This module implements the Hodgkin-Huxley model for simulating action potentials.
+"""Conductance-based neuron model for simulating action potentials.
 
 The model includes equations for ion channel dynamics and membrane voltage.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import cached_property
 
@@ -33,8 +34,8 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class HodgkinHuxley:
-    """Simulates the Hodgkin-Huxley model of action potentials.
+class Neuron:
+    """Conductance-based neuron model for simulating action potentials.
 
     All parameters are fixed at construction time. The class is immutable
     (frozen) to prevent accidental mutation of parameters after the reversal
@@ -53,6 +54,12 @@ class HodgkinHuxley:
         Cl_out: Extracellular chloride concentration in mM.
         Cl_in: Intracellular chloride concentration in mM.
         T: Temperature in Kelvin.
+        na_channel_factory: Factory function that builds the Na⁺ core channel
+            given a maximum conductance. Defaults to the HH52 squid axon kinetics.
+        k_channel_factory: Factory function that builds the K⁺ core channel
+            given a maximum conductance. Defaults to the HH52 squid axon kinetics.
+        leak_channel_factory: Factory function that builds the leak core channel
+            given a maximum conductance. Defaults to the HH52 squid axon kinetics.
         additional_channels: Tuple of additional ion channels added on top of
             the classic Na/K/leak triad.  Defaults to an empty tuple so that
             all existing code is unaffected.
@@ -60,7 +67,7 @@ class HodgkinHuxley:
 
     Cached properties (built on first access):
         core_channels: Tuple of three IonChannel objects (Na, K, leak) built
-            from the constructor conductances.
+            from the constructor conductances and factory functions.
         all_channels: All channels — core_channels + additional_channels.
         all_gating_variables: Flat tuple of every gating variable across all
             channels, in channel-declaration order.
@@ -85,6 +92,13 @@ class HodgkinHuxley:
 
     # Temperature in Kelvin (37°C for mammalian cells)
     T: float = DEFAULT_T
+
+    # Core channel factories — override to use non-HH52 kinetics
+    na_channel_factory: Callable[[float], IonChannel] = field(default=make_na_channel)
+    k_channel_factory: Callable[[float], IonChannel] = field(default=make_k_channel)
+    leak_channel_factory: Callable[[float], IonChannel] = field(
+        default=make_leak_channel
+    )
 
     # Additional extra channels — empty by default so existing code is unaffected
     additional_channels: tuple[IonChannel, ...] = field(default_factory=tuple)
@@ -129,7 +143,7 @@ class HodgkinHuxley:
                     "channel name (Na, K, leak)."
                 )
         logger.debug(
-            "HodgkinHuxley: g_Na=%.1f g_K=%.1f g_L=%.3f C_m=%.2f T=%.1f K "
+            "Neuron: g_Na=%.1f g_K=%.1f g_L=%.3f C_m=%.2f T=%.1f K "
             "additional_channels=%s calcium=%s",
             self.g_Na,
             self.g_K,
@@ -142,15 +156,15 @@ class HodgkinHuxley:
 
     @cached_property
     def core_channels(self) -> tuple[IonChannel, ...]:
-        """Return the three classic HH channels built from constructor conductances.
+        """Return the three classic core channels built from constructor conductances.
 
         Returns:
             Tuple of (Na, K, leak) IonChannel objects in that order.
         """
         return (
-            make_na_channel(self.g_Na),
-            make_k_channel(self.g_K),
-            make_leak_channel(self.g_L),
+            self.na_channel_factory(self.g_Na),
+            self.k_channel_factory(self.g_K),
+            self.leak_channel_factory(self.g_L),
         )
 
     @cached_property

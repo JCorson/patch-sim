@@ -1,11 +1,9 @@
 """Concrete additional ion channel implementations.
 
-These channels can be added to a HodgkinHuxley model via the
-``additional_channels`` argument to extend the classic three-channel HH model
+These channels can be added to a :class:`~patch_sim.Neuron` via the
+``additional_channels`` argument to extend the classic three-channel model
 with additional biophysical mechanisms.
 """
-
-import math
 
 from .channels import (
     GatingVariable,
@@ -15,19 +13,21 @@ from .channels import (
     NernstSpec,
 )
 from .constants import (
-    DEFAULT_G_ICAN,
     DEFAULT_G_ICAL,
+    DEFAULT_G_ICAN,
     DEFAULT_G_ICAT,
     DEFAULT_G_IH,
     DEFAULT_G_IKA,
     DEFAULT_G_IKCA,
     DEFAULT_G_IKIR,
+    DEFAULT_G_IKV31,
     DEFAULT_G_IM,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
     DEFAULT_IH_P_NA,
 )
-from .utils import boltzmann_cosh_rates, safe_exp
+from .electrochemistry import boltzmann_cosh_rates
+from .utils import safe_cosh, safe_exp
 
 
 def _alpha_r(V: float, ca_i: float) -> float:
@@ -152,9 +152,61 @@ def make_ika_channel(
     a_var = GatingVariable(name="a", power=1, alpha=_alpha_a, beta=_beta_a)
     b_var = GatingVariable(name="b", power=1, alpha=_alpha_b, beta=_beta_b)
     return IonChannel(
-        name="IKa",
+        name="Ka",
         g_max=g_max,
         gating_variables=(a_var, b_var),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
+
+
+_ikv31_alpha_nk, _ikv31_beta_nk = boltzmann_cosh_rates(
+    half=-12.4,
+    slope=11.8,
+    tau_scale=4.0,
+    tau_floor=0.2,
+)
+
+
+def make_ikv31_channel(
+    g_max: float = DEFAULT_G_IKV31,
+) -> IonChannel:
+    """Create an IKv31 (Kv3.1-type K⁺) ion channel.
+
+    IKv31 is a high-threshold, fast-deactivating delayed-rectifier K⁺ current
+    that is the hallmark conductance of fast-spiking interneurons.  Its high
+    activation threshold (~−12 mV V₁/₂) means it is virtually closed at rest,
+    preventing the spurious hyperpolarization that a low-threshold K⁺ channel
+    would produce.  Fast deactivation enables rapid repolarization and supports
+    high-frequency firing without adaptation.
+
+    Uses a single activation gate ``nk`` with power 2 (n-squared kinetics from
+    Erisir et al. 1999).  The reversal potential is computed dynamically from
+    the neuron's K⁺ concentrations via the Nernst equation.
+
+    Kinetics follow Erisir et al. (1999), J. Neurophysiol. 82:2476, expressed
+    with Boltzmann/cosh rate functions:
+
+    * V₁/₂ = −12.4 mV, slope = 11.8 mV
+    * τ_scale = 4.0 ms, τ_floor = 0.2 ms
+
+    Args:
+        g_max: Maximum conductance in mS/cm². Must be non-negative.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_IKV31`.
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the IKv31
+        current.
+    """
+    nk_var = GatingVariable(
+        name="nk",
+        power=2,
+        alpha=_ikv31_alpha_nk,
+        beta=_ikv31_beta_nk,
+    )
+    return IonChannel(
+        name="Kv31",
+        g_max=g_max,
+        gating_variables=(nk_var,),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )
 
@@ -190,7 +242,7 @@ def make_ih_channel(
     """
     r_var = GatingVariable(name="r", power=1, alpha=_alpha_r, beta=_beta_r)
     return IonChannel(
-        name="Ih",
+        name="h",
         g_max=g_max,
         gating_variables=(r_var,),
         reversal_spec=GoldmanSpec(
@@ -236,7 +288,7 @@ def make_inap_channel(
     """
     p_var = GatingVariable(name="p", power=1, alpha=_alpha_p, beta=_beta_p)
     return IonChannel(
-        name="INaP",
+        name="NaP",
         g_max=g_max,
         gating_variables=(p_var,),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
@@ -352,7 +404,7 @@ def make_inar_channel(
     s_var = GatingVariable(name="s", power=1, alpha=_alpha_s, beta=_beta_s)
     hr_var = GatingVariable(name="hr", power=1, alpha=_alpha_hr, beta=_beta_hr)
     return IonChannel(
-        name="INaR",
+        name="NaR",
         g_max=g_max,
         gating_variables=(s_var, hr_var),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
@@ -394,7 +446,7 @@ def make_im_channel(
     """
     w_var = GatingVariable(name="w", power=1, alpha=_alpha_w, beta=_beta_w)
     return IonChannel(
-        name="IM",
+        name="M",
         g_max=g_max,
         gating_variables=(w_var,),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
@@ -436,7 +488,7 @@ def make_ikir_channel(
     """
     kir_var = GatingVariable(name="kir", power=1, alpha=_alpha_kir, beta=_beta_kir)
     return IonChannel(
-        name="IKir",
+        name="Kir",
         g_max=g_max,
         gating_variables=(kir_var,),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
@@ -484,7 +536,7 @@ def _ikca_tau(V: float) -> float:
     Returns:
         Time constant in ms (floored at 1 ms).
     """
-    tau = _IKCA_TAU_SCALE / math.cosh((V - _IKCA_V_HALF) / _IKCA_TAU_COSH_SCALE)
+    tau = _IKCA_TAU_SCALE / safe_cosh((V - _IKCA_V_HALF) / _IKCA_TAU_COSH_SCALE)
     return max(tau, _IKCA_TAU_FLOOR)
 
 
@@ -548,7 +600,7 @@ def make_ikca_channel(
     """
     q_var = GatingVariable(name="q", power=1, alpha=_alpha_q, beta=_beta_q)
     return IonChannel(
-        name="IKCa",
+        name="KCa",
         g_max=g_max,
         gating_variables=(q_var,),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
@@ -578,7 +630,7 @@ def make_ical_channel(
     (activation, power 2) and ``f`` (inactivation, power 1).
 
     Because ICaL carries Ca²⁺, ``carries_calcium=True`` is set so that
-    :meth:`~patch_sim.hodgkin_huxley.HodgkinHuxley.calcium_current` sums its
+    :meth:`~patch_sim.neuron.Neuron.calcium_current` sums its
     contribution automatically.
 
     Kinetics use Boltzmann-cosh rate functions with activation centred at
@@ -598,7 +650,7 @@ def make_ical_channel(
     d_var = GatingVariable(name="d", power=2, alpha=_alpha_d, beta=_beta_d)
     f_var = GatingVariable(name="f", power=1, alpha=_alpha_f, beta=_beta_f)
     return IonChannel(
-        name="ICaL",
+        name="CaL",
         g_max=g_max,
         gating_variables=(d_var, f_var),
         reversal_spec=NernstSpec(IonSpecies.CALCIUM),
@@ -644,7 +696,7 @@ def make_icat_channel(
     dt_var = GatingVariable(name="dt", power=2, alpha=_alpha_dt, beta=_beta_dt)
     ft_var = GatingVariable(name="ft", power=1, alpha=_alpha_ft, beta=_beta_ft)
     return IonChannel(
-        name="ICaT",
+        name="CaT",
         g_max=g_max,
         gating_variables=(dt_var, ft_var),
         reversal_spec=NernstSpec(IonSpecies.CALCIUM),
@@ -691,7 +743,7 @@ def make_ican_channel(
     dn_var = GatingVariable(name="dn", power=2, alpha=_alpha_dn, beta=_beta_dn)
     fn_var = GatingVariable(name="fn", power=1, alpha=_alpha_fn, beta=_beta_fn)
     return IonChannel(
-        name="ICaN",
+        name="CaN",
         g_max=g_max,
         gating_variables=(dn_var, fn_var),
         reversal_spec=NernstSpec(IonSpecies.CALCIUM),

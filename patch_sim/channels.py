@@ -1,4 +1,4 @@
-"""Ion channel abstractions for the Hodgkin-Huxley simulator.
+"""Ion channel abstractions for the conductance-based neuron simulator.
 
 Provides the building blocks for defining additional ion channels that can be
 added on top of the classic Na, K, and leak channels.
@@ -145,7 +145,7 @@ class IonChannel:
             from the neuron's ion concentrations.
         carries_calcium: ``True`` for channels that carry Ca²⁺ ions (e.g.
             ICaL, ICaT, ICaN).  Used by
-            :meth:`~patch_sim.hodgkin_huxley.HodgkinHuxley.calcium_current` to
+            :meth:`~patch_sim.neuron.Neuron.calcium_current` to
             sum Ca²⁺ influx for the intracellular Ca²⁺ ODE.  Defaults to
             ``False``.
 
@@ -173,6 +173,19 @@ class IonChannel:
                 f"got {names}."
             )
 
+    @property
+    def current_name(self) -> str:
+        """Structured-array field name for this channel's current contribution.
+
+        Always prepends ``'I'`` to the channel name, so e.g. a channel named
+        ``'Na'`` contributes a field named ``'INa'``, and a channel named
+        ``'h'`` contributes a field named ``'Ih'``.
+
+        Returns:
+            The field name string used in simulation result structured arrays.
+        """
+        return f"I{self.name}"
+
     def reversal_potential(self, neuron: Any) -> float:
         """Compute the reversal potential from the neuron's ion concentrations.
 
@@ -182,7 +195,7 @@ class IonChannel:
         :class:`GoldmanSpec`, using the concentrations stored on *neuron*.
 
         Args:
-            neuron: A :class:`~patch_sim.hodgkin_huxley.HodgkinHuxley` instance
+            neuron: A :class:`~patch_sim.neuron.Neuron` instance
                 whose ``ion_concentrations()`` method is used to look up ion
                 concentrations.
 
@@ -218,7 +231,7 @@ class IonChannel:
         Args:
             V: Membrane voltage in mV.
             gating_state: Mapping from gating variable name to current value.
-            neuron: The :class:`~patch_sim.hodgkin_huxley.HodgkinHuxley` model
+            neuron: The :class:`~patch_sim.neuron.Neuron` model
                 used to compute the reversal potential.
 
         Returns:

@@ -2,7 +2,6 @@
 
 import reflex as rx
 
-from patch_sim_ui import presets
 from patch_sim_ui.components.log_panel import log_panel
 from patch_sim_ui.components.neuron_panel import neuron_panel
 from patch_sim_ui.components.protocol_panel import protocol_panel
@@ -15,15 +14,8 @@ setup_logging()
 
 
 def _header() -> rx.Component:
-    """Top navigation bar with preset selector, title, and Run/Continuous buttons."""
+    """Top navigation bar with title, reset button, and Run/Continuous buttons."""
     return rx.hstack(
-        rx.select(
-            presets.PRESET_NAMES,
-            placeholder="Load preset…",
-            on_change=AppState.load_preset,
-            width="200px",
-            size="2",
-        ),
         rx.button(
             rx.icon("rotate-ccw"),
             "Reset",
@@ -38,13 +30,11 @@ def _header() -> rx.Component:
         rx.hstack(
             rx.cond(
                 AppState.is_running,
-                rx.button(
-                    rx.icon("square"),
-                    "Stop",
-                    on_click=AppState.cancel_simulation,
-                    color_scheme="red",
-                    variant="soft",
-                    size="2",
+                rx.hstack(
+                    rx.spinner(size="2"),
+                    rx.text("Running…", size="2", color="gray"),
+                    spacing="2",
+                    align="center",
                 ),
                 rx.button(
                     rx.icon("play"),
@@ -78,6 +68,7 @@ def _header() -> rx.Component:
             spacing="2",
             align="center",
         ),
+        rx.color_mode.button(allow_system=True, variant="ghost", size="2"),
         width="100%",
         padding_x="4",
         padding_y="3",
@@ -169,7 +160,7 @@ def index() -> rx.Component:
 
 app = rx.App(
     theme=rx.theme(
-        appearance="light",
+        appearance="inherit",
         accent_color="blue",
         radius="medium",
     )

@@ -2,6 +2,7 @@
 
 import reflex as rx
 
+from patch_sim.presets import NEURON_PRESET_NAMES
 from patch_sim_ui.constants import PARAM_RANGES
 from patch_sim_ui.state import AppState
 
@@ -137,6 +138,14 @@ _ADDITIONAL_CHANNEL_ROW_SPECS = [
         "ika_g_max",
     ),
     (
+        "IKv31 (Kv3.1-type K\u207a)",
+        AppState.ikv31_enabled,
+        AppState.set_ikv31_enabled,
+        AppState.ikv31_g_max,
+        AppState.set_ikv31_g_max,
+        "ikv31_g_max",
+    ),
+    (
         "INaP (Persistent Na\u207a)",
         AppState.inap_enabled,
         AppState.set_inap_enabled,
@@ -207,24 +216,90 @@ def neuron_panel() -> rx.Component:
     """Sidebar panel for configuring Hodgkin-Huxley neuron parameters."""
     return rx.vstack(
         rx.heading("Neuron Parameters", size="3"),
+        rx.select(
+            NEURON_PRESET_NAMES,
+            placeholder="Load neuron type…",
+            value=AppState.active_neuron_type,
+            on_change=AppState.load_neuron_preset,
+            width="100%",
+            size="2",
+        ),
         rx.separator(),
-        rx.text("Conductances (mS/cm²)", size="2", weight="bold"),
-        rx.vstack(
-            _param_row("g_Na", AppState.g_Na, AppState.set_g_Na, *PARAM_RANGES["g_Na"]),
-            _param_row("g_K", AppState.g_K, AppState.set_g_K, *PARAM_RANGES["g_K"]),
-            _param_row("g_L", AppState.g_L, AppState.set_g_L, *PARAM_RANGES["g_L"]),
-            spacing="1",
+        rx.accordion.root(
+            rx.accordion.item(
+                header=rx.text(
+                    "Conductances (mS/cm²)",
+                    size="2",
+                    weight="bold",
+                    color="var(--gray-12)",
+                ),
+                content=rx.vstack(
+                    _param_row(
+                        "g_Na",
+                        AppState.g_Na,
+                        AppState.set_g_Na,
+                        *PARAM_RANGES["g_Na"],
+                    ),
+                    _param_row(
+                        "g_K",
+                        AppState.g_K,
+                        AppState.set_g_K,
+                        *PARAM_RANGES["g_K"],
+                    ),
+                    _param_row(
+                        "g_L",
+                        AppState.g_L,
+                        AppState.set_g_L,
+                        *PARAM_RANGES["g_L"],
+                    ),
+                    spacing="1",
+                    width="100%",
+                ),
+                value="conductances",
+            ),
+            collapsible=True,
+            default_value="conductances",
+            variant="ghost",
             width="100%",
         ),
         rx.separator(),
-        rx.text("Membrane Properties", size="2", weight="bold"),
-        _param_row(
-            "C_m (µF/cm²)", AppState.C_m, AppState.set_C_m, *PARAM_RANGES["C_m"]
+        rx.accordion.root(
+            rx.accordion.item(
+                header=rx.text(
+                    "Membrane Properties",
+                    size="2",
+                    weight="bold",
+                    color="var(--gray-12)",
+                ),
+                content=rx.vstack(
+                    _param_row(
+                        "C_m (µF/cm²)",
+                        AppState.C_m,
+                        AppState.set_C_m,
+                        *PARAM_RANGES["C_m"],
+                    ),
+                    _param_row(
+                        "v_rest (mV)",
+                        AppState.v_rest,
+                        AppState.set_v_rest,
+                        *PARAM_RANGES["v_rest"],
+                    ),
+                    _param_row(
+                        "T (K)",
+                        AppState.T,
+                        AppState.set_T,
+                        *PARAM_RANGES["T"],
+                    ),
+                    spacing="1",
+                    width="100%",
+                ),
+                value="membrane-properties",
+            ),
+            collapsible=True,
+            default_value="membrane-properties",
+            variant="ghost",
+            width="100%",
         ),
-        _param_row(
-            "v_rest (mV)", AppState.v_rest, AppState.set_v_rest, *PARAM_RANGES["v_rest"]
-        ),
-        _param_row("T (K)", AppState.T, AppState.set_T, *PARAM_RANGES["T"]),
         rx.separator(),
         rx.accordion.root(
             rx.accordion.item(

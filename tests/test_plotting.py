@@ -1,13 +1,13 @@
 """Unit tests for patch_sim_ui/plotting.py.
 
-Covers Sweep.from_dataframe, build_figure, and _build_hover_tables.
+Covers Sweep.from_result, build_figure, and _build_hover_tables.
 All three are pure functions with no Reflex dependency.
 """
 
 import math
+from collections import Counter
 
 import numpy as np
-import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
@@ -24,36 +24,51 @@ from patch_sim_ui.plotting import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-_N = 50  # default number of time points for test DataFrames
+_N = 50  # default number of time points for test simulation results
 
 
-def _make_df(
+def _make_result(
     extra_cols: dict[str, list[float]] | None = None,
     n: int = _N,
-) -> pd.DataFrame:
-    """Return a minimal simulation DataFrame with classic columns.
+) -> np.ndarray:
+    """Return a minimal simulation result structured array with classic fields.
 
     Args:
-        extra_cols: Additional columns to include beyond the classic set.
+        extra_cols: Additional fields to include beyond the classic set.
         n: Number of time points.
 
     Returns:
-        A DataFrame indexed by time (ms) with classic simulation columns.
+        A structured array with time and classic simulation fields.
     """
     t = np.linspace(0.0, 50.0, n)
-    data: dict[str, list[float]] = {
-        "voltage": list(np.full(n, -65.0)),
-        "total_current": list(np.zeros(n)),
-        "Na_current": list(np.zeros(n)),
-        "K_current": list(np.zeros(n)),
-        "leak_current": list(np.zeros(n)),
-        "potassium_activation": list(np.full(n, 0.3)),
-        "sodium_activation": list(np.full(n, 0.05)),
-        "sodium_inactivation": list(np.full(n, 0.6)),
-    }
+    fields = [
+        ("time", np.float64),
+        ("voltage", np.float64),
+        ("Itotal", np.float64),
+        ("INa", np.float64),
+        ("IK", np.float64),
+        ("Ileak", np.float64),
+        ("n", np.float64),
+        ("m", np.float64),
+        ("h", np.float64),
+    ]
     if extra_cols:
-        data.update(extra_cols)
-    return pd.DataFrame(data, index=t)
+        for name in extra_cols:
+            fields.append((name, np.float64))
+    result = np.empty(n, dtype=np.dtype(fields))
+    result["time"] = t
+    result["voltage"] = np.full(n, -65.0)
+    result["Itotal"] = np.zeros(n)
+    result["INa"] = np.zeros(n)
+    result["IK"] = np.zeros(n)
+    result["Ileak"] = np.zeros(n)
+    result["n"] = np.full(n, 0.3)
+    result["m"] = np.full(n, 0.05)
+    result["h"] = np.full(n, 0.6)
+    if extra_cols:
+        for name, values in extra_cols.items():
+            result[name] = values
+    return result
 
 
 def _make_stimulus(n: int = _N) -> np.ndarray:
@@ -75,33 +90,33 @@ def _make_sweep(
     n: int = _N,
     extra_cols: dict[str, list[float]] | None = None,
 ) -> Sweep:
-    """Construct a Sweep via from_dataframe for use in figure tests.
+    """Construct a Sweep via from_result for use in figure tests.
 
     Args:
         label: Sweep label string.
         color: Hex colour string.
         mode: Clamp mode string.
         n: Number of time points.
-        extra_cols: Extra DataFrame columns to include.
+        extra_cols: Extra fields to include.
 
     Returns:
         A fully-populated Sweep instance.
     """
-    df = _make_df(extra_cols=extra_cols, n=n)
+    result = _make_result(extra_cols=extra_cols, n=n)
     stim = _make_stimulus(n)
-    return Sweep.from_dataframe(df, stim, label, color, mode)
+    return Sweep.from_result(result, stim, label, color, mode)
 
 
 # ---------------------------------------------------------------------------
-# Sweep.from_dataframe — classic column classification
+# Sweep.from_result — classic column classification
 # ---------------------------------------------------------------------------
 
 
-def test_from_dataframe_classic_columns_are_populated() -> None:
+def test_from_result_classic_columns_are_populated() -> None:
     """Classic columns are stored correctly in the Sweep fields."""
-    df = _make_df()
+    df = _make_result()
     stim = _make_stimulus()
-    s = Sweep.from_dataframe(df, stim, "A", "#fff", "Current Clamp")
+    s = Sweep.from_result(df, stim, "A", "#fff", "Current Clamp")
     assert len(s.voltage) == _N
     assert len(s.sodium_current) == _N
     assert len(s.potassium_current) == _N
@@ -112,89 +127,101 @@ def test_from_dataframe_classic_columns_are_populated() -> None:
     assert len(s.sodium_inactivation) == _N
 
 
-def test_from_dataframe_time_index_stored() -> None:
-    """The DataFrame index is stored as the time axis."""
-    df = _make_df()
+def test_from_result_time_field_stored() -> None:
+    """The time field is stored as the time axis."""
+    result = _make_result()
     stim = _make_stimulus()
-    s = Sweep.from_dataframe(df, stim, "", "", "Current Clamp")
-    assert s.time == pytest.approx(df.index.tolist())
+    s = Sweep.from_result(result, stim, "", "", "Current Clamp")
+    assert s.time == pytest.approx(result["time"].tolist())
 
 
-def test_from_dataframe_stimulus_stored() -> None:
+def test_from_result_stimulus_stored() -> None:
     """The stimulus array is stored as sweep.stimulus."""
     stim = np.linspace(0, 10, _N)
-    df = _make_df()
-    s = Sweep.from_dataframe(df, stim, "", "", "Current Clamp")
+    df = _make_result()
+    s = Sweep.from_result(df, stim, "", "", "Current Clamp")
     assert s.stimulus == pytest.approx(stim.tolist())
 
 
-def test_from_dataframe_no_extra_columns_gives_empty_dicts() -> None:
+def test_from_result_no_extra_columns_gives_empty_dicts() -> None:
     """With only classic columns both additional dicts are empty."""
-    s = Sweep.from_dataframe(_make_df(), _make_stimulus(), "", "", "Current Clamp")
+    s = Sweep.from_result(_make_result(), _make_stimulus(), "", "", "Current Clamp")
     assert s.additional_currents == {}
     assert s.additional_gating == {}
 
 
-def test_from_dataframe_current_suffix_goes_to_additional_currents() -> None:
-    """Extra columns ending with _current are placed in additional_currents."""
-    extra = {"ih_current": list(np.ones(_N) * 0.5)}
-    s = Sweep.from_dataframe(_make_df(extra_cols=extra), _make_stimulus(), "", "", "CC")
-    assert "ih" in s.additional_currents
-    assert "ih_current" not in s.additional_currents
-    assert s.additional_currents["ih"] == pytest.approx([0.5] * _N)
+def test_from_result_i_prefix_goes_to_additional_currents() -> None:
+    """Extra columns starting with I are placed in additional_currents."""
+    extra = {"Ih": list(np.ones(_N) * 0.5)}
+    s = Sweep.from_result(
+        _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
+    )
+    assert "Ih" in s.additional_currents
+    assert s.additional_currents["Ih"] == pytest.approx([0.5] * _N)
 
 
-def test_from_dataframe_current_suffix_stripped_correctly() -> None:
-    """The _current suffix is fully stripped to produce the channel key."""
-    extra = {"foo_current": list(np.zeros(_N))}
-    s = Sweep.from_dataframe(_make_df(extra_cols=extra), _make_stimulus(), "", "", "CC")
-    assert list(s.additional_currents.keys()) == ["foo"]
+def test_from_result_i_prefix_key_is_column_name() -> None:
+    """The column name is used as-is as the key in additional_currents."""
+    extra = {"IKa": list(np.zeros(_N))}
+    s = Sweep.from_result(
+        _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
+    )
+    assert list(s.additional_currents.keys()) == ["IKa"]
 
 
-def test_from_dataframe_non_current_extra_goes_to_additional_gating() -> None:
-    """Extra columns without _current suffix are placed in additional_gating."""
+def test_from_result_non_current_extra_goes_to_additional_gating() -> None:
+    """Extra columns not starting with I are placed in additional_gating."""
     extra = {"r": list(np.full(_N, 0.4))}
-    s = Sweep.from_dataframe(_make_df(extra_cols=extra), _make_stimulus(), "", "", "CC")
+    s = Sweep.from_result(
+        _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
+    )
     assert "r" in s.additional_gating
     assert "r" not in s.additional_currents
     assert s.additional_gating["r"] == pytest.approx([0.4] * _N)
 
 
-def test_from_dataframe_multiple_extra_columns_classified() -> None:
+def test_from_result_multiple_extra_columns_classified() -> None:
     """Multiple extra columns are each classified into the correct dict."""
     extra = {
-        "ika_current": list(np.ones(_N)),
+        "IKa": list(np.ones(_N)),
         "a": list(np.full(_N, 0.1)),
         "b": list(np.full(_N, 0.9)),
     }
-    s = Sweep.from_dataframe(_make_df(extra_cols=extra), _make_stimulus(), "", "", "CC")
-    assert set(s.additional_currents.keys()) == {"ika"}
+    s = Sweep.from_result(
+        _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
+    )
+    assert set(s.additional_currents.keys()) == {"IKa"}
     assert set(s.additional_gating.keys()) == {"a", "b"}
 
 
-def test_from_dataframe_missing_classic_column_returns_empty_list() -> None:
-    """When a classic column is absent the corresponding field is an empty list."""
-    df = _make_df()
-    df = df.drop(columns=["voltage"])
-    s = Sweep.from_dataframe(df, _make_stimulus(), "", "", "Current Clamp")
+def test_from_result_missing_classic_field_returns_empty_list() -> None:
+    """When a classic field is absent the corresponding Sweep field is an empty list."""
+    base = _make_result()
+    # Build a structured array without the "voltage" field
+    assert base.dtype.names is not None
+    names = [f for f in base.dtype.names if f != "voltage"]
+    result = np.empty(len(base), dtype=np.dtype([(n, np.float64) for n in names]))
+    for n in names:
+        result[n] = base[n]
+    s = Sweep.from_result(result, _make_stimulus(), "", "", "Current Clamp")
     assert s.voltage == []
 
 
-def test_from_dataframe_current_clamp_mode_stored() -> None:
+def test_from_result_current_clamp_mode_stored() -> None:
     """clamp_mode is stored verbatim from the mode argument."""
-    s = Sweep.from_dataframe(_make_df(), _make_stimulus(), "", "", "Current Clamp")
+    s = Sweep.from_result(_make_result(), _make_stimulus(), "", "", "Current Clamp")
     assert s.clamp_mode == "Current Clamp"
 
 
-def test_from_dataframe_voltage_clamp_mode_stored() -> None:
+def test_from_result_voltage_clamp_mode_stored() -> None:
     """clamp_mode is stored correctly for Voltage Clamp."""
-    s = Sweep.from_dataframe(_make_df(), _make_stimulus(), "", "", "Voltage Clamp")
+    s = Sweep.from_result(_make_result(), _make_stimulus(), "", "", "Voltage Clamp")
     assert s.clamp_mode == "Voltage Clamp"
 
 
-def test_from_dataframe_label_and_color_stored() -> None:
+def test_from_result_label_and_color_stored() -> None:
     """Label and color are stored verbatim."""
-    s = Sweep.from_dataframe(_make_df(), _make_stimulus(), "My Label", "#abcdef", "CC")
+    s = Sweep.from_result(_make_result(), _make_stimulus(), "My Label", "#abcdef", "CC")
     assert s.label == "My Label"
     assert s.color == "#abcdef"
 
@@ -342,12 +369,38 @@ def test_build_figure_single_sweep_hovermode_x_unified() -> None:
 
 
 def test_build_figure_multi_sweep_hovermode_x() -> None:
-    """Multi-sweep (I-V Curve) mode uses hovermode='x'."""
+    """Multi-sweep mode uses hovermode='x'."""
     sweeps = [_make_sweep(label=f"{v} mV") for v in [-60, -40, -20]]
     fig = build_figure(
         sweeps, [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
     )
     assert fig.layout.hovermode == "x"
+
+
+def test_build_figure_show_hover_false_disables_hovermode() -> None:
+    """When show_hover is False the figure hovermode is set to False."""
+    sweep = _make_sweep()
+    fig = build_figure(
+        [sweep],
+        [],
+        visibility=_all_flags_true(),
+        clamp_mode="Current Clamp",
+        show_hover=False,
+    )
+    assert fig.layout.hovermode is False
+
+
+def test_build_figure_show_hover_false_multi_sweep() -> None:
+    """When show_hover is False multi-sweep figures also disable hovermode."""
+    sweeps = [_make_sweep(label=f"{v} mV") for v in [-60, -40, -20]]
+    fig = build_figure(
+        sweeps,
+        [],
+        visibility=_all_flags_true(),
+        clamp_mode="Voltage Clamp",
+        show_hover=False,
+    )
+    assert fig.layout.hovermode is False
 
 
 # ---------------------------------------------------------------------------
@@ -677,13 +730,13 @@ def test_compute_trace_visibility_map_cc_additional_gating_mapped() -> None:
 
 def test_compute_trace_visibility_map_vc_additional_current_mapped() -> None:
     """VC sweep with additional current maps the field to the correct index."""
-    extra = {"foo_current": [0.0] * _N}
+    extra = {"IFoo": [0.0] * _N}
     sweep = _make_sweep(mode="Voltage Clamp", extra_cols=extra)
-    curr_map = {"foo": "show_foo_current"}
+    curr_map = {"IFoo": "show_foo_current"}
     result = compute_trace_visibility_map(
         [sweep], [], "Voltage Clamp", additional_current_field_map=curr_map
     )
-    # total(0), Na(1), K(2), leak(3), foo(4), n(5), m(6), h(7), stim(8)
+    # total(0), Na(1), K(2), leak(3), IFoo(4), n(5), m(6), h(7), stim(8)
     assert result["show_foo_current"] == [4]
     assert result["show_potassium_activation"] == [5]
     assert result["show_sodium_activation"] == [6]
@@ -704,10 +757,10 @@ def test_compute_trace_visibility_map_multi_gating_keys_same_field() -> None:
 
 def test_compute_trace_visibility_map_unknown_additional_key_advances_counter() -> None:
     """Additional keys absent from the field map still advance the index counter."""
-    extra = {"unknown_current": [0.0] * _N}
+    extra = {"IUnknown": [0.0] * _N}
     sweep = _make_sweep(mode="Voltage Clamp", extra_cols=extra)
     result = compute_trace_visibility_map([sweep], [], "Voltage Clamp")
-    # unknown advances the counter; classic gating should be at 5, 6, 7
+    # IUnknown (additional_current) advances the counter; classic gating at 5, 6, 7
     assert result["show_potassium_activation"] == [5]
     assert result["show_sodium_activation"] == [6]
     assert result["show_sodium_inactivation"] == [7]
@@ -754,3 +807,270 @@ def test_compute_trace_visibility_map_with_stored_traces_advances_counter() -> N
 
     # The recorded show_* indices must be identical regardless of stored traces.
     assert result_without == result_with
+
+
+# ---------------------------------------------------------------------------
+# build_figure — legend visibility
+# ---------------------------------------------------------------------------
+
+
+def test_build_figure_cc_single_sweep_stimulus_not_in_legend() -> None:
+    """Current Clamp single sweep: stimulus trace is excluded from the legend."""
+    sweep = _make_sweep(mode="Current Clamp")
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+    )
+    stim_traces = [t for t in fig.data if "Stimulus" in (t.name or "")]
+    assert all(t.showlegend is False for t in stim_traces), (
+        "Stimulus traces must not appear in the legend"
+    )
+
+
+def test_build_figure_vc_single_sweep_command_not_in_legend() -> None:
+    """Voltage Clamp single sweep: command trace is excluded from the legend."""
+    sweep = _make_sweep(mode="Voltage Clamp")
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
+    cmd_traces = [t for t in fig.data if "Command" in (t.name or "")]
+    assert all(t.showlegend is False for t in cmd_traces), (
+        "Command traces must not appear in the legend"
+    )
+
+
+def test_build_figure_cc_single_sweep_only_gating_in_legend() -> None:
+    """Current Clamp single sweep: voltage is suppressed (sole trace); gating shown."""
+    sweep = _make_sweep(label="", mode="Current Clamp")
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+    )
+    legend_names = {t.name for t in fig.data if t.showlegend is not False}
+    # Row 1 has only Voltage — suppressed because sole entry.
+    assert "Voltage (mV)" not in legend_names
+    # Gating row has 3 entries so all three are shown.
+    assert "n" in legend_names
+    assert "m" in legend_names
+    assert "h" in legend_names
+
+
+def test_build_figure_vc_single_sweep_currents_and_gating_in_legend() -> None:
+    """Voltage Clamp single sweep: current and gating traces appear in the legend."""
+    sweep = _make_sweep(label="", mode="Voltage Clamp")
+    fig = build_figure(
+        [sweep], [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
+    legend_traces = [t for t in fig.data if t.showlegend is not False]
+    names = {t.name for t in legend_traces}
+    assert "I_total" in names
+    assert "I_Na" in names
+    assert "I_K" in names
+    assert "I_L" in names
+    assert "n" in names
+    assert "m" in names
+    assert "h" in names
+
+
+def test_build_figure_multi_sweep_only_first_sweep_in_legend() -> None:
+    """Multi-sweep mode: only the first sweep's traces appear in the legend."""
+    sweeps = [_make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40]]
+    fig = build_figure(
+        sweeps, [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
+    legend_names = {t.name for t in fig.data if t.showlegend is not False}
+    # Traces from the second sweep must not appear.
+    assert not any(n.startswith("-40 mV ") for n in legend_names), (
+        "Second sweep traces must not appear in the legend"
+    )
+
+
+def test_build_figure_multi_sweep_legend_names_have_no_voltage_prefix() -> None:
+    """Multi-sweep legends use bare names — no command level on currents or gating."""
+    sweeps = [_make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40]]
+    fig = build_figure(
+        sweeps, [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
+    legend_names = {t.name for t in fig.data if t.showlegend is not False}
+    # Current traces must use bare channel labels, not "-60 mV I_total" etc.
+    assert "I_total" in legend_names
+    assert "I_Na" in legend_names
+    assert "I_K" in legend_names
+    assert "I_L" in legend_names
+    # Gating traces must use bare variable names, not "-60 mV n" etc.
+    assert "n" in legend_names
+    assert "m" in legend_names
+    assert "h" in legend_names
+    assert not any("mV" in n for n in legend_names)
+
+
+def test_build_figure_cc_multi_sweep_gating_names_bare() -> None:
+    """CC multi-sweep: all gating traces use bare names regardless of sweep index.
+
+    Selecting a non-first sweep triggers the JS legend to show that sweep's
+    gating traces.  Those traces must not carry a stimulus-amplitude prefix
+    (e.g. "+5.0 uA/cm^2 n") so the legend always reads "n", "m", "h".
+    """
+    sweeps = [
+        _make_sweep(label=f"{c:+.1f} uA/cm^2", mode="Current Clamp") for c in [0.0, 5.0]
+    ]
+    fig = build_figure(
+        sweeps, [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+    )
+    gating_traces = [t for t in fig.data if getattr(t, "legend", None) == "legend2"]
+    assert gating_traces, "Expected gating traces with legend='legend2'"
+    for trace in gating_traces:
+        assert "uA" not in trace.name, (
+            f"Gating trace name '{trace.name}' must not contain stimulus prefix"
+        )
+
+
+def test_build_figure_saved_sweep_stimulus_not_in_legend() -> None:
+    """Saved sweep stimulus traces are excluded from the legend."""
+    current = _make_sweep(mode="Current Clamp")
+    saved = _make_sweep(label="saved", color="#aabbcc", mode="Current Clamp")
+    fig = build_figure(
+        [current], [saved], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+    )
+    # The saved sweep's stimulus trace uses sweep.label ("saved") as its name.
+    saved_stim = [t for t in fig.data if t.name == "saved" and t.showlegend is False]
+    assert len(saved_stim) >= 1, "Saved sweep stimulus must be excluded from the legend"
+
+
+def test_build_figure_stored_trace_stimulus_not_in_legend() -> None:
+    """Stored trace stimulus traces are excluded from the legend."""
+    sweep = _make_sweep(mode="Current Clamp")
+    stored = _make_sweep(mode="Current Clamp")
+    stored = stored.model_copy(update={"label": "Ref"})
+    fig = build_figure(
+        [sweep], [], TraceVisibility(), "Current Clamp", stored_traces=[stored]
+    )
+    # Stored traces add two traces named "Ref": one on row 1, one on stimulus row.
+    ref_traces = [t for t in fig.data if t.name == "Ref"]
+    assert len(ref_traces) == 2  # noqa: PLR2004
+    stimulus_ref = [t for t in ref_traces if t.showlegend is False]
+    assert len(stimulus_ref) == 1, "Stored trace stimulus must be excluded from legend"
+
+
+# ---------------------------------------------------------------------------
+# Sweep metadata (meta.sweep) embedding
+# ---------------------------------------------------------------------------
+
+
+def test_sweep_meta_vc_multi_sweep() -> None:
+    """Multi-sweep VC figure embeds correct sweep index in trace meta."""
+    sweeps = [
+        _make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40, -20]
+    ]
+    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+    for trace in fig.data:
+        assert trace.meta is not None, "Every trace must have meta"
+        assert "sweep" in trace.meta, "Every trace meta must contain 'sweep' key"
+    # Every sweep index 0..n-1 must be represented, with the same trace count each.
+    counts = Counter(t.meta["sweep"] for t in fig.data if t.meta["sweep"] >= 0)
+    assert sorted(counts.keys()) == list(range(len(sweeps))), (
+        "Sweep indices should span 0..n-1"
+    )
+    assert len(set(counts.values())) == 1, (
+        f"All sweeps should have equal trace counts; got {counts}"
+    )
+
+
+def test_sweep_meta_cc_multi_sweep() -> None:
+    """Multi-sweep CC figure embeds correct sweep index in trace meta."""
+    sweeps = [_make_sweep(label=f"s{i}", mode="Current Clamp") for i in range(2)]
+    fig = build_figure(sweeps, [], TraceVisibility(), "Current Clamp")
+    counts = Counter(t.meta["sweep"] for t in fig.data if t.meta["sweep"] >= 0)
+    assert sorted(counts.keys()) == list(range(len(sweeps))), (
+        "Sweep indices should span 0..n-1"
+    )
+    assert len(set(counts.values())) == 1, (
+        f"All sweeps should have equal trace counts; got {counts}"
+    )
+
+
+def test_sweep_meta_negative_for_saved_sweeps() -> None:
+    """Saved sweep traces have meta.sweep == -1."""
+    current = [_make_sweep(label="cur", mode="Current Clamp")]
+    saved = [_make_sweep(label="saved", color="#aaa", mode="Current Clamp")]
+    fig = build_figure(current, saved, TraceVisibility(), "Current Clamp")
+    # Current sweep traces use sweep=0; saved traces must all use -1.
+    non_current = [t for t in fig.data if t.meta["sweep"] != 0]
+    assert len(non_current) > 0, "Expected saved traces to be present"
+    for t in non_current:
+        assert t.meta["sweep"] == -1, (
+            f"Saved trace should have sweep=-1, got {t.meta['sweep']}"
+        )
+
+
+def test_sweep_meta_negative_for_stored_traces() -> None:
+    """Stored traces have meta.sweep == -1."""
+    current = [_make_sweep(mode="Current Clamp")]
+    stored = [_make_sweep(mode="Current Clamp")]
+    stored[0] = stored[0].model_copy(update={"label": "Ref"})
+    fig = build_figure(
+        current, [], TraceVisibility(), "Current Clamp", stored_traces=stored
+    )
+    # Current sweep traces use sweep=0; stored traces must all use -1.
+    non_current = [t for t in fig.data if t.meta["sweep"] != 0]
+    assert len(non_current) > 0, "Expected stored traces to be present"
+    for t in non_current:
+        assert t.meta["sweep"] == -1
+
+
+def test_sweep_meta_negative_for_carrier_traces() -> None:
+    """Carrier traces in multi-sweep mode have meta.sweep == -1."""
+    sweeps = [_make_sweep(label=f"s{i}", mode="Voltage Clamp") for i in range(3)]
+    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+    # Carrier traces are identified by their customdata hovertemplate — unique
+    # to these invisible hover-proxy traces.  There should be exactly 3 (one
+    # per subplot row) and each must have sweep=-1.
+    carrier_traces = [
+        t for t in fig.data if t.hovertemplate == "%{customdata}<extra></extra>"
+    ]
+    assert len(carrier_traces) == 3, (  # noqa: PLR2004
+        f"Expected 3 carrier traces (one per subplot row), got {len(carrier_traces)}"
+    )
+    for t in carrier_traces:
+        assert t.meta["sweep"] == -1, "Carrier trace should have sweep=-1"
+
+
+def test_sweep_meta_with_additional_channels() -> None:
+    """Additional current/gating traces carry the correct sweep index."""
+    extra = {"ih_current": list(np.ones(_N) * 0.5)}
+    sweeps = [
+        _make_sweep(label="s0", mode="Voltage Clamp", extra_cols=extra),
+        _make_sweep(label="s1", mode="Voltage Clamp", extra_cols=extra),
+    ]
+    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+    counts = Counter(t.meta["sweep"] for t in fig.data if t.meta["sweep"] >= 0)
+    assert sorted(counts.keys()) == list(range(len(sweeps))), (
+        "Sweep indices should span 0..n-1"
+    )
+    assert len(set(counts.values())) == 1, (
+        f"All sweeps should have equal trace counts; got {counts}"
+    )
+
+
+def test_sweep_traces_have_correct_yaxis_assignments() -> None:
+    """Sweep traces are assigned to the correct subplot yaxis.
+
+    The client-side sweep-highlight JS uses gd.data[i].yaxis to group traces
+    by subplot row when resolving which sweep the user clicked.  This test
+    verifies the contract: response traces use 'y', gating traces use 'y2',
+    and stimulus traces use 'y3'.
+    """
+    sweeps = [
+        _make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40, -20]
+    ]
+    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+
+    # Filter by meta.sweep >= 0 to exclude carrier traces at the end.
+    sweep_traces = [t for t in fig.data if t.meta and t.meta.get("sweep", -1) >= 0]
+
+    yaxis_values = {t.yaxis for t in sweep_traces}
+    assert "y" in yaxis_values, "Response traces must use yaxis='y'"
+    assert "y2" in yaxis_values, "Gating traces must use yaxis='y2'"
+    assert "y3" in yaxis_values, "Stimulus traces must use yaxis='y3'"
+
+    # Every sweep trace must have a non-None yaxis.
+    for i, t in enumerate(sweep_traces):
+        assert t.yaxis is not None, f"Trace {i} must have a yaxis assignment"

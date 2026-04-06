@@ -103,6 +103,16 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
         AppState.set_show_ika_gating,
     ),
     (
+        "IKv31 (Kv3.1-type K\u207a)",
+        AppState.ikv31_enabled,
+        "I_IKv31",
+        AppState.show_ikv31_current,
+        AppState.set_show_ikv31_current,
+        "IKv31 gating (nk)",
+        AppState.show_ikv31_gating,
+        AppState.set_show_ikv31_gating,
+    ),
+    (
         "INaP (Persistent Na\u207a)",
         AppState.inap_enabled,
         "I_INaP",
@@ -363,6 +373,21 @@ def sweep_manager() -> rx.Component:
     return rx.vstack(
         rx.hstack(
             _trace_visibility_popover(),
+            rx.tooltip(
+                rx.icon_button(
+                    rx.icon("crosshair"),
+                    on_click=AppState.toggle_hover,
+                    size="1",
+                    variant=rx.cond(AppState.show_hover, "soft", "outline"),
+                    color_scheme=rx.cond(AppState.show_hover, "gray", "gray"),
+                    aria_label="Toggle hover tooltips",
+                ),
+                content=rx.cond(
+                    AppState.show_hover,
+                    "Hide hover tooltips",
+                    "Show hover tooltips",
+                ),
+            ),
             rx.separator(orientation="vertical"),
             rx.button(
                 rx.icon("scroll-text"),

@@ -1,9 +1,22 @@
 """Patch Clamp Simulator.
 
-A package for simulating patch clamp experiments using the Hodgkin-Huxley model.
+A package for simulating patch clamp experiments using conductance-based neuron models.
 """
 
 from . import constants
+from .additional_channels import (
+    make_ical_channel,
+    make_ican_channel,
+    make_icat_channel,
+    make_ih_channel,
+    make_ika_channel,
+    make_ikca_channel,
+    make_ikir_channel,
+    make_ikv31_channel,
+    make_im_channel,
+    make_inap_channel,
+    make_inar_channel,
+)
 from .calcium import CalciumDynamics
 from .channels import (
     GatingVariable,
@@ -12,7 +25,22 @@ from .channels import (
     IonSpecies,
     NernstSpec,
 )
+from .clamp_simulations import (
+    SimulationResult,
+    simulate_batch,
+    simulate_current_clamp,
+    simulate_current_clamp_from_state,
+    simulate_voltage_clamp,
+    simulate_voltage_clamp_from_state,
+)
+from .constants import (
+    CURRENT_CLAMP,
+    CURRENT_PROTOCOLS,
+    VOLTAGE_CLAMP,
+    VOLTAGE_PROTOCOLS,
+)
 from .core_channels import (
+    POSPISCHIL_VT,
     alpha_h,
     alpha_m,
     alpha_n,
@@ -22,51 +50,69 @@ from .core_channels import (
     make_k_channel,
     make_leak_channel,
     make_na_channel,
-)
-from .hodgkin_huxley import HodgkinHuxley
-from .additional_channels import (
-    make_ican_channel,
-    make_ical_channel,
-    make_icat_channel,
-    make_ih_channel,
-    make_ika_channel,
-    make_ikca_channel,
-    make_ikir_channel,
-    make_im_channel,
-    make_inap_channel,
-    make_inar_channel,
-)
-from .clamp_simulations import (
-    simulate_voltage_clamp,
-    simulate_current_clamp,
-    simulate_voltage_clamp_from_state,
-    simulate_current_clamp_from_state,
-    simulate_batch,
+    make_pospischil_k_channel,
+    make_pospischil_na_channel,
+    pospischil_alpha_h,
+    pospischil_alpha_m,
+    pospischil_alpha_n,
+    pospischil_beta_h,
+    pospischil_beta_m,
+    pospischil_beta_n,
 )
 from .electrochemistry import goldman_potential, nernst_potential
+from .neuron import Neuron
+from .neuron_factory import (
+    CHANNEL_REGISTRY,
+    ChannelConfig,
+    NeuronConfig,
+    make_neuron,
+)
+from .presets import (
+    NEURON_PRESET_NAMES,
+    NEURON_PRESETS,
+    NEURON_PROTOCOL_ADJUSTMENTS,
+    PROTOCOL_PRESET_NAMES,
+    PROTOCOL_PRESETS,
+    build_protocol_from_preset,
+)
 from .protocols import (
-    step_current,
-    ramp_current,
-    pulse_train,
-    sinusoidal_current,
+    build_current_protocol,
+    build_voltage_protocol,
     chirp_current,
     noise_current,
+    pulse_train,
+    pulse_train_voltage,
+    ramp_current,
+    ramp_voltage,
+    sinusoidal_current,
+    step_current,
     # Voltage clamp protocols
     step_voltage,
-    ramp_voltage,
-    pulse_train_voltage,
-    iv_curve_protocol,
 )
 
 __all__ = [
     "constants",
+    "CURRENT_CLAMP",
+    "CURRENT_PROTOCOLS",
+    "VOLTAGE_CLAMP",
+    "VOLTAGE_PROTOCOLS",
     "CalciumDynamics",
     "GatingVariable",
     "GoldmanSpec",
     "IonChannel",
     "IonSpecies",
     "NernstSpec",
-    "HodgkinHuxley",
+    "Neuron",
+    "CHANNEL_REGISTRY",
+    "ChannelConfig",
+    "NeuronConfig",
+    "make_neuron",
+    "NEURON_PRESET_NAMES",
+    "NEURON_PRESETS",
+    "NEURON_PROTOCOL_ADJUSTMENTS",
+    "PROTOCOL_PRESET_NAMES",
+    "PROTOCOL_PRESETS",
+    "build_protocol_from_preset",
     "make_ican_channel",
     "make_ical_channel",
     "make_icat_channel",
@@ -74,6 +120,7 @@ __all__ = [
     "make_ika_channel",
     "make_ikca_channel",
     "make_ikir_channel",
+    "make_ikv31_channel",
     "make_im_channel",
     "make_inap_channel",
     "make_inar_channel",
@@ -86,6 +133,16 @@ __all__ = [
     "make_k_channel",
     "make_leak_channel",
     "make_na_channel",
+    "POSPISCHIL_VT",
+    "make_pospischil_k_channel",
+    "make_pospischil_na_channel",
+    "pospischil_alpha_h",
+    "pospischil_alpha_m",
+    "pospischil_alpha_n",
+    "pospischil_beta_h",
+    "pospischil_beta_m",
+    "pospischil_beta_n",
+    "SimulationResult",
     "simulate_voltage_clamp",
     "simulate_current_clamp",
     "simulate_voltage_clamp_from_state",
@@ -93,6 +150,8 @@ __all__ = [
     "simulate_batch",
     "nernst_potential",
     "goldman_potential",
+    "build_current_protocol",
+    "build_voltage_protocol",
     "step_current",
     "ramp_current",
     "pulse_train",
@@ -103,5 +162,4 @@ __all__ = [
     "step_voltage",
     "ramp_voltage",
     "pulse_train_voltage",
-    "iv_curve_protocol",
 ]

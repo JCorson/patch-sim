@@ -3,26 +3,24 @@ name = "patch_sim"
 version = "0.1.0"
 description = "Patch clamp experiment simulator implementing the Hodgkin-Huxley model for neuronal electrophysiology"
 readme = "README.md"
+license = "GPL-3.0-or-later"
 requires-python = ">=3.11"
 dependencies = [
     "numpy",
     "matplotlib",
-    "pandas",
 ]
 
 [tool.ruff]
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "D"]
+select = ["E", "F", "W", "D", "I"]
 ignore = []
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
 [project.optional-dependencies]
-dev = ["ruff", "pytest", "mypy", "pandas-stubs"]
-ui = ["reflex>=0.8", "plotly"]
 numba = [
     "numba",
 ]
@@ -30,20 +28,34 @@ numba = [
 [tool.uv.sources]
 patch_sim = {path = "./patch_sim", editable = true}
 
-[tool.mypy]
-exclude = ["scratch/"]
+[tool.ty.src]
+include = ["./patch_sim", "./patch_sim_ui", "./tests"]
 
-[[tool.mypy.overrides]]
-module = ["patch_sim_ui.*", "reflex.*", "plotly.*", "rxconfig", "numba.*", "patch_sim.numba_kernel"]
-ignore_errors = true
+[[tool.ty.overrides]]
+include = ["patch_sim_ui/**", "tests/test_state.py", "tests/test_plotting.py"]
 
-[[tool.mypy.overrides]]
-# test_state.py uses Reflex internals (_reflex_internal_init) and accesses
-# dynamically-generated AppState attributes (set_duration, set_show_voltage,
-# etc.) that mypy cannot resolve from the class definition alone.
-# test_plotting.py imports plotly directly; plotly has no type stubs.
-module = ["tests.test_state", "tests.test_plotting"]
-ignore_errors = true
+[tool.ty.overrides.analysis]
+replace-imports-with-any = ["reflex.**", "plotly.**", "patch_sim_ui.**"]
+
+# numba is not typed; suppress all errors in the JIT kernel module.
+[[tool.ty.overrides]]
+include = ["patch_sim/numba_kernel.py"]
+
+[tool.ty.overrides.analysis]
+replace-imports-with-any = ["numba.**"]
+
+# NumPy structured arrays use string-key subscript assignment which ty does not
+# model. Suppress the false-positive invalid-assignment errors in files that
+# build or read structured arrays.
+[[tool.ty.overrides]]
+include = [
+    "patch_sim/clamp_simulations.py",
+    "tests/test_plotting.py",
+    "tests/test_state.py",
+]
+
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -53,5 +65,11 @@ filterwarnings = [
 
 [dependency-groups]
 dev = [
+    "pytest>=7",
     "pytest-cov>=7.0.0",
+    "ruff>=0.1",
+]
+ui = [
+    "plotly>=5",
+    "reflex>=0.8",
 ]

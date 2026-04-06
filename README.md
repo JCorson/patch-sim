@@ -3,34 +3,40 @@
 `patch_sim` is a Python library for simulating neuronal electrophysiology using the
 [Hodgkin-Huxley model](https://en.wikipedia.org/wiki/Hodgkin%E2%80%93Huxley_model).
 It models how action potentials arise at a neuron's membrane by simulating the dynamics
-of voltage-gated ion channels (sodium, potassium, and leak) over time.
+of voltage-gated ion channels over time. The core model includes the classic sodium,
+potassium, and leak channels, and can be extended with 10 additional channel types
+(Ih, IKa, INaP, INaR, IM, IKir, IKCa, ICaL, ICaT, ICaN) via a pluggable channel
+architecture.
 
 Key features:
 
 - **Hodgkin-Huxley neuron model** with configurable conductances, ion concentrations,
-  and temperature. Reversal potentials are automatically derived from ion concentration
-  gradients via the Nernst equation.
+  and temperature. Reversal potentials are derived via the Nernst equation, with
+  Goldman-Hodgkin-Katz support for mixed-ion channels (e.g. Ih). Optional intracellular
+  calcium dynamics are coupled to calcium-permeable channels.
 - **Current clamp** simulations: inject a stimulus current and record the resulting
   membrane voltage response.
 - **Voltage clamp** simulations: hold the membrane at a commanded voltage and record the
   resulting ionic currents.
-- A library of **stimulation protocols** covering step, ramp, pulse train, sinusoidal,
-  chirp, noise, I-V curve, and activation waveforms.
-- Simulation results are returned as `pandas.DataFrame` objects indexed by time (ms),
-  making them straightforward to analyze or plot with standard Python tools.
-- Numerically stable handling of the singularity points in the Hodgkin-Huxley rate
-  equations.
+- A library of **stimulation protocols**: current clamp (step, ramp, pulse train,
+  sinusoidal, chirp, noise) and voltage clamp (step, ramp, pulse train, I-V curve).
 
 ---
 
 ## Web UI
 
-`patch_sim` includes an interactive web interface inspired by pClamp electrophysiology software. It lets you configure Hodgkin-Huxley neuron parameters, choose stimulation protocols, run simulations, and view stacked response/stimulus traces with sweep overlay support.
+`patch_sim` includes an interactive web interface inspired by pClamp electrophysiology software.
+
+- Configure neuron parameters and enable/disable additional ion channels with conductance sliders
+- Run current clamp and voltage clamp protocols
+- Sweep overlay with click/hover/keyboard selection
+- Continuous simulation mode for oscilloscope-like real-time recording
+- 6 built-in presets: Action Potential, Subthreshold Response, Repetitive Firing, I-V Curve, Na+ Channel Activation, Frequency Response
 
 ### Installing the UI
 
 ```
-uv sync --frozen --extra=ui
+uv sync --frozen --group=ui
 ```
 
 ### Running the UI
@@ -60,7 +66,7 @@ you are at the top level of the repository.
 #### Installing the development environment
 
 ```
-uv sync --frozen --extra=dev
+uv sync --frozen --group=dev
 ```
 
 This creates a Python `venv` virtual environment under the name `.venv`
@@ -68,7 +74,7 @@ in the top-level directory of the repository.
 
 #### Managing dependencies
 
-To regenerate all project dependencies files, run:
+To regenerate and update project dependencies, run:
 
 ```
 uv lock --upgrade
@@ -104,19 +110,25 @@ black and isort behavior.
 Formatting fixes can be applied using:
 
 ```
-uv tool run ruff format .
-uv tool run ruff check . --fix-only
+uvx ruff format .
+uvx ruff check . --fix-only
 ```
 
 Conformance to the styling rules can be checked with:
 
 ```
-uv tool run ruff check .
-uv tool run ruff format --check .
+uvx ruff check .
+uvx ruff format --check .
 ```
 
 #### Type checking
 
 ```
-uv run --frozen -m mypy .
+uvx ty check
 ```
+
+---
+
+## License
+
+This project is licensed under the [GNU General Public License v3.0 or later](LICENSE).

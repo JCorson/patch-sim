@@ -84,19 +84,19 @@ class StateLogHandler(logging.Handler):
 
 
 def setup_logging() -> None:
-    """Configure the ``patch_sim_ui`` logger with :class:`StateLogHandler`.
+    """Configure ``patch_sim_ui`` and ``patch_sim`` with :class:`StateLogHandler`.
 
-    Creates the logger at DEBUG level and attaches a single
-    :class:`StateLogHandler` instance.  Safe to call multiple times —
+    Creates both loggers at DEBUG level and attaches a single shared
+    :class:`StateLogHandler` instance to each.  Safe to call multiple times —
     subsequent calls are no-ops if the handler is already registered.
     """
-    logger = logging.getLogger("patch_sim_ui")
-    logger.setLevel(logging.DEBUG)
-
-    # Avoid duplicate handlers if setup_logging is called more than once.
-    if any(isinstance(h, StateLogHandler) for h in logger.handlers):
-        return
-
     handler = StateLogHandler()
     handler.setFormatter(logging.Formatter("%(message)s"))
-    logger.addHandler(handler)
+
+    for name in ("patch_sim_ui", "patch_sim"):
+        logger = logging.getLogger(name)
+        logger.setLevel(logging.DEBUG)
+
+        # Avoid duplicate handlers if setup_logging is called more than once.
+        if not any(isinstance(h, StateLogHandler) for h in logger.handlers):
+            logger.addHandler(handler)

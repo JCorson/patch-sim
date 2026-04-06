@@ -7,11 +7,12 @@ protocols that can be used with current clamp simulations.
 import numpy as np
 
 from .common import (
+    DEFAULT_SAMPLING_FREQUENCY,
+    _apply_time_window,
     _calculate_time_parameters,
     _generate_pulse_train_protocol,
     _generate_ramp_protocol,
     _generate_step_protocol,
-    DEFAULT_SAMPLING_FREQUENCY,
 )
 
 
@@ -131,6 +132,8 @@ def sinusoidal_current(
     amplitude: float,
     frequency: float,
     phase: float = 0.0,
+    stimulus_start: float = 0.0,
+    stimulus_duration: float = 0.0,
     sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> np.ndarray:
     """Generate a sinusoidal current protocol.
@@ -138,24 +141,37 @@ def sinusoidal_current(
     Creates a sinusoidal current waveform with specified DC offset, amplitude,
     and frequency, useful for studying frequency response and impedance.
 
+    The waveform starts at `stimulus_start` and lasts for `stimulus_duration`.
+    The pre- and post-stimulus periods are filled with 0 current. When both
+    `stimulus_start` and `stimulus_duration` are 0.0, the waveform fills the
+    entire `duration`.
+
     Args:
         duration: Total duration of the protocol in milliseconds.
         dc_offset: DC offset current in uA/cm^2.
         amplitude: Amplitude of the sinusoidal component in uA/cm^2.
         frequency: Frequency of the sinusoid in Hz.
         phase: Phase offset in radians. Default is 0.0.
+        stimulus_start: Time when the waveform begins in milliseconds.
+            Default is 0.0.
+        stimulus_duration: Duration of the sinusoidal stimulus in milliseconds.
+            Default is 0.0, which fills the recording from stimulus_start to
+            the end of duration.
         sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
 
     Returns:
         Array of current values in uA/cm^2.
     """
-    # Calculate time step and number of points
-    _, time_array = _calculate_time_parameters(duration, sampling_frequency)
+    if stimulus_duration == 0.0:
+        stimulus_duration = duration - stimulus_start
 
-    # Generate sinusoidal current
-    time_array_seconds = time_array / 1000.0  # Convert to seconds
-    current_array = dc_offset + amplitude * np.sin(
-        2 * np.pi * frequency * time_array_seconds + phase
+    num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
+    current_array = np.zeros(num_points)
+
+    stim_mask = _apply_time_window(time_array, stimulus_start, stimulus_duration)
+    stim_times_seconds = (time_array[stim_mask] - stimulus_start) / 1000.0
+    current_array[stim_mask] = dc_offset + amplitude * np.sin(
+        2 * np.pi * frequency * stim_times_seconds + phase
     )
 
     return current_array
@@ -167,6 +183,8 @@ def chirp_current(
     amplitude: float,
     start_frequency: float,
     end_frequency: float,
+    stimulus_start: float = 0.0,
+    stimulus_duration: float = 0.0,
     sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
 ) -> np.ndarray:
     """Generate a chirp (frequency sweep) current protocol.
@@ -174,36 +192,49 @@ def chirp_current(
     Creates a sinusoidal current with linearly increasing frequency,
     useful for measuring frequency response characteristics.
 
+    The waveform starts at `stimulus_start` and lasts for `stimulus_duration`.
+    The pre- and post-stimulus periods are filled with 0 current. The frequency
+    sweep spans `start_frequency` to `end_frequency` over `stimulus_duration`.
+    When both `stimulus_start` and `stimulus_duration` are 0.0, the waveform
+    fills the entire `duration`.
+
     Args:
         duration: Total duration of the protocol in milliseconds.
         dc_offset: DC offset current in uA/cm^2.
         amplitude: Amplitude of the chirp in uA/cm^2.
         start_frequency: Starting frequency in Hz.
         end_frequency: Ending frequency in Hz.
+        stimulus_start: Time when the waveform begins in milliseconds.
+            Default is 0.0.
+        stimulus_duration: Duration of the chirp stimulus in milliseconds.
+            Default is 0.0, which fills the recording from stimulus_start to
+            the end of duration.
         sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
 
     Returns:
         Array of current values in uA/cm^2.
     """
-    # Calculate time step and number of points
-    _, time_array = _calculate_time_parameters(duration, sampling_frequency)
+    if stimulus_duration == 0.0:
+        stimulus_duration = duration - stimulus_start
 
-    # Calculate instantaneous frequency
-    time_array_seconds = time_array / 1000.0  # Convert to seconds
-    freq_slope = (end_frequency - start_frequency) / (duration / 1000.0)
+    num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
+    current_array = np.zeros(num_points)
 
-    # Generate chirp current using proper phase integration
-    # Phase = 2π * ∫f(t)dt where f(t) = f0 + kt
-    # ∫(f0 + kt)dt = f0*t + k*t²/2
+    stim_mask = _apply_time_window(time_array, stimulus_start, stimulus_duration)
+    stim_times_seconds = (time_array[stim_mask] - stimulus_start) / 1000.0
+    stim_duration_seconds = stimulus_duration / 1000.0
+    freq_slope = (end_frequency - start_frequency) / stim_duration_seconds
+
+    # Phase = 2π * ∫f(t)dt where f(t) = f0 + kt; ∫(f0 + kt)dt = f0*t + k*t²/2
     phase = (
         2
         * np.pi
         * (
-            start_frequency * time_array_seconds
-            + 0.5 * freq_slope * time_array_seconds**2
+            start_frequency * stim_times_seconds
+            + 0.5 * freq_slope * stim_times_seconds**2
         )
     )
-    current_array = dc_offset + amplitude * np.sin(phase)
+    current_array[stim_mask] = dc_offset + amplitude * np.sin(phase)
 
     return current_array
 
@@ -212,6 +243,8 @@ def noise_current(
     duration: float,
     mean_current: float,
     std_current: float,
+    stimulus_start: float = 0.0,
+    stimulus_duration: float = 0.0,
     sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
     seed: int | None = None,
 ) -> np.ndarray:
@@ -220,23 +253,37 @@ def noise_current(
     Creates a current protocol with Gaussian-distributed random values,
     useful for studying stochastic resonance and noise effects.
 
+    The noise starts at `stimulus_start` and lasts for `stimulus_duration`.
+    The pre- and post-stimulus periods are filled with 0 current. When both
+    `stimulus_start` and `stimulus_duration` are 0.0, the noise fills the
+    entire `duration`.
+
     Args:
         duration: Total duration of the protocol in milliseconds.
         mean_current: Mean current value in uA/cm^2.
         std_current: Standard deviation of current in uA/cm^2.
+        stimulus_start: Time when the noise begins in milliseconds.
+            Default is 0.0.
+        stimulus_duration: Duration of the noise stimulus in milliseconds.
+            Default is 0.0, which fills the recording from stimulus_start to
+            the end of duration.
         sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
         seed: Random seed for reproducibility. If None, uses random seed.
 
     Returns:
         Array of current values in uA/cm^2.
     """
+    if stimulus_duration == 0.0:
+        stimulus_duration = duration - stimulus_start
+
     # Create a local RNG instance to avoid mutating global state
     rng = np.random.default_rng(seed)
 
-    # Calculate time step and number of points
-    num_points, _ = _calculate_time_parameters(duration, sampling_frequency)
+    num_points, time_array = _calculate_time_parameters(duration, sampling_frequency)
+    current_array = np.zeros(num_points)
 
-    # Generate Gaussian noise
-    current_array = rng.normal(mean_current, std_current, num_points)
+    stim_mask = _apply_time_window(time_array, stimulus_start, stimulus_duration)
+    n_stim_points = int(np.sum(stim_mask))
+    current_array[stim_mask] = rng.normal(mean_current, std_current, n_stim_points)
 
     return current_array

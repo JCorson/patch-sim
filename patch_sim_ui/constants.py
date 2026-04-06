@@ -1,8 +1,12 @@
 """UI constants: parameter ranges and colour palettes."""
 
-#: Clamp mode identifier strings used throughout state, plotting, and UI.
-CURRENT_CLAMP: str = "Current Clamp"
-VOLTAGE_CLAMP: str = "Voltage Clamp"
+# Re-export domain constants from core so existing UI imports continue to work.
+from patch_sim.constants import (  # noqa: F401
+    CURRENT_CLAMP,
+    CURRENT_PROTOCOLS,
+    VOLTAGE_CLAMP,
+    VOLTAGE_PROTOCOLS,
+)
 
 # Slider ranges for neuron parameters
 PARAM_RANGES: dict[str, tuple[float, float, float]] = {
@@ -24,6 +28,7 @@ PARAM_RANGES: dict[str, tuple[float, float, float]] = {
     # Additional channel conductances
     "ih_g_max": (0.0, 1.0, 0.01),
     "ika_g_max": (0.0, 100.0, 0.1),
+    "ikv31_g_max": (0.0, 100.0, 0.5),
     "inap_g_max": (0.0, 5.0, 0.01),
     "inar_g_max": (0.0, 5.0, 0.01),
     "im_g_max": (0.0, 5.0, 0.01),
@@ -33,24 +38,6 @@ PARAM_RANGES: dict[str, tuple[float, float, float]] = {
     "icat_g_max": (0.0, 5.0, 0.01),
     "ican_g_max": (0.0, 5.0, 0.01),
 }
-
-# Current clamp protocol types
-CURRENT_PROTOCOLS: list[str] = [
-    "Step",
-    "Ramp",
-    "Pulse Train",
-    "Sinusoidal",
-    "Chirp",
-    "Noise",
-]
-
-# Voltage clamp protocol types
-VOLTAGE_PROTOCOLS: list[str] = [
-    "Step",
-    "Ramp",
-    "Pulse Train",
-    "I-V Curve",
-]
 
 # Fixed colour for the Current Clamp voltage trace.  Matches the blue used for
 # I_total in Voltage Clamp so the primary response trace looks consistent across
@@ -70,6 +57,7 @@ CHANNEL_COLORS: dict[str, str] = {
     "leak_current": "#7f7f7f",  # grey
     "Ih": "#d62728",  # red
     "IKa": "#9467bd",  # purple
+    "IKv31": "#DAA520",  # goldenrod
     "INaP": "#e377c2",  # pink
     "INaR": "#bcbd22",  # olive
     "IM": "#17becf",  # cyan
@@ -92,6 +80,8 @@ GATING_VAR_COLORS: dict[str, str] = {
     # IKa
     "a": "#8c564b",  # brown
     "b": "#e377c2",  # pink
+    # IKv31
+    "nk": "#DAA520",  # goldenrod
     # INaP
     "p": "#7f7f7f",  # grey
     # INaR
@@ -143,3 +133,13 @@ SWEEP_COLORS: list[str] = [
     "#9e9e9e",
     "#707070",
 ]
+
+# Sweep highlight / dim styling for the interactive sweep-selection feature.
+HIGHLIGHT_DIM_OPACITY: float = 0.15
+"""Opacity applied to non-selected sweeps after a click selection."""
+
+HIGHLIGHT_HOVER_WIDTH: float = 4.0
+"""Line width (px) applied to the hovered sweep during a hover preview."""
+
+HIGHLIGHT_DIM_WIDTH: float = 0.5
+"""Line width (px) applied to dimmed (non-selected) sweep traces."""

@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 
 from patch_sim.protocols import (
-    iv_curve_protocol,
     pulse_train_voltage,
     ramp_voltage,
     step_voltage,
@@ -240,77 +239,6 @@ class TestPulseTrainVoltage:
                 )
                 if np.any(pulse_mask):
                     assert np.allclose(voltage[pulse_mask], pulse_amplitude)
-
-
-class TestIVCurveProtocol:
-    """Test cases for iv_curve_protocol function."""
-
-    def test_basic_iv_curve(self):
-        """Test basic I-V curve protocol generation."""
-        step_duration = 5.0  # ms
-        voltage_min = -80.0  # mV
-        voltage_max = 40.0  # mV
-        voltage_step = 20.0  # mV
-        holding_voltage = -70.0  # mV
-        sampling_frequency = 10000.0  # Hz
-
-        voltage = iv_curve_protocol(
-            step_duration=step_duration,
-            voltage_min=voltage_min,
-            voltage_max=voltage_max,
-            voltage_step=voltage_step,
-            holding_voltage=holding_voltage,
-            sampling_frequency=sampling_frequency,
-        )
-
-        # Check that protocol contains expected voltage levels
-        n_steps = round((voltage_max - voltage_min) / voltage_step) + 1
-        expected_voltages = np.linspace(voltage_min, voltage_max, n_steps)
-        unique_voltages = np.unique(voltage)
-
-        # Should contain holding voltage and all test voltages
-        expected_unique = set([holding_voltage] + list(expected_voltages))
-        actual_unique = set()
-        for val in unique_voltages:
-            for exp_val in expected_unique:
-                if np.isclose(val, exp_val, atol=1e-10):
-                    actual_unique.add(exp_val)
-                    break
-
-        assert len(actual_unique) >= len(expected_voltages)
-
-    def test_iv_curve_timing(self):
-        """Test I-V curve protocol timing."""
-        step_duration = 3.0  # ms
-        voltage_min = -60.0  # mV
-        voltage_max = 0.0  # mV
-        voltage_step = 30.0  # mV  # Only 3 steps: -60, -30, 0
-        pre_pulse_duration = 2.0  # ms
-        post_pulse_duration = 1.0  # ms
-        holding_voltage = -70.0  # mV
-        sampling_frequency = 10000.0  # Hz
-
-        voltage = iv_curve_protocol(
-            step_duration=step_duration,
-            voltage_min=voltage_min,
-            voltage_max=voltage_max,
-            voltage_step=voltage_step,
-            pre_pulse_duration=pre_pulse_duration,
-            post_pulse_duration=post_pulse_duration,
-            holding_voltage=holding_voltage,
-            sampling_frequency=sampling_frequency,
-        )
-
-        # Calculate expected duration
-        n_steps = round((voltage_max - voltage_min) / voltage_step) + 1
-        expected_voltages = np.linspace(voltage_min, voltage_max, n_steps)
-        sweep_duration = pre_pulse_duration + step_duration + post_pulse_duration
-        expected_total_duration = sweep_duration * len(expected_voltages)
-
-        # Check total duration
-        time_step = 1000.0 / sampling_frequency
-        actual_duration = (len(voltage) - 1) * time_step
-        assert np.isclose(actual_duration, expected_total_duration, atol=time_step)
 
 
 class TestVoltageProtocolIntegration:

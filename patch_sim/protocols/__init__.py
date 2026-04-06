@@ -4,6 +4,7 @@ This package provides functions to generate typical stimulation protocols
 that can be used with current and voltage clamp simulations.
 """
 
+from .builders import build_current_protocol, build_voltage_protocol
 from .current import (
     chirp_current,
     noise_current,
@@ -13,13 +14,15 @@ from .current import (
     step_current,
 )
 from .voltage import (
-    iv_curve_protocol,
     pulse_train_voltage,
     ramp_voltage,
     step_voltage,
 )
 
 __all__ = [
+    # Protocol builders
+    "build_current_protocol",
+    "build_voltage_protocol",
     # Current clamp protocols
     "step_current",
     "ramp_current",
@@ -31,5 +34,4 @@ __all__ = [
     "step_voltage",
     "ramp_voltage",
     "pulse_train_voltage",
-    "iv_curve_protocol",
 ]

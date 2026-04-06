@@ -12,7 +12,6 @@ registration does not see a non-testing environment.
 import os
 
 import numpy as np
-import pandas as pd
 import pytest
 
 # Must be set before importing Reflex/AppState so the metaclass and init
@@ -21,6 +20,13 @@ os.environ.setdefault("PYTEST_CURRENT_TEST", "test_state.py::setup")
 
 pytest.importorskip("reflex")
 
+from patch_sim.constants import (
+    CORTICAL_PYRAMIDAL,
+    DOPAMINERGIC,
+    FAST_SPIKING_INTERNEURON,
+    PURKINJE,
+    THALAMIC_RELAY,
+)
 from patch_sim_ui import constants  # noqa: E402
 from patch_sim_ui.log_handler import UILogRecord  # noqa: E402
 from patch_sim_ui.plotting import Sweep  # noqa: E402
@@ -49,20 +55,31 @@ def _make_sweep(label: str = "test", color: str = "#000000") -> Sweep:
     n = 100
     t = np.linspace(0, 50, n)
     zeros = np.zeros(n)
-    df = pd.DataFrame(
-        {
-            "time": t,
-            "voltage": zeros,
-            "total_current": zeros,
-            "Na_current": zeros,
-            "K_current": zeros,
-            "leak_current": zeros,
-            "potassium_activation": zeros,
-            "sodium_activation": zeros,
-            "sodium_inactivation": zeros,
-        }
-    )
-    return Sweep.from_dataframe(df, zeros, label, color, "Current Clamp")
+    fields = [
+        ("time", np.float64),
+        ("voltage", np.float64),
+        ("Itotal", np.float64),
+        ("INa", np.float64),
+        ("IK", np.float64),
+        ("Ileak", np.float64),
+        ("n", np.float64),
+        ("m", np.float64),
+        ("h", np.float64),
+    ]
+    result = np.empty(n, dtype=np.dtype(fields))
+    result["time"] = t
+    for name in (
+        "voltage",
+        "Itotal",
+        "INa",
+        "IK",
+        "Ileak",
+        "n",
+        "m",
+        "h",
+    ):
+        result[name] = zeros
+    return Sweep.from_result(result, zeros, label, color, "Current Clamp")
 
 
 # ---------------------------------------------------------------------------
@@ -73,38 +90,38 @@ def _make_sweep(label: str = "test", color: str = "#000000") -> Sweep:
 def test_set_float_accepts_plain_float() -> None:
     """_set_float stores a plain float value as-is."""
     s = _make_state()
-    s._set_float("duration", 99.5)
-    assert s.duration == pytest.approx(99.5)
+    s._set_float("stimulus_duration", 99.5)
+    assert s.stimulus_duration == pytest.approx(99.5)
 
 
 def test_set_float_accepts_string() -> None:
     """_set_float parses a string to float and stores it."""
     s = _make_state()
-    s._set_float("duration", "77.25")
-    assert s.duration == pytest.approx(77.25)
+    s._set_float("stimulus_duration", "77.25")
+    assert s.stimulus_duration == pytest.approx(77.25)
 
 
 def test_set_float_accepts_list_uses_first_element() -> None:
     """_set_float uses the first element when given a list (slider events)."""
     s = _make_state()
-    s._set_float("duration", [42.0, 50.0])
-    assert s.duration == pytest.approx(42.0)
+    s._set_float("stimulus_duration", [42.0, 50.0])
+    assert s.stimulus_duration == pytest.approx(42.0)
 
 
 def test_set_float_ignores_unparseable_string() -> None:
     """_set_float silently ignores values that cannot be converted to float."""
     s = _make_state()
-    original = s.duration
-    s._set_float("duration", "not_a_number")
-    assert s.duration == pytest.approx(original)
+    original = s.stimulus_duration
+    s._set_float("stimulus_duration", "not_a_number")
+    assert s.stimulus_duration == pytest.approx(original)
 
 
 def test_set_float_ignores_none() -> None:
     """_set_float silently ignores None without raising."""
     s = _make_state()
-    original = s.duration
-    s._set_float("duration", None)  # type: ignore[arg-type]
-    assert s.duration == pytest.approx(original)
+    original = s.stimulus_duration
+    s._set_float("stimulus_duration", None)
+    assert s.stimulus_duration == pytest.approx(original)
 
 
 # ---------------------------------------------------------------------------
@@ -113,24 +130,24 @@ def test_set_float_ignores_none() -> None:
 
 
 def test_generated_float_setter_stores_value() -> None:
-    """set_duration(50.0) stores 50.0 in self.duration."""
+    """set_stimulus_duration(50.0) stores 50.0 in self.stimulus_duration."""
     s = _make_state()
-    s.set_duration(50.0)
-    assert s.duration == pytest.approx(50.0)
+    s.set_stimulus_duration(50.0)
+    assert s.stimulus_duration == pytest.approx(50.0)
 
 
 def test_generated_float_setter_accepts_string() -> None:
     """Generated float setter parses a string value via _set_float."""
     s = _make_state()
-    s.set_duration("123.4")
-    assert s.duration == pytest.approx(123.4)
+    s.set_stimulus_duration("123.4")
+    assert s.stimulus_duration == pytest.approx(123.4)
 
 
 def test_generated_float_setter_accepts_list() -> None:
     """Generated float setter accepts a slider list and uses the first element."""
     s = _make_state()
-    s.set_duration([25.0, 50.0])
-    assert s.duration == pytest.approx(25.0)
+    s.set_stimulus_duration([25.0, 50.0])
+    assert s.stimulus_duration == pytest.approx(25.0)
 
 
 # ---------------------------------------------------------------------------
@@ -203,79 +220,237 @@ def test_clear_sweeps_on_empty_list_does_not_raise() -> None:
 
 
 # ---------------------------------------------------------------------------
-# load_preset
+# load_protocol_preset
 # ---------------------------------------------------------------------------
 
 
-def test_load_preset_action_potential_sets_duration() -> None:
-    """Loading 'Action Potential' preset sets duration to 50.0."""
+def test_load_protocol_preset_action_potential_sets_stimulus_duration() -> None:
+    """Loading 'Action Potential' preset sets stimulus_duration to 30.0."""
     s = _make_state()
-    s.load_preset("Action Potential")
-    assert s.duration == pytest.approx(50.0)
+    s.load_protocol_preset("Action Potential")
+    assert s.stimulus_duration == pytest.approx(30.0)
 
 
-def test_load_preset_action_potential_sets_clamp_mode() -> None:
+def test_load_protocol_preset_action_potential_sets_clamp_mode() -> None:
     """Loading 'Action Potential' preset sets clamp_mode to 'Current Clamp'."""
     s = _make_state()
-    s.load_preset("Action Potential")
+    s.load_protocol_preset("Action Potential")
     assert s.clamp_mode == "Current Clamp"
 
 
-def test_load_preset_repetitive_firing_sets_duration() -> None:
-    """Loading 'Repetitive Firing' preset sets duration to 200.0."""
+def test_load_protocol_preset_repetitive_firing_sets_stimulus_duration() -> None:
+    """Loading 'Repetitive Firing' preset sets stimulus_duration to 180.0."""
     s = _make_state()
-    s.load_preset("Repetitive Firing")
-    assert s.duration == pytest.approx(200.0)
+    s.load_protocol_preset("Repetitive Firing")
+    assert s.stimulus_duration == pytest.approx(180.0)
 
 
-def test_load_preset_iv_curve_sets_voltage_clamp_mode() -> None:
+def test_load_protocol_preset_iv_curve_sets_voltage_clamp_mode() -> None:
     """Loading 'I-V Curve' preset sets clamp_mode to 'Voltage Clamp'."""
     s = _make_state()
-    s.load_preset("I-V Curve")
+    s.load_protocol_preset("I-V Curve")
     assert s.clamp_mode == "Voltage Clamp"
 
 
-def test_load_preset_clears_current_sweeps() -> None:
-    """load_preset resets current_sweeps to an empty list."""
+def test_load_protocol_preset_clears_current_sweeps() -> None:
+    """load_protocol_preset resets current_sweeps to an empty list."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
-    s.load_preset("Action Potential")
+    s.load_protocol_preset("Action Potential")
     assert len(s.current_sweeps) == 0
 
 
-def test_load_preset_clears_saved_sweeps() -> None:
-    """load_preset resets saved_sweeps to an empty list."""
+def test_load_protocol_preset_clears_saved_sweeps() -> None:
+    """load_protocol_preset resets saved_sweeps to an empty list."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     s.add_sweep()
-    s.load_preset("Action Potential")
+    s.load_protocol_preset("Action Potential")
     assert len(s.saved_sweeps) == 0
 
 
-def test_load_preset_clears_stored_traces() -> None:
-    """load_preset resets stored_traces to an empty list."""
+def test_load_protocol_preset_clears_stored_traces() -> None:
+    """load_protocol_preset resets stored_traces to an empty list."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     s.store_trace()
     assert len(s.stored_traces) == 1
-    s.load_preset("Action Potential")
+    s.load_protocol_preset("Action Potential")
     assert len(s.stored_traces) == 0
 
 
-def test_load_preset_resets_cont_has_state() -> None:
-    """load_preset resets _cont_has_state so the next continuous iter starts fresh."""
+def test_load_protocol_preset_resets_cont_has_state() -> None:
+    """load_protocol_preset resets _cont_has_state before the next continuous run."""
     s = _make_state()
     s._cont_has_state = True
-    s.load_preset("Action Potential")
+    s.load_protocol_preset("Action Potential")
     assert s._cont_has_state is False
 
 
-def test_load_preset_unknown_name_is_ignored() -> None:
-    """load_preset silently ignores an unknown preset name."""
+def test_load_protocol_preset_unknown_name_is_ignored() -> None:
+    """load_protocol_preset silently ignores an unknown preset name."""
     s = _make_state()
-    original_duration = s.duration
-    s.load_preset("NonExistentPreset")
-    assert s.duration == pytest.approx(original_duration)
+    original = s.stimulus_duration
+    s.load_protocol_preset("NonExistentPreset")
+    assert s.stimulus_duration == pytest.approx(original)
+
+
+# ---------------------------------------------------------------------------
+# load_neuron_preset
+# ---------------------------------------------------------------------------
+
+
+def test_load_neuron_preset_fast_spiking_interneuron() -> None:
+    """Fast-Spiking Interneuron preset enables IKv31; protocol fields are unchanged."""
+    s = _make_state()
+    original_duration = s.stimulus_duration
+    original_clamp = s.clamp_mode
+    s.load_neuron_preset(FAST_SPIKING_INTERNEURON)
+    assert s.ikv31_enabled is True
+    assert s.ika_enabled is False
+    assert s.stimulus_duration == pytest.approx(original_duration)
+    assert s.clamp_mode == original_clamp
+
+
+def test_load_neuron_preset_sets_active_neuron_type() -> None:
+    """load_neuron_preset records the selected neuron type on the state."""
+    s = _make_state()
+    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert s.active_neuron_type == CORTICAL_PYRAMIDAL
+
+
+def test_load_neuron_preset_resets_previously_enabled_channels() -> None:
+    """Loading a second neuron preset disables channels from the first."""
+    s = _make_state()
+    s.load_neuron_preset(FAST_SPIKING_INTERNEURON)
+    assert s.ikv31_enabled is True
+    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert s.ikv31_enabled is False
+
+
+def test_load_neuron_preset_pyramidal_neuron() -> None:
+    """Pyramidal Neuron preset enables Ih, INaP, and IM channels."""
+    s = _make_state()
+    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert s.ih_enabled is True
+    assert s.inap_enabled is True
+    assert s.im_enabled is True
+
+
+def test_load_neuron_preset_purkinje_cell() -> None:
+    """Purkinje Cell preset enables ICaL, ICaT, and IKCa channels."""
+    s = _make_state()
+    s.load_neuron_preset(PURKINJE)
+    assert s.ical_enabled is True
+    assert s.icat_enabled is True
+    assert s.ikca_enabled is True
+
+
+def test_load_neuron_preset_dopaminergic_neuron() -> None:
+    """Dopaminergic Neuron preset enables Ih and IM channels."""
+    s = _make_state()
+    s.load_neuron_preset(DOPAMINERGIC)
+    assert s.ih_enabled is True
+    assert s.im_enabled is True
+
+
+def test_load_neuron_preset_thalamic_relay() -> None:
+    """Thalamic Relay preset enables ICaT and Ih channels."""
+    s = _make_state()
+    s.load_neuron_preset(THALAMIC_RELAY)
+    assert s.icat_enabled is True
+    assert s.ih_enabled is True
+
+
+def test_load_neuron_preset_clears_current_sweeps() -> None:
+    """load_neuron_preset resets current_sweeps to an empty list."""
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert len(s.current_sweeps) == 0
+
+
+def test_load_neuron_preset_unknown_name_is_ignored() -> None:
+    """load_neuron_preset silently ignores an unknown preset name."""
+    s = _make_state()
+    before = s.active_neuron_type
+    s.load_neuron_preset("NonExistentNeuron")
+    assert s.active_neuron_type == before
+
+
+def test_load_neuron_preset_preserves_saved_sweeps() -> None:
+    """load_neuron_preset retains saved sweeps so neuron types can be compared."""
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    s.add_sweep()
+    assert len(s.saved_sweeps) == 1
+    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert len(s.saved_sweeps) == 1
+
+
+def test_load_neuron_preset_preserves_stored_traces() -> None:
+    """load_neuron_preset retains stored traces so neuron types can be compared."""
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    s.store_trace()
+    assert len(s.stored_traces) == 1
+    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert len(s.stored_traces) == 1
+
+
+def test_add_sweep_label_includes_neuron_type() -> None:
+    """add_sweep includes the active neuron type in the sweep label."""
+    s = _make_state()
+    s.current_sweeps = [_make_sweep()]
+    s.load_neuron_preset(FAST_SPIKING_INTERNEURON)
+    s.current_sweeps = [_make_sweep()]
+    s.add_sweep()
+    assert FAST_SPIKING_INTERNEURON in s.saved_sweeps[0].label
+
+
+def test_store_trace_label_includes_neuron_type() -> None:
+    """store_trace includes the active neuron type in the stored trace label."""
+    s = _make_state()
+    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    s.current_sweeps = [_make_sweep()]
+    s.store_trace()
+    assert CORTICAL_PYRAMIDAL in s.stored_traces[0].label
+
+
+# ---------------------------------------------------------------------------
+# Neuron-type protocol adjustments
+# ---------------------------------------------------------------------------
+
+
+def test_protocol_preset_with_active_neuron_type_applies_adjustment() -> None:
+    """Repetitive Firing with Thalamic Relay active uses hyperpolarizing current."""
+    s = _make_state()
+    s.load_neuron_preset(THALAMIC_RELAY)
+    s.load_protocol_preset("Repetitive Firing")
+    assert s.min_stimulus < 0.0
+
+
+def test_protocol_preset_without_active_neuron_type_uses_base_params() -> None:
+    """Repetitive Firing without an active neuron type uses the base stimulus."""
+    s = _make_state()
+    s.load_protocol_preset("Repetitive Firing")
+    assert s.min_stimulus == pytest.approx(15.0)
+
+
+def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> None:
+    """Action Potential with Thalamic Relay active falls through to base duration."""
+    s = _make_state()
+    s.load_neuron_preset(THALAMIC_RELAY)
+    s.load_protocol_preset("Action Potential")
+    assert s.stimulus_duration == pytest.approx(30.0)
+
+
+def test_protocol_preset_dopaminergic_repetitive_firing_uses_long_duration() -> None:
+    """Dopaminergic Neuron + Repetitive Firing sets stimulus_duration to 480 ms."""
+    s = _make_state()
+    s.load_neuron_preset(DOPAMINERGIC)
+    s.load_protocol_preset("Repetitive Firing")
+    assert s.stimulus_duration == pytest.approx(480.0)
 
 
 # ---------------------------------------------------------------------------
@@ -293,21 +468,21 @@ def test_store_trace_appends_to_stored_traces() -> None:
 
 
 def test_store_trace_sets_stored_label() -> None:
-    """store_trace labels the stored entry 'Stored 1'."""
+    """store_trace labels the stored entry with index and neuron type."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     s.store_trace()
-    assert s.stored_traces[0].label == "Stored 1"
+    assert s.stored_traces[0].label == f"Stored 1 ({s.active_neuron_type})"
 
 
 def test_store_trace_twice_increments_label() -> None:
-    """Calling store_trace twice creates 'Stored 1' and 'Stored 2'."""
+    """Calling store_trace twice creates sequentially numbered labels."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     s.store_trace()
     s.store_trace()
     assert len(s.stored_traces) == 2
-    assert s.stored_traces[1].label == "Stored 2"
+    assert s.stored_traces[1].label == f"Stored 2 ({s.active_neuron_type})"
 
 
 def test_store_trace_does_nothing_when_no_result() -> None:
@@ -373,7 +548,7 @@ def test_set_clamp_mode_to_current_resets_protocol_type() -> None:
     """set_clamp_mode('Current Clamp') resets protocol_type to the first CC option."""
     s = _make_state()
     s.clamp_mode = "Voltage Clamp"
-    s.protocol_type = "I-V Curve"
+    s.protocol_type = "Ramp"
     s.set_clamp_mode("Current Clamp")
     assert s.protocol_type == constants.CURRENT_PROTOCOLS[0]
 
@@ -409,11 +584,24 @@ def test_protocol_options_voltage_clamp() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_can_run_continuous_true_for_step() -> None:
-    """can_run_continuous is True for the Step protocol."""
+def test_can_run_continuous_true_for_step_single_sweep() -> None:
+    """can_run_continuous is True for a single-step Step protocol (min == max)."""
     s = _make_state()
     s.protocol_type = "Step"
+    s.min_stimulus = 10.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 0.0
     assert s.can_run_continuous is True
+
+
+def test_can_run_continuous_false_for_step_multi_sweep() -> None:
+    """can_run_continuous is False for a multi-sweep Step protocol."""
+    s = _make_state()
+    s.protocol_type = "Step"
+    s.min_stimulus = -10.0
+    s.max_stimulus = 20.0
+    s.stimulus_step = 2.5
+    assert s.can_run_continuous is False
 
 
 def test_can_run_continuous_true_for_ramp() -> None:
@@ -423,11 +611,90 @@ def test_can_run_continuous_true_for_ramp() -> None:
     assert s.can_run_continuous is True
 
 
-def test_can_run_continuous_false_for_iv_curve() -> None:
-    """can_run_continuous is False for the I-V Curve protocol."""
+# ---------------------------------------------------------------------------
+# Stimulus range setters — constraint logic
+# ---------------------------------------------------------------------------
+
+
+def test_set_max_stimulus_auto_sets_step_when_range_opens() -> None:
+    """set_max_stimulus auto-sets stimulus_step to 1.0 when min != max and step is 0."""
     s = _make_state()
-    s.protocol_type = "I-V Curve"
-    assert s.can_run_continuous is False
+    s.min_stimulus = 10.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 0.0
+    s.set_max_stimulus(20.0)
+    assert s.max_stimulus == 20.0
+    assert s.stimulus_step == 1.0
+
+
+def test_set_min_stimulus_auto_sets_step_when_range_opens() -> None:
+    """set_min_stimulus auto-sets stimulus_step to 1.0 when min != max and step is 0."""
+    s = _make_state()
+    s.min_stimulus = 10.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 0.0
+    s.set_min_stimulus(0.0)
+    assert s.min_stimulus == 0.0
+    assert s.stimulus_step == 1.0
+
+
+def test_set_max_stimulus_does_not_change_step_when_already_nonzero() -> None:
+    """set_max_stimulus leaves stimulus_step unchanged when it is already non-zero."""
+    s = _make_state()
+    s.min_stimulus = 0.0
+    s.max_stimulus = 20.0
+    s.stimulus_step = 5.0
+    s.set_max_stimulus(30.0)
+    assert s.stimulus_step == 5.0
+
+
+def test_set_stimulus_step_zero_rejected_when_range_open() -> None:
+    """set_stimulus_step resets to 1.0 when 0 is submitted in multi-sweep mode.
+
+    Resetting to 1.0 (rather than keeping the previous value) guarantees a
+    state change, which forces Reflex to emit a delta and snap the controlled
+    input back to the validated value.
+    """
+    s = _make_state()
+    s.min_stimulus = 0.0
+    s.max_stimulus = 20.0
+    s.stimulus_step = 5.0
+    s.set_stimulus_step(0.0)
+    assert s.stimulus_step == 1.0
+
+
+def test_set_stimulus_step_negative_rejected_when_range_open() -> None:
+    """set_stimulus_step resets to 1.0 for negative values in multi-sweep mode."""
+    s = _make_state()
+    s.min_stimulus = 0.0
+    s.max_stimulus = 20.0
+    s.stimulus_step = 5.0
+    s.set_stimulus_step(-1.0)
+    assert s.stimulus_step == 1.0
+
+
+def test_set_stimulus_step_rejection_always_changes_state() -> None:
+    """Rejected step values always mutate stimulus_step so Reflex emits a delta.
+
+    Even when the previous step was already 1.0, a rejected value must still
+    produce a state change so the frontend controlled input snaps back.
+    """
+    s = _make_state()
+    s.min_stimulus = 0.0
+    s.max_stimulus = 20.0
+    s.stimulus_step = 1.0
+    s.set_stimulus_step(0.0)
+    assert s.stimulus_step == 1.0
+
+
+def test_set_stimulus_step_zero_accepted_when_single_sweep() -> None:
+    """set_stimulus_step accepts 0 when min_stimulus == max_stimulus."""
+    s = _make_state()
+    s.min_stimulus = 10.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 5.0
+    s.set_stimulus_step(0.0)
+    assert s.stimulus_step == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -563,20 +830,133 @@ def test_filtered_log_entries_empty_when_no_entries() -> None:
 
 
 # ---------------------------------------------------------------------------
-# cancel_simulation
+# toggle_hover
 # ---------------------------------------------------------------------------
 
 
-def test_cancel_requested_default_is_false() -> None:
-    """_cancel_requested is False by default."""
+def test_show_hover_defaults_to_true() -> None:
+    """show_hover is True on a freshly created AppState."""
     s = _make_state()
-    assert s._cancel_requested is False
+    assert s.show_hover is True
 
 
-def test_cancel_simulation_sets_flag() -> None:
-    """cancel_simulation sets _cancel_requested to True."""
-    import asyncio
-
+def test_toggle_hover_disables_when_on() -> None:
+    """toggle_hover sets show_hover to False when it was True."""
     s = _make_state()
-    asyncio.run(s.cancel_simulation())
-    assert s._cancel_requested is True
+    assert s.show_hover is True
+    s.toggle_hover()
+    assert s.show_hover is False
+
+
+def test_toggle_hover_enables_when_off() -> None:
+    """toggle_hover sets show_hover to True when it was False."""
+    s = _make_state()
+    s.show_hover = False
+    s.toggle_hover()
+    assert s.show_hover is True
+
+
+def test_toggle_hover_returns_call_script() -> None:
+    """toggle_hover returns a non-None value (the rx.call_script event)."""
+    s = _make_state()
+    result = s.toggle_hover()
+    assert result is not None
+
+
+def test_toggle_hover_twice_restores_original_state() -> None:
+    """Calling toggle_hover twice leaves show_hover unchanged."""
+    s = _make_state()
+    original = s.show_hover
+    s.toggle_hover()
+    s.toggle_hover()
+    assert s.show_hover is original
+
+
+# ---------------------------------------------------------------------------
+# _build_protocols label generation
+# ---------------------------------------------------------------------------
+
+
+def test_build_protocols_single_sweep_current_clamp_has_empty_label() -> None:
+    """Single-sweep current clamp protocol returns an empty sweep label."""
+    s = _make_state()
+    s.clamp_mode = "Current Clamp"
+    s.protocol_type = "Step"
+    s.min_stimulus = 10.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 0.0
+    result = s._build_protocols()
+    assert len(result) == 1
+    assert result[0][1] == ""
+
+
+def test_build_protocols_multi_sweep_current_clamp_labels_contain_unit() -> None:
+    """Multi-sweep current clamp Step protocol labels include µA/cm² unit."""
+    s = _make_state()
+    s.clamp_mode = "Current Clamp"
+    s.protocol_type = "Step"
+    s.min_stimulus = 0.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 5.0
+    result = s._build_protocols()
+    # 0 to 10 in steps of 5 → [0, 5, 10] = 3 sweeps
+    assert len(result) == 3
+    for _arr, label in result:
+        assert label != ""
+        assert "µA/cm²" in label
+
+
+def test_build_protocols_multi_sweep_current_clamp_label_values() -> None:
+    """Multi-sweep current clamp labels match the actual stimulus values."""
+    s = _make_state()
+    s.clamp_mode = "Current Clamp"
+    s.protocol_type = "Step"
+    s.min_stimulus = 0.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 5.0
+    result = s._build_protocols()
+    labels = [label for _arr, label in result]
+    assert labels == ["+0.0 µA/cm²", "+5.0 µA/cm²", "+10.0 µA/cm²"]
+
+
+def test_build_protocols_single_sweep_voltage_clamp_has_empty_label() -> None:
+    """Single-sweep voltage clamp protocol returns an empty sweep label."""
+    s = _make_state()
+    s.clamp_mode = "Voltage Clamp"
+    s.protocol_type = "Step"
+    s.min_stimulus = -70.0
+    s.max_stimulus = -70.0
+    s.stimulus_step = 0.0
+    result = s._build_protocols()
+    assert len(result) == 1
+    assert result[0][1] == ""
+
+
+def test_build_protocols_multi_sweep_voltage_clamp_labels_contain_unit() -> None:
+    """Multi-sweep voltage clamp Step protocol labels include mV unit."""
+    s = _make_state()
+    s.clamp_mode = "Voltage Clamp"
+    s.protocol_type = "Step"
+    s.min_stimulus = -40.0
+    s.max_stimulus = 40.0
+    s.stimulus_step = 20.0
+    result = s._build_protocols()
+    # -40 to +40 in steps of 20 → 5 sweeps
+    assert len(result) == 5
+    for _arr, label in result:
+        assert label != ""
+        assert "mV" in label
+
+
+def test_build_protocols_multi_sweep_voltage_clamp_label_values() -> None:
+    """Multi-sweep voltage clamp labels match the actual voltage step values."""
+    s = _make_state()
+    s.clamp_mode = "Voltage Clamp"
+    s.protocol_type = "Step"
+    s.min_stimulus = -40.0
+    s.max_stimulus = 40.0
+    s.stimulus_step = 40.0
+    result = s._build_protocols()
+    # -40 to +40 in steps of 40 → [-40, 0, +40] = 3 sweeps
+    labels = [label for _arr, label in result]
+    assert labels == ["-40 mV", "+0 mV", "+40 mV"]
