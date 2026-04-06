@@ -1245,16 +1245,17 @@ class AppState(rx.State):
         return patch_sim.make_neuron(config=config)
 
     def _attach_step_labels(
-        self, arrays: "list[np.ndarray]", fmt: str
+        self, arrays: "np.ndarray", fmt: str
     ) -> "list[tuple[np.ndarray, str]]":
-        """Pair arrays with formatted step labels derived from the current range.
+        """Pair rows of a 2-D stimulus array with formatted step labels.
 
         Re-derives the stimulus values from ``min_stimulus``, ``max_stimulus``,
         and ``stimulus_step`` using the same formula as the builder, so the
         labels always match the arrays.
 
         Args:
-            arrays: Stimulus arrays returned by a builder function.
+            arrays: 2-D stimulus array of shape ``(n_sweeps, n_samples)``
+                returned by a builder function.
             fmt: Format string applied to each stimulus value (e.g.
                 ``"{:+.1f} µA/cm²"``).
 
@@ -1265,7 +1266,7 @@ class AppState(rx.State):
             round((self.max_stimulus - self.min_stimulus) / self.stimulus_step) + 1
         )
         values = np.linspace(self.min_stimulus, self.max_stimulus, n_steps)
-        return [(arr, fmt.format(v)) for arr, v in zip(arrays, values)]
+        return [(row, fmt.format(v)) for row, v in zip(arrays, values)]
 
     def _build_protocols(self) -> "list[tuple[np.ndarray, str]]":
         """Build stimulus arrays from current protocol state with sweep labels.
@@ -1303,9 +1304,9 @@ class AppState(rx.State):
                 mean_current=self.mean_current,
                 std_current=self.std_current,
             )
-            if len(arrays) > 1:
+            if arrays.shape[0] > 1:
                 return self._attach_step_labels(arrays, "{:+.1f} µA/cm²")
-            return [(arr, "") for arr in arrays]
+            return [(arrays[0], "")]
         else:
             arrays = build_voltage_protocol(
                 protocol_type=self.protocol_type,
@@ -1323,9 +1324,9 @@ class AppState(rx.State):
                 max_stimulus=self.max_stimulus,
                 stimulus_step=self.stimulus_step,
             )
-            if len(arrays) > 1:
+            if arrays.shape[0] > 1:
                 return self._attach_step_labels(arrays, "{:+.0f} mV")
-            return [(arr, "") for arr in arrays]
+            return [(arrays[0], "")]
 
     # ------------------------------------------------------------------ #
     # Continuous simulation mode                                        #

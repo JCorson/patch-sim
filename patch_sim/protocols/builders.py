@@ -1,6 +1,7 @@
 """Pure functions for building simulation protocol arrays.
 
-These functions take explicit parameters and return a list of stimulus arrays.
+These functions take explicit parameters and return a 2-D stimulus array of
+shape ``(n_sweeps, n_samples)``.
 """
 
 import logging
@@ -45,7 +46,7 @@ def build_current_protocol(
     end_frequency: float = 100.0,
     mean_current: float = 8.0,
     std_current: float = 2.0,
-) -> list[np.ndarray]:
+) -> np.ndarray:
     """Build current clamp protocol arrays from explicit parameters.
 
     Args:
@@ -75,14 +76,15 @@ def build_current_protocol(
         std_current: Noise standard deviation in µA/cm².
 
     Returns:
-        List of stimulus arrays.  Single-step protocols return a one-element
-        list.  Multi-sweep Step protocols return one array per current level.
+        2-D array of shape ``(n_sweeps, n_samples)``.  Single-step protocols
+        return shape ``(1, n_samples)``.  Multi-sweep Step protocols return one
+        row per current level.
 
     Raises:
         ValueError: If protocol_type is unrecognized or parameters are invalid.
     """
     total_duration = pre_stimulus_duration + stimulus_duration + post_stimulus_duration
-    result: list[np.ndarray]
+    sweeps: list[np.ndarray]
     if protocol_type == "Step":
         if stimulus_step < 0.0:
             raise ValueError("stimulus_step must be >= 0.0")
@@ -96,7 +98,7 @@ def build_current_protocol(
                 "stimulus_step must be > 0.0 when min_stimulus != max_stimulus"
             )
         if min_stimulus == max_stimulus:
-            result = [
+            sweeps = [
                 step_current(
                     duration=total_duration,
                     current_amplitude=min_stimulus,
@@ -108,7 +110,7 @@ def build_current_protocol(
         else:
             n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
             currents = np.linspace(min_stimulus, max_stimulus, n_steps)
-            result = [
+            sweeps = [
                 step_current(
                     duration=total_duration,
                     current_amplitude=float(current),
@@ -119,7 +121,7 @@ def build_current_protocol(
                 for current in currents
             ]
     elif protocol_type == "Ramp":
-        result = [
+        sweeps = [
             ramp_current(
                 duration=total_duration,
                 start_current=start_current,
@@ -130,7 +132,7 @@ def build_current_protocol(
             )
         ]
     elif protocol_type == "Pulse Train":
-        result = [
+        sweeps = [
             pulse_train(
                 duration=total_duration,
                 pulse_amplitude=pulse_amplitude,
@@ -141,7 +143,7 @@ def build_current_protocol(
             )
         ]
     elif protocol_type == "Sinusoidal":
-        result = [
+        sweeps = [
             sinusoidal_current(
                 duration=total_duration,
                 dc_offset=dc_offset,
@@ -153,7 +155,7 @@ def build_current_protocol(
             )
         ]
     elif protocol_type == "Chirp":
-        result = [
+        sweeps = [
             chirp_current(
                 duration=total_duration,
                 dc_offset=dc_offset,
@@ -166,7 +168,7 @@ def build_current_protocol(
             )
         ]
     elif protocol_type == "Noise":
-        result = [
+        sweeps = [
             noise_current(
                 duration=total_duration,
                 mean_current=mean_current,
@@ -182,9 +184,9 @@ def build_current_protocol(
         "build_current_protocol: type=%r total_duration=%.1f ms sweeps=%d",
         protocol_type,
         total_duration,
-        len(result),
+        len(sweeps),
     )
-    return result
+    return np.array(sweeps)
 
 
 def build_voltage_protocol(
@@ -202,7 +204,7 @@ def build_voltage_protocol(
     min_stimulus: float = 0.0,
     max_stimulus: float = 0.0,
     stimulus_step: float = 0.0,
-) -> list[np.ndarray]:
+) -> np.ndarray:
     """Build voltage clamp protocol arrays from explicit parameters.
 
     Args:
@@ -225,14 +227,15 @@ def build_voltage_protocol(
             (or set min_stimulus == max_stimulus) for a single-step protocol.
 
     Returns:
-        List of stimulus arrays.  Single-step protocols return a one-element
-        list.  Multi-sweep Step protocols return one array per voltage level.
+        2-D array of shape ``(n_sweeps, n_samples)``.  Single-step protocols
+        return shape ``(1, n_samples)``.  Multi-sweep Step protocols return one
+        row per voltage level.
 
     Raises:
         ValueError: If protocol_type is unrecognized or parameters are invalid.
     """
     total_duration = pre_stimulus_duration + stimulus_duration + post_stimulus_duration
-    result: list[np.ndarray]
+    sweeps: list[np.ndarray]
     if protocol_type == "Step":
         if stimulus_step < 0.0:
             raise ValueError("stimulus_step must be >= 0.0")
@@ -246,7 +249,7 @@ def build_voltage_protocol(
                 "stimulus_step must be > 0.0 when min_stimulus != max_stimulus"
             )
         if min_stimulus == max_stimulus:
-            result = [
+            sweeps = [
                 step_voltage(
                     duration=total_duration,
                     voltage_amplitude=min_stimulus,
@@ -259,7 +262,7 @@ def build_voltage_protocol(
         else:
             n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
             voltages = np.linspace(min_stimulus, max_stimulus, n_steps)
-            result = [
+            sweeps = [
                 step_voltage(
                     duration=total_duration,
                     voltage_amplitude=float(voltage),
@@ -271,7 +274,7 @@ def build_voltage_protocol(
                 for voltage in voltages
             ]
     elif protocol_type == "Ramp":
-        result = [
+        sweeps = [
             ramp_voltage(
                 duration=total_duration,
                 start_voltage=start_voltage,
@@ -283,7 +286,7 @@ def build_voltage_protocol(
             )
         ]
     elif protocol_type == "Pulse Train":
-        result = [
+        sweeps = [
             pulse_train_voltage(
                 duration=total_duration,
                 pulse_amplitude=pulse_amplitude,
@@ -300,6 +303,6 @@ def build_voltage_protocol(
         "build_voltage_protocol: type=%r total_duration=%.1f ms sweeps=%d",
         protocol_type,
         total_duration,
-        len(result),
+        len(sweeps),
     )
-    return result
+    return np.array(sweeps)

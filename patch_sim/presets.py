@@ -385,8 +385,8 @@ def build_protocol_from_preset(
     neuron_preset: str | None = None,
     sampling_frequency: float = 40_000.0,
     **overrides: Any,
-) -> list[np.ndarray]:
-    """Build a protocol array list from a named preset.
+) -> np.ndarray:
+    """Build a protocol array from a named preset.
 
     Looks up *preset_name* in :data:`PROTOCOL_PRESETS`, applies any
     neuron-specific adjustments from :data:`NEURON_PROTOCOL_ADJUSTMENTS` when
@@ -406,7 +406,7 @@ def build_protocol_from_preset(
             (e.g. ``min_stimulus``, ``stimulus_step``).
 
     Returns:
-        List of stimulus arrays.
+        2-D array of shape ``(n_sweeps, n_samples)``.
 
     Raises:
         KeyError: If *preset_name* is not in :data:`PROTOCOL_PRESETS`.

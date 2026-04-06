@@ -20,13 +20,13 @@ from patch_sim.protocols.builders import (
 SAMPLING_FREQUENCY = 10000.0  # Hz — matches UI default
 
 
-def _is_valid_protocol_list(result: list[np.ndarray]) -> bool:
-    """Return True if result is a non-empty list of finite ndarrays."""
-    if not isinstance(result, list) or len(result) == 0:
-        return False
-    return all(
-        isinstance(arr, np.ndarray) and arr.size > 0 and bool(np.all(np.isfinite(arr)))
-        for arr in result
+def _is_valid_protocol_array(result: np.ndarray) -> bool:
+    """Return True if result is a non-empty 2-D finite ndarray."""
+    return (
+        isinstance(result, np.ndarray)
+        and result.ndim == 2
+        and result.size > 0
+        and bool(np.all(np.isfinite(result)))
     )
 
 
@@ -48,10 +48,10 @@ def test_current_protocol_returns_valid_list(protocol_type: str) -> None:
         stimulus_duration=40.0,
         post_stimulus_duration=5.0,
     )
-    assert _is_valid_protocol_list(result), (
+    assert _is_valid_protocol_array(result), (
         f"Protocol '{protocol_type}' returned an invalid protocol list"
     )
-    assert len(result) == 1
+    assert result.shape[0] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -72,10 +72,10 @@ def test_single_sweep_voltage_protocol_returns_valid_list(protocol_type: str) ->
         stimulus_duration=10.0,
         post_stimulus_duration=5.0,
     )
-    assert _is_valid_protocol_list(result), (
+    assert _is_valid_protocol_array(result), (
         f"Protocol '{protocol_type}' returned an invalid protocol list"
     )
-    assert len(result) == 1
+    assert result.shape[0] == 1
 
 
 def test_step_multi_sweep_returns_list_per_current_level() -> None:
@@ -91,8 +91,8 @@ def test_step_multi_sweep_returns_list_per_current_level() -> None:
         stimulus_step=5.0,
     )
     # 0 to 10 in steps of 5 → [0, 5, 10] = 3 sweeps
-    assert _is_valid_protocol_list(result)
-    assert len(result) == 3
+    assert _is_valid_protocol_array(result)
+    assert result.shape[0] == 3
 
 
 def test_step_multi_sweep_voltage_returns_list_per_voltage_level() -> None:
@@ -108,8 +108,8 @@ def test_step_multi_sweep_voltage_returns_list_per_voltage_level() -> None:
         stimulus_step=20.0,
     )
     # -40 to +40 in steps of 20 → [-40, -20, 0, +20, +40] = 5 sweeps
-    assert _is_valid_protocol_list(result)
-    assert len(result) == 5
+    assert _is_valid_protocol_array(result)
+    assert result.shape[0] == 5
 
 
 def test_step_single_via_equal_range_returns_single_sweep() -> None:
@@ -121,7 +121,7 @@ def test_step_single_via_equal_range_returns_single_sweep() -> None:
         max_stimulus=10.0,
         stimulus_step=5.0,
     )
-    assert len(result) == 1
+    assert result.shape[0] == 1
 
 
 def test_voltage_step_single_via_equal_range_returns_single_sweep() -> None:
@@ -133,7 +133,7 @@ def test_voltage_step_single_via_equal_range_returns_single_sweep() -> None:
         max_stimulus=-40.0,
         stimulus_step=10.0,
     )
-    assert len(result) == 1
+    assert result.shape[0] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -287,6 +287,6 @@ def test_preset_produces_valid_protocol(preset_name: str) -> None:
             **kwargs,
         )
 
-    assert _is_valid_protocol_list(result), (
+    assert _is_valid_protocol_array(result), (
         f"Preset '{preset_name}' produced an invalid protocol list"
     )

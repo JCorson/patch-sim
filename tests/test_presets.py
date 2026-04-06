@@ -66,16 +66,14 @@ def test_neuron_protocol_adjustment_protocol_keys_are_known() -> None:
 
 @pytest.mark.parametrize("preset_name", PROTOCOL_PRESET_NAMES)
 def test_build_protocol_from_preset_produces_valid_output(preset_name: str) -> None:
-    """Each protocol preset returns a non-empty list of finite ndarrays."""
+    """Each protocol preset returns a non-empty 2-D finite ndarray."""
     result = build_protocol_from_preset(
         preset_name, sampling_frequency=SAMPLING_FREQUENCY
     )
-    assert isinstance(result, list) and len(result) > 0
-    for arr in result:
-        assert isinstance(arr, np.ndarray) and arr.size > 0
-        assert bool(np.all(np.isfinite(arr))), (
-            f"Non-finite values in preset '{preset_name}'"
-        )
+    assert isinstance(result, np.ndarray) and result.ndim == 2 and result.shape[0] > 0
+    assert bool(np.all(np.isfinite(result))), (
+        f"Non-finite values in preset '{preset_name}'"
+    )
 
 
 def test_build_protocol_from_preset_unknown_raises_key_error() -> None:
@@ -138,7 +136,7 @@ def test_repetitive_firing_adjusted_for_all_configured_neurons(
         neuron_preset=neuron_name,
         sampling_frequency=SAMPLING_FREQUENCY,
     )
-    assert isinstance(result, list) and len(result) == 1
+    assert isinstance(result, np.ndarray) and result.shape[0] == 1
     assert result[0].size > 0 and bool(np.all(np.isfinite(result[0])))
 
 
@@ -177,7 +175,7 @@ def test_build_protocol_from_preset_exported_from_patch_sim() -> None:
     result = patch_sim.build_protocol_from_preset(
         "Action Potential", sampling_frequency=SAMPLING_FREQUENCY
     )
-    assert isinstance(result, list) and len(result) == 1
+    assert isinstance(result, np.ndarray) and result.shape[0] == 1
 
 
 # ---------------------------------------------------------------------------
