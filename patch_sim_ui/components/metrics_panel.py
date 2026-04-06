@@ -11,75 +11,22 @@ import reflex as rx
 from patch_sim_ui.state import AppState
 
 
-def _summary_row(label: str, value: rx.Var, unit: str = "") -> rx.Component:
-    """Render one row of the summary table.
-
-    Args:
-        label: Metric name shown in the left column.
-        value: Reactive var holding the formatted value string.
-        unit: Optional unit string appended after the value.
-
-    Returns:
-        An hstack with the label and formatted value.
-    """
-    return rx.hstack(
-        rx.text(label, size="1", color="gray", min_width="10em"),
-        rx.text(value, size="1"),
-        rx.text(unit, size="1", color="gray"),
-        spacing="2",
-        align="center",
-    )
-
-
-def _fmt(val: float | None, decimals: int = 2) -> str:
-    """Format a nullable float for display.
-
-    Args:
-        val: The value to format, or None.
-        decimals: Number of decimal places.
-
-    Returns:
-        A formatted string, or ``"—"`` when ``val`` is None.
-    """
-    if val is None:
-        return "\u2014"
-    return f"{val:.{decimals}f}"
-
-
 def _spike_row(spike: dict) -> rx.Component:
     """Render one row of the per-spike table.
 
     Args:
-        spike: Dictionary produced by ``dataclasses.asdict(SpikeMetrics)``.
+        spike: Dictionary with pre-formatted string values for each metric.
 
     Returns:
         A table row with per-spike metric cells.
     """
-    ahp = spike["ahp_depth"]
-    ahp_str = rx.cond(
-        ahp is None,
-        "\u2014",
-        ahp.to_string(),
-    )
     return rx.table.row(
-        rx.table.cell(
-            rx.text(spike["index"].to(int) + 1, size="1"),
-        ),
-        rx.table.cell(
-            rx.text(spike["threshold_voltage"].to(float).to_string(), size="1"),
-        ),
-        rx.table.cell(
-            rx.text(spike["peak_voltage"].to(float).to_string(), size="1"),
-        ),
-        rx.table.cell(
-            rx.text(spike["rise_time"].to(float).to_string(), size="1"),
-        ),
-        rx.table.cell(
-            rx.text(spike["half_width"].to(float).to_string(), size="1"),
-        ),
-        rx.table.cell(
-            rx.text(ahp_str, size="1"),
-        ),
+        rx.table.cell(rx.text(spike["index"].to(int) + 1, size="1")),
+        rx.table.cell(rx.text(spike["threshold_voltage"].to(str), size="1")),
+        rx.table.cell(rx.text(spike["peak_voltage"].to(str), size="1")),
+        rx.table.cell(rx.text(spike["rise_time"].to(str), size="1")),
+        rx.table.cell(rx.text(spike["half_width"].to(str), size="1")),
+        rx.table.cell(rx.text(spike["ahp_depth"].to(str), size="1")),
     )
 
 
@@ -94,27 +41,28 @@ def _summary_section() -> rx.Component:
         rx.text("Summary", size="1", weight="bold"),
         rx.grid(
             rx.text("Spikes detected", size="1", color="gray"),
-            rx.text(s["spike_count"].to(int).to_string(), size="1"),
+            rx.text(s["spike_count"].to(str), size="1"),
+            rx.text("", size="1"),
             rx.text("Mean threshold", size="1", color="gray"),
-            rx.text(s["mean_threshold_voltage"].to_string(), size="1"),
+            rx.text(s["mean_threshold_voltage"].to(str), size="1"),
             rx.text("mV", size="1", color="gray"),
             rx.text("Mean peak", size="1", color="gray"),
-            rx.text(s["mean_peak_voltage"].to_string(), size="1"),
+            rx.text(s["mean_peak_voltage"].to(str), size="1"),
             rx.text("mV", size="1", color="gray"),
             rx.text("Mean rise time", size="1", color="gray"),
-            rx.text(s["mean_rise_time"].to_string(), size="1"),
+            rx.text(s["mean_rise_time"].to(str), size="1"),
             rx.text("ms", size="1", color="gray"),
             rx.text("Mean half-width", size="1", color="gray"),
-            rx.text(s["mean_half_width"].to_string(), size="1"),
+            rx.text(s["mean_half_width"].to(str), size="1"),
             rx.text("ms", size="1", color="gray"),
             rx.text("Mean AHP depth", size="1", color="gray"),
-            rx.text(s["mean_ahp_depth"].to_string(), size="1"),
+            rx.text(s["mean_ahp_depth"].to(str), size="1"),
             rx.text("mV", size="1", color="gray"),
             rx.text("Mean ISI", size="1", color="gray"),
-            rx.text(s["mean_isi"].to_string(), size="1"),
+            rx.text(s["mean_isi"].to(str), size="1"),
             rx.text("ms", size="1", color="gray"),
             rx.text("Firing rate", size="1", color="gray"),
-            rx.text(s["firing_rate"].to_string(), size="1"),
+            rx.text(s["firing_rate"].to(str), size="1"),
             rx.text("Hz", size="1", color="gray"),
             columns="3",
             spacing="2",

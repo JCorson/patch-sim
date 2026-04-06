@@ -5,7 +5,6 @@ the Reflex component tree via computed properties.
 """
 
 import asyncio
-import dataclasses
 import json
 import logging
 import time
@@ -1569,17 +1568,57 @@ class AppState(rx.State):
                     if mode == CURRENT_CLAMP:
                         ap_result = patch_sim.analyze_aps_from_result(result)
                         self.ap_metrics = [
-                            dataclasses.asdict(s) for s in ap_result.spikes
+                            {
+                                "index": s.index,
+                                "threshold_voltage": f"{s.threshold_voltage:.1f}",
+                                "peak_voltage": f"{s.peak_voltage:.1f}",
+                                "rise_time": f"{s.rise_time:.2f}",
+                                "half_width": f"{s.half_width:.2f}",
+                                "ahp_depth": (
+                                    f"{s.ahp_depth:.1f}"
+                                    if s.ahp_depth is not None
+                                    else "\u2014"
+                                ),
+                            }
+                            for s in ap_result.spikes
                         ]
                         self.ap_summary = {
-                            "spike_count": ap_result.spike_count,
-                            "mean_threshold_voltage": ap_result.mean_threshold_voltage,
-                            "mean_peak_voltage": ap_result.mean_peak_voltage,
-                            "mean_rise_time": ap_result.mean_rise_time,
-                            "mean_half_width": ap_result.mean_half_width,
-                            "mean_ahp_depth": ap_result.mean_ahp_depth,
-                            "mean_isi": ap_result.mean_isi,
-                            "firing_rate": ap_result.firing_rate,
+                            "spike_count": str(ap_result.spike_count),
+                            "mean_threshold_voltage": (
+                                f"{ap_result.mean_threshold_voltage:.1f}"
+                                if ap_result.mean_threshold_voltage is not None
+                                else "\u2014"
+                            ),
+                            "mean_peak_voltage": (
+                                f"{ap_result.mean_peak_voltage:.1f}"
+                                if ap_result.mean_peak_voltage is not None
+                                else "\u2014"
+                            ),
+                            "mean_rise_time": (
+                                f"{ap_result.mean_rise_time:.2f}"
+                                if ap_result.mean_rise_time is not None
+                                else "\u2014"
+                            ),
+                            "mean_half_width": (
+                                f"{ap_result.mean_half_width:.2f}"
+                                if ap_result.mean_half_width is not None
+                                else "\u2014"
+                            ),
+                            "mean_ahp_depth": (
+                                f"{ap_result.mean_ahp_depth:.1f}"
+                                if ap_result.mean_ahp_depth is not None
+                                else "\u2014"
+                            ),
+                            "mean_isi": (
+                                f"{ap_result.mean_isi:.1f}"
+                                if ap_result.mean_isi is not None
+                                else "\u2014"
+                            ),
+                            "firing_rate": (
+                                f"{ap_result.firing_rate:.1f}"
+                                if ap_result.firing_rate is not None
+                                else "\u2014"
+                            ),
                         }
                     else:
                         self.ap_metrics = []
