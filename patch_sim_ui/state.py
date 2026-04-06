@@ -5,6 +5,7 @@ the Reflex component tree via computed properties.
 """
 
 import asyncio
+import dataclasses
 import json
 import logging
 import time
@@ -699,6 +700,12 @@ class AppState(rx.State):
     stored_traces: list[Sweep] = []  # Oscilloscope-style stored reference traces
 
     # ------------------------------------------------------------------ #
+    # AP analysis results                                                #
+    # ------------------------------------------------------------------ #
+    ap_metrics: list[dict[str, Any]] = []  # Per-spike metrics (serialized)
+    ap_summary: dict[str, Any] = {}  # Aggregate summary statistics
+
+    # ------------------------------------------------------------------ #
     # Trace visibility checkboxes                                        #
     # ------------------------------------------------------------------ #
     show_voltage: bool = True
@@ -769,6 +776,14 @@ class AppState(rx.State):
     log_panel_open: bool = False
     log_entries: list[UILogRecord] = []
     log_level_filter: str = "DEBUG"
+
+    # ------------------------------------------------------------------ #
+    # AP analysis computed properties                                   #
+    # ------------------------------------------------------------------ #
+    @rx.var
+    def has_ap_metrics(self) -> bool:
+        """Return True when AP analysis results are available for display."""
+        return len(self.ap_metrics) > 0
 
     # ------------------------------------------------------------------ #
     # Derived reversal potentials (shown as read-only in neuron panel)  #
@@ -1541,6 +1556,8 @@ class AppState(rx.State):
                 new_sweeps = await loop.run_in_executor(None, _run_batch)
                 async with self:
                     self.current_sweeps = new_sweeps
+                    self.ap_metrics = []
+                    self.ap_summary = {}
 
             else:
                 stimulus, _ = protocols[0]
@@ -1549,6 +1566,24 @@ class AppState(rx.State):
                     self.current_sweeps = [
                         Sweep.from_result(result, stimulus, "", "", mode)
                     ]
+                    if mode == CURRENT_CLAMP:
+                        ap_result = patch_sim.analyze_aps_from_result(result)
+                        self.ap_metrics = [
+                            dataclasses.asdict(s) for s in ap_result.spikes
+                        ]
+                        self.ap_summary = {
+                            "spike_count": ap_result.spike_count,
+                            "mean_threshold_voltage": ap_result.mean_threshold_voltage,
+                            "mean_peak_voltage": ap_result.mean_peak_voltage,
+                            "mean_rise_time": ap_result.mean_rise_time,
+                            "mean_half_width": ap_result.mean_half_width,
+                            "mean_ahp_depth": ap_result.mean_ahp_depth,
+                            "mean_isi": ap_result.mean_isi,
+                            "firing_rate": ap_result.firing_rate,
+                        }
+                    else:
+                        self.ap_metrics = []
+                        self.ap_summary = {}
 
         except ValueError as exc:
             logger.exception("Simulation error: %s", exc)
