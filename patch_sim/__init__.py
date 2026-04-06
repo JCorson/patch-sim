@@ -3,7 +3,7 @@
 A package for simulating patch clamp experiments using conductance-based neuron models.
 """
 
-from . import constants
+from . import analysis, constants
 from .additional_channels import (
     make_ical_channel,
     make_ican_channel,
@@ -16,6 +16,12 @@ from .additional_channels import (
     make_im_channel,
     make_inap_channel,
     make_inar_channel,
+)
+from .analysis import (
+    APAnalysisResult,
+    SpikeMetrics,
+    analyze_aps,
+    analyze_aps_from_result,
 )
 from .calcium import CalciumDynamics
 from .channels import (
@@ -91,7 +97,12 @@ from .protocols import (
 )
 
 __all__ = [
+    "analysis",
     "constants",
+    "APAnalysisResult",
+    "SpikeMetrics",
+    "analyze_aps",
+    "analyze_aps_from_result",
     "CURRENT_CLAMP",
     "CURRENT_PROTOCOLS",
     "VOLTAGE_CLAMP",
