@@ -3,6 +3,7 @@
 import reflex as rx
 
 from patch_sim_ui.components.log_panel import log_panel
+from patch_sim_ui.components.metrics_panel import metrics_panel
 from patch_sim_ui.components.neuron_panel import neuron_panel
 from patch_sim_ui.components.protocol_panel import protocol_panel
 from patch_sim_ui.components.sweep_manager import sweep_manager
@@ -126,6 +127,7 @@ def _main_content() -> rx.Component:
             min_height="0",
             overflow="hidden",
         ),
+        metrics_panel(),
         log_panel(),
         rx.box(
             sweep_manager(),
