@@ -870,3 +870,93 @@ def test_toggle_hover_twice_restores_original_state() -> None:
     s.toggle_hover()
     s.toggle_hover()
     assert s.show_hover is original
+
+
+# ---------------------------------------------------------------------------
+# _build_protocols label generation
+# ---------------------------------------------------------------------------
+
+
+def test_build_protocols_single_sweep_current_clamp_has_empty_label() -> None:
+    """Single-sweep current clamp protocol returns an empty sweep label."""
+    s = _make_state()
+    s.clamp_mode = "Current Clamp"
+    s.protocol_type = "Step"
+    s.min_stimulus = 10.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 0.0
+    result = s._build_protocols()
+    assert len(result) == 1
+    assert result[0][1] == ""
+
+
+def test_build_protocols_multi_sweep_current_clamp_labels_contain_unit() -> None:
+    """Multi-sweep current clamp Step protocol labels include µA/cm² unit."""
+    s = _make_state()
+    s.clamp_mode = "Current Clamp"
+    s.protocol_type = "Step"
+    s.min_stimulus = 0.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 5.0
+    result = s._build_protocols()
+    # 0 to 10 in steps of 5 → [0, 5, 10] = 3 sweeps
+    assert len(result) == 3
+    for _arr, label in result:
+        assert label != ""
+        assert "µA/cm²" in label
+
+
+def test_build_protocols_multi_sweep_current_clamp_label_values() -> None:
+    """Multi-sweep current clamp labels match the actual stimulus values."""
+    s = _make_state()
+    s.clamp_mode = "Current Clamp"
+    s.protocol_type = "Step"
+    s.min_stimulus = 0.0
+    s.max_stimulus = 10.0
+    s.stimulus_step = 5.0
+    result = s._build_protocols()
+    labels = [label for _arr, label in result]
+    assert labels == ["+0.0 µA/cm²", "+5.0 µA/cm²", "+10.0 µA/cm²"]
+
+
+def test_build_protocols_single_sweep_voltage_clamp_has_empty_label() -> None:
+    """Single-sweep voltage clamp protocol returns an empty sweep label."""
+    s = _make_state()
+    s.clamp_mode = "Voltage Clamp"
+    s.protocol_type = "Step"
+    s.min_stimulus = -70.0
+    s.max_stimulus = -70.0
+    s.stimulus_step = 0.0
+    result = s._build_protocols()
+    assert len(result) == 1
+    assert result[0][1] == ""
+
+
+def test_build_protocols_multi_sweep_voltage_clamp_labels_contain_unit() -> None:
+    """Multi-sweep voltage clamp Step protocol labels include mV unit."""
+    s = _make_state()
+    s.clamp_mode = "Voltage Clamp"
+    s.protocol_type = "Step"
+    s.min_stimulus = -40.0
+    s.max_stimulus = 40.0
+    s.stimulus_step = 20.0
+    result = s._build_protocols()
+    # -40 to +40 in steps of 20 → 5 sweeps
+    assert len(result) == 5
+    for _arr, label in result:
+        assert label != ""
+        assert "mV" in label
+
+
+def test_build_protocols_multi_sweep_voltage_clamp_label_values() -> None:
+    """Multi-sweep voltage clamp labels match the actual voltage step values."""
+    s = _make_state()
+    s.clamp_mode = "Voltage Clamp"
+    s.protocol_type = "Step"
+    s.min_stimulus = -40.0
+    s.max_stimulus = 40.0
+    s.stimulus_step = 40.0
+    result = s._build_protocols()
+    # -40 to +40 in steps of 40 → [-40, 0, +40] = 3 sweeps
+    labels = [label for _arr, label in result]
+    assert labels == ["-40 mV", "+0 mV", "+40 mV"]
