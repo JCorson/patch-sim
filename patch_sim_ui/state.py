@@ -770,6 +770,11 @@ class AppState(rx.State):
     selected_sweep: int = -1
 
     # ------------------------------------------------------------------ #
+    # Analysis sidebar state                                             #
+    # ------------------------------------------------------------------ #
+    analysis_panel_open: bool = True
+
+    # ------------------------------------------------------------------ #
     # Log panel state                                                    #
     # ------------------------------------------------------------------ #
     log_panel_open: bool = False
@@ -950,6 +955,10 @@ class AppState(rx.State):
     def reset_to_defaults(self) -> None:
         """Reset all parameters and sweeps to their class-level defaults."""
         self.reset()
+
+    def toggle_analysis_panel(self) -> None:
+        """Toggle the right-hand analysis sidebar open or closed."""
+        self.analysis_panel_open = not self.analysis_panel_open
 
     def toggle_hover(self):
         """Toggle plot hover tooltips on or off.

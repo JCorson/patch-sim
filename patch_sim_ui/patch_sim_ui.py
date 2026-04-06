@@ -3,7 +3,7 @@
 import reflex as rx
 
 from patch_sim_ui.components.log_panel import log_panel
-from patch_sim_ui.components.metrics_panel import metrics_panel
+from patch_sim_ui.components.metrics_panel import analysis_sidebar
 from patch_sim_ui.components.neuron_panel import neuron_panel
 from patch_sim_ui.components.protocol_panel import protocol_panel
 from patch_sim_ui.components.sweep_manager import sweep_manager
@@ -127,7 +127,6 @@ def _main_content() -> rx.Component:
             min_height="0",
             overflow="hidden",
         ),
-        metrics_panel(),
         log_panel(),
         rx.box(
             sweep_manager(),
@@ -142,12 +141,13 @@ def _main_content() -> rx.Component:
 
 
 def index() -> rx.Component:
-    """Root page component: header + sidebar + main content."""
+    """Root page component: header + left sidebar + main content + analysis sidebar."""
     return rx.vstack(
         _header(),
         rx.hstack(
             _sidebar(),
             _main_content(),
+            analysis_sidebar(),
             spacing="0",
             width="100%",
             align="start",
