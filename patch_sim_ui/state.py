@@ -857,14 +857,14 @@ class AppState(rx.State):
         return len(self.iv_data) > 0
 
     @rx.var
-    def iv_figure(self) -> dict[str, Any]:
-        """Return a Plotly I-V curve figure serialised as a dict.
+    def iv_figure(self) -> go.Figure:
+        """Return a Plotly I-V curve figure.
 
-        Returns an empty dict when no I-V data is available.
+        Returns an empty figure when no I-V data is available.
         """
         if not self.iv_data:
-            return {}
-        return build_iv_figure(self.iv_data).to_plotly_json()
+            return go.Figure()
+        return build_iv_figure(self.iv_data)
 
     # ------------------------------------------------------------------ #
     # Derived reversal potentials (shown as read-only in neuron panel)  #

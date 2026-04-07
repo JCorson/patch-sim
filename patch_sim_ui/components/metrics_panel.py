@@ -148,7 +148,6 @@ def _iv_curve_tab() -> rx.Component:
         rx.flex(
             rx.plotly(
                 data=AppState.iv_figure,
-                layout=AppState.iv_figure["layout"],
                 width="100%",
             ),
             direction="column",
