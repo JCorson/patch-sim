@@ -90,11 +90,4 @@ def analyze_iv(
         for current, v in zip(currents, voltage_steps)
     ]
     points.sort(key=lambda p: p.voltage_step)
-
-    return IVAnalysisResult(
-        points=points,
-        voltage_steps=[p.voltage_step for p in points],
-        peak_inward_currents=[p.peak_inward_current for p in points],
-        peak_outward_currents=[p.peak_outward_current for p in points],
-        steady_state_currents=[p.steady_state_current for p in points],
-    )
+    return IVAnalysisResult(points=points)
