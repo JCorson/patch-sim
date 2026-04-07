@@ -949,8 +949,11 @@ def build_figure(
 def build_iv_figure(iv_data: dict) -> go.Figure:
     """Build a Plotly I-V curve figure from serialised I-V analysis results.
 
-    Renders three traces: peak inward current (red), peak outward current
-    (orange), and steady-state current (blue), all plotted against voltage.
+    Renders three traces: peak inward current (red, solid), peak outward
+    current (orange, solid), and steady-state current (blue, dashed) plotted
+    against voltage.  The steady-state line uses a dashed style and diamond
+    markers so it remains distinguishable when it overlaps with the peak
+    outward trace.
 
     Args:
         iv_data: Dict with keys ``voltages``, ``peak_inward_currents``,
@@ -988,8 +991,8 @@ def build_iv_figure(iv_data: dict) -> go.Figure:
             y=iv_data["steady_state_currents"],
             mode="lines+markers",
             name="Steady-state",
-            line=dict(color="#3498db"),
-            marker=dict(size=5),
+            line=dict(color="#3498db", dash="dash"),
+            marker=dict(size=5, symbol="diamond"),
         )
     )
     fig.update_layout(
