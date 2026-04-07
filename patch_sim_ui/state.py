@@ -699,6 +699,12 @@ class AppState(rx.State):
     stored_traces: list[Sweep] = []  # Oscilloscope-style stored reference traces
 
     # ------------------------------------------------------------------ #
+    # AP analysis results                                                #
+    # ------------------------------------------------------------------ #
+    ap_metrics: list[dict[str, Any]] = []  # Per-spike metrics (serialized)
+    ap_summary: dict[str, Any] = {}  # Aggregate summary statistics
+
+    # ------------------------------------------------------------------ #
     # Trace visibility checkboxes                                        #
     # ------------------------------------------------------------------ #
     show_voltage: bool = True
@@ -764,11 +770,24 @@ class AppState(rx.State):
     selected_sweep: int = -1
 
     # ------------------------------------------------------------------ #
+    # Analysis sidebar state                                             #
+    # ------------------------------------------------------------------ #
+    analysis_panel_open: bool = True
+
+    # ------------------------------------------------------------------ #
     # Log panel state                                                    #
     # ------------------------------------------------------------------ #
     log_panel_open: bool = False
     log_entries: list[UILogRecord] = []
     log_level_filter: str = "DEBUG"
+
+    # ------------------------------------------------------------------ #
+    # AP analysis computed properties                                   #
+    # ------------------------------------------------------------------ #
+    @rx.var
+    def has_ap_metrics(self) -> bool:
+        """Return True when AP analysis results are available for display."""
+        return len(self.ap_metrics) > 0
 
     # ------------------------------------------------------------------ #
     # Derived reversal potentials (shown as read-only in neuron panel)  #
@@ -936,6 +955,10 @@ class AppState(rx.State):
     def reset_to_defaults(self) -> None:
         """Reset all parameters and sweeps to their class-level defaults."""
         self.reset()
+
+    def toggle_analysis_panel(self) -> None:
+        """Toggle the right-hand analysis sidebar open or closed."""
+        self.analysis_panel_open = not self.analysis_panel_open
 
     def toggle_hover(self):
         """Toggle plot hover tooltips on or off.
@@ -1541,6 +1564,8 @@ class AppState(rx.State):
                 new_sweeps = await loop.run_in_executor(None, _run_batch)
                 async with self:
                     self.current_sweeps = new_sweeps
+                    self.ap_metrics = []
+                    self.ap_summary = {}
 
             else:
                 stimulus, _ = protocols[0]
@@ -1549,6 +1574,64 @@ class AppState(rx.State):
                     self.current_sweeps = [
                         Sweep.from_result(result, stimulus, "", "", mode)
                     ]
+                    if mode == CURRENT_CLAMP:
+                        ap_result = patch_sim.analyze_aps_from_result(result)
+                        self.ap_metrics = [
+                            {
+                                "index": s.index,
+                                "threshold_voltage": f"{s.threshold_voltage:.1f}",
+                                "peak_voltage": f"{s.peak_voltage:.1f}",
+                                "rise_time": f"{s.rise_time:.2f}",
+                                "half_width": f"{s.half_width:.2f}",
+                                "ahp_depth": (
+                                    f"{s.ahp_depth:.1f}"
+                                    if s.ahp_depth is not None
+                                    else "\u2014"
+                                ),
+                            }
+                            for s in ap_result.spikes
+                        ]
+                        self.ap_summary = {
+                            "spike_count": str(ap_result.spike_count),
+                            "mean_threshold_voltage": (
+                                f"{ap_result.mean_threshold_voltage:.1f}"
+                                if ap_result.mean_threshold_voltage is not None
+                                else "\u2014"
+                            ),
+                            "mean_peak_voltage": (
+                                f"{ap_result.mean_peak_voltage:.1f}"
+                                if ap_result.mean_peak_voltage is not None
+                                else "\u2014"
+                            ),
+                            "mean_rise_time": (
+                                f"{ap_result.mean_rise_time:.2f}"
+                                if ap_result.mean_rise_time is not None
+                                else "\u2014"
+                            ),
+                            "mean_half_width": (
+                                f"{ap_result.mean_half_width:.2f}"
+                                if ap_result.mean_half_width is not None
+                                else "\u2014"
+                            ),
+                            "mean_ahp_depth": (
+                                f"{ap_result.mean_ahp_depth:.1f}"
+                                if ap_result.mean_ahp_depth is not None
+                                else "\u2014"
+                            ),
+                            "mean_isi": (
+                                f"{ap_result.mean_isi:.1f}"
+                                if ap_result.mean_isi is not None
+                                else "\u2014"
+                            ),
+                            "firing_rate": (
+                                f"{ap_result.firing_rate:.1f}"
+                                if ap_result.firing_rate is not None
+                                else "\u2014"
+                            ),
+                        }
+                    else:
+                        self.ap_metrics = []
+                        self.ap_summary = {}
 
         except ValueError as exc:
             logger.exception("Simulation error: %s", exc)
