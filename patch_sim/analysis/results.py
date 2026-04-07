@@ -90,7 +90,7 @@ class IVAnalysisResult:
 
     @property
     def steady_state_currents(self) -> list[float]:
-        """Mean current over the last 10% of each step (µA/cm²)."""
+        """Steady-state current at each step (µA/cm²)."""
         return [p.steady_state_current for p in self.points]
 
 

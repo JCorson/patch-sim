@@ -633,13 +633,17 @@ def _compute_iv_data(
         A dict with keys ``voltages``, ``peak_inward_currents``,
         ``peak_outward_currents``, and ``steady_state_currents``, each a list
         of floats sorted by voltage.  Returns an empty dict when fewer than
-        two sweeps are provided.
+        two sweeps are provided or when the number of sweeps does not match
+        the number of voltage steps derived from the protocol parameters.
     """
     if len(sweeps) < 2:
         return {}
 
     n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
     voltage_steps = list(np.linspace(min_stimulus, max_stimulus, n_steps))
+
+    if len(sweeps) != len(voltage_steps):
+        return {}
 
     time = np.array(sweeps[0].time)
     currents = [np.array(s.total_current) for s in sweeps]
@@ -759,7 +763,7 @@ class AppState(rx.State):
     ap_summary: dict[str, Any] = {}  # Aggregate summary statistics
 
     # ------------------------------------------------------------------ #
-    # I-V analysis results                                               #
+    # I-V analysis results                                                #
     # ------------------------------------------------------------------ #
     iv_data: dict[str, Any] = {}  # Serialized IVAnalysisResult for the UI
 
@@ -849,7 +853,7 @@ class AppState(rx.State):
         return len(self.ap_metrics) > 0
 
     # ------------------------------------------------------------------ #
-    # I-V analysis computed properties                                  #
+    # I-V analysis computed properties                                    #
     # ------------------------------------------------------------------ #
     @rx.var
     def has_iv_data(self) -> bool:
