@@ -133,6 +133,42 @@ def _ap_metrics_tab() -> rx.Component:
     )
 
 
+def _iv_curve_tab() -> rx.Component:
+    """Render the I-V Curve tab content.
+
+    Shows a Plotly I-V curve with peak inward, peak outward, and steady-state
+    traces when voltage clamp multi-sweep data is available.  Displays a
+    placeholder message otherwise.
+
+    Returns:
+        The full tab content as a flex column.
+    """
+    return rx.cond(
+        AppState.has_iv_data,
+        rx.flex(
+            rx.plotly(
+                data=AppState.iv_figure,
+                width="100%",
+            ),
+            direction="column",
+            height="100%",
+            width="100%",
+            overflow="hidden",
+            padding="1",
+        ),
+        rx.flex(
+            rx.text(
+                "Run a voltage clamp multi-sweep simulation to see the I-V curve.",
+                size="1",
+                color="gray",
+                text_align="center",
+            ),
+            padding="4",
+            justify="center",
+        ),
+    )
+
+
 def _expanded_panel() -> rx.Component:
     """Render the full expanded analysis sidebar.
 
@@ -162,6 +198,7 @@ def _expanded_panel() -> rx.Component:
         rx.tabs.root(
             rx.tabs.list(
                 rx.tabs.trigger("AP Metrics", value="ap", size="1"),
+                rx.tabs.trigger("I-V Curve", value="iv", size="1"),
                 padding_x="3",
                 padding_y="1",
                 border_bottom="1px solid var(--gray-4)",
@@ -169,6 +206,14 @@ def _expanded_panel() -> rx.Component:
             rx.tabs.content(
                 _ap_metrics_tab(),
                 value="ap",
+                flex_grow="1",
+                min_height="0",
+                overflow="hidden",
+                padding="0",
+            ),
+            rx.tabs.content(
+                _iv_curve_tab(),
+                value="iv",
                 flex_grow="1",
                 min_height="0",
                 overflow="hidden",

@@ -43,6 +43,7 @@ from patch_sim.constants import (
     DEFAULT_NA_OUT,
     DEFAULT_T,
     DEFAULT_V_REST,
+    VOLTAGE_CLAMP,
 )
 from patch_sim.presets import (
     NEURON_PROTOCOL_ADJUSTMENTS,
@@ -58,6 +59,7 @@ from patch_sim_ui.plotting import (
     Sweep,
     TraceVisibility,
     build_figure,
+    build_iv_figure,
     compute_trace_visibility_map,
 )
 
@@ -604,6 +606,62 @@ def _make_float_setter(field_name: str):
     return setter
 
 
+def _compute_iv_data(
+    sweeps: list[Sweep],
+    min_stimulus: float,
+    max_stimulus: float,
+    stimulus_step: float,
+    pre_stimulus_duration: float,
+    stimulus_duration: float,
+) -> dict[str, Any]:
+    """Compute I-V analysis data from multi-sweep voltage clamp results.
+
+    Derives voltage step values from the protocol parameters, extracts total
+    current arrays from each sweep, and calls :func:`patch_sim.analyze_iv`.
+    The result is serialised into a plain dict suitable for use as a Reflex
+    state variable.
+
+    Args:
+        sweeps: Ordered list of :class:`Sweep` objects from the simulation.
+        min_stimulus: Minimum voltage step command (mV).
+        max_stimulus: Maximum voltage step command (mV).
+        stimulus_step: Step size between voltage commands (mV).
+        pre_stimulus_duration: Duration before the step begins (ms).
+        stimulus_duration: Duration of the voltage step (ms).
+
+    Returns:
+        A dict with keys ``voltages``, ``peak_inward_currents``,
+        ``peak_outward_currents``, and ``steady_state_currents``, each a list
+        of floats sorted by voltage.  Returns an empty dict when fewer than
+        two sweeps are provided or when the number of sweeps does not match
+        the number of voltage steps derived from the protocol parameters.
+    """
+    if len(sweeps) < 2:
+        return {}
+
+    n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
+    voltage_steps = list(np.linspace(min_stimulus, max_stimulus, n_steps))
+
+    if len(sweeps) != len(voltage_steps):
+        return {}
+
+    time = np.array(sweeps[0].time)
+    currents = [np.array(s.total_current) for s in sweeps]
+
+    stim_start = pre_stimulus_duration
+    stim_end = pre_stimulus_duration + stimulus_duration
+
+    iv_result = patch_sim.analyze_iv(
+        time, currents, voltage_steps, stim_start, stim_end
+    )
+    return {
+        "voltages": iv_result.voltage_steps,
+        "peak_inward_currents": iv_result.peak_inward_currents,
+        "peak_outward_currents": iv_result.peak_outward_currents,
+        "steady_state_currents": iv_result.steady_state_currents,
+    }
+
+
 class AppState(rx.State):
     """Top-level application state."""
 
@@ -705,6 +763,11 @@ class AppState(rx.State):
     ap_summary: dict[str, Any] = {}  # Aggregate summary statistics
 
     # ------------------------------------------------------------------ #
+    # I-V analysis results                                                #
+    # ------------------------------------------------------------------ #
+    iv_data: dict[str, Any] = {}  # Serialized IVAnalysisResult for the UI
+
+    # ------------------------------------------------------------------ #
     # Trace visibility checkboxes                                        #
     # ------------------------------------------------------------------ #
     show_voltage: bool = True
@@ -788,6 +851,24 @@ class AppState(rx.State):
     def has_ap_metrics(self) -> bool:
         """Return True when AP analysis results are available for display."""
         return len(self.ap_metrics) > 0
+
+    # ------------------------------------------------------------------ #
+    # I-V analysis computed properties                                    #
+    # ------------------------------------------------------------------ #
+    @rx.var
+    def has_iv_data(self) -> bool:
+        """Return True when I-V analysis results are available for display."""
+        return len(self.iv_data) > 0
+
+    @rx.var
+    def iv_figure(self) -> go.Figure:
+        """Return a Plotly I-V curve figure.
+
+        Returns an empty figure when no I-V data is available.
+        """
+        if not self.iv_data:
+            return go.Figure()
+        return build_iv_figure(self.iv_data)
 
     # ------------------------------------------------------------------ #
     # Derived reversal potentials (shown as read-only in neuron panel)  #
@@ -1566,6 +1647,17 @@ class AppState(rx.State):
                     self.current_sweeps = new_sweeps
                     self.ap_metrics = []
                     self.ap_summary = {}
+                    if mode == VOLTAGE_CLAMP:
+                        self.iv_data = _compute_iv_data(
+                            new_sweeps,
+                            self.min_stimulus,
+                            self.max_stimulus,
+                            self.stimulus_step,
+                            self.pre_stimulus_duration,
+                            self.stimulus_duration,
+                        )
+                    else:
+                        self.iv_data = {}
 
             else:
                 stimulus, _ = protocols[0]
@@ -1632,6 +1724,7 @@ class AppState(rx.State):
                     else:
                         self.ap_metrics = []
                         self.ap_summary = {}
+                        self.iv_data = {}
 
         except ValueError as exc:
             logger.exception("Simulation error: %s", exc)
