@@ -5,8 +5,6 @@ All classes are plain dataclasses (no Reflex dependency) and are fully
 serializable via :func:`dataclasses.asdict`.
 """
 
-from __future__ import annotations
-
 import dataclasses
 
 

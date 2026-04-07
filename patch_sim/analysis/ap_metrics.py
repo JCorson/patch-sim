@@ -5,6 +5,9 @@ voltage trace, and :func:`analyze_aps_from_result` as a convenience wrapper
 for :class:`~patch_sim.clamp_simulations.SimulationResult` structured arrays.
 """
 
+# Needed so that the SimulationResult annotation in analyze_aps_from_result is
+# not evaluated eagerly at import time — SimulationResult is only imported
+# under TYPE_CHECKING to avoid a circular dependency.
 from __future__ import annotations
 
 import dataclasses
