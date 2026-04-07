@@ -38,6 +38,48 @@ class SpikeMetrics:
 
 
 @dataclasses.dataclass
+class IVPoint:
+    """Current measurements for a single voltage step in an I-V protocol.
+
+    Attributes:
+        voltage_step: Command voltage applied during the step (mV).
+        peak_inward_current: Most negative (inward) current during the step
+            (µA/cm²).
+        peak_outward_current: Most positive (outward) current during the step
+            (µA/cm²).
+        steady_state_current: Mean current over the last 10% of the stimulus
+            window (µA/cm²).
+    """
+
+    voltage_step: float
+    peak_inward_current: float
+    peak_outward_current: float
+    steady_state_current: float
+
+
+@dataclasses.dataclass
+class IVAnalysisResult:
+    """Complete I-V analysis from a multi-sweep voltage clamp simulation.
+
+    All lists are sorted in ascending order of voltage step.
+
+    Attributes:
+        points: Per-step measurements, one entry per voltage step.
+        voltage_steps: Command voltages in mV.
+        peak_inward_currents: Most negative current at each step (µA/cm²).
+        peak_outward_currents: Most positive current at each step (µA/cm²).
+        steady_state_currents: Mean current over the last 10% of each step
+            (µA/cm²).
+    """
+
+    points: list[IVPoint]
+    voltage_steps: list[float]
+    peak_inward_currents: list[float]
+    peak_outward_currents: list[float]
+    steady_state_currents: list[float]
+
+
+@dataclasses.dataclass
 class APAnalysisResult:
     """Complete action potential analysis of a voltage trace.
 

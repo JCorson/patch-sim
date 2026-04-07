@@ -19,9 +19,13 @@ from .additional_channels import (
 )
 from .analysis import (
     APAnalysisResult,
+    IVAnalysisResult,
+    IVPoint,
     SpikeMetrics,
     analyze_aps,
     analyze_aps_from_result,
+    analyze_iv,
+    compute_iv_point,
 )
 from .calcium import CalciumDynamics
 from .channels import (
@@ -100,9 +104,13 @@ __all__ = [
     "analysis",
     "constants",
     "APAnalysisResult",
+    "IVAnalysisResult",
+    "IVPoint",
     "SpikeMetrics",
     "analyze_aps",
     "analyze_aps_from_result",
+    "analyze_iv",
+    "compute_iv_point",
     "CURRENT_CLAMP",
     "CURRENT_PROTOCOLS",
     "VOLTAGE_CLAMP",
