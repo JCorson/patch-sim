@@ -18,7 +18,10 @@ if TYPE_CHECKING:
     from patch_sim.clamp_simulations import SimulationResult
 
 #: Minimum number of samples that must separate two threshold crossings.
-#: Corresponds to a ~1 ms refractory period at 40 kHz (dt = 0.025 ms).
+#: Corresponds to a ~1 ms refractory period at the project's standard 40 kHz
+#: sampling rate (dt = 0.025 ms).  ``analyze_aps`` accepts arbitrary time
+#: arrays, so callers using a different sampling rate should be aware that
+#: the effective refractory window will scale with their dt.
 _REFRACTORY_SAMPLES: int = 40
 
 
@@ -160,6 +163,13 @@ def analyze_aps(
             time, voltage, half_level, peak_idx, fall_end, rising=False
         )
         half_width = fall_cross_t - rise_cross_t
+        if half_width < 0:
+            raise ValueError(
+                f"Spike {len(spikes)}: computed half_width={half_width:.4f} ms is "
+                "negative (rise_cross_t={rise_cross_t:.4f}, "
+                f"fall_cross_t={fall_cross_t:.4f}).  This indicates a bug in the "
+                "crossing-detection logic."
+            )
 
         spikes.append(
             SpikeMetrics(

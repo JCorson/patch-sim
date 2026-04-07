@@ -234,10 +234,9 @@ def test_firing_rate_from_isi(hh_model):
     result_sim = patch_sim.simulate_current_clamp(hh_model, stimulus)
     analysis = analyze_aps_from_result(result_sim)
 
-    if analysis.mean_isi is not None:
-        assert analysis.firing_rate == pytest.approx(
-            1000.0 / analysis.mean_isi, rel=1e-6
-        )
+    assert analysis.spike_count >= 2
+    assert analysis.mean_isi is not None
+    assert analysis.firing_rate == pytest.approx(1000.0 / analysis.mean_isi, rel=1e-6)
 
 
 # ---------------------------------------------------------------------------
