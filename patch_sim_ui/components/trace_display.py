@@ -2,7 +2,7 @@
 
 import reflex as rx
 
-from patch_sim_ui.state import AppState
+from patch_sim_ui.state import SimulationState
 
 # Layout overrides applied client-side so they track the active colour mode
 # without requiring a server round-trip.  These take precedence over any
@@ -25,9 +25,9 @@ def trace_display() -> rx.Component:
     """Main plot area: stacked Plotly subplots with sweep overlays."""
     return rx.box(
         rx.cond(
-            AppState.has_result,
+            SimulationState.has_result,
             rx.plotly(
-                data=AppState.figure_data,
+                data=SimulationState.figure_data,
                 layout=rx.color_mode_cond(
                     light=_LAYOUT_LIGHT,
                     dark=_LAYOUT_DARK,

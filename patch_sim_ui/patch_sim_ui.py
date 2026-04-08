@@ -9,7 +9,7 @@ from patch_sim_ui.components.protocol_panel import protocol_panel
 from patch_sim_ui.components.sweep_manager import sweep_manager
 from patch_sim_ui.components.trace_display import trace_display
 from patch_sim_ui.log_handler import setup_logging
-from patch_sim_ui.state import AppState
+from patch_sim_ui.state import SimulationState
 from patch_sim_ui.state.protocol import ProtocolState
 
 setup_logging()
@@ -21,7 +21,7 @@ def _header() -> rx.Component:
         rx.button(
             rx.icon("rotate-ccw"),
             "Reset",
-            on_click=AppState.reset_to_defaults,
+            on_click=SimulationState.reset_to_defaults,
             color_scheme="gray",
             variant="soft",
             size="2",
@@ -31,7 +31,7 @@ def _header() -> rx.Component:
         rx.spacer(),
         rx.hstack(
             rx.cond(
-                AppState.is_running,
+                SimulationState.is_running,
                 rx.hstack(
                     rx.spinner(size="2"),
                     rx.text("Running…", size="2", color="gray"),
@@ -41,18 +41,18 @@ def _header() -> rx.Component:
                 rx.button(
                     rx.icon("play"),
                     "Run",
-                    on_click=AppState.run_simulation,
+                    on_click=SimulationState.run_simulation,
                     color_scheme="blue",
                     size="2",
-                    disabled=AppState.continuous_loop_running,
+                    disabled=SimulationState.continuous_loop_running,
                 ),
             ),
             rx.cond(
-                AppState.continuous_active,
+                SimulationState.continuous_active,
                 rx.button(
                     rx.icon("square"),
                     "Stop",
-                    on_click=AppState.toggle_continuous_mode,
+                    on_click=SimulationState.toggle_continuous_mode,
                     color_scheme="red",
                     variant="soft",
                     size="2",
@@ -60,7 +60,7 @@ def _header() -> rx.Component:
                 rx.button(
                     rx.icon("repeat"),
                     "Continuous",
-                    on_click=AppState.toggle_continuous_mode,
+                    on_click=SimulationState.toggle_continuous_mode,
                     color_scheme="green",
                     variant="soft",
                     size="2",
@@ -82,9 +82,9 @@ def _header() -> rx.Component:
 def _error_banner() -> rx.Component:
     """Display an error message banner when simulation fails."""
     return rx.cond(
-        AppState.error_message != "",
+        SimulationState.error_message != "",
         rx.callout(
-            AppState.error_message,
+            SimulationState.error_message,
             icon="circle-x",
             color_scheme="red",
             variant="soft",

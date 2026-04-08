@@ -1,11 +1,11 @@
-"""Unit tests for pure logic in patch_sim_ui/state.py.
+"""Unit tests for pure logic in the patch_sim_ui state package.
 
-These tests exercise AppState methods that contain no Reflex event-loop
+These tests exercise substate methods that contain no Reflex event-loop
 machinery.  Instantiation uses ``_reflex_internal_init=True`` (the same
 flag the framework passes internally) after setting ``PYTEST_CURRENT_TEST``
 so that Reflex's ``is_testing_env()`` guard also passes.
 
-The environment variable is set at import time so the AppState metaclass
+The environment variable is set at import time so the substate metaclass
 registration does not see a non-testing environment.
 """
 
@@ -14,7 +14,7 @@ import os
 import numpy as np
 import pytest
 
-# Must be set before importing Reflex/AppState so the metaclass and init
+# Must be set before importing Reflex/SimulationState so the metaclass and init
 # guard both see a testing environment.
 os.environ.setdefault("PYTEST_CURRENT_TEST", "test_state.py::setup")
 
@@ -30,7 +30,7 @@ from patch_sim.constants import (
 from patch_sim_ui import constants  # noqa: E402
 from patch_sim_ui.log_handler import UILogRecord  # noqa: E402
 from patch_sim_ui.plotting import Sweep  # noqa: E402
-from patch_sim_ui.state import AppState  # noqa: E402
+from patch_sim_ui.state import SimulationState  # noqa: E402
 from patch_sim_ui.state.log import LogState  # noqa: E402
 from patch_sim_ui.state.neuron import NeuronState  # noqa: E402
 from patch_sim_ui.state.protocol import ProtocolState  # noqa: E402
@@ -41,9 +41,9 @@ from patch_sim_ui.state.visibility import VisibilityState  # noqa: E402
 # ---------------------------------------------------------------------------
 
 
-def _make_state() -> AppState:
-    """Return a fresh AppState instance bypassing the Reflex runtime guard."""
-    return AppState(_reflex_internal_init=True)
+def _make_state() -> SimulationState:
+    """Return a fresh SimulationState instance bypassing the Reflex runtime guard."""
+    return SimulationState(_reflex_internal_init=True)
 
 
 def _make_log_state() -> LogState:
@@ -825,7 +825,7 @@ def test_filtered_log_entries_empty_when_no_entries() -> None:
 
 
 def test_show_hover_defaults_to_true() -> None:
-    """show_hover is True on a freshly created AppState."""
+    """show_hover is True on a freshly created SimulationState."""
     s = _make_state()
     assert s.show_hover is True
 

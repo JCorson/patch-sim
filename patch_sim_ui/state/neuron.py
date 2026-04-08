@@ -155,14 +155,14 @@ class NeuronState(rx.State):
             name: Key into ``patch_sim_ui.presets.NEURON_UI_PRESETS``.
                 Ignored if not found.
         """
-        from patch_sim_ui.state.simulation import AppState
+        from patch_sim_ui.state.simulation import SimulationState
 
         if name not in presets.NEURON_UI_PRESETS:
             logger.debug("load_neuron_preset: unknown preset %r ignored", name)
             return
         logger.info("Loaded neuron preset: %s", name)
         self._apply_neuron_preset(name)
-        sim_st = await self.get_state(AppState)
+        sim_st = await self.get_state(SimulationState)
         sim_st.current_sweeps = []
         sim_st._cont_has_state = False
         sim_st._label_neuron_type = name

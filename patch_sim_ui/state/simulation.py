@@ -1,7 +1,8 @@
-"""Application state for the patch_sim web UI.
+"""Simulation state for the patch_sim web UI.
 
-All reactive variables and event handlers live here. The state drives
-the Reflex component tree via computed properties.
+SimulationState owns simulation results, sweep collections, continuous mode,
+and the figure computed var.  Cross-cutting state lives in the sibling
+substates (NeuronState, ProtocolState, VisibilityState, AnalysisState, LogState).
 """
 
 import asyncio
@@ -42,8 +43,8 @@ from patch_sim_ui.state.visibility import VisibilityState
 logger = logging.getLogger("patch_sim_ui.state")
 
 
-class AppState(rx.State):
-    """Top-level application state for simulation results and UI."""
+class SimulationState(rx.State):
+    """State for simulation results, sweep collections, and figure rendering."""
 
     # Synced copy of NeuronState.active_neuron_type used by add_sweep /
     # store_trace for labelling (avoids making those handlers async).
@@ -151,9 +152,19 @@ class AppState(rx.State):
         self._cont_has_state = False
         self.selected_sweep = -1
 
-    def reset_to_defaults(self) -> None:
-        """Reset all parameters and sweeps to their class-level defaults."""
+    async def reset_to_defaults(self) -> None:
+        """Reset all state vars across all substates to their class-level defaults."""
         self.reset()
+        neuron_st = await self.get_state(NeuronState)
+        neuron_st.reset()
+        proto_st = await self.get_state(ProtocolState)
+        proto_st.reset()
+        vis_st = await self.get_state(VisibilityState)
+        vis_st.reset()
+        analysis_st = await self.get_state(AnalysisState)
+        analysis_st.reset()
+        log_st = await self.get_state(LogState)
+        log_st.reset()
 
     def toggle_analysis_panel(self) -> None:
         """Toggle the right-hand analysis sidebar open or closed."""
@@ -351,7 +362,7 @@ class AppState(rx.State):
             self.continuous_mode = False
         else:
             self.continuous_mode = True
-            return AppState.run_continuous  # type: ignore[return-value]
+            return SimulationState.run_continuous  # type: ignore[return-value]
 
     @rx.event(background=True)
     async def run_continuous(self) -> AsyncGenerator[Any, None]:

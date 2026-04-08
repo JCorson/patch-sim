@@ -21,7 +21,7 @@ def _make_visibility_setter_async(field_name: str):
 
     The generated handler updates the server-side state var and issues a
     ``Plotly.restyle`` call to toggle the corresponding trace(s) client-side.
-    Implemented as async because it reads sweep data from AppState to build
+    Implemented as async because it reads sweep data from SimulationState to build
     the trace index map.
 
     Args:
@@ -34,17 +34,17 @@ def _make_visibility_setter_async(field_name: str):
 
     async def setter(self, value: bool):
         """Set the visibility flag and apply a client-side Plotly restyle."""
-        from patch_sim_ui.state.simulation import AppState
+        from patch_sim_ui.state.simulation import SimulationState
 
         setattr(self, field_name, value)
-        app_st = await self.get_state(AppState)
+        sim_st = await self.get_state(SimulationState)
         trace_map = compute_trace_visibility_map(
-            current_sweeps=app_st.current_sweeps,
-            saved_sweeps=app_st.saved_sweeps,
-            clamp_mode=app_st._figure_clamp_mode,
+            current_sweeps=sim_st.current_sweeps,
+            saved_sweeps=sim_st.saved_sweeps,
+            clamp_mode=sim_st._figure_clamp_mode,
             additional_current_field_map=_ADDITIONAL_CURRENT_FIELD_MAP,
             additional_gating_field_map=_ADDITIONAL_GATING_FIELD_MAP,
-            stored_traces=app_st.stored_traces,
+            stored_traces=sim_st.stored_traces,
         )
         indices = trace_map.get(field_name, [])
         if indices:

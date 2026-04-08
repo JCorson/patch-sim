@@ -3,7 +3,7 @@
 import reflex as rx
 
 from patch_sim_ui.constants import CURRENT_CLAMP
-from patch_sim_ui.state import AppState
+from patch_sim_ui.state import SimulationState
 from patch_sim_ui.state.log import LogState
 from patch_sim_ui.state.neuron import NeuronState
 from patch_sim_ui.state.protocol import ProtocolState
@@ -384,14 +384,14 @@ def sweep_manager() -> rx.Component:
             rx.tooltip(
                 rx.icon_button(
                     rx.icon("crosshair"),
-                    on_click=AppState.toggle_hover,
+                    on_click=SimulationState.toggle_hover,
                     size="1",
-                    variant=rx.cond(AppState.show_hover, "soft", "outline"),
-                    color_scheme=rx.cond(AppState.show_hover, "gray", "gray"),
+                    variant=rx.cond(SimulationState.show_hover, "soft", "outline"),
+                    color_scheme=rx.cond(SimulationState.show_hover, "gray", "gray"),
                     aria_label="Toggle hover tooltips",
                 ),
                 content=rx.cond(
-                    AppState.show_hover,
+                    SimulationState.show_hover,
                     "Hide hover tooltips",
                     "Show hover tooltips",
                 ),
@@ -406,41 +406,41 @@ def sweep_manager() -> rx.Component:
             ),
             rx.separator(orientation="vertical"),
             rx.text("Sweeps:", size="2", weight="bold"),
-            rx.foreach(AppState.saved_sweeps, _sweep_chip),
+            rx.foreach(SimulationState.saved_sweeps, _sweep_chip),
             rx.spacer(),
             rx.button(
                 "Add sweep",
-                on_click=AppState.add_sweep,
+                on_click=SimulationState.add_sweep,
                 size="1",
                 variant="soft",
-                disabled=~AppState.has_result,
+                disabled=~SimulationState.has_result,
             ),
             rx.button(
                 "Clear",
-                on_click=AppState.clear_sweeps,
+                on_click=SimulationState.clear_sweeps,
                 size="1",
                 variant="soft",
                 color_scheme="red",
-                disabled=AppState.saved_sweeps.length() == 0,
+                disabled=SimulationState.saved_sweeps.length() == 0,
             ),
             rx.separator(orientation="vertical"),
             rx.text("Stored:", size="2", weight="bold"),
-            rx.foreach(AppState.stored_traces, _stored_chip),
+            rx.foreach(SimulationState.stored_traces, _stored_chip),
             rx.button(
                 "Store",
-                on_click=AppState.store_trace,
+                on_click=SimulationState.store_trace,
                 size="1",
                 variant="soft",
                 color_scheme="orange",
-                disabled=~AppState.has_result,
+                disabled=~SimulationState.has_result,
             ),
             rx.button(
                 "Clear Stored",
-                on_click=AppState.clear_stored_traces,
+                on_click=SimulationState.clear_stored_traces,
                 size="1",
                 variant="soft",
                 color_scheme="red",
-                disabled=~AppState.has_stored_traces,
+                disabled=~SimulationState.has_stored_traces,
             ),
             spacing="2",
             align="center",

@@ -123,19 +123,19 @@ class ProtocolState(rx.State):
         """Switch between Current Clamp and Voltage Clamp modes.
 
         Resets ``protocol_type`` to the first option for the new mode and
-        clears all simulation results in AppState.  Syncs the
-        ``_figure_clamp_mode`` shadow copy so that AppState's ``figure_data``
+        clears all simulation results in SimulationState.  Syncs the
+        ``_figure_clamp_mode`` shadow copy so that SimulationState's ``figure_data``
         computed var stays consistent.
 
         Args:
             mode: New clamp mode string (``CURRENT_CLAMP`` or ``VOLTAGE_CLAMP``).
         """
-        from patch_sim_ui.state.simulation import AppState
+        from patch_sim_ui.state.simulation import SimulationState
 
         self._apply_clamp_mode(mode)
-        app_st = await self.get_state(AppState)
-        app_st._clear_for_new_protocol()
-        app_st._figure_clamp_mode = mode
+        sim_st = await self.get_state(SimulationState)
+        sim_st._clear_for_new_protocol()
+        sim_st._figure_clamp_mode = mode
 
     def _apply_protocol_preset(self, name: str, neuron_type: str = "") -> None:
         """Apply protocol preset parameters synchronously.
@@ -162,14 +162,14 @@ class ProtocolState(rx.State):
         """Load a protocol preset, applying neuron-type adjustments if active.
 
         Applies the base protocol preset, overlays neuron-type-specific
-        adjustments, clears simulation results in AppState, and syncs the
+        adjustments, clears simulation results in SimulationState, and syncs the
         ``_figure_clamp_mode`` shadow copy.
 
         Args:
             name: Key into PROTOCOL_PRESETS.  Ignored if not found.
         """
         from patch_sim_ui.state.neuron import NeuronState
-        from patch_sim_ui.state.simulation import AppState
+        from patch_sim_ui.state.simulation import SimulationState
 
         if name not in PROTOCOL_PRESETS:
             logger.debug("load_protocol_preset: unknown preset %r ignored", name)
@@ -177,9 +177,9 @@ class ProtocolState(rx.State):
         logger.info("Loaded protocol preset: %s", name)
         neuron_st = await self.get_state(NeuronState)
         self._apply_protocol_preset(name, neuron_st.active_neuron_type)
-        app_st = await self.get_state(AppState)
-        app_st._clear_for_new_protocol()
-        app_st._figure_clamp_mode = self.clamp_mode
+        sim_st = await self.get_state(SimulationState)
+        sim_st._clear_for_new_protocol()
+        sim_st._figure_clamp_mode = self.clamp_mode
 
     # ------------------------------------------------------------------ #
     # Numeric field setters                                              #

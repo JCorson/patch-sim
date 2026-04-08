@@ -490,7 +490,7 @@ _SWEEP_HIGHLIGHT_JS = """
 # ------------------------------------------------------------------ #
 
 
-def _make_bool_setter(field_name: str, class_name: str = "AppState"):
+def _make_bool_setter(field_name: str, class_name: str = "SimulationState"):
     """Factory returning a bool event handler for ``field_name``.
 
     Args:
@@ -511,7 +511,7 @@ def _make_bool_setter(field_name: str, class_name: str = "AppState"):
     return setter
 
 
-def _make_visibility_setter(field_name: str, class_name: str = "AppState"):
+def _make_visibility_setter(field_name: str, class_name: str = "SimulationState"):
     """Factory returning a visibility event handler for ``field_name``.
 
     The generated handler updates the server-side state var and issues a
@@ -554,7 +554,7 @@ def _make_visibility_setter(field_name: str, class_name: str = "AppState"):
     return setter
 
 
-def _make_float_setter(field_name: str, class_name: str = "AppState"):
+def _make_float_setter(field_name: str, class_name: str = "SimulationState"):
     """Factory returning a float-coercing event handler for ``field_name``.
 
     Args:
