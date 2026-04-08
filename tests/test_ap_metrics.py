@@ -9,8 +9,11 @@ import numpy as np
 import pytest
 
 import patch_sim
-from patch_sim.analysis.ap_metrics import analyze_aps, analyze_aps_from_result
-from patch_sim.analysis.results import APAnalysisResult
+from patch_sim.analysis.ap_metrics import (
+    APAnalysisResult,
+    analyze_aps,
+    analyze_aps_from_result,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
