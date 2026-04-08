@@ -3,6 +3,10 @@
 Provides :func:`analyze_aps` for extracting standard AP metrics from a
 voltage trace, and :func:`analyze_aps_from_result` as a convenience wrapper
 for :class:`~patch_sim.clamp_simulations.SimulationResult` structured arrays.
+
+Data classes:
+    SpikeMetrics: Per-spike measurement record.
+    APAnalysisResult: Aggregated AP analysis output.
 """
 
 # Needed so that the SimulationResult annotation in analyze_aps_from_result is
@@ -15,10 +19,74 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .results import APAnalysisResult, SpikeMetrics
-
 if TYPE_CHECKING:
     from patch_sim.clamp_simulations import SimulationResult
+
+
+@dataclasses.dataclass
+class SpikeMetrics:
+    """Metrics for a single detected action potential.
+
+    Attributes:
+        index: Zero-based spike number within the trace.
+        threshold_voltage: Membrane voltage at spike onset (mV), defined as
+            the point where dV/dt first exceeds the detection threshold.
+        threshold_time: Time of threshold crossing (ms).
+        peak_voltage: Maximum membrane voltage during the spike (mV).
+        peak_time: Time of peak voltage (ms).
+        rise_time: Duration from threshold crossing to peak (ms).
+        half_width: Spike duration measured at the half-amplitude level
+            between threshold voltage and peak voltage (ms).
+        ahp_depth: Minimum membrane voltage after the spike trough (mV).
+            ``None`` when no trough region is available (e.g. last spike
+            with no subsequent data).
+    """
+
+    index: int
+    threshold_voltage: float
+    threshold_time: float
+    peak_voltage: float
+    peak_time: float
+    rise_time: float
+    half_width: float
+    ahp_depth: float | None
+
+
+@dataclasses.dataclass
+class APAnalysisResult:
+    """Complete action potential analysis of a voltage trace.
+
+    Attributes:
+        spike_count: Number of detected spikes.
+        spikes: Per-spike metrics for each detected spike.
+        isis: Inter-spike intervals in ms (length = spike_count - 1).
+        mean_threshold_voltage: Mean threshold voltage across all spikes (mV),
+            or ``None`` when no spikes were detected.
+        mean_peak_voltage: Mean peak voltage across all spikes (mV), or
+            ``None`` when no spikes were detected.
+        mean_rise_time: Mean rise time across all spikes (ms), or ``None``
+            when no spikes were detected.
+        mean_half_width: Mean half-width across all spikes (ms), or ``None``
+            when no spikes were detected.
+        mean_ahp_depth: Mean AHP depth across spikes that have a measurable
+            trough (mV), or ``None`` when no such spikes exist.
+        mean_isi: Mean inter-spike interval (ms), or ``None`` when fewer
+            than two spikes were detected.
+        firing_rate: Mean firing rate in Hz (``1000 / mean_isi``), or
+            ``None`` when fewer than two spikes were detected.
+    """
+
+    spike_count: int
+    spikes: list[SpikeMetrics]
+    isis: list[float]
+    mean_threshold_voltage: float | None
+    mean_peak_voltage: float | None
+    mean_rise_time: float | None
+    mean_half_width: float | None
+    mean_ahp_depth: float | None
+    mean_isi: float | None
+    firing_rate: float | None
+
 
 #: Minimum number of samples that must separate two threshold crossings.
 #: Corresponds to a ~1 ms refractory period at the project's standard 40 kHz
@@ -103,8 +171,8 @@ def analyze_aps(
             peak well below 0 mV.
 
     Returns:
-        An :class:`~patch_sim.analysis.results.APAnalysisResult` containing
-        per-spike metrics and aggregate summary statistics.
+        An :class:`APAnalysisResult` containing per-spike metrics and
+        aggregate summary statistics.
     """
     time = np.asarray(time, dtype=float)
     voltage = np.asarray(voltage, dtype=float)
@@ -254,7 +322,7 @@ def analyze_aps_from_result(
         min_spike_height: Minimum peak voltage for a valid spike (mV).
 
     Returns:
-        An :class:`~patch_sim.analysis.results.APAnalysisResult`.
+        An :class:`APAnalysisResult`.
     """
     return analyze_aps(
         result["time"],
@@ -268,8 +336,8 @@ def _empty_result() -> APAnalysisResult:
     """Return an APAnalysisResult representing a trace with no detected spikes.
 
     Returns:
-        An :class:`~patch_sim.analysis.results.APAnalysisResult` with
-        ``spike_count`` of 0 and all summary fields set to ``None``.
+        An :class:`APAnalysisResult` with ``spike_count`` of 0 and all
+        summary fields set to ``None``.
     """
     return APAnalysisResult(
         spike_count=0,

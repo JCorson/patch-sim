@@ -8,8 +8,12 @@ import numpy as np
 import pytest
 
 import patch_sim
-from patch_sim.analysis.iv_curve import analyze_iv, compute_iv_point
-from patch_sim.analysis.results import IVAnalysisResult, IVPoint
+from patch_sim.analysis.iv_curve import (
+    IVAnalysisResult,
+    IVPoint,
+    analyze_iv,
+    compute_iv_point,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers

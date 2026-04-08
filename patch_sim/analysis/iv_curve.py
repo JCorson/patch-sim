@@ -3,11 +3,72 @@
 Provides functions to extract peak (inward and outward) and steady-state
 currents from each voltage step of a multi-sweep voltage clamp experiment
 and assemble the results into an :class:`IVAnalysisResult`.
+
+Data classes:
+    IVPoint: Per-step current measurement record.
+    IVAnalysisResult: Aggregated I-V analysis output.
 """
+
+import dataclasses
 
 import numpy as np
 
-from .results import IVAnalysisResult, IVPoint
+
+@dataclasses.dataclass
+class IVPoint:
+    """Current measurements for a single voltage step in an I-V protocol.
+
+    Attributes:
+        voltage_step: Command voltage applied during the step (mV).
+        peak_inward_current: Most negative (inward) current during the step
+            (µA/cm²).
+        peak_outward_current: Most positive (outward) current during the step
+            (µA/cm²).
+        steady_state_current: Mean current over the last 10% of the stimulus
+            window (µA/cm²).
+    """
+
+    voltage_step: float
+    peak_inward_current: float
+    peak_outward_current: float
+    steady_state_current: float
+
+
+@dataclasses.dataclass
+class IVAnalysisResult:
+    """Complete I-V analysis from a multi-sweep voltage clamp simulation.
+
+    Points are stored in ascending order of voltage step.  The convenience
+    properties ``voltage_steps``, ``peak_inward_currents``,
+    ``peak_outward_currents``, and ``steady_state_currents`` extract the
+    corresponding field from each point on demand.
+
+    Attributes:
+        points: Per-step measurements, one entry per voltage step, sorted by
+            ascending voltage.
+    """
+
+    points: list[IVPoint]
+
+    @property
+    def voltage_steps(self) -> list[float]:
+        """Command voltages in mV, sorted ascending."""
+        return [p.voltage_step for p in self.points]
+
+    @property
+    def peak_inward_currents(self) -> list[float]:
+        """Most negative current at each step (µA/cm²)."""
+        return [p.peak_inward_current for p in self.points]
+
+    @property
+    def peak_outward_currents(self) -> list[float]:
+        """Most positive current at each step (µA/cm²)."""
+        return [p.peak_outward_current for p in self.points]
+
+    @property
+    def steady_state_currents(self) -> list[float]:
+        """Steady-state current at each step (µA/cm²)."""
+        return [p.steady_state_current for p in self.points]
 
 
 def compute_iv_point(
