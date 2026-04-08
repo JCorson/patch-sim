@@ -57,7 +57,6 @@ from patch_sim_ui.plotting import (
     Sweep,
     TraceVisibility,
     build_figure,
-    build_iv_figure,
     compute_trace_visibility_map,
 )
 from patch_sim_ui.state._common import (
@@ -74,6 +73,7 @@ from patch_sim_ui.state._common import (
     _make_float_setter,
     _make_visibility_setter,
 )
+from patch_sim_ui.state.analysis import AnalysisState
 from patch_sim_ui.state.log import LogState
 
 logger = logging.getLogger("patch_sim_ui.state")
@@ -175,17 +175,6 @@ class AppState(rx.State):
     stored_traces: list[Sweep] = []  # Oscilloscope-style stored reference traces
 
     # ------------------------------------------------------------------ #
-    # AP analysis results                                                #
-    # ------------------------------------------------------------------ #
-    ap_metrics: list[dict[str, Any]] = []  # Per-spike metrics (serialized)
-    ap_summary: dict[str, Any] = {}  # Aggregate summary statistics
-
-    # ------------------------------------------------------------------ #
-    # I-V analysis results                                                #
-    # ------------------------------------------------------------------ #
-    iv_data: dict[str, Any] = {}  # Serialized IVAnalysisResult for the UI
-
-    # ------------------------------------------------------------------ #
     # Trace visibility checkboxes                                        #
     # ------------------------------------------------------------------ #
     show_voltage: bool = True
@@ -258,29 +247,6 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     # AP analysis computed properties                                   #
     # ------------------------------------------------------------------ #
-    @rx.var
-    def has_ap_metrics(self) -> bool:
-        """Return True when AP analysis results are available for display."""
-        return len(self.ap_metrics) > 0
-
-    # ------------------------------------------------------------------ #
-    # I-V analysis computed properties                                    #
-    # ------------------------------------------------------------------ #
-    @rx.var
-    def has_iv_data(self) -> bool:
-        """Return True when I-V analysis results are available for display."""
-        return len(self.iv_data) > 0
-
-    @rx.var
-    def iv_figure(self) -> go.Figure:
-        """Return a Plotly I-V curve figure.
-
-        Returns an empty figure when no I-V data is available.
-        """
-        if not self.iv_data:
-            return go.Figure()
-        return build_iv_figure(self.iv_data)
-
     # ------------------------------------------------------------------ #
     # Derived reversal potentials (shown as read-only in neuron panel)  #
     # ------------------------------------------------------------------ #
@@ -1008,10 +974,11 @@ class AppState(rx.State):
                 new_sweeps = await loop.run_in_executor(None, _run_batch)
                 async with self:
                     self.current_sweeps = new_sweeps
-                    self.ap_metrics = []
-                    self.ap_summary = {}
+                    analysis_st = await self.get_state(AnalysisState)
+                    analysis_st.ap_metrics = []
+                    analysis_st.ap_summary = {}
                     if mode == VOLTAGE_CLAMP:
-                        self.iv_data = _compute_iv_data(
+                        analysis_st.iv_data = _compute_iv_data(
                             new_sweeps,
                             self.min_stimulus,
                             self.max_stimulus,
@@ -1020,7 +987,7 @@ class AppState(rx.State):
                             self.stimulus_duration,
                         )
                     else:
-                        self.iv_data = {}
+                        analysis_st.iv_data = {}
 
             else:
                 stimulus, _ = protocols[0]
@@ -1029,9 +996,10 @@ class AppState(rx.State):
                     self.current_sweeps = [
                         Sweep.from_result(result, stimulus, "", "", mode)
                     ]
+                    analysis_st = await self.get_state(AnalysisState)
                     if mode == CURRENT_CLAMP:
                         ap_result = patch_sim.analyze_aps_from_result(result)
-                        self.ap_metrics = [
+                        analysis_st.ap_metrics = [
                             {
                                 "index": s.index,
                                 "threshold_voltage": f"{s.threshold_voltage:.1f}",
@@ -1046,7 +1014,7 @@ class AppState(rx.State):
                             }
                             for s in ap_result.spikes
                         ]
-                        self.ap_summary = {
+                        analysis_st.ap_summary = {
                             "spike_count": str(ap_result.spike_count),
                             "mean_threshold_voltage": (
                                 f"{ap_result.mean_threshold_voltage:.1f}"
@@ -1084,10 +1052,11 @@ class AppState(rx.State):
                                 else "\u2014"
                             ),
                         }
+                        analysis_st.iv_data = {}
                     else:
-                        self.ap_metrics = []
-                        self.ap_summary = {}
-                        self.iv_data = {}
+                        analysis_st.ap_metrics = []
+                        analysis_st.ap_summary = {}
+                        analysis_st.iv_data = {}
 
         except ValueError as exc:
             logger.exception("Simulation error: %s", exc)
