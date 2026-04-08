@@ -5,6 +5,7 @@ import reflex as rx
 from patch_sim_ui.constants import CURRENT_CLAMP
 from patch_sim_ui.state import AppState
 from patch_sim_ui.state.log import LogState
+from patch_sim_ui.state.neuron import NeuronState
 
 
 def _trace_checkbox(label: str, var: rx.Var, handler) -> rx.Component:
@@ -85,7 +86,7 @@ def _channel_trace_group(
 _ADDITIONAL_CHANNEL_TRACE_SPECS = [
     (
         "Ih (HCN)",
-        AppState.ih_enabled,
+        NeuronState.ih_enabled,
         "I_Ih",
         AppState.show_ih_current,
         AppState.set_show_ih_current,
@@ -95,7 +96,7 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
     ),
     (
         "IKa (A-type K\u207a)",
-        AppState.ika_enabled,
+        NeuronState.ika_enabled,
         "I_IKa",
         AppState.show_ika_current,
         AppState.set_show_ika_current,
@@ -105,7 +106,7 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
     ),
     (
         "IKv31 (Kv3.1-type K\u207a)",
-        AppState.ikv31_enabled,
+        NeuronState.ikv31_enabled,
         "I_IKv31",
         AppState.show_ikv31_current,
         AppState.set_show_ikv31_current,
@@ -115,7 +116,7 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
     ),
     (
         "INaP (Persistent Na\u207a)",
-        AppState.inap_enabled,
+        NeuronState.inap_enabled,
         "I_INaP",
         AppState.show_inap_current,
         AppState.set_show_inap_current,
@@ -125,7 +126,7 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
     ),
     (
         "INaR (Resurgent Na\u207a)",
-        AppState.inar_enabled,
+        NeuronState.inar_enabled,
         "I_INaR",
         AppState.show_inar_current,
         AppState.set_show_inar_current,
@@ -135,7 +136,7 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
     ),
     (
         "IM (Muscarinic K\u207a)",
-        AppState.im_enabled,
+        NeuronState.im_enabled,
         "I_IM",
         AppState.show_im_current,
         AppState.set_show_im_current,
@@ -145,7 +146,7 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
     ),
     (
         "IKir (Inward Rectifier K\u207a)",
-        AppState.ikir_enabled,
+        NeuronState.ikir_enabled,
         "I_IKir",
         AppState.show_ikir_current,
         AppState.set_show_ikir_current,
@@ -155,7 +156,7 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
     ),
     (
         "IKCa (Ca\u00b2\u207a-activated K\u207a)",
-        AppState.ikca_enabled,
+        NeuronState.ikca_enabled,
         "I_IKCa",
         AppState.show_ikca_current,
         AppState.set_show_ikca_current,
@@ -165,7 +166,7 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
     ),
     (
         "ICaL (L-type Ca\u00b2\u207a)",
-        AppState.ical_enabled,
+        NeuronState.ical_enabled,
         "I_ICaL",
         AppState.show_ical_current,
         AppState.set_show_ical_current,
@@ -175,7 +176,7 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
     ),
     (
         "ICaT (T-type Ca\u00b2\u207a)",
-        AppState.icat_enabled,
+        NeuronState.icat_enabled,
         "I_ICaT",
         AppState.show_icat_current,
         AppState.set_show_icat_current,
@@ -185,7 +186,7 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
     ),
     (
         "ICaN (N-type Ca\u00b2\u207a)",
-        AppState.ican_enabled,
+        NeuronState.ican_enabled,
         "I_ICaN",
         AppState.show_ican_current,
         AppState.set_show_ican_current,

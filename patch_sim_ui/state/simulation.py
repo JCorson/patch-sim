@@ -17,31 +17,6 @@ import patch_sim
 import patch_sim.clamp_simulations
 from patch_sim.constants import (
     CURRENT_CLAMP,
-    DEFAULT_C_M,
-    DEFAULT_CA_IN,
-    DEFAULT_CA_OUT,
-    DEFAULT_CL_IN,
-    DEFAULT_CL_OUT,
-    DEFAULT_G_ICAL,
-    DEFAULT_G_ICAN,
-    DEFAULT_G_ICAT,
-    DEFAULT_G_IH,
-    DEFAULT_G_IKA,
-    DEFAULT_G_IKCA,
-    DEFAULT_G_IKIR,
-    DEFAULT_G_IKV31,
-    DEFAULT_G_IM,
-    DEFAULT_G_K,
-    DEFAULT_G_L,
-    DEFAULT_G_NA,
-    DEFAULT_G_NAP,
-    DEFAULT_G_NAR,
-    DEFAULT_K_IN,
-    DEFAULT_K_OUT,
-    DEFAULT_NA_IN,
-    DEFAULT_NA_OUT,
-    DEFAULT_T,
-    DEFAULT_V_REST,
     VOLTAGE_CLAMP,
 )
 from patch_sim.presets import (
@@ -62,19 +37,18 @@ from patch_sim_ui.plotting import (
 from patch_sim_ui.state._common import (
     _ADDITIONAL_CURRENT_FIELD_MAP,
     _ADDITIONAL_GATING_FIELD_MAP,
-    _FLOAT_FIELDS,
     _LOG_SCROLL_JS,
-    _NON_VISIBILITY_BOOL_FIELDS,
     _PLOTLY_GD_JS,
+    _PROTOCOL_FLOAT_FIELDS,
     _SWEEP_HIGHLIGHT_JS,
     _VISIBILITY_FIELDS,
     _compute_iv_data,
-    _make_bool_setter,
     _make_float_setter,
     _make_visibility_setter,
 )
 from patch_sim_ui.state.analysis import AnalysisState
 from patch_sim_ui.state.log import LogState
+from patch_sim_ui.state.neuron import NeuronState
 
 logger = logging.getLogger("patch_sim_ui.state")
 
@@ -83,54 +57,12 @@ class AppState(rx.State):
     """Top-level application state."""
 
     # ------------------------------------------------------------------ #
-    # Neuron parameters                                                   #
-    # ------------------------------------------------------------------ #
-    g_Na: float = DEFAULT_G_NA
-    g_K: float = DEFAULT_G_K
-    g_L: float = DEFAULT_G_L
-    C_m: float = DEFAULT_C_M
-    v_rest: float = DEFAULT_V_REST
-    Na_out: float = DEFAULT_NA_OUT
-    Na_in: float = DEFAULT_NA_IN
-    K_out: float = DEFAULT_K_OUT
-    K_in: float = DEFAULT_K_IN
-    Cl_out: float = DEFAULT_CL_OUT
-    Cl_in: float = DEFAULT_CL_IN
-    Ca_out: float = DEFAULT_CA_OUT
-    Ca_in: float = DEFAULT_CA_IN
-    T: float = DEFAULT_T
-
-    # ------------------------------------------------------------------ #
-    # Additional channels                                                 #
-    # ------------------------------------------------------------------ #
-    ih_enabled: bool = False
-    ih_g_max: float = DEFAULT_G_IH
-    ika_enabled: bool = False
-    ika_g_max: float = DEFAULT_G_IKA
-    ikv31_enabled: bool = False
-    ikv31_g_max: float = DEFAULT_G_IKV31
-    inap_enabled: bool = False
-    inap_g_max: float = DEFAULT_G_NAP
-    inar_enabled: bool = False
-    inar_g_max: float = DEFAULT_G_NAR
-    im_enabled: bool = False
-    im_g_max: float = DEFAULT_G_IM
-    ikir_enabled: bool = False
-    ikir_g_max: float = DEFAULT_G_IKIR
-    ikca_enabled: bool = False
-    ikca_g_max: float = DEFAULT_G_IKCA
-    ical_enabled: bool = False
-    ical_g_max: float = DEFAULT_G_ICAL
-    icat_enabled: bool = False
-    icat_g_max: float = DEFAULT_G_ICAT
-    ican_enabled: bool = False
-    ican_g_max: float = DEFAULT_G_ICAN
-
-    # ------------------------------------------------------------------ #
     # Experiment mode                                                     #
     # ------------------------------------------------------------------ #
-    active_neuron_type: str = "Squid Giant Axon (Classic HH)"  # selected preset
     clamp_mode: str = CURRENT_CLAMP  # CURRENT_CLAMP | VOLTAGE_CLAMP
+    # Synced copy of NeuronState.active_neuron_type used by add_sweep /
+    # store_trace for labelling (avoids making those handlers async).
+    _label_neuron_type: str = "Squid Giant Axon (Classic HH)"
 
     # ------------------------------------------------------------------ #
     # Protocol parameters                                                #
@@ -247,29 +179,6 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     # AP analysis computed properties                                   #
     # ------------------------------------------------------------------ #
-    # ------------------------------------------------------------------ #
-    # Derived reversal potentials (shown as read-only in neuron panel)  #
-    # ------------------------------------------------------------------ #
-    @rx.var
-    def E_Na(self) -> float:
-        """Sodium reversal potential in mV."""
-        return float(patch_sim.nernst_potential(1, self.T, self.Na_out, self.Na_in))
-
-    @rx.var
-    def E_K(self) -> float:
-        """Potassium reversal potential in mV."""
-        return float(patch_sim.nernst_potential(1, self.T, self.K_out, self.K_in))
-
-    @rx.var
-    def E_L(self) -> float:
-        """Leak reversal potential in mV."""
-        return float(patch_sim.nernst_potential(-1, self.T, self.Cl_out, self.Cl_in))
-
-    @rx.var
-    def E_Ca(self) -> float:
-        """Calcium reversal potential in mV (z=+2)."""
-        return float(patch_sim.nernst_potential(2, self.T, self.Ca_out, self.Ca_in))
-
     @rx.var
     def protocol_options(self) -> list[str]:
         """Protocol type options filtered by clamp mode."""
@@ -391,30 +300,32 @@ class AppState(rx.State):
         )
         return rx.call_script(js)
 
-    def load_neuron_preset(self, name: str) -> None:
-        """Load a neuron-type preset, updating only neuron parameters.
+    def _apply_protocol_preset(self, name: str, neuron_type: str = "") -> None:
+        """Apply a protocol preset synchronously, with optional neuron-type adjustments.
 
-        Sets conductances and auxiliary channel configuration for the selected
-        neuron type without touching any protocol settings.  Records the active
-        neuron type so that subsequent protocol preset loads can apply
-        neuron-specific adjustments via NEURON_PROTOCOL_ADJUSTMENTS.
+        Sets all protocol parameters for the given preset, overlays any
+        neuron-type-specific adjustments, then clears all sweep / trace
+        collections and resets the continuous-mode state flag.
 
         Args:
-            name: Key into ``patch_sim_ui.presets.NEURON_UI_PRESETS``.
-                Ignored if not found.
+            name: Key into PROTOCOL_PRESETS.  Silently ignored if not found.
+            neuron_type: Active neuron type name used to look up adjustments in
+                NEURON_PROTOCOL_ADJUSTMENTS.  Pass an empty string to skip.
         """
-        if name not in presets.NEURON_UI_PRESETS:
-            logger.debug("load_neuron_preset: unknown preset %r ignored", name)
+        if name not in PROTOCOL_PRESETS:
             return
-        logger.info("Loaded neuron preset: %s", name)
-        config = presets.NEURON_UI_PRESETS[name]
+        config = dict(PROTOCOL_PRESETS[name])
+        adjustments = NEURON_PROTOCOL_ADJUSTMENTS.get(neuron_type, {}).get(name, {})
+        config.update(adjustments)
+        config.update(presets.PROTOCOL_NEURON_OVERRIDES.get(name, {}))
         for key, value in config.items():
             setattr(self, key, value)
-        self.active_neuron_type = name
         self.current_sweeps = []
+        self.saved_sweeps = []
+        self.stored_traces = []
         self._cont_has_state = False
 
-    def load_protocol_preset(self, name: str) -> None:
+    async def load_protocol_preset(self, name: str) -> None:
         """Load a protocol preset, applying neuron-type adjustments if active.
 
         Applies the base protocol preset, then overlays any entries from
@@ -428,18 +339,8 @@ class AppState(rx.State):
             logger.debug("load_protocol_preset: unknown preset %r ignored", name)
             return
         logger.info("Loaded protocol preset: %s", name)
-        config = dict(PROTOCOL_PRESETS[name])
-        adjustments = NEURON_PROTOCOL_ADJUSTMENTS.get(self.active_neuron_type, {}).get(
-            name, {}
-        )
-        config.update(adjustments)
-        config.update(presets.PROTOCOL_NEURON_OVERRIDES.get(name, {}))
-        for key, value in config.items():
-            setattr(self, key, value)
-        self.current_sweeps = []
-        self.saved_sweeps = []
-        self.stored_traces = []
-        self._cont_has_state = False
+        neuron_st = await self.get_state(NeuronState)
+        self._apply_protocol_preset(name, neuron_st.active_neuron_type)
 
     # ------------------------------------------------------------------ #
     # Numeric field setters                                              #
@@ -457,9 +358,9 @@ class AppState(rx.State):
         except (ValueError, TypeError):
             pass
 
-    # One setter per float field — generated at class-definition time so
-    # Reflex's metaclass sees them as regular event handlers.
-    for _f in _FLOAT_FIELDS:
+    # One setter per protocol float field — generated at class-definition time
+    # so Reflex's metaclass sees them as regular event handlers.
+    for _f in _PROTOCOL_FLOAT_FIELDS:
         vars()[f"set_{_f}"] = _make_float_setter(_f)
 
     # Stimulus range setters — custom logic to keep stimulus_step valid.
@@ -516,10 +417,6 @@ class AppState(rx.State):
             self.stimulus_step = 1.0
             return
         self.stimulus_step = parsed
-
-    # Non-visibility bool setters (channel enable/disable).
-    for _f in _NON_VISIBILITY_BOOL_FIELDS:
-        vars()[f"set_{_f}"] = _make_bool_setter(_f)
 
     # Visibility setters: update state + issue client-side Plotly.restyle.
     for _f in _VISIBILITY_FIELDS:
@@ -607,7 +504,7 @@ class AppState(rx.State):
                 sweep.model_copy(
                     update={
                         "color": color,
-                        "label": f"Sweep {idx + 1} ({self.active_neuron_type})",
+                        "label": f"Sweep {idx + 1} ({self._label_neuron_type})",
                     }
                 )
             )
@@ -632,7 +529,7 @@ class AppState(rx.State):
             return
         idx = len(self.stored_traces)
         color = constants.STORED_TRACE_COLORS[idx % len(constants.STORED_TRACE_COLORS)]
-        label = f"Stored {idx + 1} ({self.active_neuron_type})"
+        label = f"Stored {idx + 1} ({self._label_neuron_type})"
         self.stored_traces.append(
             self.current_sweeps[0].model_copy(update={"color": color, "label": label})
         )
@@ -650,32 +547,6 @@ class AppState(rx.State):
     # ------------------------------------------------------------------ #
     # Simulation helpers (called while holding the state lock)          #
     # ------------------------------------------------------------------ #
-    def _build_neuron(self) -> "patch_sim.Neuron":
-        """Construct a Neuron from current state parameters."""
-        channels = tuple(
-            patch_sim.ChannelConfig(factory, g_max=getattr(self, f"{name}_g_max"))
-            for name, factory in patch_sim.CHANNEL_REGISTRY.items()
-            if getattr(self, f"{name}_enabled")
-        )
-        config = patch_sim.NeuronConfig(
-            g_Na=self.g_Na,
-            g_K=self.g_K,
-            g_L=self.g_L,
-            C_m=self.C_m,
-            v_rest=self.v_rest,
-            Na_out=self.Na_out,
-            Na_in=self.Na_in,
-            K_out=self.K_out,
-            K_in=self.K_in,
-            Cl_out=self.Cl_out,
-            Cl_in=self.Cl_in,
-            Ca_out=self.Ca_out,
-            Ca_in=self.Ca_in,
-            T=self.T,
-            channels=channels,
-        )
-        return patch_sim.make_neuron(config=config)
-
     def _attach_step_labels(
         self, arrays: "np.ndarray", fmt: str
     ) -> "list[tuple[np.ndarray, str]]":
@@ -801,7 +672,8 @@ class AppState(rx.State):
 
                     mode = self.clamp_mode
                     ptype = self.protocol_type
-                    neuron = self._build_neuron()
+                    neuron_st = await self.get_state(NeuronState)
+                    neuron = neuron_st._build_neuron()
                     stimulus = self._build_protocols()[0][0]
                     use_prior_state = self._cont_has_state
                     prior_V = self._cont_V
@@ -922,7 +794,8 @@ class AppState(rx.State):
             self.is_running = True
             self.error_message = ""
             self.selected_sweep = -1
-            neuron = self._build_neuron()
+            neuron_st = await self.get_state(NeuronState)
+            neuron = neuron_st._build_neuron()
             mode = self.clamp_mode
             ptype = self.protocol_type
             try:

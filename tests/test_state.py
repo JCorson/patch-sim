@@ -32,6 +32,7 @@ from patch_sim_ui.log_handler import UILogRecord  # noqa: E402
 from patch_sim_ui.plotting import Sweep  # noqa: E402
 from patch_sim_ui.state import AppState  # noqa: E402
 from patch_sim_ui.state.log import LogState  # noqa: E402
+from patch_sim_ui.state.neuron import NeuronState  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -46,6 +47,11 @@ def _make_state() -> AppState:
 def _make_log_state() -> LogState:
     """Return a fresh LogState instance bypassing the Reflex runtime guard."""
     return LogState(_reflex_internal_init=True)
+
+
+def _make_neuron_state() -> NeuronState:
+    """Return a fresh NeuronState instance bypassing the Reflex runtime guard."""
+    return NeuronState(_reflex_internal_init=True)
 
 
 def _make_sweep(label: str = "test", color: str = "#000000") -> Sweep:
@@ -233,63 +239,63 @@ def test_clear_sweeps_on_empty_list_does_not_raise() -> None:
 def test_load_protocol_preset_action_potential_sets_stimulus_duration() -> None:
     """Loading 'Action Potential' preset sets stimulus_duration to 30.0."""
     s = _make_state()
-    s.load_protocol_preset("Action Potential")
+    s._apply_protocol_preset("Action Potential")
     assert s.stimulus_duration == pytest.approx(30.0)
 
 
 def test_load_protocol_preset_action_potential_sets_clamp_mode() -> None:
     """Loading 'Action Potential' preset sets clamp_mode to 'Current Clamp'."""
     s = _make_state()
-    s.load_protocol_preset("Action Potential")
+    s._apply_protocol_preset("Action Potential")
     assert s.clamp_mode == "Current Clamp"
 
 
 def test_load_protocol_preset_repetitive_firing_sets_stimulus_duration() -> None:
     """Loading 'Repetitive Firing' preset sets stimulus_duration to 180.0."""
     s = _make_state()
-    s.load_protocol_preset("Repetitive Firing")
+    s._apply_protocol_preset("Repetitive Firing")
     assert s.stimulus_duration == pytest.approx(180.0)
 
 
 def test_load_protocol_preset_iv_curve_sets_voltage_clamp_mode() -> None:
     """Loading 'I-V Curve' preset sets clamp_mode to 'Voltage Clamp'."""
     s = _make_state()
-    s.load_protocol_preset("I-V Curve")
+    s._apply_protocol_preset("I-V Curve")
     assert s.clamp_mode == "Voltage Clamp"
 
 
 def test_load_protocol_preset_clears_current_sweeps() -> None:
-    """load_protocol_preset resets current_sweeps to an empty list."""
+    """_apply_protocol_preset resets current_sweeps to an empty list."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
-    s.load_protocol_preset("Action Potential")
+    s._apply_protocol_preset("Action Potential")
     assert len(s.current_sweeps) == 0
 
 
 def test_load_protocol_preset_clears_saved_sweeps() -> None:
-    """load_protocol_preset resets saved_sweeps to an empty list."""
+    """_apply_protocol_preset resets saved_sweeps to an empty list."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     s.add_sweep()
-    s.load_protocol_preset("Action Potential")
+    s._apply_protocol_preset("Action Potential")
     assert len(s.saved_sweeps) == 0
 
 
 def test_load_protocol_preset_clears_stored_traces() -> None:
-    """load_protocol_preset resets stored_traces to an empty list."""
+    """_apply_protocol_preset resets stored_traces to an empty list."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     s.store_trace()
     assert len(s.stored_traces) == 1
-    s.load_protocol_preset("Action Potential")
+    s._apply_protocol_preset("Action Potential")
     assert len(s.stored_traces) == 0
 
 
 def test_load_protocol_preset_resets_cont_has_state() -> None:
-    """load_protocol_preset resets _cont_has_state before the next continuous run."""
+    """_apply_protocol_preset resets _cont_has_state before the next continuous run."""
     s = _make_state()
     s._cont_has_state = True
-    s.load_protocol_preset("Action Potential")
+    s._apply_protocol_preset("Action Potential")
     assert s._cont_has_state is False
 
 
@@ -297,7 +303,7 @@ def test_load_protocol_preset_unknown_name_is_ignored() -> None:
     """load_protocol_preset silently ignores an unknown preset name."""
     s = _make_state()
     original = s.stimulus_duration
-    s.load_protocol_preset("NonExistentPreset")
+    s._apply_protocol_preset("NonExistentPreset")
     assert s.stimulus_duration == pytest.approx(original)
 
 
@@ -307,108 +313,75 @@ def test_load_protocol_preset_unknown_name_is_ignored() -> None:
 
 
 def test_load_neuron_preset_fast_spiking_interneuron() -> None:
-    """Fast-Spiking Interneuron preset enables IKv31; protocol fields are unchanged."""
-    s = _make_state()
-    original_duration = s.stimulus_duration
-    original_clamp = s.clamp_mode
-    s.load_neuron_preset(FAST_SPIKING_INTERNEURON)
-    assert s.ikv31_enabled is True
-    assert s.ika_enabled is False
-    assert s.stimulus_duration == pytest.approx(original_duration)
-    assert s.clamp_mode == original_clamp
+    """Fast-Spiking Interneuron preset enables IKv31 and leaves IKa disabled."""
+    ns = _make_neuron_state()
+    ns._apply_neuron_preset(FAST_SPIKING_INTERNEURON)
+    assert ns.ikv31_enabled is True
+    assert ns.ika_enabled is False
 
 
 def test_load_neuron_preset_sets_active_neuron_type() -> None:
-    """load_neuron_preset records the selected neuron type on the state."""
-    s = _make_state()
-    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
-    assert s.active_neuron_type == CORTICAL_PYRAMIDAL
+    """_apply_neuron_preset records the selected neuron type on NeuronState."""
+    ns = _make_neuron_state()
+    ns._apply_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert ns.active_neuron_type == CORTICAL_PYRAMIDAL
 
 
 def test_load_neuron_preset_resets_previously_enabled_channels() -> None:
     """Loading a second neuron preset disables channels from the first."""
-    s = _make_state()
-    s.load_neuron_preset(FAST_SPIKING_INTERNEURON)
-    assert s.ikv31_enabled is True
-    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
-    assert s.ikv31_enabled is False
+    ns = _make_neuron_state()
+    ns._apply_neuron_preset(FAST_SPIKING_INTERNEURON)
+    assert ns.ikv31_enabled is True
+    ns._apply_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert ns.ikv31_enabled is False
 
 
 def test_load_neuron_preset_pyramidal_neuron() -> None:
     """Pyramidal Neuron preset enables Ih, INaP, and IM channels."""
-    s = _make_state()
-    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
-    assert s.ih_enabled is True
-    assert s.inap_enabled is True
-    assert s.im_enabled is True
+    ns = _make_neuron_state()
+    ns._apply_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert ns.ih_enabled is True
+    assert ns.inap_enabled is True
+    assert ns.im_enabled is True
 
 
 def test_load_neuron_preset_purkinje_cell() -> None:
     """Purkinje Cell preset enables ICaL, ICaT, and IKCa channels."""
-    s = _make_state()
-    s.load_neuron_preset(PURKINJE)
-    assert s.ical_enabled is True
-    assert s.icat_enabled is True
-    assert s.ikca_enabled is True
+    ns = _make_neuron_state()
+    ns._apply_neuron_preset(PURKINJE)
+    assert ns.ical_enabled is True
+    assert ns.icat_enabled is True
+    assert ns.ikca_enabled is True
 
 
 def test_load_neuron_preset_dopaminergic_neuron() -> None:
     """Dopaminergic Neuron preset enables Ih and IM channels."""
-    s = _make_state()
-    s.load_neuron_preset(DOPAMINERGIC)
-    assert s.ih_enabled is True
-    assert s.im_enabled is True
+    ns = _make_neuron_state()
+    ns._apply_neuron_preset(DOPAMINERGIC)
+    assert ns.ih_enabled is True
+    assert ns.im_enabled is True
 
 
 def test_load_neuron_preset_thalamic_relay() -> None:
     """Thalamic Relay preset enables ICaT and Ih channels."""
-    s = _make_state()
-    s.load_neuron_preset(THALAMIC_RELAY)
-    assert s.icat_enabled is True
-    assert s.ih_enabled is True
-
-
-def test_load_neuron_preset_clears_current_sweeps() -> None:
-    """load_neuron_preset resets current_sweeps to an empty list."""
-    s = _make_state()
-    s.current_sweeps = [_make_sweep()]
-    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
-    assert len(s.current_sweeps) == 0
+    ns = _make_neuron_state()
+    ns._apply_neuron_preset(THALAMIC_RELAY)
+    assert ns.icat_enabled is True
+    assert ns.ih_enabled is True
 
 
 def test_load_neuron_preset_unknown_name_is_ignored() -> None:
-    """load_neuron_preset silently ignores an unknown preset name."""
-    s = _make_state()
-    before = s.active_neuron_type
-    s.load_neuron_preset("NonExistentNeuron")
-    assert s.active_neuron_type == before
-
-
-def test_load_neuron_preset_preserves_saved_sweeps() -> None:
-    """load_neuron_preset retains saved sweeps so neuron types can be compared."""
-    s = _make_state()
-    s.current_sweeps = [_make_sweep()]
-    s.add_sweep()
-    assert len(s.saved_sweeps) == 1
-    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
-    assert len(s.saved_sweeps) == 1
-
-
-def test_load_neuron_preset_preserves_stored_traces() -> None:
-    """load_neuron_preset retains stored traces so neuron types can be compared."""
-    s = _make_state()
-    s.current_sweeps = [_make_sweep()]
-    s.store_trace()
-    assert len(s.stored_traces) == 1
-    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
-    assert len(s.stored_traces) == 1
+    """_apply_neuron_preset silently ignores an unknown preset name."""
+    ns = _make_neuron_state()
+    before = ns.active_neuron_type
+    ns._apply_neuron_preset("NonExistentNeuron")
+    assert ns.active_neuron_type == before
 
 
 def test_add_sweep_label_includes_neuron_type() -> None:
     """add_sweep includes the active neuron type in the sweep label."""
     s = _make_state()
-    s.current_sweeps = [_make_sweep()]
-    s.load_neuron_preset(FAST_SPIKING_INTERNEURON)
+    s._label_neuron_type = FAST_SPIKING_INTERNEURON
     s.current_sweeps = [_make_sweep()]
     s.add_sweep()
     assert FAST_SPIKING_INTERNEURON in s.saved_sweeps[0].label
@@ -417,7 +390,7 @@ def test_add_sweep_label_includes_neuron_type() -> None:
 def test_store_trace_label_includes_neuron_type() -> None:
     """store_trace includes the active neuron type in the stored trace label."""
     s = _make_state()
-    s.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    s._label_neuron_type = CORTICAL_PYRAMIDAL
     s.current_sweeps = [_make_sweep()]
     s.store_trace()
     assert CORTICAL_PYRAMIDAL in s.stored_traces[0].label
@@ -431,31 +404,28 @@ def test_store_trace_label_includes_neuron_type() -> None:
 def test_protocol_preset_with_active_neuron_type_applies_adjustment() -> None:
     """Repetitive Firing with Thalamic Relay active uses hyperpolarizing current."""
     s = _make_state()
-    s.load_neuron_preset(THALAMIC_RELAY)
-    s.load_protocol_preset("Repetitive Firing")
+    s._apply_protocol_preset("Repetitive Firing", THALAMIC_RELAY)
     assert s.min_stimulus < 0.0
 
 
 def test_protocol_preset_without_active_neuron_type_uses_base_params() -> None:
     """Repetitive Firing without an active neuron type uses the base stimulus."""
     s = _make_state()
-    s.load_protocol_preset("Repetitive Firing")
+    s._apply_protocol_preset("Repetitive Firing")
     assert s.min_stimulus == pytest.approx(15.0)
 
 
 def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> None:
     """Action Potential with Thalamic Relay active falls through to base duration."""
     s = _make_state()
-    s.load_neuron_preset(THALAMIC_RELAY)
-    s.load_protocol_preset("Action Potential")
+    s._apply_protocol_preset("Action Potential", THALAMIC_RELAY)
     assert s.stimulus_duration == pytest.approx(30.0)
 
 
 def test_protocol_preset_dopaminergic_repetitive_firing_uses_long_duration() -> None:
     """Dopaminergic Neuron + Repetitive Firing sets stimulus_duration to 480 ms."""
     s = _make_state()
-    s.load_neuron_preset(DOPAMINERGIC)
-    s.load_protocol_preset("Repetitive Firing")
+    s._apply_protocol_preset("Repetitive Firing", DOPAMINERGIC)
     assert s.stimulus_duration == pytest.approx(480.0)
 
 
@@ -478,7 +448,7 @@ def test_store_trace_sets_stored_label() -> None:
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     s.store_trace()
-    assert s.stored_traces[0].label == f"Stored 1 ({s.active_neuron_type})"
+    assert s.stored_traces[0].label == f"Stored 1 ({s._label_neuron_type})"
 
 
 def test_store_trace_twice_increments_label() -> None:
@@ -488,7 +458,7 @@ def test_store_trace_twice_increments_label() -> None:
     s.store_trace()
     s.store_trace()
     assert len(s.stored_traces) == 2
-    assert s.stored_traces[1].label == f"Stored 2 ({s.active_neuron_type})"
+    assert s.stored_traces[1].label == f"Stored 2 ({s._label_neuron_type})"
 
 
 def test_store_trace_does_nothing_when_no_result() -> None:
