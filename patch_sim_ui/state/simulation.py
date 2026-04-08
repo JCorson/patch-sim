@@ -31,14 +31,13 @@ from patch_sim_ui.state._common import (
     _LOG_SCROLL_JS,
     _PLOTLY_GD_JS,
     _SWEEP_HIGHLIGHT_JS,
-    _VISIBILITY_FIELDS,
     _compute_iv_data,
-    _make_visibility_setter,
 )
 from patch_sim_ui.state.analysis import AnalysisState
 from patch_sim_ui.state.log import LogState
 from patch_sim_ui.state.neuron import NeuronState
 from patch_sim_ui.state.protocol import ProtocolState
+from patch_sim_ui.state.visibility import VisibilityState
 
 logger = logging.getLogger("patch_sim_ui.state")
 
@@ -59,40 +58,6 @@ class AppState(rx.State):
     current_sweeps: list[Sweep] = []  # Latest simulation result
     saved_sweeps: list[Sweep] = []  # User-saved sweeps for comparison overlay
     stored_traces: list[Sweep] = []  # Oscilloscope-style stored reference traces
-
-    # ------------------------------------------------------------------ #
-    # Trace visibility checkboxes                                        #
-    # ------------------------------------------------------------------ #
-    show_voltage: bool = True
-    show_total_current: bool = True
-    show_sodium_current: bool = True
-    show_potassium_current: bool = True
-    show_leak_current: bool = False
-    show_potassium_activation: bool = True
-    show_sodium_activation: bool = True
-    show_sodium_inactivation: bool = True
-    show_ih_current: bool = True
-    show_ih_gating: bool = True
-    show_ika_current: bool = True
-    show_ika_gating: bool = True
-    show_ikv31_current: bool = True
-    show_ikv31_gating: bool = True
-    show_inap_current: bool = True
-    show_inap_gating: bool = True
-    show_inar_current: bool = True
-    show_inar_gating: bool = True
-    show_im_current: bool = True
-    show_im_gating: bool = True
-    show_ikir_current: bool = True
-    show_ikir_gating: bool = True
-    show_ikca_current: bool = True
-    show_ikca_gating: bool = True
-    show_ical_current: bool = True
-    show_ical_gating: bool = True
-    show_icat_current: bool = True
-    show_icat_gating: bool = True
-    show_ican_current: bool = True
-    show_ican_gating: bool = True
 
     # ------------------------------------------------------------------ #
     # Continuous simulation mode                                        #
@@ -218,14 +183,10 @@ class AppState(rx.State):
         )
         return rx.call_script(js)
 
-    # Visibility setters: update state + issue client-side Plotly.restyle.
-    for _f in _VISIBILITY_FIELDS:
-        vars()[f"set_{_f}"] = _make_visibility_setter(_f)
-
     # ------------------------------------------------------------------ #
     # Sweep management                                                   #
     # ------------------------------------------------------------------ #
-    def _apply_visibility_js(self) -> str | None:
+    def _apply_visibility_js(self, vis_st: "VisibilityState") -> str | None:
         """Build a JS snippet to re-apply trace visibility, hover, and sweep highlight.
 
         Called after any operation that triggers a full figure rebuild (run
@@ -234,10 +195,15 @@ class AppState(rx.State):
         current ``show_hover`` flag, and sweep highlight listeners are
         (re-)attached in multi-sweep mode.
 
+        Args:
+            vis_st: Current VisibilityState instance providing show_* values.
+
         Returns:
             A JS string that re-applies trace visibility, hover mode, and
             sweep highlight, or ``None`` when nothing needs to be applied.
         """
+        import json
+
         trace_map = compute_trace_visibility_map(
             current_sweeps=self.current_sweeps,
             saved_sweeps=self.saved_sweeps,
@@ -248,13 +214,11 @@ class AppState(rx.State):
         )
         hidden: list[int] = []
         for field_name, indices in trace_map.items():
-            if not getattr(self, field_name):
+            if not getattr(vis_st, field_name, True):
                 hidden.extend(indices)
 
         parts: list[str] = []
         if hidden:
-            import json
-
             parts.append(
                 f"if(gd&&gd.data)Plotly.restyle(gd,"
                 f"{{visible:false}},{json.dumps(hidden)});"
@@ -292,8 +256,12 @@ class AppState(rx.State):
             .replace("/*SELECTED_SWEEP*/", str(self.selected_sweep))
         )
 
-    def add_sweep(self):
-        """Promote current simulation result to the saved sweep overlay."""
+    def _do_add_sweep(self) -> None:
+        """Append current sweeps to the saved overlay without applying visibility JS.
+
+        Core logic extracted so tests can call it synchronously without
+        triggering the async ``get_state`` path.
+        """
         if not self.has_result:
             return
         logger.debug("Adding %d sweep(s) to overlay", len(self.current_sweeps))
@@ -308,23 +276,39 @@ class AppState(rx.State):
                     }
                 )
             )
-        js = self._apply_visibility_js()
+
+    async def add_sweep(self):
+        """Promote current simulation result to the saved sweep overlay."""
+        self._do_add_sweep()
+        vis_st = await self.get_state(VisibilityState)
+        js = self._apply_visibility_js(vis_st)
         if js:
             return rx.call_script(js)
 
-    def clear_sweeps(self):
-        """Remove all saved sweeps."""
+    def _do_clear_sweeps(self) -> None:
+        """Empty the saved sweep overlay without applying visibility JS.
+
+        Core logic extracted so tests can call it synchronously.
+        """
         logger.debug("Cleared %d saved sweep(s)", len(self.saved_sweeps))
         self.saved_sweeps = []
-        js = self._apply_visibility_js()
+
+    async def clear_sweeps(self):
+        """Remove all saved sweeps."""
+        self._do_clear_sweeps()
+        vis_st = await self.get_state(VisibilityState)
+        js = self._apply_visibility_js(vis_st)
         if js:
             return rx.call_script(js)
 
     # ------------------------------------------------------------------ #
     # Stored trace management                                            #
     # ------------------------------------------------------------------ #
-    def store_trace(self) -> None:
-        """Snapshot the current sweep into the oscilloscope stored traces."""
+    def _do_store_trace(self) -> None:
+        """Snapshot the current sweep into stored traces without applying visibility JS.
+
+        Core logic extracted so tests can call it synchronously.
+        """
         if not self.has_result:
             return
         idx = len(self.stored_traces)
@@ -333,14 +317,27 @@ class AppState(rx.State):
         self.stored_traces.append(
             self.current_sweeps[0].model_copy(update={"color": color, "label": label})
         )
-        js = self._apply_visibility_js()
+
+    async def store_trace(self) -> None:
+        """Snapshot the current sweep into the oscilloscope stored traces."""
+        self._do_store_trace()
+        vis_st = await self.get_state(VisibilityState)
+        js = self._apply_visibility_js(vis_st)
         if js:
             return rx.call_script(js)
 
-    def clear_stored_traces(self) -> None:
-        """Remove all oscilloscope stored traces."""
+    def _do_clear_stored_traces(self) -> None:
+        """Remove all stored traces without applying visibility JS.
+
+        Core logic extracted so tests can call it synchronously.
+        """
         self.stored_traces = []
-        js = self._apply_visibility_js()
+
+    async def clear_stored_traces(self) -> None:
+        """Remove all oscilloscope stored traces."""
+        self._do_clear_stored_traces()
+        vis_st = await self.get_state(VisibilityState)
+        js = self._apply_visibility_js(vis_st)
         if js:
             return rx.call_script(js)
 
@@ -491,7 +488,8 @@ class AppState(rx.State):
                 )
                 log_st = await self.get_state(LogState)
                 log_st._refresh_logs()
-            js = self._apply_visibility_js()
+                vis_st = await self.get_state(VisibilityState)
+            js = self._apply_visibility_js(vis_st)
             if js:
                 yield rx.call_script(js)
             yield rx.call_script(_LOG_SCROLL_JS)
@@ -660,7 +658,8 @@ class AppState(rx.State):
                 self.is_running = False
                 log_st = await self.get_state(LogState)
                 log_st._refresh_logs()
-            js = self._apply_visibility_js()
+                vis_st = await self.get_state(VisibilityState)
+            js = self._apply_visibility_js(vis_st)
             if js:
                 yield rx.call_script(js)
             yield rx.call_script(_LOG_SCROLL_JS)

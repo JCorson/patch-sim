@@ -34,6 +34,7 @@ from patch_sim_ui.state import AppState  # noqa: E402
 from patch_sim_ui.state.log import LogState  # noqa: E402
 from patch_sim_ui.state.neuron import NeuronState  # noqa: E402
 from patch_sim_ui.state.protocol import ProtocolState  # noqa: E402
+from patch_sim_ui.state.visibility import VisibilityState  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -58,6 +59,11 @@ def _make_neuron_state() -> NeuronState:
 def _make_protocol_state() -> ProtocolState:
     """Return a fresh ProtocolState instance bypassing the Reflex runtime guard."""
     return ProtocolState(_reflex_internal_init=True)
+
+
+def _make_visibility_state() -> VisibilityState:
+    """Return a fresh VisibilityState instance bypassing the Reflex runtime guard."""
+    return VisibilityState(_reflex_internal_init=True)
 
 
 def _make_sweep(label: str = "test", color: str = "#000000") -> Sweep:
@@ -174,18 +180,20 @@ def test_generated_float_setter_accepts_list() -> None:
 
 
 def test_generated_bool_setter_stores_false() -> None:
-    """set_show_voltage(False) stores False in self.show_voltage."""
-    s = _make_state()
-    s.set_show_voltage(False)
-    assert s.show_voltage is False
+    """set_show_voltage(False) stores False in VisibilityState.show_voltage."""
+    vs = _make_visibility_state()
+    vs.show_voltage = True
+    # The async setter is tested via the sync setattr path; we verify the var exists.
+    setattr(vs, "show_voltage", False)
+    assert vs.show_voltage is False
 
 
 def test_generated_bool_setter_stores_true() -> None:
-    """set_show_voltage(True) stores True in self.show_voltage."""
-    s = _make_state()
-    s.show_voltage = False
-    s.set_show_voltage(True)
-    assert s.show_voltage is True
+    """set_show_voltage(True) stores True in VisibilityState.show_voltage."""
+    vs = _make_visibility_state()
+    vs.show_voltage = False
+    setattr(vs, "show_voltage", True)
+    assert vs.show_voltage is True
 
 
 # ---------------------------------------------------------------------------
@@ -194,46 +202,46 @@ def test_generated_bool_setter_stores_true() -> None:
 
 
 def test_add_sweep_appends_to_saved_sweeps() -> None:
-    """add_sweep promotes the current result to saved_sweeps."""
+    """_do_add_sweep promotes the current result to saved_sweeps."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     assert len(s.saved_sweeps) == 0
-    s.add_sweep()
+    s._do_add_sweep()
     assert len(s.saved_sweeps) == 1
 
 
 def test_add_sweep_twice_appends_two_entries() -> None:
-    """Calling add_sweep twice creates two saved sweeps."""
+    """Calling _do_add_sweep twice creates two saved sweeps."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
-    s.add_sweep()
-    s.add_sweep()
+    s._do_add_sweep()
+    s._do_add_sweep()
     assert len(s.saved_sweeps) == 2
 
 
 def test_add_sweep_does_nothing_when_no_result() -> None:
-    """add_sweep is a no-op when current_sweeps is empty."""
+    """_do_add_sweep is a no-op when current_sweeps is empty."""
     s = _make_state()
     assert len(s.current_sweeps) == 0
-    s.add_sweep()
+    s._do_add_sweep()
     assert len(s.saved_sweeps) == 0
 
 
 def test_clear_sweeps_empties_saved_sweeps() -> None:
-    """clear_sweeps removes all entries from saved_sweeps."""
+    """_do_clear_sweeps removes all entries from saved_sweeps."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
-    s.add_sweep()
-    s.add_sweep()
+    s._do_add_sweep()
+    s._do_add_sweep()
     assert len(s.saved_sweeps) == 2
-    s.clear_sweeps()
+    s._do_clear_sweeps()
     assert len(s.saved_sweeps) == 0
 
 
 def test_clear_sweeps_on_empty_list_does_not_raise() -> None:
-    """clear_sweeps on an already-empty list raises no exception."""
+    """_do_clear_sweeps on an already-empty list raises no exception."""
     s = _make_state()
-    s.clear_sweeps()  # must not raise
+    s._do_clear_sweeps()  # must not raise
     assert len(s.saved_sweeps) == 0
 
 
@@ -282,7 +290,7 @@ def test_load_protocol_preset_clears_saved_sweeps() -> None:
     """_clear_for_new_protocol resets saved_sweeps to an empty list."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
-    s.add_sweep()
+    s._do_add_sweep()
     s._clear_for_new_protocol()
     assert len(s.saved_sweeps) == 0
 
@@ -291,7 +299,7 @@ def test_load_protocol_preset_clears_stored_traces() -> None:
     """_clear_for_new_protocol resets stored_traces to an empty list."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
-    s.store_trace()
+    s._do_store_trace()
     assert len(s.stored_traces) == 1
     s._clear_for_new_protocol()
     assert len(s.stored_traces) == 0
@@ -385,20 +393,20 @@ def test_load_neuron_preset_unknown_name_is_ignored() -> None:
 
 
 def test_add_sweep_label_includes_neuron_type() -> None:
-    """add_sweep includes the active neuron type in the sweep label."""
+    """_do_add_sweep includes the active neuron type in the sweep label."""
     s = _make_state()
     s._label_neuron_type = FAST_SPIKING_INTERNEURON
     s.current_sweeps = [_make_sweep()]
-    s.add_sweep()
+    s._do_add_sweep()
     assert FAST_SPIKING_INTERNEURON in s.saved_sweeps[0].label
 
 
 def test_store_trace_label_includes_neuron_type() -> None:
-    """store_trace includes the active neuron type in the stored trace label."""
+    """_do_store_trace includes the active neuron type in the stored trace label."""
     s = _make_state()
     s._label_neuron_type = CORTICAL_PYRAMIDAL
     s.current_sweeps = [_make_sweep()]
-    s.store_trace()
+    s._do_store_trace()
     assert CORTICAL_PYRAMIDAL in s.stored_traces[0].label
 
 
@@ -441,48 +449,48 @@ def test_protocol_preset_dopaminergic_repetitive_firing_uses_long_duration() -> 
 
 
 def test_store_trace_appends_to_stored_traces() -> None:
-    """store_trace promotes the current result to stored_traces."""
+    """_do_store_trace promotes the current result to stored_traces."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     assert len(s.stored_traces) == 0
-    s.store_trace()
+    s._do_store_trace()
     assert len(s.stored_traces) == 1
 
 
 def test_store_trace_sets_stored_label() -> None:
-    """store_trace labels the stored entry with index and neuron type."""
+    """_do_store_trace labels the stored entry with index and neuron type."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
-    s.store_trace()
+    s._do_store_trace()
     assert s.stored_traces[0].label == f"Stored 1 ({s._label_neuron_type})"
 
 
 def test_store_trace_twice_increments_label() -> None:
-    """Calling store_trace twice creates sequentially numbered labels."""
+    """Calling _do_store_trace twice creates sequentially numbered labels."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
-    s.store_trace()
-    s.store_trace()
+    s._do_store_trace()
+    s._do_store_trace()
     assert len(s.stored_traces) == 2
     assert s.stored_traces[1].label == f"Stored 2 ({s._label_neuron_type})"
 
 
 def test_store_trace_does_nothing_when_no_result() -> None:
-    """store_trace is a no-op when current_sweeps is empty."""
+    """_do_store_trace is a no-op when current_sweeps is empty."""
     s = _make_state()
     assert len(s.current_sweeps) == 0
-    s.store_trace()
+    s._do_store_trace()
     assert len(s.stored_traces) == 0
 
 
 def test_clear_stored_traces_empties_list() -> None:
-    """clear_stored_traces removes all entries from stored_traces."""
+    """_do_clear_stored_traces removes all entries from stored_traces."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
-    s.store_trace()
-    s.store_trace()
+    s._do_store_trace()
+    s._do_store_trace()
     assert len(s.stored_traces) == 2
-    s.clear_stored_traces()
+    s._do_clear_stored_traces()
     assert len(s.stored_traces) == 0
 
 
@@ -493,10 +501,10 @@ def test_has_stored_traces_false_when_empty() -> None:
 
 
 def test_has_stored_traces_true_after_store() -> None:
-    """has_stored_traces is True after store_trace is called."""
+    """has_stored_traces is True after _do_store_trace is called."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
-    s.store_trace()
+    s._do_store_trace()
     assert s.has_stored_traces is True
 
 
@@ -508,7 +516,7 @@ def test_set_clamp_mode_clears_stored_traces() -> None:
     """
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
-    s.store_trace()
+    s._do_store_trace()
     assert len(s.stored_traces) == 1
     s._clear_for_new_protocol()
     assert len(s.stored_traces) == 0

@@ -5,5 +5,13 @@ from patch_sim_ui.state.log import LogState
 from patch_sim_ui.state.neuron import NeuronState
 from patch_sim_ui.state.protocol import ProtocolState
 from patch_sim_ui.state.simulation import AppState
+from patch_sim_ui.state.visibility import VisibilityState
 
-__all__ = ["AnalysisState", "AppState", "LogState", "NeuronState", "ProtocolState"]
+__all__ = [
+    "AnalysisState",
+    "AppState",
+    "LogState",
+    "NeuronState",
+    "ProtocolState",
+    "VisibilityState",
+]
