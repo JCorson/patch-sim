@@ -4,6 +4,7 @@ import reflex as rx
 
 from patch_sim_ui.constants import CURRENT_CLAMP
 from patch_sim_ui.state import AppState
+from patch_sim_ui.state.log import LogState
 
 
 def _trace_checkbox(label: str, var: rx.Var, handler) -> rx.Component:
@@ -392,7 +393,7 @@ def sweep_manager() -> rx.Component:
             rx.button(
                 rx.icon("scroll-text"),
                 "Logs",
-                on_click=AppState.toggle_log_panel,
+                on_click=LogState.toggle_log_panel,
                 size="1",
                 variant="soft",
             ),

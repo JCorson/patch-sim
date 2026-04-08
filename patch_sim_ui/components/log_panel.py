@@ -3,7 +3,7 @@
 import reflex as rx
 
 from patch_sim_ui.log_handler import UILogRecord
-from patch_sim_ui.state import AppState
+from patch_sim_ui.state.log import LogState
 
 _LEVEL_COLORS: dict[str, str] = {
     "DEBUG": "gray",
@@ -72,7 +72,7 @@ def _log_entry(entry: UILogRecord) -> rx.Component:
 def log_panel() -> rx.Component:
     """Conditionally rendered log viewer panel.
 
-    Renders an empty fragment when ``AppState.log_panel_open`` is False.
+    Renders an empty fragment when ``LogState.log_panel_open`` is False.
     When open, displays a 200 px tall panel with a header bar (level
     filter, Refresh, Clear, Close) and a scrollable list of log entries.
 
@@ -80,15 +80,15 @@ def log_panel() -> rx.Component:
         A conditional component that shows or hides the panel.
     """
     return rx.cond(
-        AppState.log_panel_open,
+        LogState.log_panel_open,
         rx.box(
             # Header bar
             rx.hstack(
                 rx.text("Logs", size="2", weight="bold"),
                 rx.select(
                     _LOG_LEVELS,
-                    value=AppState.log_level_filter,
-                    on_change=AppState.set_log_level_filter,
+                    value=LogState.log_level_filter,
+                    on_change=LogState.set_log_level_filter,
                     size="1",
                     width="90px",
                 ),
@@ -96,21 +96,21 @@ def log_panel() -> rx.Component:
                 rx.button(
                     rx.icon("refresh-cw", size=12),
                     "Refresh",
-                    on_click=AppState.refresh_logs,
+                    on_click=LogState.refresh_logs,
                     size="1",
                     variant="ghost",
                 ),
                 rx.button(
                     rx.icon("trash-2", size=12),
                     "Clear",
-                    on_click=AppState.clear_logs,
+                    on_click=LogState.clear_logs,
                     size="1",
                     variant="ghost",
                     color_scheme="red",
                 ),
                 rx.button(
                     rx.icon("x", size=12),
-                    on_click=AppState.toggle_log_panel,
+                    on_click=LogState.toggle_log_panel,
                     size="1",
                     variant="ghost",
                 ),
@@ -124,7 +124,7 @@ def log_panel() -> rx.Component:
             # Log entries
             rx.scroll_area(
                 rx.vstack(
-                    rx.foreach(AppState.filtered_log_entries, _log_entry),
+                    rx.foreach(LogState.filtered_log_entries, _log_entry),
                     spacing="0",
                     width="100%",
                     align="start",

@@ -53,7 +53,6 @@ from patch_sim.protocols.builders import (
     build_voltage_protocol,
 )
 from patch_sim_ui import constants, presets
-from patch_sim_ui.log_handler import MAX_LOG_ENTRIES, StateLogHandler, UILogRecord
 from patch_sim_ui.plotting import (
     Sweep,
     TraceVisibility,
@@ -75,6 +74,7 @@ from patch_sim_ui.state._common import (
     _make_float_setter,
     _make_visibility_setter,
 )
+from patch_sim_ui.state.log import LogState
 
 logger = logging.getLogger("patch_sim_ui.state")
 
@@ -256,13 +256,6 @@ class AppState(rx.State):
     analysis_panel_open: bool = True
 
     # ------------------------------------------------------------------ #
-    # Log panel state                                                    #
-    # ------------------------------------------------------------------ #
-    log_panel_open: bool = False
-    log_entries: list[UILogRecord] = []
-    log_level_filter: str = "DEBUG"
-
-    # ------------------------------------------------------------------ #
     # AP analysis computed properties                                   #
     # ------------------------------------------------------------------ #
     @rx.var
@@ -357,26 +350,6 @@ class AppState(rx.State):
         return self.is_step_single_sweep
 
     @rx.var
-    def filtered_log_entries(self) -> list[UILogRecord]:
-        """Log entries filtered to the selected minimum level, newest first.
-
-        Returns:
-            Entries whose numeric level is >= the selected filter level,
-            in reverse chronological order so the most recent entry is
-            always visible at the top of the panel without scrolling.
-        """
-        import logging as _logging
-
-        min_level = _logging.getLevelName(self.log_level_filter)
-        if not isinstance(min_level, int):
-            min_level = _logging.DEBUG
-        return [
-            e
-            for e in reversed(self.log_entries)
-            if _logging.getLevelName(e.level) >= min_level
-        ]
-
-    @rx.var
     def figure_data(self) -> go.Figure:
         """Plotly figure rebuilt when sweeps, clamp mode, or hover state change.
 
@@ -398,39 +371,6 @@ class AppState(rx.State):
             stored_traces=self.stored_traces,
             show_hover=self.show_hover,
         )
-
-    # ------------------------------------------------------------------ #
-    # Log panel event handlers                                          #
-    # ------------------------------------------------------------------ #
-    def toggle_log_panel(self):
-        """Toggle the log panel open/closed, refreshing logs on open."""
-        self.log_panel_open = not self.log_panel_open
-        if self.log_panel_open:
-            self._refresh_logs()
-            return rx.call_script(_LOG_SCROLL_JS)
-
-    def refresh_logs(self):
-        """Public event handler: drain buffered records into state."""
-        self._refresh_logs()
-        return rx.call_script(_LOG_SCROLL_JS)
-
-    def _refresh_logs(self) -> None:
-        """Drain buffered log records into state, capping at MAX_LOG_ENTRIES."""
-        new_records = StateLogHandler.drain()
-        combined = list(self.log_entries) + new_records
-        self.log_entries = combined[-MAX_LOG_ENTRIES:]
-
-    def clear_logs(self) -> None:
-        """Clear all displayed log entries."""
-        self.log_entries = []
-
-    def set_log_level_filter(self, value: str) -> None:
-        """Set the minimum display level for log entries.
-
-        Args:
-            value: Level name string (e.g. ``"DEBUG"``, ``"INFO"``).
-        """
-        self.log_level_filter = value
 
     # ------------------------------------------------------------------ #
     # Event handlers                                                     #
@@ -995,7 +935,8 @@ class AppState(rx.State):
                 logger.info(
                     "Continuous simulation stopped after %d iteration(s)", _iteration
                 )
-                self._refresh_logs()
+                log_st = await self.get_state(LogState)
+                log_st._refresh_logs()
             js = self._apply_visibility_js()
             if js:
                 yield rx.call_script(js)
@@ -1158,7 +1099,8 @@ class AppState(rx.State):
         finally:
             async with self:
                 self.is_running = False
-                self._refresh_logs()
+                log_st = await self.get_state(LogState)
+                log_st._refresh_logs()
             js = self._apply_visibility_js()
             if js:
                 yield rx.call_script(js)

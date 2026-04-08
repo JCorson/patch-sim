@@ -31,6 +31,7 @@ from patch_sim_ui import constants  # noqa: E402
 from patch_sim_ui.log_handler import UILogRecord  # noqa: E402
 from patch_sim_ui.plotting import Sweep  # noqa: E402
 from patch_sim_ui.state import AppState  # noqa: E402
+from patch_sim_ui.state.log import LogState  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -40,6 +41,11 @@ from patch_sim_ui.state import AppState  # noqa: E402
 def _make_state() -> AppState:
     """Return a fresh AppState instance bypassing the Reflex runtime guard."""
     return AppState(_reflex_internal_init=True)
+
+
+def _make_log_state() -> LogState:
+    """Return a fresh LogState instance bypassing the Reflex runtime guard."""
+    return LogState(_reflex_internal_init=True)
 
 
 def _make_sweep(label: str = "test", color: str = "#000000") -> Sweep:
@@ -769,7 +775,7 @@ def _make_log_record(level: str, message: str) -> UILogRecord:
 
 def test_filtered_log_entries_returns_all_at_debug() -> None:
     """filtered_log_entries returns all records when filter is DEBUG."""
-    s = _make_state()
+    s = _make_log_state()
     s.log_level_filter = "DEBUG"
     s.log_entries = [
         _make_log_record("DEBUG", "dbg"),
@@ -782,7 +788,7 @@ def test_filtered_log_entries_returns_all_at_debug() -> None:
 
 def test_filtered_log_entries_filters_below_info() -> None:
     """filtered_log_entries omits DEBUG entries when filter is INFO."""
-    s = _make_state()
+    s = _make_log_state()
     s.log_level_filter = "INFO"
     s.log_entries = [
         _make_log_record("DEBUG", "dbg"),
@@ -796,7 +802,7 @@ def test_filtered_log_entries_filters_below_info() -> None:
 
 def test_filtered_log_entries_only_errors_at_error_level() -> None:
     """filtered_log_entries returns only ERROR records when filter is ERROR."""
-    s = _make_state()
+    s = _make_log_state()
     s.log_level_filter = "ERROR"
     s.log_entries = [
         _make_log_record("DEBUG", "dbg"),
@@ -811,7 +817,7 @@ def test_filtered_log_entries_only_errors_at_error_level() -> None:
 
 def test_filtered_log_entries_newest_first() -> None:
     """filtered_log_entries returns entries in reverse order (newest first)."""
-    s = _make_state()
+    s = _make_log_state()
     s.log_level_filter = "DEBUG"
     s.log_entries = [
         _make_log_record("INFO", "first"),
@@ -825,7 +831,7 @@ def test_filtered_log_entries_newest_first() -> None:
 
 def test_filtered_log_entries_empty_when_no_entries() -> None:
     """filtered_log_entries returns an empty list when log_entries is empty."""
-    s = _make_state()
+    s = _make_log_state()
     assert s.filtered_log_entries == []
 
 
