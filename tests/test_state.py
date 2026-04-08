@@ -33,6 +33,7 @@ from patch_sim_ui.plotting import Sweep  # noqa: E402
 from patch_sim_ui.state import AppState  # noqa: E402
 from patch_sim_ui.state.log import LogState  # noqa: E402
 from patch_sim_ui.state.neuron import NeuronState  # noqa: E402
+from patch_sim_ui.state.protocol import ProtocolState  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -52,6 +53,11 @@ def _make_log_state() -> LogState:
 def _make_neuron_state() -> NeuronState:
     """Return a fresh NeuronState instance bypassing the Reflex runtime guard."""
     return NeuronState(_reflex_internal_init=True)
+
+
+def _make_protocol_state() -> ProtocolState:
+    """Return a fresh ProtocolState instance bypassing the Reflex runtime guard."""
+    return ProtocolState(_reflex_internal_init=True)
 
 
 def _make_sweep(label: str = "test", color: str = "#000000") -> Sweep:
@@ -95,45 +101,45 @@ def _make_sweep(label: str = "test", color: str = "#000000") -> Sweep:
 
 
 # ---------------------------------------------------------------------------
-# AppState._set_float
+# ProtocolState._set_float
 # ---------------------------------------------------------------------------
 
 
 def test_set_float_accepts_plain_float() -> None:
     """_set_float stores a plain float value as-is."""
-    s = _make_state()
-    s._set_float("stimulus_duration", 99.5)
-    assert s.stimulus_duration == pytest.approx(99.5)
+    ps = _make_protocol_state()
+    ps._set_float("stimulus_duration", 99.5)
+    assert ps.stimulus_duration == pytest.approx(99.5)
 
 
 def test_set_float_accepts_string() -> None:
     """_set_float parses a string to float and stores it."""
-    s = _make_state()
-    s._set_float("stimulus_duration", "77.25")
-    assert s.stimulus_duration == pytest.approx(77.25)
+    ps = _make_protocol_state()
+    ps._set_float("stimulus_duration", "77.25")
+    assert ps.stimulus_duration == pytest.approx(77.25)
 
 
 def test_set_float_accepts_list_uses_first_element() -> None:
     """_set_float uses the first element when given a list (slider events)."""
-    s = _make_state()
-    s._set_float("stimulus_duration", [42.0, 50.0])
-    assert s.stimulus_duration == pytest.approx(42.0)
+    ps = _make_protocol_state()
+    ps._set_float("stimulus_duration", [42.0, 50.0])
+    assert ps.stimulus_duration == pytest.approx(42.0)
 
 
 def test_set_float_ignores_unparseable_string() -> None:
     """_set_float silently ignores values that cannot be converted to float."""
-    s = _make_state()
-    original = s.stimulus_duration
-    s._set_float("stimulus_duration", "not_a_number")
-    assert s.stimulus_duration == pytest.approx(original)
+    ps = _make_protocol_state()
+    original = ps.stimulus_duration
+    ps._set_float("stimulus_duration", "not_a_number")
+    assert ps.stimulus_duration == pytest.approx(original)
 
 
 def test_set_float_ignores_none() -> None:
     """_set_float silently ignores None without raising."""
-    s = _make_state()
-    original = s.stimulus_duration
-    s._set_float("stimulus_duration", None)
-    assert s.stimulus_duration == pytest.approx(original)
+    ps = _make_protocol_state()
+    original = ps.stimulus_duration
+    ps._set_float("stimulus_duration", None)
+    assert ps.stimulus_duration == pytest.approx(original)
 
 
 # ---------------------------------------------------------------------------
@@ -143,23 +149,23 @@ def test_set_float_ignores_none() -> None:
 
 def test_generated_float_setter_stores_value() -> None:
     """set_stimulus_duration(50.0) stores 50.0 in self.stimulus_duration."""
-    s = _make_state()
-    s.set_stimulus_duration(50.0)
-    assert s.stimulus_duration == pytest.approx(50.0)
+    ps = _make_protocol_state()
+    ps.set_stimulus_duration(50.0)
+    assert ps.stimulus_duration == pytest.approx(50.0)
 
 
 def test_generated_float_setter_accepts_string() -> None:
     """Generated float setter parses a string value via _set_float."""
-    s = _make_state()
-    s.set_stimulus_duration("123.4")
-    assert s.stimulus_duration == pytest.approx(123.4)
+    ps = _make_protocol_state()
+    ps.set_stimulus_duration("123.4")
+    assert ps.stimulus_duration == pytest.approx(123.4)
 
 
 def test_generated_float_setter_accepts_list() -> None:
     """Generated float setter accepts a slider list and uses the first element."""
-    s = _make_state()
-    s.set_stimulus_duration([25.0, 50.0])
-    assert s.stimulus_duration == pytest.approx(25.0)
+    ps = _make_protocol_state()
+    ps.set_stimulus_duration([25.0, 50.0])
+    assert ps.stimulus_duration == pytest.approx(25.0)
 
 
 # ---------------------------------------------------------------------------
@@ -238,73 +244,73 @@ def test_clear_sweeps_on_empty_list_does_not_raise() -> None:
 
 def test_load_protocol_preset_action_potential_sets_stimulus_duration() -> None:
     """Loading 'Action Potential' preset sets stimulus_duration to 30.0."""
-    s = _make_state()
-    s._apply_protocol_preset("Action Potential")
-    assert s.stimulus_duration == pytest.approx(30.0)
+    ps = _make_protocol_state()
+    ps._apply_protocol_preset("Action Potential")
+    assert ps.stimulus_duration == pytest.approx(30.0)
 
 
 def test_load_protocol_preset_action_potential_sets_clamp_mode() -> None:
     """Loading 'Action Potential' preset sets clamp_mode to 'Current Clamp'."""
-    s = _make_state()
-    s._apply_protocol_preset("Action Potential")
-    assert s.clamp_mode == "Current Clamp"
+    ps = _make_protocol_state()
+    ps._apply_protocol_preset("Action Potential")
+    assert ps.clamp_mode == "Current Clamp"
 
 
 def test_load_protocol_preset_repetitive_firing_sets_stimulus_duration() -> None:
     """Loading 'Repetitive Firing' preset sets stimulus_duration to 180.0."""
-    s = _make_state()
-    s._apply_protocol_preset("Repetitive Firing")
-    assert s.stimulus_duration == pytest.approx(180.0)
+    ps = _make_protocol_state()
+    ps._apply_protocol_preset("Repetitive Firing")
+    assert ps.stimulus_duration == pytest.approx(180.0)
 
 
 def test_load_protocol_preset_iv_curve_sets_voltage_clamp_mode() -> None:
     """Loading 'I-V Curve' preset sets clamp_mode to 'Voltage Clamp'."""
-    s = _make_state()
-    s._apply_protocol_preset("I-V Curve")
-    assert s.clamp_mode == "Voltage Clamp"
+    ps = _make_protocol_state()
+    ps._apply_protocol_preset("I-V Curve")
+    assert ps.clamp_mode == "Voltage Clamp"
 
 
 def test_load_protocol_preset_clears_current_sweeps() -> None:
-    """_apply_protocol_preset resets current_sweeps to an empty list."""
+    """_clear_for_new_protocol resets current_sweeps to an empty list."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
-    s._apply_protocol_preset("Action Potential")
+    s._clear_for_new_protocol()
     assert len(s.current_sweeps) == 0
 
 
 def test_load_protocol_preset_clears_saved_sweeps() -> None:
-    """_apply_protocol_preset resets saved_sweeps to an empty list."""
+    """_clear_for_new_protocol resets saved_sweeps to an empty list."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     s.add_sweep()
-    s._apply_protocol_preset("Action Potential")
+    s._clear_for_new_protocol()
     assert len(s.saved_sweeps) == 0
 
 
 def test_load_protocol_preset_clears_stored_traces() -> None:
-    """_apply_protocol_preset resets stored_traces to an empty list."""
+    """_clear_for_new_protocol resets stored_traces to an empty list."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     s.store_trace()
     assert len(s.stored_traces) == 1
-    s._apply_protocol_preset("Action Potential")
+    s._clear_for_new_protocol()
     assert len(s.stored_traces) == 0
 
 
 def test_load_protocol_preset_resets_cont_has_state() -> None:
-    """_apply_protocol_preset resets _cont_has_state before the next continuous run."""
+    """_clear_for_new_protocol resets _cont_has_state before the next continuous run."""
     s = _make_state()
     s._cont_has_state = True
-    s._apply_protocol_preset("Action Potential")
+    s._clear_for_new_protocol()
     assert s._cont_has_state is False
 
 
 def test_load_protocol_preset_unknown_name_is_ignored() -> None:
-    """load_protocol_preset silently ignores an unknown preset name."""
-    s = _make_state()
-    original = s.stimulus_duration
-    s._apply_protocol_preset("NonExistentPreset")
-    assert s.stimulus_duration == pytest.approx(original)
+    """_apply_protocol_preset silently ignores an unknown preset name."""
+    ps = _make_protocol_state()
+    original = ps.stimulus_duration
+    ps._apply_protocol_preset("NonExistentPreset")
+    assert ps.stimulus_duration == pytest.approx(original)
 
 
 # ---------------------------------------------------------------------------
@@ -403,30 +409,30 @@ def test_store_trace_label_includes_neuron_type() -> None:
 
 def test_protocol_preset_with_active_neuron_type_applies_adjustment() -> None:
     """Repetitive Firing with Thalamic Relay active uses hyperpolarizing current."""
-    s = _make_state()
-    s._apply_protocol_preset("Repetitive Firing", THALAMIC_RELAY)
-    assert s.min_stimulus < 0.0
+    ps = _make_protocol_state()
+    ps._apply_protocol_preset("Repetitive Firing", THALAMIC_RELAY)
+    assert ps.min_stimulus < 0.0
 
 
 def test_protocol_preset_without_active_neuron_type_uses_base_params() -> None:
     """Repetitive Firing without an active neuron type uses the base stimulus."""
-    s = _make_state()
-    s._apply_protocol_preset("Repetitive Firing")
-    assert s.min_stimulus == pytest.approx(15.0)
+    ps = _make_protocol_state()
+    ps._apply_protocol_preset("Repetitive Firing")
+    assert ps.min_stimulus == pytest.approx(15.0)
 
 
 def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> None:
     """Action Potential with Thalamic Relay active falls through to base duration."""
-    s = _make_state()
-    s._apply_protocol_preset("Action Potential", THALAMIC_RELAY)
-    assert s.stimulus_duration == pytest.approx(30.0)
+    ps = _make_protocol_state()
+    ps._apply_protocol_preset("Action Potential", THALAMIC_RELAY)
+    assert ps.stimulus_duration == pytest.approx(30.0)
 
 
 def test_protocol_preset_dopaminergic_repetitive_firing_uses_long_duration() -> None:
     """Dopaminergic Neuron + Repetitive Firing sets stimulus_duration to 480 ms."""
-    s = _make_state()
-    s._apply_protocol_preset("Repetitive Firing", DOPAMINERGIC)
-    assert s.stimulus_duration == pytest.approx(480.0)
+    ps = _make_protocol_state()
+    ps._apply_protocol_preset("Repetitive Firing", DOPAMINERGIC)
+    assert ps.stimulus_duration == pytest.approx(480.0)
 
 
 # ---------------------------------------------------------------------------
@@ -495,7 +501,7 @@ def test_has_stored_traces_true_after_store() -> None:
 
 
 def test_set_clamp_mode_clears_stored_traces() -> None:
-    """set_clamp_mode clears stored_traces when switching modes.
+    """_clear_for_new_protocol clears stored_traces when switching modes.
 
     Stored traces from the old mode must not persist — they would have
     incompatible axes alongside new-mode data.
@@ -504,36 +510,36 @@ def test_set_clamp_mode_clears_stored_traces() -> None:
     s.current_sweeps = [_make_sweep()]
     s.store_trace()
     assert len(s.stored_traces) == 1
-    s.set_clamp_mode("Voltage Clamp")
+    s._clear_for_new_protocol()
     assert len(s.stored_traces) == 0
 
 
 def test_set_clamp_mode_resets_cont_has_state() -> None:
-    """set_clamp_mode resets _cont_has_state so the next continuous iter starts fresh.
+    """_clear_for_new_protocol resets _cont_has_state for the next continuous iteration.
 
     This ensures that switching clamp modes during continuous simulation does
     not carry over stale gating state from the previous mode.
     """
     s = _make_state()
     s._cont_has_state = True
-    s.set_clamp_mode("Voltage Clamp")
+    s._clear_for_new_protocol()
     assert s._cont_has_state is False
 
 
 def test_set_clamp_mode_to_current_resets_protocol_type() -> None:
-    """set_clamp_mode('Current Clamp') resets protocol_type to the first CC option."""
-    s = _make_state()
-    s.clamp_mode = "Voltage Clamp"
-    s.protocol_type = "Ramp"
-    s.set_clamp_mode("Current Clamp")
-    assert s.protocol_type == constants.CURRENT_PROTOCOLS[0]
+    """_apply_clamp_mode('Current Clamp') resets protocol_type to first CC option."""
+    ps = _make_protocol_state()
+    ps.clamp_mode = "Voltage Clamp"
+    ps.protocol_type = "Ramp"
+    ps._apply_clamp_mode("Current Clamp")
+    assert ps.protocol_type == constants.CURRENT_PROTOCOLS[0]
 
 
 def test_set_clamp_mode_to_voltage_resets_protocol_type() -> None:
-    """set_clamp_mode('Voltage Clamp') resets protocol_type to the first VC option."""
-    s = _make_state()
-    s.set_clamp_mode("Voltage Clamp")
-    assert s.protocol_type == constants.VOLTAGE_PROTOCOLS[0]
+    """_apply_clamp_mode('Voltage Clamp') resets protocol_type to first VC option."""
+    ps = _make_protocol_state()
+    ps._apply_clamp_mode("Voltage Clamp")
+    assert ps.protocol_type == constants.VOLTAGE_PROTOCOLS[0]
 
 
 # ---------------------------------------------------------------------------
@@ -543,16 +549,16 @@ def test_set_clamp_mode_to_voltage_resets_protocol_type() -> None:
 
 def test_protocol_options_current_clamp() -> None:
     """protocol_options returns the current clamp list when mode is Current Clamp."""
-    s = _make_state()
-    s.clamp_mode = "Current Clamp"
-    assert s.protocol_options == constants.CURRENT_PROTOCOLS
+    ps = _make_protocol_state()
+    ps.clamp_mode = "Current Clamp"
+    assert ps.protocol_options == constants.CURRENT_PROTOCOLS
 
 
 def test_protocol_options_voltage_clamp() -> None:
     """protocol_options returns the voltage clamp list when mode is Voltage Clamp."""
-    s = _make_state()
-    s.clamp_mode = "Voltage Clamp"
-    assert s.protocol_options == constants.VOLTAGE_PROTOCOLS
+    ps = _make_protocol_state()
+    ps.clamp_mode = "Voltage Clamp"
+    assert ps.protocol_options == constants.VOLTAGE_PROTOCOLS
 
 
 # ---------------------------------------------------------------------------
@@ -562,29 +568,29 @@ def test_protocol_options_voltage_clamp() -> None:
 
 def test_can_run_continuous_true_for_step_single_sweep() -> None:
     """can_run_continuous is True for a single-step Step protocol (min == max)."""
-    s = _make_state()
-    s.protocol_type = "Step"
-    s.min_stimulus = 10.0
-    s.max_stimulus = 10.0
-    s.stimulus_step = 0.0
-    assert s.can_run_continuous is True
+    ps = _make_protocol_state()
+    ps.protocol_type = "Step"
+    ps.min_stimulus = 10.0
+    ps.max_stimulus = 10.0
+    ps.stimulus_step = 0.0
+    assert ps.can_run_continuous is True
 
 
 def test_can_run_continuous_false_for_step_multi_sweep() -> None:
     """can_run_continuous is False for a multi-sweep Step protocol."""
-    s = _make_state()
-    s.protocol_type = "Step"
-    s.min_stimulus = -10.0
-    s.max_stimulus = 20.0
-    s.stimulus_step = 2.5
-    assert s.can_run_continuous is False
+    ps = _make_protocol_state()
+    ps.protocol_type = "Step"
+    ps.min_stimulus = -10.0
+    ps.max_stimulus = 20.0
+    ps.stimulus_step = 2.5
+    assert ps.can_run_continuous is False
 
 
 def test_can_run_continuous_true_for_ramp() -> None:
     """can_run_continuous is True for the Ramp protocol."""
-    s = _make_state()
-    s.protocol_type = "Ramp"
-    assert s.can_run_continuous is True
+    ps = _make_protocol_state()
+    ps.protocol_type = "Ramp"
+    assert ps.can_run_continuous is True
 
 
 # ---------------------------------------------------------------------------
@@ -594,34 +600,34 @@ def test_can_run_continuous_true_for_ramp() -> None:
 
 def test_set_max_stimulus_auto_sets_step_when_range_opens() -> None:
     """set_max_stimulus auto-sets stimulus_step to 1.0 when min != max and step is 0."""
-    s = _make_state()
-    s.min_stimulus = 10.0
-    s.max_stimulus = 10.0
-    s.stimulus_step = 0.0
-    s.set_max_stimulus(20.0)
-    assert s.max_stimulus == 20.0
-    assert s.stimulus_step == 1.0
+    ps = _make_protocol_state()
+    ps.min_stimulus = 10.0
+    ps.max_stimulus = 10.0
+    ps.stimulus_step = 0.0
+    ps.set_max_stimulus(20.0)
+    assert ps.max_stimulus == 20.0
+    assert ps.stimulus_step == 1.0
 
 
 def test_set_min_stimulus_auto_sets_step_when_range_opens() -> None:
     """set_min_stimulus auto-sets stimulus_step to 1.0 when min != max and step is 0."""
-    s = _make_state()
-    s.min_stimulus = 10.0
-    s.max_stimulus = 10.0
-    s.stimulus_step = 0.0
-    s.set_min_stimulus(0.0)
-    assert s.min_stimulus == 0.0
-    assert s.stimulus_step == 1.0
+    ps = _make_protocol_state()
+    ps.min_stimulus = 10.0
+    ps.max_stimulus = 10.0
+    ps.stimulus_step = 0.0
+    ps.set_min_stimulus(0.0)
+    assert ps.min_stimulus == 0.0
+    assert ps.stimulus_step == 1.0
 
 
 def test_set_max_stimulus_does_not_change_step_when_already_nonzero() -> None:
     """set_max_stimulus leaves stimulus_step unchanged when it is already non-zero."""
-    s = _make_state()
-    s.min_stimulus = 0.0
-    s.max_stimulus = 20.0
-    s.stimulus_step = 5.0
-    s.set_max_stimulus(30.0)
-    assert s.stimulus_step == 5.0
+    ps = _make_protocol_state()
+    ps.min_stimulus = 0.0
+    ps.max_stimulus = 20.0
+    ps.stimulus_step = 5.0
+    ps.set_max_stimulus(30.0)
+    assert ps.stimulus_step == 5.0
 
 
 def test_set_stimulus_step_zero_rejected_when_range_open() -> None:
@@ -631,22 +637,22 @@ def test_set_stimulus_step_zero_rejected_when_range_open() -> None:
     state change, which forces Reflex to emit a delta and snap the controlled
     input back to the validated value.
     """
-    s = _make_state()
-    s.min_stimulus = 0.0
-    s.max_stimulus = 20.0
-    s.stimulus_step = 5.0
-    s.set_stimulus_step(0.0)
-    assert s.stimulus_step == 1.0
+    ps = _make_protocol_state()
+    ps.min_stimulus = 0.0
+    ps.max_stimulus = 20.0
+    ps.stimulus_step = 5.0
+    ps.set_stimulus_step(0.0)
+    assert ps.stimulus_step == 1.0
 
 
 def test_set_stimulus_step_negative_rejected_when_range_open() -> None:
     """set_stimulus_step resets to 1.0 for negative values in multi-sweep mode."""
-    s = _make_state()
-    s.min_stimulus = 0.0
-    s.max_stimulus = 20.0
-    s.stimulus_step = 5.0
-    s.set_stimulus_step(-1.0)
-    assert s.stimulus_step == 1.0
+    ps = _make_protocol_state()
+    ps.min_stimulus = 0.0
+    ps.max_stimulus = 20.0
+    ps.stimulus_step = 5.0
+    ps.set_stimulus_step(-1.0)
+    assert ps.stimulus_step == 1.0
 
 
 def test_set_stimulus_step_rejection_always_changes_state() -> None:
@@ -655,22 +661,22 @@ def test_set_stimulus_step_rejection_always_changes_state() -> None:
     Even when the previous step was already 1.0, a rejected value must still
     produce a state change so the frontend controlled input snaps back.
     """
-    s = _make_state()
-    s.min_stimulus = 0.0
-    s.max_stimulus = 20.0
-    s.stimulus_step = 1.0
-    s.set_stimulus_step(0.0)
-    assert s.stimulus_step == 1.0
+    ps = _make_protocol_state()
+    ps.min_stimulus = 0.0
+    ps.max_stimulus = 20.0
+    ps.stimulus_step = 1.0
+    ps.set_stimulus_step(0.0)
+    assert ps.stimulus_step == 1.0
 
 
 def test_set_stimulus_step_zero_accepted_when_single_sweep() -> None:
     """set_stimulus_step accepts 0 when min_stimulus == max_stimulus."""
-    s = _make_state()
-    s.min_stimulus = 10.0
-    s.max_stimulus = 10.0
-    s.stimulus_step = 5.0
-    s.set_stimulus_step(0.0)
-    assert s.stimulus_step == 0.0
+    ps = _make_protocol_state()
+    ps.min_stimulus = 10.0
+    ps.max_stimulus = 10.0
+    ps.stimulus_step = 5.0
+    ps.set_stimulus_step(0.0)
+    assert ps.stimulus_step == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -855,26 +861,26 @@ def test_toggle_hover_twice_restores_original_state() -> None:
 
 def test_build_protocols_single_sweep_current_clamp_has_empty_label() -> None:
     """Single-sweep current clamp protocol returns an empty sweep label."""
-    s = _make_state()
-    s.clamp_mode = "Current Clamp"
-    s.protocol_type = "Step"
-    s.min_stimulus = 10.0
-    s.max_stimulus = 10.0
-    s.stimulus_step = 0.0
-    result = s._build_protocols()
+    ps = _make_protocol_state()
+    ps.clamp_mode = "Current Clamp"
+    ps.protocol_type = "Step"
+    ps.min_stimulus = 10.0
+    ps.max_stimulus = 10.0
+    ps.stimulus_step = 0.0
+    result = ps._build_protocols()
     assert len(result) == 1
     assert result[0][1] == ""
 
 
 def test_build_protocols_multi_sweep_current_clamp_labels_contain_unit() -> None:
     """Multi-sweep current clamp Step protocol labels include µA/cm² unit."""
-    s = _make_state()
-    s.clamp_mode = "Current Clamp"
-    s.protocol_type = "Step"
-    s.min_stimulus = 0.0
-    s.max_stimulus = 10.0
-    s.stimulus_step = 5.0
-    result = s._build_protocols()
+    ps = _make_protocol_state()
+    ps.clamp_mode = "Current Clamp"
+    ps.protocol_type = "Step"
+    ps.min_stimulus = 0.0
+    ps.max_stimulus = 10.0
+    ps.stimulus_step = 5.0
+    result = ps._build_protocols()
     # 0 to 10 in steps of 5 → [0, 5, 10] = 3 sweeps
     assert len(result) == 3
     for _arr, label in result:
@@ -884,39 +890,39 @@ def test_build_protocols_multi_sweep_current_clamp_labels_contain_unit() -> None
 
 def test_build_protocols_multi_sweep_current_clamp_label_values() -> None:
     """Multi-sweep current clamp labels match the actual stimulus values."""
-    s = _make_state()
-    s.clamp_mode = "Current Clamp"
-    s.protocol_type = "Step"
-    s.min_stimulus = 0.0
-    s.max_stimulus = 10.0
-    s.stimulus_step = 5.0
-    result = s._build_protocols()
+    ps = _make_protocol_state()
+    ps.clamp_mode = "Current Clamp"
+    ps.protocol_type = "Step"
+    ps.min_stimulus = 0.0
+    ps.max_stimulus = 10.0
+    ps.stimulus_step = 5.0
+    result = ps._build_protocols()
     labels = [label for _arr, label in result]
     assert labels == ["+0.0 µA/cm²", "+5.0 µA/cm²", "+10.0 µA/cm²"]
 
 
 def test_build_protocols_single_sweep_voltage_clamp_has_empty_label() -> None:
     """Single-sweep voltage clamp protocol returns an empty sweep label."""
-    s = _make_state()
-    s.clamp_mode = "Voltage Clamp"
-    s.protocol_type = "Step"
-    s.min_stimulus = -70.0
-    s.max_stimulus = -70.0
-    s.stimulus_step = 0.0
-    result = s._build_protocols()
+    ps = _make_protocol_state()
+    ps.clamp_mode = "Voltage Clamp"
+    ps.protocol_type = "Step"
+    ps.min_stimulus = -70.0
+    ps.max_stimulus = -70.0
+    ps.stimulus_step = 0.0
+    result = ps._build_protocols()
     assert len(result) == 1
     assert result[0][1] == ""
 
 
 def test_build_protocols_multi_sweep_voltage_clamp_labels_contain_unit() -> None:
     """Multi-sweep voltage clamp Step protocol labels include mV unit."""
-    s = _make_state()
-    s.clamp_mode = "Voltage Clamp"
-    s.protocol_type = "Step"
-    s.min_stimulus = -40.0
-    s.max_stimulus = 40.0
-    s.stimulus_step = 20.0
-    result = s._build_protocols()
+    ps = _make_protocol_state()
+    ps.clamp_mode = "Voltage Clamp"
+    ps.protocol_type = "Step"
+    ps.min_stimulus = -40.0
+    ps.max_stimulus = 40.0
+    ps.stimulus_step = 20.0
+    result = ps._build_protocols()
     # -40 to +40 in steps of 20 → 5 sweeps
     assert len(result) == 5
     for _arr, label in result:
@@ -926,13 +932,13 @@ def test_build_protocols_multi_sweep_voltage_clamp_labels_contain_unit() -> None
 
 def test_build_protocols_multi_sweep_voltage_clamp_label_values() -> None:
     """Multi-sweep voltage clamp labels match the actual voltage step values."""
-    s = _make_state()
-    s.clamp_mode = "Voltage Clamp"
-    s.protocol_type = "Step"
-    s.min_stimulus = -40.0
-    s.max_stimulus = 40.0
-    s.stimulus_step = 40.0
-    result = s._build_protocols()
+    ps = _make_protocol_state()
+    ps.clamp_mode = "Voltage Clamp"
+    ps.protocol_type = "Step"
+    ps.min_stimulus = -40.0
+    ps.max_stimulus = 40.0
+    ps.stimulus_step = 40.0
+    result = ps._build_protocols()
     # -40 to +40 in steps of 40 → [-40, 0, +40] = 3 sweeps
     labels = [label for _arr, label in result]
     assert labels == ["-40 mV", "+0 mV", "+40 mV"]

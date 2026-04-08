@@ -6,6 +6,7 @@ from patch_sim_ui.constants import CURRENT_CLAMP
 from patch_sim_ui.state import AppState
 from patch_sim_ui.state.log import LogState
 from patch_sim_ui.state.neuron import NeuronState
+from patch_sim_ui.state.protocol import ProtocolState
 
 
 def _trace_checkbox(label: str, var: rx.Var, handler) -> rx.Component:
@@ -320,7 +321,7 @@ def _trace_visibility_popover() -> rx.Component:
         ),
         rx.popover.content(
             rx.cond(
-                AppState.clamp_mode == CURRENT_CLAMP,
+                ProtocolState.clamp_mode == CURRENT_CLAMP,
                 _cc_popover_content(),
                 _vc_popover_content(),
             ),

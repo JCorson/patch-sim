@@ -10,6 +10,7 @@ from patch_sim_ui.components.sweep_manager import sweep_manager
 from patch_sim_ui.components.trace_display import trace_display
 from patch_sim_ui.log_handler import setup_logging
 from patch_sim_ui.state import AppState
+from patch_sim_ui.state.protocol import ProtocolState
 
 setup_logging()
 
@@ -63,7 +64,7 @@ def _header() -> rx.Component:
                     color_scheme="green",
                     variant="soft",
                     size="2",
-                    disabled=~AppState.can_run_continuous,
+                    disabled=~ProtocolState.can_run_continuous,
                 ),
             ),
             spacing="2",
