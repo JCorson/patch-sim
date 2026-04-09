@@ -179,13 +179,13 @@ def _expanded_panel() -> rx.Component:
         # Header
         rx.hstack(
             rx.icon("chart-line", size=14),
-            rx.text("Analysis", size="2", weight="bold"),
+            rx.text("Analysis", size="4", weight="bold"),
             rx.spacer(),
             rx.icon_button(
                 rx.icon("panel-right-close", size=14),
                 on_click=AppState.toggle_analysis_panel,
                 variant="ghost",
-                size="1",
+                size="2",
                 cursor="pointer",
             ),
             padding_x="3",
@@ -244,7 +244,7 @@ def _collapsed_strip() -> rx.Component:
             rx.icon("panel-right-open", size=14),
             on_click=AppState.toggle_analysis_panel,
             variant="ghost",
-            size="1",
+            size="2",
             cursor="pointer",
         ),
         direction="column",
