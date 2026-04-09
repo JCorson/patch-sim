@@ -13,7 +13,7 @@ from patch_sim_ui.state._common import (
     _VISIBILITY_FIELDS,
 )
 
-logger = logging.getLogger("patch_sim_ui.state")
+logger = logging.getLogger(__name__)
 
 
 def _make_visibility_setter_async(field_name: str):

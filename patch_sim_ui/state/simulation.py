@@ -40,7 +40,7 @@ from patch_sim_ui.state.neuron import NeuronState
 from patch_sim_ui.state.protocol import ProtocolState
 from patch_sim_ui.state.visibility import VisibilityState
 
-logger = logging.getLogger("patch_sim_ui.state")
+logger = logging.getLogger(__name__)
 
 
 class SimulationState(rx.State):
@@ -362,6 +362,9 @@ class SimulationState(rx.State):
             self.continuous_mode = False
         else:
             self.continuous_mode = True
+            # Returning an event from a sync handler chains it: Reflex will
+            # dispatch run_continuous immediately after toggle_continuous_mode
+            # completes, without requiring this handler to be async.
             return SimulationState.run_continuous  # type: ignore[return-value]
 
     @rx.event(background=True)

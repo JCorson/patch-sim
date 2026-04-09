@@ -13,7 +13,7 @@ from patch_sim.protocols.builders import build_current_protocol, build_voltage_p
 from patch_sim_ui import constants, presets
 from patch_sim_ui.state._common import _PROTOCOL_FLOAT_FIELDS, _make_float_setter
 
-logger = logging.getLogger("patch_sim_ui.state")
+logger = logging.getLogger(__name__)
 
 
 class ProtocolState(rx.State):

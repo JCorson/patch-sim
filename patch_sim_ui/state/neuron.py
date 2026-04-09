@@ -41,7 +41,7 @@ from patch_sim_ui.state._common import (
     _make_float_setter,
 )
 
-logger = logging.getLogger("patch_sim_ui.state")
+logger = logging.getLogger(__name__)
 
 
 class NeuronState(rx.State):
