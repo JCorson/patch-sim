@@ -55,13 +55,12 @@ def _additional_channel_row(
     )
 
 
-def _reversal_row(label: str, value: rx.Var, unit: str = "mV") -> rx.Component:
+def _reversal_str(label: str, value: rx.Var, unit: str = "mV") -> rx.Component:
     """Render a read-only reversal potential display row."""
     return rx.hstack(
         rx.text(label, size="2", color="gray"),
-        rx.spacer(),
         rx.badge(
-            rx.text(value.to_string(), size="2"),
+            rx.text(f"{value:.2f}", size="2"),
             rx.text(f" {unit}", size="1", color="gray"),
             variant="soft",
         ),
@@ -215,7 +214,7 @@ _ADDITIONAL_CHANNEL_ROW_SPECS = [
 def neuron_panel() -> rx.Component:
     """Sidebar panel for configuring Hodgkin-Huxley neuron parameters."""
     return rx.vstack(
-        rx.heading("Neuron Parameters", size="3"),
+        rx.heading("Neuron Parameters", size="4"),
         rx.select(
             NEURON_PRESET_NAMES,
             placeholder="Load neuron type…",
@@ -258,7 +257,6 @@ def neuron_panel() -> rx.Component:
                 value="conductances",
             ),
             collapsible=True,
-            default_value="conductances",
             variant="ghost",
             width="100%",
         ),
@@ -296,7 +294,6 @@ def neuron_panel() -> rx.Component:
                 value="membrane-properties",
             ),
             collapsible=True,
-            default_value="membrane-properties",
             variant="ghost",
             width="100%",
         ),
@@ -392,13 +389,14 @@ def neuron_panel() -> rx.Component:
         ),
         rx.separator(),
         rx.text("Reversal Potentials", size="2", weight="bold"),
-        rx.vstack(
-            _reversal_row("E_Na", AppState.E_Na),
-            _reversal_row("E_K", AppState.E_K),
-            _reversal_row("E_L", AppState.E_L),
-            _reversal_row("E_Ca", AppState.E_Ca),
+        rx.grid(
+            _reversal_str("E_Na", AppState.E_Na),
+            _reversal_str("E_K", AppState.E_K),
+            _reversal_str("E_L", AppState.E_L),
+            _reversal_str("E_Ca", AppState.E_Ca),
             spacing="1",
             width="100%",
+            columns="2",
         ),
         spacing="3",
         width="100%",

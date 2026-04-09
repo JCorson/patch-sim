@@ -273,7 +273,7 @@ def _voltage_protocol_params() -> rx.Component:
 def protocol_panel() -> rx.Component:
     """Sidebar panel for experiment mode and protocol configuration."""
     return rx.vstack(
-        rx.heading("Experiment", size="3"),
+        rx.heading("Experiment", size="4"),
         rx.select(
             PROTOCOL_PRESET_NAMES,
             placeholder="Load preset…",
