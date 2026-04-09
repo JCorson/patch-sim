@@ -11,7 +11,34 @@ from patch_sim.constants import CURRENT_CLAMP
 from patch_sim.presets import NEURON_PROTOCOL_ADJUSTMENTS, PROTOCOL_PRESETS
 from patch_sim.protocols.builders import build_current_protocol, build_voltage_protocol
 from patch_sim_ui import constants, presets
-from patch_sim_ui.state._common import _PROTOCOL_FLOAT_FIELDS, _make_float_setter
+from patch_sim_ui.state._common import _make_float_setter
+
+_PROTOCOL_FLOAT_FIELDS: list[str] = [
+    # Shared timing
+    "pre_stimulus_duration",
+    "stimulus_duration",
+    "post_stimulus_duration",
+    # Current clamp protocol params
+    "start_current",
+    "end_current",
+    "pulse_amplitude",
+    "pulse_width",
+    "pulse_interval",
+    "dc_offset",
+    "amplitude",
+    "frequency",
+    "start_frequency",
+    "end_frequency",
+    "mean_current",
+    "std_current",
+    # Voltage clamp protocol params
+    "holding_voltage",
+    "vc_start_voltage",
+    "vc_end_voltage",
+    "vc_pulse_amplitude",
+    "vc_pulse_width",
+    "vc_pulse_interval",
+]
 
 logger = logging.getLogger(__name__)
 

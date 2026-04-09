@@ -10,8 +10,41 @@ from patch_sim_ui.state._common import (
     _ADDITIONAL_CURRENT_FIELD_MAP,
     _ADDITIONAL_GATING_FIELD_MAP,
     _PLOTLY_GD_JS,
-    _VISIBILITY_FIELDS,
 )
+
+_VISIBILITY_FIELDS: list[str] = [
+    "show_voltage",
+    "show_total_current",
+    "show_sodium_current",
+    "show_potassium_current",
+    "show_leak_current",
+    "show_potassium_activation",
+    "show_sodium_activation",
+    "show_sodium_inactivation",
+    # Additional channel visibility
+    "show_ih_current",
+    "show_ih_gating",
+    "show_ika_current",
+    "show_ika_gating",
+    "show_ikv31_current",
+    "show_ikv31_gating",
+    "show_inap_current",
+    "show_inap_gating",
+    "show_inar_current",
+    "show_inar_gating",
+    "show_im_current",
+    "show_im_gating",
+    "show_ikir_current",
+    "show_ikir_gating",
+    "show_ikca_current",
+    "show_ikca_gating",
+    "show_ical_current",
+    "show_ical_gating",
+    "show_icat_current",
+    "show_icat_gating",
+    "show_ican_current",
+    "show_ican_gating",
+]
 
 logger = logging.getLogger(__name__)
 

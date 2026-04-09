@@ -33,13 +33,74 @@ from patch_sim.constants import (
     DEFAULT_V_REST,
 )
 from patch_sim_ui import presets
-from patch_sim_ui.state._common import (
-    _CHANNEL_FLOAT_FIELDS,
-    _NEURON_FLOAT_FIELDS,
-    _NON_VISIBILITY_BOOL_FIELDS,
-    _make_bool_setter,
-    _make_float_setter,
-)
+from patch_sim_ui.state._common import _make_float_setter
+
+_NEURON_FLOAT_FIELDS: list[str] = [
+    "g_Na",
+    "g_K",
+    "g_L",
+    "C_m",
+    "v_rest",
+    "Na_out",
+    "Na_in",
+    "K_out",
+    "K_in",
+    "Cl_out",
+    "Cl_in",
+    "Ca_out",
+    "Ca_in",
+    "T",
+]
+
+_CHANNEL_FLOAT_FIELDS: list[str] = [
+    "ih_g_max",
+    "ika_g_max",
+    "ikv31_g_max",
+    "inap_g_max",
+    "inar_g_max",
+    "im_g_max",
+    "ikir_g_max",
+    "ikca_g_max",
+    "ical_g_max",
+    "icat_g_max",
+    "ican_g_max",
+]
+
+_NON_VISIBILITY_BOOL_FIELDS: list[str] = [
+    "ih_enabled",
+    "ika_enabled",
+    "ikv31_enabled",
+    "inap_enabled",
+    "inar_enabled",
+    "im_enabled",
+    "ikir_enabled",
+    "ikca_enabled",
+    "ical_enabled",
+    "icat_enabled",
+    "ican_enabled",
+]
+
+
+def _make_bool_setter(field_name: str, class_name: str = "NeuronState"):
+    """Factory returning a bool event handler for ``field_name``.
+
+    Args:
+        field_name: Name of the state attribute to update.
+        class_name: Owning state class name used in ``__qualname__``.
+
+    Returns:
+        An event handler method that sets the bool field.
+    """
+
+    def setter(self, value: bool) -> None:
+        """Set the field from a checkbox event."""
+        setattr(self, field_name, value)
+
+    setter.__name__ = f"set_{field_name}"
+    setter.__qualname__ = f"{class_name}.set_{field_name}"
+    setter.__doc__ = f"Set {field_name} from a checkbox event."
+    return setter
+
 
 logger = logging.getLogger(__name__)
 
