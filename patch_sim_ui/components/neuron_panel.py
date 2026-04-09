@@ -215,7 +215,7 @@ _ADDITIONAL_CHANNEL_ROW_SPECS = [
 def neuron_panel() -> rx.Component:
     """Sidebar panel for configuring Hodgkin-Huxley neuron parameters."""
     return rx.vstack(
-        rx.heading("Neuron Parameters", size="3"),
+        rx.heading("Neuron Parameters", size="4"),
         rx.select(
             NEURON_PRESET_NAMES,
             placeholder="Load neuron type…",
