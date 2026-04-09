@@ -26,7 +26,7 @@ def _header() -> rx.Component:
             size="2",
         ),
         rx.spacer(),
-        rx.heading("Patch Clamp Simulator", size="4"),
+        rx.heading("Patch Clamp Simulator", size="6"),
         rx.spacer(),
         rx.hstack(
             rx.cond(
