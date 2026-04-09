@@ -9,7 +9,6 @@ The environment variable is set at import time so the substate metaclass
 registration does not see a non-testing environment.
 """
 
-import asyncio
 import os
 from unittest.mock import MagicMock, patch
 
@@ -106,18 +105,6 @@ def _make_sweep(label: str = "test", color: str = "#000000") -> Sweep:
     ):
         result[name] = zeros
     return Sweep.from_result(result, zeros, label, color, "Current Clamp")
-
-
-def _run(coro):
-    """Run an async coroutine synchronously for testing.
-
-    Args:
-        coro: Coroutine to run.
-
-    Returns:
-        The coroutine's return value.
-    """
-    return asyncio.run(coro)
 
 
 def _make_get_state_fn(class_returns: dict):
@@ -234,50 +221,50 @@ def test_generated_bool_setter_stores_true() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_add_sweep_appends_to_saved_sweeps() -> None:
+async def test_add_sweep_appends_to_saved_sweeps() -> None:
     """add_sweep promotes the current result to saved_sweeps."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     assert len(s.saved_sweeps) == 0
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        _run(s.add_sweep())
+        await s.add_sweep()
     assert len(s.saved_sweeps) == 1
 
 
-def test_add_sweep_twice_appends_two_entries() -> None:
+async def test_add_sweep_twice_appends_two_entries() -> None:
     """Calling add_sweep twice creates two saved sweeps."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        _run(s.add_sweep())
-        _run(s.add_sweep())
+        await s.add_sweep()
+        await s.add_sweep()
     assert len(s.saved_sweeps) == 2
 
 
-def test_add_sweep_does_nothing_when_no_result() -> None:
+async def test_add_sweep_does_nothing_when_no_result() -> None:
     """add_sweep is a no-op when current_sweeps is empty."""
     s = _make_state()
     assert len(s.current_sweeps) == 0
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        _run(s.add_sweep())
+        await s.add_sweep()
     assert len(s.saved_sweeps) == 0
 
 
-def test_clear_sweeps_empties_saved_sweeps() -> None:
+async def test_clear_sweeps_empties_saved_sweeps() -> None:
     """clear_sweeps removes all entries from saved_sweeps."""
     s = _make_state()
     s.saved_sweeps = [_make_sweep(), _make_sweep()]
     assert len(s.saved_sweeps) == 2
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        _run(s.clear_sweeps())
+        await s.clear_sweeps()
     assert len(s.saved_sweeps) == 0
 
 
-def test_clear_sweeps_on_empty_list_does_not_raise() -> None:
+async def test_clear_sweeps_on_empty_list_does_not_raise() -> None:
     """clear_sweeps on an already-empty list raises no exception."""
     s = _make_state()
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        _run(s.clear_sweeps())  # must not raise
+        await s.clear_sweeps()  # must not raise
     assert len(s.saved_sweeps) == 0
 
 
@@ -286,39 +273,39 @@ def test_clear_sweeps_on_empty_list_does_not_raise() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_load_protocol_preset_action_potential_sets_stimulus_duration() -> None:
+async def test_load_protocol_preset_action_potential_sets_stimulus_duration() -> None:
     """load_protocol_preset('Action Potential') sets stimulus_duration to 30.0."""
     ps = _make_protocol_state()
     with patch.object(ProtocolState, "get_state", new=_make_get_state_fn({})):
-        _run(ps.load_protocol_preset("Action Potential"))
+        await ps.load_protocol_preset("Action Potential")
     assert ps.stimulus_duration == pytest.approx(30.0)
 
 
-def test_load_protocol_preset_action_potential_sets_clamp_mode() -> None:
+async def test_load_protocol_preset_action_potential_sets_clamp_mode() -> None:
     """load_protocol_preset('Action Potential') sets clamp_mode to 'Current Clamp'."""
     ps = _make_protocol_state()
     with patch.object(ProtocolState, "get_state", new=_make_get_state_fn({})):
-        _run(ps.load_protocol_preset("Action Potential"))
+        await ps.load_protocol_preset("Action Potential")
     assert ps.clamp_mode == "Current Clamp"
 
 
-def test_load_protocol_preset_repetitive_firing_sets_stimulus_duration() -> None:
+async def test_load_protocol_preset_repetitive_firing_sets_stimulus_duration() -> None:
     """load_protocol_preset('Repetitive Firing') sets stimulus_duration to 180.0."""
     ps = _make_protocol_state()
     with patch.object(ProtocolState, "get_state", new=_make_get_state_fn({})):
-        _run(ps.load_protocol_preset("Repetitive Firing"))
+        await ps.load_protocol_preset("Repetitive Firing")
     assert ps.stimulus_duration == pytest.approx(180.0)
 
 
-def test_load_protocol_preset_iv_curve_sets_voltage_clamp_mode() -> None:
+async def test_load_protocol_preset_iv_curve_sets_voltage_clamp_mode() -> None:
     """load_protocol_preset('I-V Curve') sets clamp_mode to 'Voltage Clamp'."""
     ps = _make_protocol_state()
     with patch.object(ProtocolState, "get_state", new=_make_get_state_fn({})):
-        _run(ps.load_protocol_preset("I-V Curve"))
+        await ps.load_protocol_preset("I-V Curve")
     assert ps.clamp_mode == "Voltage Clamp"
 
 
-def test_set_clamp_mode_clears_current_sweeps() -> None:
+async def test_set_clamp_mode_clears_current_sweeps() -> None:
     """set_clamp_mode resets current_sweeps on the SimulationState."""
     ps = _make_protocol_state()
     sim_st = _make_state()
@@ -326,11 +313,11 @@ def test_set_clamp_mode_clears_current_sweeps() -> None:
     with patch.object(
         ProtocolState, "get_state", new=_make_get_state_fn({SimulationState: sim_st})
     ):
-        _run(ps.set_clamp_mode("Voltage Clamp"))
+        await ps.set_clamp_mode("Voltage Clamp")
     assert len(sim_st.current_sweeps) == 0
 
 
-def test_set_clamp_mode_clears_saved_sweeps() -> None:
+async def test_set_clamp_mode_clears_saved_sweeps() -> None:
     """set_clamp_mode resets saved_sweeps on the SimulationState."""
     ps = _make_protocol_state()
     sim_st = _make_state()
@@ -338,11 +325,11 @@ def test_set_clamp_mode_clears_saved_sweeps() -> None:
     with patch.object(
         ProtocolState, "get_state", new=_make_get_state_fn({SimulationState: sim_st})
     ):
-        _run(ps.set_clamp_mode("Voltage Clamp"))
+        await ps.set_clamp_mode("Voltage Clamp")
     assert len(sim_st.saved_sweeps) == 0
 
 
-def test_set_clamp_mode_clears_stored_traces() -> None:
+async def test_set_clamp_mode_clears_stored_traces() -> None:
     """set_clamp_mode resets stored_traces on the SimulationState."""
     ps = _make_protocol_state()
     sim_st = _make_state()
@@ -350,11 +337,11 @@ def test_set_clamp_mode_clears_stored_traces() -> None:
     with patch.object(
         ProtocolState, "get_state", new=_make_get_state_fn({SimulationState: sim_st})
     ):
-        _run(ps.set_clamp_mode("Voltage Clamp"))
+        await ps.set_clamp_mode("Voltage Clamp")
     assert len(sim_st.stored_traces) == 0
 
 
-def test_set_clamp_mode_resets_cont_has_state() -> None:
+async def test_set_clamp_mode_resets_cont_has_state() -> None:
     """set_clamp_mode resets _cont_has_state on the SimulationState."""
     ps = _make_protocol_state()
     sim_st = _make_state()
@@ -362,15 +349,15 @@ def test_set_clamp_mode_resets_cont_has_state() -> None:
     with patch.object(
         ProtocolState, "get_state", new=_make_get_state_fn({SimulationState: sim_st})
     ):
-        _run(ps.set_clamp_mode("Voltage Clamp"))
+        await ps.set_clamp_mode("Voltage Clamp")
     assert sim_st._cont_has_state is False
 
 
-def test_load_protocol_preset_unknown_name_is_ignored() -> None:
+async def test_load_protocol_preset_unknown_name_is_ignored() -> None:
     """load_protocol_preset silently ignores an unknown preset name."""
     ps = _make_protocol_state()
     original = ps.stimulus_duration
-    _run(ps.load_protocol_preset("NonExistentPreset"))
+    await ps.load_protocol_preset("NonExistentPreset")
     assert ps.stimulus_duration == pytest.approx(original)
 
 
@@ -379,96 +366,96 @@ def test_load_protocol_preset_unknown_name_is_ignored() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_load_neuron_preset_fast_spiking_interneuron() -> None:
+async def test_load_neuron_preset_fast_spiking_interneuron() -> None:
     """load_neuron_preset enables IKv31 and leaves IKa disabled for Fast-Spiking."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        _run(ns.load_neuron_preset(FAST_SPIKING_INTERNEURON))
+        await ns.load_neuron_preset(FAST_SPIKING_INTERNEURON)
     assert ns.ikv31_enabled is True
     assert ns.ika_enabled is False
 
 
-def test_load_neuron_preset_sets_active_neuron_type() -> None:
+async def test_load_neuron_preset_sets_active_neuron_type() -> None:
     """load_neuron_preset records the selected neuron type on NeuronState."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        _run(ns.load_neuron_preset(CORTICAL_PYRAMIDAL))
+        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
     assert ns.active_neuron_type == CORTICAL_PYRAMIDAL
 
 
-def test_load_neuron_preset_resets_previously_enabled_channels() -> None:
+async def test_load_neuron_preset_resets_previously_enabled_channels() -> None:
     """Loading a second neuron preset disables channels from the first."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        _run(ns.load_neuron_preset(FAST_SPIKING_INTERNEURON))
+        await ns.load_neuron_preset(FAST_SPIKING_INTERNEURON)
         assert ns.ikv31_enabled is True
-        _run(ns.load_neuron_preset(CORTICAL_PYRAMIDAL))
+        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
     assert ns.ikv31_enabled is False
 
 
-def test_load_neuron_preset_pyramidal_neuron() -> None:
+async def test_load_neuron_preset_pyramidal_neuron() -> None:
     """load_neuron_preset enables Ih, INaP, and IM channels for Cortical Pyramidal."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        _run(ns.load_neuron_preset(CORTICAL_PYRAMIDAL))
+        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
     assert ns.ih_enabled is True
     assert ns.inap_enabled is True
     assert ns.im_enabled is True
 
 
-def test_load_neuron_preset_purkinje_cell() -> None:
+async def test_load_neuron_preset_purkinje_cell() -> None:
     """load_neuron_preset enables ICaL, ICaT, and IKCa channels for Purkinje Cell."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        _run(ns.load_neuron_preset(PURKINJE))
+        await ns.load_neuron_preset(PURKINJE)
     assert ns.ical_enabled is True
     assert ns.icat_enabled is True
     assert ns.ikca_enabled is True
 
 
-def test_load_neuron_preset_dopaminergic_neuron() -> None:
+async def test_load_neuron_preset_dopaminergic_neuron() -> None:
     """load_neuron_preset enables Ih and IM channels for Dopaminergic Neuron."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        _run(ns.load_neuron_preset(DOPAMINERGIC))
+        await ns.load_neuron_preset(DOPAMINERGIC)
     assert ns.ih_enabled is True
     assert ns.im_enabled is True
 
 
-def test_load_neuron_preset_thalamic_relay() -> None:
+async def test_load_neuron_preset_thalamic_relay() -> None:
     """load_neuron_preset enables ICaT and Ih channels for Thalamic Relay."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        _run(ns.load_neuron_preset(THALAMIC_RELAY))
+        await ns.load_neuron_preset(THALAMIC_RELAY)
     assert ns.icat_enabled is True
     assert ns.ih_enabled is True
 
 
-def test_load_neuron_preset_unknown_name_is_ignored() -> None:
+async def test_load_neuron_preset_unknown_name_is_ignored() -> None:
     """load_neuron_preset silently ignores an unknown preset name."""
     ns = _make_neuron_state()
     before = ns.active_neuron_type
-    _run(ns.load_neuron_preset("NonExistentNeuron"))
+    await ns.load_neuron_preset("NonExistentNeuron")
     assert ns.active_neuron_type == before
 
 
-def test_add_sweep_label_includes_neuron_type() -> None:
+async def test_add_sweep_label_includes_neuron_type() -> None:
     """add_sweep includes the active neuron type in the sweep label."""
     s = _make_state()
     s._label_neuron_type = FAST_SPIKING_INTERNEURON
     s.current_sweeps = [_make_sweep()]
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        _run(s.add_sweep())
+        await s.add_sweep()
     assert FAST_SPIKING_INTERNEURON in s.saved_sweeps[0].label
 
 
-def test_store_trace_label_includes_neuron_type() -> None:
+async def test_store_trace_label_includes_neuron_type() -> None:
     """store_trace includes the active neuron type in the stored trace label."""
     s = _make_state()
     s._label_neuron_type = CORTICAL_PYRAMIDAL
     s.current_sweeps = [_make_sweep()]
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        _run(s.store_trace())
+        await s.store_trace()
     assert CORTICAL_PYRAMIDAL in s.stored_traces[0].label
 
 
@@ -477,7 +464,7 @@ def test_store_trace_label_includes_neuron_type() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_protocol_preset_with_active_neuron_type_applies_adjustment() -> None:
+async def test_protocol_preset_with_active_neuron_type_applies_adjustment() -> None:
     """Repetitive Firing with Thalamic Relay applies a hyperpolarizing adjustment."""
     ps = _make_protocol_state()
     mock_neuron = MagicMock()
@@ -485,11 +472,11 @@ def test_protocol_preset_with_active_neuron_type_applies_adjustment() -> None:
     with patch.object(
         ProtocolState, "get_state", new=_make_get_state_fn({NeuronState: mock_neuron})
     ):
-        _run(ps.load_protocol_preset("Repetitive Firing"))
+        await ps.load_protocol_preset("Repetitive Firing")
     assert ps.min_stimulus < 0.0
 
 
-def test_protocol_preset_without_active_neuron_type_uses_base_params() -> None:
+async def test_protocol_preset_without_active_neuron_type_uses_base_params() -> None:
     """Repetitive Firing with no active neuron type uses the base stimulus."""
     ps = _make_protocol_state()
     mock_neuron = MagicMock()
@@ -497,11 +484,11 @@ def test_protocol_preset_without_active_neuron_type_uses_base_params() -> None:
     with patch.object(
         ProtocolState, "get_state", new=_make_get_state_fn({NeuronState: mock_neuron})
     ):
-        _run(ps.load_protocol_preset("Repetitive Firing"))
+        await ps.load_protocol_preset("Repetitive Firing")
     assert ps.min_stimulus == pytest.approx(15.0)
 
 
-def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> None:
+async def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> None:
     """Action Potential with Thalamic Relay active falls through to base duration."""
     ps = _make_protocol_state()
     mock_neuron = MagicMock()
@@ -509,11 +496,11 @@ def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> None:
     with patch.object(
         ProtocolState, "get_state", new=_make_get_state_fn({NeuronState: mock_neuron})
     ):
-        _run(ps.load_protocol_preset("Action Potential"))
+        await ps.load_protocol_preset("Action Potential")
     assert ps.stimulus_duration == pytest.approx(30.0)
 
 
-def test_protocol_preset_dopaminergic_repetitive_firing_uses_long_duration() -> None:
+async def test_protocol_preset_dopaminergic_repetitive_firing_long_duration() -> None:
     """Dopaminergic Neuron + Repetitive Firing sets stimulus_duration to 480 ms."""
     ps = _make_protocol_state()
     mock_neuron = MagicMock()
@@ -521,7 +508,7 @@ def test_protocol_preset_dopaminergic_repetitive_firing_uses_long_duration() -> 
     with patch.object(
         ProtocolState, "get_state", new=_make_get_state_fn({NeuronState: mock_neuron})
     ):
-        _run(ps.load_protocol_preset("Repetitive Firing"))
+        await ps.load_protocol_preset("Repetitive Firing")
     assert ps.stimulus_duration == pytest.approx(480.0)
 
 
@@ -530,52 +517,52 @@ def test_protocol_preset_dopaminergic_repetitive_firing_uses_long_duration() -> 
 # ---------------------------------------------------------------------------
 
 
-def test_store_trace_appends_to_stored_traces() -> None:
+async def test_store_trace_appends_to_stored_traces() -> None:
     """store_trace promotes the current sweep to stored_traces."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     assert len(s.stored_traces) == 0
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        _run(s.store_trace())
+        await s.store_trace()
     assert len(s.stored_traces) == 1
 
 
-def test_store_trace_sets_stored_label() -> None:
+async def test_store_trace_sets_stored_label() -> None:
     """store_trace labels the stored entry with index and neuron type."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        _run(s.store_trace())
+        await s.store_trace()
     assert s.stored_traces[0].label == f"Stored 1 ({s._label_neuron_type})"
 
 
-def test_store_trace_twice_increments_label() -> None:
+async def test_store_trace_twice_increments_label() -> None:
     """Calling store_trace twice creates sequentially numbered labels."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        _run(s.store_trace())
-        _run(s.store_trace())
+        await s.store_trace()
+        await s.store_trace()
     assert len(s.stored_traces) == 2
     assert s.stored_traces[1].label == f"Stored 2 ({s._label_neuron_type})"
 
 
-def test_store_trace_does_nothing_when_no_result() -> None:
+async def test_store_trace_does_nothing_when_no_result() -> None:
     """store_trace is a no-op when current_sweeps is empty."""
     s = _make_state()
     assert len(s.current_sweeps) == 0
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        _run(s.store_trace())
+        await s.store_trace()
     assert len(s.stored_traces) == 0
 
 
-def test_clear_stored_traces_empties_list() -> None:
+async def test_clear_stored_traces_empties_list() -> None:
     """clear_stored_traces removes all entries from stored_traces."""
     s = _make_state()
     s.stored_traces = [_make_sweep(), _make_sweep()]
     assert len(s.stored_traces) == 2
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        _run(s.clear_stored_traces())
+        await s.clear_stored_traces()
     assert len(s.stored_traces) == 0
 
 
@@ -585,30 +572,30 @@ def test_has_stored_traces_false_when_empty() -> None:
     assert s.has_stored_traces is False
 
 
-def test_has_stored_traces_true_after_store() -> None:
+async def test_has_stored_traces_true_after_store() -> None:
     """has_stored_traces is True after store_trace is called."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        _run(s.store_trace())
+        await s.store_trace()
     assert s.has_stored_traces is True
 
 
-def test_set_clamp_mode_to_current_resets_protocol_type() -> None:
+async def test_set_clamp_mode_to_current_resets_protocol_type() -> None:
     """set_clamp_mode('Current Clamp') resets protocol_type to the first CC option."""
     ps = _make_protocol_state()
     ps.clamp_mode = "Voltage Clamp"
     ps.protocol_type = "Ramp"
     with patch.object(ProtocolState, "get_state", new=_make_get_state_fn({})):
-        _run(ps.set_clamp_mode("Current Clamp"))
+        await ps.set_clamp_mode("Current Clamp")
     assert ps.protocol_type == constants.CURRENT_PROTOCOLS[0]
 
 
-def test_set_clamp_mode_to_voltage_resets_protocol_type() -> None:
+async def test_set_clamp_mode_to_voltage_resets_protocol_type() -> None:
     """set_clamp_mode('Voltage Clamp') resets protocol_type to the first VC option."""
     ps = _make_protocol_state()
     with patch.object(ProtocolState, "get_state", new=_make_get_state_fn({})):
-        _run(ps.set_clamp_mode("Voltage Clamp"))
+        await ps.set_clamp_mode("Voltage Clamp")
     assert ps.protocol_type == constants.VOLTAGE_PROTOCOLS[0]
 
 
