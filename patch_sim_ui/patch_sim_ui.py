@@ -27,7 +27,7 @@ def _header() -> rx.Component:
             size="2",
         ),
         rx.spacer(),
-        rx.heading("Patch Clamp Simulator", size="4"),
+        rx.heading("Patch Clamp Simulator", size="6"),
         rx.spacer(),
         rx.hstack(
             rx.cond(
@@ -104,7 +104,7 @@ def _sidebar() -> rx.Component:
                 neuron_panel(),
                 rx.separator(),
                 protocol_panel(),
-                spacing="0",
+                spacing="1",
                 width="100%",
             ),
             height="calc(100vh - 60px - 2 * var(--space-3))",
