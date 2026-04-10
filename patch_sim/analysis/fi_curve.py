@@ -13,7 +13,7 @@ import dataclasses
 
 import numpy as np
 
-from patch_sim.analysis.ap_metrics import analyze_aps
+from patch_sim.analysis.ap_metrics import APAnalysisResult, analyze_aps
 
 
 @dataclasses.dataclass
@@ -76,20 +76,17 @@ class FIAnalysisResult:
         return [p.steady_state_firing_rate for p in self.points]
 
 
-def compute_fi_point(
-    time: np.ndarray,
-    voltage: np.ndarray,
+def _fi_point_from_ap_result(
+    ap_result: APAnalysisResult,
     current_step: float,
     stim_start_ms: float,
     stim_end_ms: float,
 ) -> FIPoint:
-    """Compute F-I metrics for a single current step sweep.
+    """Build an FIPoint from a pre-computed APAnalysisResult.
 
-    Detects spikes using :func:`~patch_sim.analysis.ap_metrics.analyze_aps`
-    and restricts the analysis to spikes whose threshold time falls within
-    the stimulus window ``[stim_start_ms, stim_end_ms]``.  Firing rates are
-    derived from inter-spike intervals (ISIs) between consecutive spike
-    peak times:
+    Restricts the analysis to spikes whose threshold time falls within the
+    stimulus window ``[stim_start_ms, stim_end_ms]`` and derives firing rates
+    from inter-spike intervals (ISIs) between consecutive spike peak times:
 
     - Mean firing rate: ``1000 / mean(ISIs)``
     - Initial firing rate: ``1000 / ISIs[0]`` (first ISI)
@@ -99,8 +96,7 @@ def compute_fi_point(
     detected.
 
     Args:
-        time: Time axis array in ms.
-        voltage: Membrane voltage array in mV, same length as ``time``.
+        ap_result: Pre-computed AP analysis result for this sweep.
         current_step: Injected current amplitude during the step (µA/cm²).
         stim_start_ms: Start of the stimulus window in ms.
         stim_end_ms: End of the stimulus window in ms.
@@ -109,9 +105,6 @@ def compute_fi_point(
         An :class:`FIPoint` with spike count and firing rate measurements for
         this current step.
     """
-    ap_result = analyze_aps(time, voltage)
-
-    # Restrict spikes to those whose threshold crossing falls within the window.
     in_window = [
         s for s in ap_result.spikes if stim_start_ms <= s.threshold_time <= stim_end_ms
     ]
@@ -129,16 +122,40 @@ def compute_fi_point(
     peak_times = [s.peak_time for s in in_window]
     isis = [peak_times[i + 1] - peak_times[i] for i in range(len(peak_times) - 1)]
 
-    mean_rate = 1000.0 / float(np.mean(isis))
-    initial_rate = 1000.0 / isis[0]
-    steady_rate = 1000.0 / isis[-1]
-
     return FIPoint(
         current_step=current_step,
         spike_count=spike_count,
-        mean_firing_rate=mean_rate,
-        initial_firing_rate=initial_rate,
-        steady_state_firing_rate=steady_rate,
+        mean_firing_rate=1000.0 / float(np.mean(isis)),
+        initial_firing_rate=1000.0 / isis[0],
+        steady_state_firing_rate=1000.0 / isis[-1],
+    )
+
+
+def compute_fi_point(
+    time: np.ndarray,
+    voltage: np.ndarray,
+    current_step: float,
+    stim_start_ms: float,
+    stim_end_ms: float,
+) -> FIPoint:
+    """Compute F-I metrics for a single current step sweep.
+
+    Detects spikes using :func:`~patch_sim.analysis.ap_metrics.analyze_aps`
+    and delegates to :func:`_fi_point_from_ap_result` for the rate computation.
+
+    Args:
+        time: Time axis array in ms.
+        voltage: Membrane voltage array in mV, same length as ``time``.
+        current_step: Injected current amplitude during the step (µA/cm²).
+        stim_start_ms: Start of the stimulus window in ms.
+        stim_end_ms: End of the stimulus window in ms.
+
+    Returns:
+        An :class:`FIPoint` with spike count and firing rate measurements for
+        this current step.
+    """
+    return _fi_point_from_ap_result(
+        analyze_aps(time, voltage), current_step, stim_start_ms, stim_end_ms
     )
 
 

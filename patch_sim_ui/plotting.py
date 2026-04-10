@@ -978,9 +978,11 @@ def build_fi_figure(fi_data: dict) -> go.Figure:
         Returns:
             Tuple of (filtered current steps, filtered rate values).
         """
-        xs = [c for c, r in zip(currents, rates) if r is not None]
-        ys = [r for r in rates if r is not None]
-        return xs, ys
+        pairs = [(c, r) for c, r in zip(currents, rates) if r is not None]
+        if not pairs:
+            return [], []
+        xs, ys = zip(*pairs)
+        return list(xs), list(ys)
 
     fig = go.Figure()
     x_mean, y_mean = _filter(mean_rates)

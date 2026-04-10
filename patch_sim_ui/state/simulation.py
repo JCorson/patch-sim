@@ -17,6 +17,7 @@ import reflex as rx
 
 import patch_sim
 import patch_sim.clamp_simulations
+from patch_sim.analysis.fi_curve import _fi_point_from_ap_result
 from patch_sim.constants import (
     CURRENT_CLAMP,
     VOLTAGE_CLAMP,
@@ -420,38 +421,21 @@ def _compute_cc_multi_sweep_analysis(
 
     # --- F-I data (derived from the same per-sweep AP results) ---
     if len(sweeps) != len(current_steps):
+        logger.warning(
+            "F-I analysis skipped: %d sweeps but %d current steps derived "
+            "from protocol (min=%.3g, max=%.3g, step=%.3g)",
+            len(sweeps),
+            len(current_steps),
+            min_stimulus,
+            max_stimulus,
+            stimulus_step,
+        )
         return ap_metrics, ap_summary, {}
 
-    fi_points: list[patch_sim.FIPoint] = []
-    for ap_result, i_step in zip(per_sweep_ap, current_steps):
-        in_window = [
-            s for s in ap_result.spikes if stim_start <= s.threshold_time <= stim_end
-        ]
-        spike_count = len(in_window)
-        if spike_count < 2:
-            fi_points.append(
-                patch_sim.FIPoint(
-                    current_step=i_step,
-                    spike_count=spike_count,
-                    mean_firing_rate=None,
-                    initial_firing_rate=None,
-                    steady_state_firing_rate=None,
-                )
-            )
-        else:
-            peak_times = [s.peak_time for s in in_window]
-            isis = [
-                peak_times[j + 1] - peak_times[j] for j in range(len(peak_times) - 1)
-            ]
-            fi_points.append(
-                patch_sim.FIPoint(
-                    current_step=i_step,
-                    spike_count=spike_count,
-                    mean_firing_rate=1000.0 / float(np.mean(isis)),
-                    initial_firing_rate=1000.0 / isis[0],
-                    steady_state_firing_rate=1000.0 / isis[-1],
-                )
-            )
+    fi_points: list[patch_sim.FIPoint] = [
+        _fi_point_from_ap_result(ap_result, i_step, stim_start, stim_end)
+        for ap_result, i_step in zip(per_sweep_ap, current_steps)
+    ]
 
     fi_points.sort(key=lambda p: p.current_step)
     fi_result = patch_sim.FIAnalysisResult(points=fi_points)

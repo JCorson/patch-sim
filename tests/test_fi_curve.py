@@ -283,14 +283,18 @@ def test_fi_curve_integration_hh(hh_model):
     # Subthreshold step should produce no spikes
     assert fi.points[0].spike_count == 0
 
-    # Among spiking steps (those with at least 2 spikes), firing rate should
-    # be non-negative and increase with current (or at least not strictly decrease
-    # for the highest step compared to lower ones).
+    # Among spiking steps, all mean firing rates should be positive.
     spiking_rates = [
         p.mean_firing_rate for p in fi.points if p.mean_firing_rate is not None
     ]
     for rate in spiking_rates:
         assert rate > 0.0
+
+    # Mean firing rates should be non-decreasing as injected current increases
+    # (points are sorted by current_step).
+    assert all(
+        spiking_rates[i] <= spiking_rates[i + 1] for i in range(len(spiking_rates) - 1)
+    )
 
     # The highest current step should have the most spikes
     spike_counts = [p.spike_count for p in fi.points]
