@@ -338,6 +338,67 @@ _SWEEP_HIGHLIGHT_JS = """
 """
 
 
+def _compute_multi_sweep_ap_data(
+    sweeps: "list[Sweep]",
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Pool AP metrics across all sweeps for display in the analysis panel.
+
+    Runs spike detection on every sweep's full voltage trace and aggregates
+    the results into a flat spike list and a summary dict.  The summary omits
+    ``mean_isi`` and ``firing_rate`` because those values are shown per-sweep
+    in the F-I curve.
+
+    Args:
+        sweeps: Ordered list of :class:`Sweep` objects from the simulation.
+
+    Returns:
+        A 2-tuple ``(ap_metrics, ap_summary)`` where ``ap_metrics`` is a list
+        of per-spike dicts (sequentially renumbered across all sweeps) and
+        ``ap_summary`` is an aggregate dict.  Returns ``([], {})`` when no
+        spikes are found across any sweep.
+    """
+    all_spikes = []
+    for sweep in sweeps:
+        time_arr = np.array(sweep.time)
+        voltage_arr = np.array(sweep.voltage)
+        ap_result = patch_sim.analyze_aps(time_arr, voltage_arr)
+        all_spikes.extend(ap_result.spikes)
+
+    if not all_spikes:
+        return [], {}
+
+    ap_metrics: list[dict[str, Any]] = [
+        {
+            "index": i,
+            "threshold_voltage": f"{s.threshold_voltage:.1f}",
+            "peak_voltage": f"{s.peak_voltage:.1f}",
+            "rise_time": f"{s.rise_time:.2f}",
+            "half_width": f"{s.half_width:.2f}",
+            "ahp_depth": (
+                f"{s.ahp_depth:.1f}" if s.ahp_depth is not None else "\u2014"
+            ),
+        }
+        for i, s in enumerate(all_spikes)
+    ]
+
+    thresh_vals = [s.threshold_voltage for s in all_spikes]
+    peak_vals = [s.peak_voltage for s in all_spikes]
+    rise_vals = [s.rise_time for s in all_spikes]
+    hw_vals = [s.half_width for s in all_spikes]
+    ahp_vals = [s.ahp_depth for s in all_spikes if s.ahp_depth is not None]
+
+    ap_summary: dict[str, Any] = {
+        "spike_count": str(len(all_spikes)),
+        "mean_threshold_voltage": f"{float(np.mean(thresh_vals)):.1f}",
+        "mean_peak_voltage": f"{float(np.mean(peak_vals)):.1f}",
+        "mean_rise_time": f"{float(np.mean(rise_vals)):.2f}",
+        "mean_half_width": f"{float(np.mean(hw_vals)):.2f}",
+        "mean_ahp_depth": (f"{float(np.mean(ahp_vals)):.1f}" if ahp_vals else "\u2014"),
+        # Omitted for multi-sweep: mean_isi, firing_rate
+    }
+    return ap_metrics, ap_summary
+
+
 def _compute_fi_data(
     sweeps: "list[Sweep]",
     min_stimulus: float,
@@ -985,9 +1046,10 @@ class SimulationState(rx.State):
                 async with self:
                     self.current_sweeps = new_sweeps
                     analysis_st = await self.get_state(AnalysisState)
-                    analysis_st.ap_metrics = []
-                    analysis_st.ap_summary = {}
                     if mode == VOLTAGE_CLAMP:
+                        analysis_st.ap_metrics = []
+                        analysis_st.ap_summary = {}
+                        analysis_st.ap_is_multi_sweep = False
                         analysis_st.fi_data = {}
                         analysis_st.iv_data = _compute_iv_data(
                             new_sweeps,
@@ -998,6 +1060,12 @@ class SimulationState(rx.State):
                             proto_st.stimulus_duration,
                         )
                     else:
+                        ms_metrics, ms_summary = _compute_multi_sweep_ap_data(
+                            new_sweeps
+                        )
+                        analysis_st.ap_metrics = ms_metrics
+                        analysis_st.ap_summary = ms_summary
+                        analysis_st.ap_is_multi_sweep = True
                         analysis_st.iv_data = {}
                         analysis_st.fi_data = _compute_fi_data(
                             new_sweeps,
@@ -1071,11 +1139,13 @@ class SimulationState(rx.State):
                                 else "\u2014"
                             ),
                         }
+                        analysis_st.ap_is_multi_sweep = False
                         analysis_st.iv_data = {}
                         analysis_st.fi_data = {}
                     else:
                         analysis_st.ap_metrics = []
                         analysis_st.ap_summary = {}
+                        analysis_st.ap_is_multi_sweep = False
                         analysis_st.iv_data = {}
                         analysis_st.fi_data = {}
 

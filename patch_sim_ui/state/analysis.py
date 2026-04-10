@@ -13,6 +13,7 @@ class AnalysisState(rx.State):
 
     ap_metrics: list[dict[str, Any]] = []  # Per-spike metrics (serialized)
     ap_summary: dict[str, Any] = {}  # Aggregate summary statistics
+    ap_is_multi_sweep: bool = False  # True when AP data is pooled from multiple sweeps
     fi_data: dict[str, Any] = {}  # Serialized FIAnalysisResult for the UI
     iv_data: dict[str, Any] = {}  # Serialized IVAnalysisResult for the UI
 
@@ -20,6 +21,11 @@ class AnalysisState(rx.State):
     def has_ap_metrics(self) -> bool:
         """Return True when AP analysis results are available for display."""
         return len(self.ap_metrics) > 0
+
+    @rx.var
+    def has_ap_or_fi(self) -> bool:
+        """Return True when either AP metrics or F-I data are available."""
+        return len(self.ap_metrics) > 0 or len(self.fi_data) > 0
 
     @rx.var
     def has_fi_data(self) -> bool:
