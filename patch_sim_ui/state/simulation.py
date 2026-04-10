@@ -17,6 +17,7 @@ import reflex as rx
 
 import patch_sim
 import patch_sim.clamp_simulations
+from patch_sim.analysis.fi_curve import _fi_point_from_ap_result
 from patch_sim.constants import (
     CURRENT_CLAMP,
     VOLTAGE_CLAMP,
@@ -336,6 +337,115 @@ _SWEEP_HIGHLIGHT_JS = """
   setup(10);
 })();
 """
+
+
+def _compute_cc_multi_sweep_analysis(
+    sweeps: "list[Sweep]",
+    min_stimulus: float,
+    max_stimulus: float,
+    stimulus_step: float,
+    pre_stimulus_duration: float,
+    stimulus_duration: float,
+) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
+    """Compute AP metrics and F-I data from multi-sweep current clamp results.
+
+    Runs spike detection once per sweep and derives both outputs from those
+    results, avoiding the redundant ``analyze_aps`` call that would occur if
+    the AP and F-I helpers were called separately.
+
+    Args:
+        sweeps: Ordered list of :class:`Sweep` objects from the simulation.
+        min_stimulus: Minimum injected current step (µA/cm²).
+        max_stimulus: Maximum injected current step (µA/cm²).
+        stimulus_step: Step size between current commands (µA/cm²).
+        pre_stimulus_duration: Duration before the step begins (ms).
+        stimulus_duration: Duration of the current step (ms).
+
+    Returns:
+        A 3-tuple ``(ap_metrics, ap_summary, fi_data)``  where ``ap_metrics``
+        is a list of per-spike dicts (pooled and renumbered across all sweeps),
+        ``ap_summary`` is an aggregate dict without ``mean_isi`` / ``firing_rate``
+        (those are shown in the F-I curve), and ``fi_data`` is a serialised
+        :class:`~patch_sim.FIAnalysisResult` dict.  ``ap_metrics`` and
+        ``ap_summary`` are empty when no spikes are detected.  ``fi_data`` is
+        empty when the sweep count does not match the derived step count.
+    """
+    n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
+    current_steps = list(np.linspace(min_stimulus, max_stimulus, n_steps))
+
+    time_arr = np.array(sweeps[0].time)
+    stim_start = pre_stimulus_duration
+    stim_end = pre_stimulus_duration + stimulus_duration
+
+    # Run analyze_aps once per sweep; reuse results for both AP metrics and F-I.
+    per_sweep_ap = [
+        patch_sim.analyze_aps(time_arr, np.array(s.voltage)) for s in sweeps
+    ]
+
+    # --- AP metrics (pooled across all sweeps) ---
+    all_spikes = [spike for ap in per_sweep_ap for spike in ap.spikes]
+
+    if all_spikes:
+        ap_metrics: list[dict[str, Any]] = [
+            {
+                "index": i,
+                "threshold_voltage": f"{s.threshold_voltage:.1f}",
+                "peak_voltage": f"{s.peak_voltage:.1f}",
+                "rise_time": f"{s.rise_time:.2f}",
+                "half_width": f"{s.half_width:.2f}",
+                "ahp_depth": (
+                    f"{s.ahp_depth:.1f}" if s.ahp_depth is not None else "\u2014"
+                ),
+            }
+            for i, s in enumerate(all_spikes)
+        ]
+        thresh_vals = [s.threshold_voltage for s in all_spikes]
+        peak_vals = [s.peak_voltage for s in all_spikes]
+        rise_vals = [s.rise_time for s in all_spikes]
+        hw_vals = [s.half_width for s in all_spikes]
+        ahp_vals = [s.ahp_depth for s in all_spikes if s.ahp_depth is not None]
+        ap_summary: dict[str, Any] = {
+            "spike_count": str(len(all_spikes)),
+            "mean_threshold_voltage": f"{float(np.mean(thresh_vals)):.1f}",
+            "mean_peak_voltage": f"{float(np.mean(peak_vals)):.1f}",
+            "mean_rise_time": f"{float(np.mean(rise_vals)):.2f}",
+            "mean_half_width": f"{float(np.mean(hw_vals)):.2f}",
+            "mean_ahp_depth": (
+                f"{float(np.mean(ahp_vals)):.1f}" if ahp_vals else "\u2014"
+            ),
+            # mean_isi and firing_rate omitted: shown per-sweep in the F-I curve.
+        }
+    else:
+        ap_metrics = []
+        ap_summary = {}
+
+    # --- F-I data (derived from the same per-sweep AP results) ---
+    if len(sweeps) != len(current_steps):
+        logger.warning(
+            "F-I analysis skipped: %d sweeps but %d current steps derived "
+            "from protocol (min=%.3g, max=%.3g, step=%.3g)",
+            len(sweeps),
+            len(current_steps),
+            min_stimulus,
+            max_stimulus,
+            stimulus_step,
+        )
+        return ap_metrics, ap_summary, {}
+
+    fi_points: list[patch_sim.FIPoint] = [
+        _fi_point_from_ap_result(ap_result, i_step, stim_start, stim_end)
+        for ap_result, i_step in zip(per_sweep_ap, current_steps)
+    ]
+
+    fi_points.sort(key=lambda p: p.current_step)
+    fi_result = patch_sim.FIAnalysisResult(points=fi_points)
+    fi_data: dict[str, Any] = {
+        "current_steps": fi_result.current_steps,
+        "mean_firing_rates": fi_result.mean_firing_rates,
+        "initial_firing_rates": fi_result.initial_firing_rates,
+        "steady_state_firing_rates": fi_result.steady_state_firing_rates,
+    }
+    return ap_metrics, ap_summary, fi_data
 
 
 def _compute_iv_data(
@@ -928,9 +1038,11 @@ class SimulationState(rx.State):
                 async with self:
                     self.current_sweeps = new_sweeps
                     analysis_st = await self.get_state(AnalysisState)
-                    analysis_st.ap_metrics = []
-                    analysis_st.ap_summary = {}
                     if mode == VOLTAGE_CLAMP:
+                        analysis_st.ap_metrics = []
+                        analysis_st.ap_summary = {}
+                        analysis_st.ap_is_multi_sweep = False
+                        analysis_st.fi_data = {}
                         analysis_st.iv_data = _compute_iv_data(
                             new_sweeps,
                             proto_st.min_stimulus,
@@ -940,7 +1052,21 @@ class SimulationState(rx.State):
                             proto_st.stimulus_duration,
                         )
                     else:
+                        ms_metrics, ms_summary, ms_fi = (
+                            _compute_cc_multi_sweep_analysis(
+                                new_sweeps,
+                                proto_st.min_stimulus,
+                                proto_st.max_stimulus,
+                                proto_st.stimulus_step,
+                                proto_st.pre_stimulus_duration,
+                                proto_st.stimulus_duration,
+                            )
+                        )
+                        analysis_st.ap_metrics = ms_metrics
+                        analysis_st.ap_summary = ms_summary
+                        analysis_st.ap_is_multi_sweep = True
                         analysis_st.iv_data = {}
+                        analysis_st.fi_data = ms_fi
 
             else:
                 stimulus, _ = protocols[0]
@@ -1005,11 +1131,15 @@ class SimulationState(rx.State):
                                 else "\u2014"
                             ),
                         }
+                        analysis_st.ap_is_multi_sweep = False
                         analysis_st.iv_data = {}
+                        analysis_st.fi_data = {}
                     else:
                         analysis_st.ap_metrics = []
                         analysis_st.ap_summary = {}
+                        analysis_st.ap_is_multi_sweep = False
                         analysis_st.iv_data = {}
+                        analysis_st.fi_data = {}
 
         except ValueError as exc:
             logger.exception("Simulation error: %s", exc)

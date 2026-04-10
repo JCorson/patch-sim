@@ -36,8 +36,12 @@ def _spike_row(spike: dict) -> rx.Component:
 def _ap_summary() -> rx.Component:
     """Render the AP summary statistics section.
 
+    Firing rate and mean ISI are omitted when the data is pooled from multiple
+    sweeps (``AnalysisState.ap_is_multi_sweep``), because those values are
+    shown per-sweep in the F-I curve.
+
     Returns:
-        A compact grid of labelled metric values drawn from SimulationState.ap_summary.
+        A compact grid of labelled metric values drawn from AnalysisState.ap_summary.
     """
     s = AnalysisState.ap_summary
     return rx.box(
@@ -56,10 +60,26 @@ def _ap_summary() -> rx.Component:
             rx.text(s["mean_half_width"].to(str) + " ms", size="1", align="left"),
             rx.text("AHP depth", size="1", color="gray"),
             rx.text(s["mean_ahp_depth"].to(str) + " mV", size="1", align="left"),
-            rx.text("ISI", size="1", color="gray"),
-            rx.text(s["mean_isi"].to(str) + " ms", size="1", align="left"),
-            rx.text("Firing rate", size="1", color="gray"),
-            rx.text(s["firing_rate"].to(str) + " Hz", size="1", align="left"),
+            rx.cond(
+                ~AnalysisState.ap_is_multi_sweep,
+                rx.text("ISI", size="1", color="gray"),
+                rx.box(),
+            ),
+            rx.cond(
+                ~AnalysisState.ap_is_multi_sweep,
+                rx.text(s["mean_isi"].to(str) + " ms", size="1", align="left"),
+                rx.box(),
+            ),
+            rx.cond(
+                ~AnalysisState.ap_is_multi_sweep,
+                rx.text("Firing rate", size="1", color="gray"),
+                rx.box(),
+            ),
+            rx.cond(
+                ~AnalysisState.ap_is_multi_sweep,
+                rx.text(s["firing_rate"].to(str) + " Hz", size="1", align="left"),
+                rx.box(),
+            ),
             columns="2",
             spacing="2",
             width="100%",
@@ -101,21 +121,45 @@ def _ap_spike_table() -> rx.Component:
     )
 
 
+def _ap_fi_plot() -> rx.Component:
+    """Render the embedded F-I curve inside the AP Metrics tab.
+
+    Shown only when F-I data is available (current clamp multi-sweep).
+
+    Returns:
+        A compact Plotly F-I figure inside a flex container.
+    """
+    return rx.flex(
+        rx.plotly(
+            data=AnalysisState.fi_figure,
+            width="100%",
+        ),
+        direction="column",
+        width="100%",
+        flex_shrink="0",
+        border_top="1px solid var(--gray-4)",
+        padding="1",
+    )
+
+
 def _ap_metrics_tab() -> rx.Component:
     """Render the AP Metrics tab content.
 
-    Shows summary statistics at the top and a per-spike detail table
-    filling the remaining height.  When no metrics are available a
-    placeholder message is shown instead.
+    For single-sweep runs: shows summary statistics (including firing rate and
+    ISI) and a per-spike detail table.  For multi-sweep current clamp runs:
+    shows pooled AP summary (without firing rate / ISI), the F-I curve plot,
+    and the pooled spike table.  When neither AP metrics nor F-I data are
+    available, a placeholder message is shown instead.
 
     Returns:
         The full tab content as a flex column.
     """
     return rx.cond(
-        AnalysisState.has_ap_metrics,
+        AnalysisState.has_ap_or_fi,
         rx.flex(
-            _ap_summary(),
-            _ap_spike_table(),
+            rx.cond(AnalysisState.has_ap_metrics, _ap_summary(), rx.box()),
+            rx.cond(AnalysisState.has_fi_data, _ap_fi_plot(), rx.box()),
+            rx.cond(AnalysisState.has_ap_metrics, _ap_spike_table(), rx.box()),
             direction="column",
             height="100%",
             width="100%",

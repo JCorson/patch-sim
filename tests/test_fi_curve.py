@@ -1,0 +1,301 @@
+"""Tests for patch_sim.analysis.fi_curve.
+
+Covers compute_fi_point and analyze_fi with synthetic voltage traces,
+edge cases, and an integration test against a real multi-sweep simulation.
+"""
+
+import numpy as np
+import pytest
+
+import patch_sim
+from patch_sim.analysis.fi_curve import (
+    FIAnalysisResult,
+    FIPoint,
+    analyze_fi,
+    compute_fi_point,
+)
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+_DT = 0.025  # ms — matches SIM_SAMPLING_FREQ = 40 kHz
+
+
+def _make_time(duration_ms: float) -> np.ndarray:
+    """Create a time array from 0 to duration_ms with dt = 0.025 ms.
+
+    Args:
+        duration_ms: Total duration in ms.
+
+    Returns:
+        1-D float array of time points in ms.
+    """
+    return np.arange(0.0, duration_ms, _DT)
+
+
+def _make_spike_voltage(
+    time: np.ndarray,
+    spike_times_ms: list[float],
+    baseline: float = -65.0,
+    spike_height: float = 80.0,
+    spike_width_ms: float = 1.0,
+) -> np.ndarray:
+    """Create a synthetic voltage trace with rectangular spikes.
+
+    Outside spike windows the voltage is held at ``baseline``.  Each spike is
+    a rectangular bump from ``baseline`` to ``baseline + spike_height`` lasting
+    ``spike_width_ms``.  The default ``spike_height`` of 80 mV places the peak
+    at 15 mV, comfortably above the ``analyze_aps`` rejection threshold of
+    -20 mV.
+
+    Args:
+        time: Time axis in ms.
+        spike_times_ms: Peak times for each spike in ms.
+        baseline: Resting membrane potential in mV.
+        spike_height: Height of each rectangular spike above baseline in mV.
+        spike_width_ms: Duration of each rectangular spike in ms.
+
+    Returns:
+        1-D voltage array in mV.
+    """
+    voltage = np.full_like(time, baseline)
+    for t_peak in spike_times_ms:
+        mask = (time >= t_peak - spike_width_ms / 2) & (
+            time < t_peak + spike_width_ms / 2
+        )
+        voltage[mask] = baseline + spike_height
+    return voltage
+
+
+# ---------------------------------------------------------------------------
+# compute_fi_point — basic attributes
+# ---------------------------------------------------------------------------
+
+
+def test_compute_fi_point_returns_fipoint_instance():
+    """compute_fi_point returns an FIPoint dataclass instance."""
+    time = _make_time(50.0)
+    voltage = np.full_like(time, -65.0)
+    point = compute_fi_point(time, voltage, 5.0, 10.0, 40.0)
+    assert isinstance(point, FIPoint)
+
+
+def test_compute_fi_point_current_step_stored():
+    """The supplied current_step is stored on the returned FIPoint."""
+    time = _make_time(30.0)
+    voltage = np.full_like(time, -65.0)
+    point = compute_fi_point(time, voltage, 12.5, 5.0, 25.0)
+    assert point.current_step == pytest.approx(12.5)
+
+
+# ---------------------------------------------------------------------------
+# compute_fi_point — no spikes
+# ---------------------------------------------------------------------------
+
+
+def test_compute_fi_point_no_spikes_zero_count():
+    """A silent trace produces spike_count of 0."""
+    time = _make_time(50.0)
+    voltage = np.full_like(time, -65.0)
+    point = compute_fi_point(time, voltage, 0.0, 10.0, 40.0)
+    assert point.spike_count == 0
+
+
+def test_compute_fi_point_no_spikes_rates_none():
+    """A silent trace has all firing rate fields set to None."""
+    time = _make_time(50.0)
+    voltage = np.full_like(time, -65.0)
+    point = compute_fi_point(time, voltage, 0.0, 10.0, 40.0)
+    assert point.mean_firing_rate is None
+    assert point.initial_firing_rate is None
+    assert point.steady_state_firing_rate is None
+
+
+# ---------------------------------------------------------------------------
+# compute_fi_point — single spike
+# ---------------------------------------------------------------------------
+
+
+def test_compute_fi_point_single_spike_count():
+    """A trace with one in-window spike produces spike_count of 1."""
+    time = _make_time(50.0)
+    voltage = _make_spike_voltage(time, [20.0])
+    point = compute_fi_point(time, voltage, 5.0, 10.0, 40.0)
+    assert point.spike_count == 1
+
+
+def test_compute_fi_point_single_spike_rates_none():
+    """A single in-window spike produces all firing rate fields as None."""
+    time = _make_time(50.0)
+    voltage = _make_spike_voltage(time, [20.0])
+    point = compute_fi_point(time, voltage, 5.0, 10.0, 40.0)
+    assert point.mean_firing_rate is None
+    assert point.initial_firing_rate is None
+    assert point.steady_state_firing_rate is None
+
+
+# ---------------------------------------------------------------------------
+# compute_fi_point — two spikes (initial == steady-state)
+# ---------------------------------------------------------------------------
+
+
+def test_compute_fi_point_two_spikes_count():
+    """A trace with two in-window spikes produces spike_count of 2."""
+    time = _make_time(100.0)
+    voltage = _make_spike_voltage(time, [20.0, 40.0])
+    point = compute_fi_point(time, voltage, 5.0, 10.0, 80.0)
+    assert point.spike_count == 2
+
+
+def test_compute_fi_point_two_spikes_mean_rate():
+    """Mean firing rate for two spikes equals 1000 / ISI."""
+    time = _make_time(100.0)
+    # Peaks at 20 ms and 40 ms → ISI = 20 ms → rate = 50 Hz
+    voltage = _make_spike_voltage(time, [20.0, 40.0])
+    point = compute_fi_point(time, voltage, 5.0, 10.0, 80.0)
+    assert point.mean_firing_rate == pytest.approx(50.0, rel=0.05)
+
+
+def test_compute_fi_point_two_spikes_initial_equals_steady():
+    """With two spikes there is one ISI so initial and steady-state rates are equal."""
+    time = _make_time(100.0)
+    voltage = _make_spike_voltage(time, [20.0, 40.0])
+    point = compute_fi_point(time, voltage, 5.0, 10.0, 80.0)
+    assert point.initial_firing_rate == pytest.approx(point.steady_state_firing_rate)
+
+
+# ---------------------------------------------------------------------------
+# compute_fi_point — three spikes (distinct initial and steady-state)
+# ---------------------------------------------------------------------------
+
+
+def test_compute_fi_point_three_spikes_initial_from_first_isi():
+    """Initial firing rate is derived from the first ISI."""
+    time = _make_time(150.0)
+    # Peaks at 20, 30, 60 ms → ISIs = [10, 30] ms
+    # Initial rate = 1000/10 = 100 Hz
+    voltage = _make_spike_voltage(time, [20.0, 30.0, 60.0])
+    point = compute_fi_point(time, voltage, 5.0, 10.0, 120.0)
+    assert point.initial_firing_rate == pytest.approx(100.0, rel=0.05)
+
+
+def test_compute_fi_point_three_spikes_steady_from_last_isi():
+    """Steady-state firing rate is derived from the last ISI."""
+    time = _make_time(150.0)
+    # ISIs = [10, 30] ms → steady-state rate = 1000/30 ≈ 33.3 Hz
+    voltage = _make_spike_voltage(time, [20.0, 30.0, 60.0])
+    point = compute_fi_point(time, voltage, 5.0, 10.0, 120.0)
+    assert point.steady_state_firing_rate == pytest.approx(1000.0 / 30.0, rel=0.05)
+
+
+# ---------------------------------------------------------------------------
+# compute_fi_point — window filtering
+# ---------------------------------------------------------------------------
+
+
+def test_compute_fi_point_spike_outside_window_excluded():
+    """Spikes whose threshold time falls outside the stimulus window are excluded."""
+    time = _make_time(100.0)
+    # Spike at 5 ms is before stim_start=10; spike at 50 ms is inside window
+    voltage = _make_spike_voltage(time, [5.0, 50.0])
+    point = compute_fi_point(time, voltage, 5.0, 10.0, 80.0)
+    # Only the in-window spike at 50 ms counts
+    assert point.spike_count == 1
+
+
+# ---------------------------------------------------------------------------
+# analyze_fi
+# ---------------------------------------------------------------------------
+
+
+def test_analyze_fi_returns_fianalysisresult():
+    """analyze_fi returns an FIAnalysisResult instance."""
+    time = _make_time(50.0)
+    voltages = [np.full_like(time, -65.0), np.full_like(time, -65.0)]
+    result = analyze_fi(time, voltages, [0.0, 5.0], 10.0, 40.0)
+    assert isinstance(result, FIAnalysisResult)
+
+
+def test_analyze_fi_point_count_matches_sweeps():
+    """analyze_fi produces one FIPoint per sweep."""
+    time = _make_time(50.0)
+    n = 4
+    voltages = [np.full_like(time, -65.0)] * n
+    current_steps = [float(i) for i in range(n)]
+    result = analyze_fi(time, voltages, current_steps, 10.0, 40.0)
+    assert len(result.points) == n
+
+
+def test_analyze_fi_sorted_by_current():
+    """analyze_fi sorts points by ascending current step regardless of input order."""
+    time = _make_time(50.0)
+    voltages = [np.full_like(time, -65.0)] * 3
+    # Supply in reverse order
+    result = analyze_fi(time, voltages, [10.0, 5.0, 0.0], 10.0, 40.0)
+    steps = result.current_steps
+    assert steps == sorted(steps)
+
+
+def test_analyze_fi_convenience_properties_length():
+    """Convenience list properties have length equal to the number of points."""
+    time = _make_time(50.0)
+    n = 3
+    voltages = [np.full_like(time, -65.0)] * n
+    result = analyze_fi(time, voltages, [0.0, 5.0, 10.0], 10.0, 40.0)
+    assert len(result.mean_firing_rates) == n
+    assert len(result.initial_firing_rates) == n
+    assert len(result.steady_state_firing_rates) == n
+
+
+# ---------------------------------------------------------------------------
+# Integration test — real HH simulation
+# ---------------------------------------------------------------------------
+
+
+def test_fi_curve_integration_hh(hh_model):
+    """F-I curve from real HH sweeps: firing rate increases with injected current.
+
+    Runs a short batch of current clamp steps from subthreshold to suprathreshold
+    and verifies that higher current steps produce higher mean firing rates.
+    """
+    stim_start = 10.0
+    stim_duration = 50.0
+    stim_end = stim_start + stim_duration
+    current_steps = [0.0, 5.0, 10.0, 20.0]
+    protocols = [
+        patch_sim.step_current(
+            duration=stim_start + stim_duration + 10.0,
+            current_amplitude=amp,
+            step_start=stim_start,
+            step_duration=stim_duration,
+        )
+        for amp in current_steps
+    ]
+    results = list(
+        patch_sim.simulate_batch(hh_model, protocols, patch_sim.simulate_current_clamp)
+    )
+    voltages = [r["voltage"] for r in results]
+    time = results[0]["time"]
+
+    fi = patch_sim.analyze_fi(time, voltages, current_steps, stim_start, stim_end)
+
+    # Subthreshold step should produce no spikes
+    assert fi.points[0].spike_count == 0
+
+    # Among spiking steps, all mean firing rates should be positive.
+    spiking_rates = [
+        p.mean_firing_rate for p in fi.points if p.mean_firing_rate is not None
+    ]
+    for rate in spiking_rates:
+        assert rate > 0.0
+
+    # Mean firing rates should be non-decreasing as injected current increases
+    # (points are sorted by current_step).
+    assert all(
+        spiking_rates[i] <= spiking_rates[i + 1] for i in range(len(spiking_rates) - 1)
+    )
+
+    # The highest current step should have the most spikes
+    spike_counts = [p.spike_count for p in fi.points]
+    assert spike_counts[-1] >= max(spike_counts[:-1])
