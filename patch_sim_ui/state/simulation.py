@@ -559,6 +559,8 @@ class SimulationState(rx.State):
 
         Args:
             vis_st: Current VisibilityState instance providing show_* values.
+                Passed in by the caller rather than fetched via ``self.get_state``
+                because this method is synchronous and ``get_state`` is async-only.
 
         Returns:
             A JS string that re-applies trace visibility, hover mode, and
