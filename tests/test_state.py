@@ -119,7 +119,7 @@ def _make_get_state_fn(class_returns: dict):
         An async method suitable for ``patch.object(StateClass, 'get_state', new=...)``.
     """
 
-    async def _get_state(self, cls):
+    async def _get_state(_self, cls):
         """Return the mapped instance or a fresh MagicMock."""
         return class_returns.get(cls, MagicMock())
 
@@ -199,20 +199,21 @@ def test_generated_float_setter_accepts_list() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_generated_bool_setter_stores_false() -> None:
+async def test_generated_bool_setter_stores_false() -> None:
     """set_show_voltage(False) stores False in VisibilityState.show_voltage."""
     vs = _make_visibility_state()
     vs.show_voltage = True
-    # The async setter is tested via the sync setattr path; we verify the var exists.
-    setattr(vs, "show_voltage", False)
+    with patch.object(VisibilityState, "get_state", new=_make_get_state_fn({})):
+        await vs.set_show_voltage(False)
     assert vs.show_voltage is False
 
 
-def test_generated_bool_setter_stores_true() -> None:
+async def test_generated_bool_setter_stores_true() -> None:
     """set_show_voltage(True) stores True in VisibilityState.show_voltage."""
     vs = _make_visibility_state()
     vs.show_voltage = False
-    setattr(vs, "show_voltage", True)
+    with patch.object(VisibilityState, "get_state", new=_make_get_state_fn({})):
+        await vs.set_show_voltage(True)
     assert vs.show_voltage is True
 
 
@@ -437,6 +438,34 @@ async def test_load_neuron_preset_unknown_name_is_ignored() -> None:
     before = ns.active_neuron_type
     await ns.load_neuron_preset("NonExistentNeuron")
     assert ns.active_neuron_type == before
+
+
+async def test_load_neuron_preset_preserves_saved_sweeps() -> None:
+    """load_neuron_preset retains saved sweeps so neuron types can be compared."""
+    sim_st = _make_state()
+    sim_st.saved_sweeps = [_make_sweep()]
+    ns = _make_neuron_state()
+    with patch.object(
+        NeuronState,
+        "get_state",
+        new=_make_get_state_fn({SimulationState: sim_st}),
+    ):
+        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert len(sim_st.saved_sweeps) == 1
+
+
+async def test_load_neuron_preset_preserves_stored_traces() -> None:
+    """load_neuron_preset retains stored traces so neuron types can be compared."""
+    sim_st = _make_state()
+    sim_st.stored_traces = [_make_sweep()]
+    ns = _make_neuron_state()
+    with patch.object(
+        NeuronState,
+        "get_state",
+        new=_make_get_state_fn({SimulationState: sim_st}),
+    ):
+        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert len(sim_st.stored_traces) == 1
 
 
 async def test_add_sweep_label_includes_neuron_type() -> None:
