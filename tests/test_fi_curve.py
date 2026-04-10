@@ -286,7 +286,9 @@ def test_fi_curve_integration_hh(hh_model):
     # Among spiking steps (those with at least 2 spikes), firing rate should
     # be non-negative and increase with current (or at least not strictly decrease
     # for the highest step compared to lower ones).
-    spiking_rates = [p.mean_firing_rate for p in fi.points if p.mean_firing_rate is not None]
+    spiking_rates = [
+        p.mean_firing_rate for p in fi.points if p.mean_firing_rate is not None
+    ]
     for rate in spiking_rates:
         assert rate > 0.0
 
