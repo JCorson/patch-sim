@@ -44,9 +44,9 @@ _FACTORY_TO_NAME: dict[Any, str] = {v: k for k, v in CHANNEL_REGISTRY.items()}
 
 
 def neuron_config_to_ui_state(config: NeuronConfig) -> dict[str, Any]:
-    """Convert a :class:`~patch_sim.NeuronConfig` to a flat AppState dict.
+    """Convert a :class:`~patch_sim.NeuronConfig` to a flat NeuronState dict.
 
-    Produces a mapping whose keys exactly match ``AppState`` field names so
+    Produces a mapping whose keys exactly match ``NeuronState`` field names so
     that it can be unpacked with ``setattr`` in ``load_neuron_preset``.
 
     All auxiliary channels that are absent from *config.channels* are set to
@@ -57,7 +57,7 @@ def neuron_config_to_ui_state(config: NeuronConfig) -> dict[str, Any]:
         config: Core neuron configuration to convert.
 
     Returns:
-        Flat dict of ``{field_name: value}`` pairs for ``AppState``.
+        Flat dict of ``{field_name: value}`` pairs for ``NeuronState``.
     """
     state: dict[str, Any] = {
         "g_Na": config.g_Na,
@@ -96,7 +96,7 @@ NEURON_UI_PRESETS: dict[str, dict[str, Any]] = {
 }
 
 # Neuron-parameter overrides applied when a protocol preset is loaded,
-# regardless of which neuron type is active.  Keys must match AppState field
+# regardless of which neuron type is active.  Keys must match NeuronState field
 # names exactly.
 PROTOCOL_NEURON_OVERRIDES: dict[str, dict[str, Any]] = {
     # Disable K⁺ channels so only Na⁺ current is visible.

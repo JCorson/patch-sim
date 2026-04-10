@@ -7,7 +7,8 @@ makes it straightforward to add further analysis views in future.
 
 import reflex as rx
 
-from patch_sim_ui.state import AppState
+from patch_sim_ui.state import SimulationState
+from patch_sim_ui.state.analysis import AnalysisState
 
 _PANEL_WIDTH = "300px"
 _COLLAPSED_WIDTH = "36px"
@@ -36,9 +37,9 @@ def _ap_summary() -> rx.Component:
     """Render the AP summary statistics section.
 
     Returns:
-        A compact grid of labelled metric values drawn from AppState.ap_summary.
+        A compact grid of labelled metric values drawn from SimulationState.ap_summary.
     """
-    s = AppState.ap_summary
+    s = AnalysisState.ap_summary
     return rx.box(
         rx.grid(
             rx.text("Spikes", size="1", color="gray"),
@@ -88,7 +89,7 @@ def _ap_spike_table() -> rx.Component:
                 ),
             ),
             rx.table.body(
-                rx.foreach(AppState.ap_metrics, _spike_row),
+                rx.foreach(AnalysisState.ap_metrics, _spike_row),
             ),
             size="1",
             variant="surface",
@@ -111,7 +112,7 @@ def _ap_metrics_tab() -> rx.Component:
         The full tab content as a flex column.
     """
     return rx.cond(
-        AppState.has_ap_metrics,
+        AnalysisState.has_ap_metrics,
         rx.flex(
             _ap_summary(),
             _ap_spike_table(),
@@ -144,10 +145,10 @@ def _iv_curve_tab() -> rx.Component:
         The full tab content as a flex column.
     """
     return rx.cond(
-        AppState.has_iv_data,
+        AnalysisState.has_iv_data,
         rx.flex(
             rx.plotly(
-                data=AppState.iv_figure,
+                data=AnalysisState.iv_figure,
                 width="100%",
             ),
             direction="column",
@@ -183,7 +184,7 @@ def _expanded_panel() -> rx.Component:
             rx.spacer(),
             rx.icon_button(
                 rx.icon("panel-right-close", size=14),
-                on_click=AppState.toggle_analysis_panel,
+                on_click=SimulationState.toggle_analysis_panel,
                 variant="ghost",
                 size="2",
                 cursor="pointer",
@@ -242,7 +243,7 @@ def _collapsed_strip() -> rx.Component:
     return rx.flex(
         rx.icon_button(
             rx.icon("panel-right-open", size=14),
-            on_click=AppState.toggle_analysis_panel,
+            on_click=SimulationState.toggle_analysis_panel,
             variant="ghost",
             size="2",
             cursor="pointer",
@@ -260,14 +261,14 @@ def analysis_sidebar() -> rx.Component:
     """Render the right-hand analysis sidebar.
 
     Toggles between a full panel (with tabbed analysis views) and a thin
-    collapsed strip.  The panel is toggled via AppState.toggle_analysis_panel.
+    collapsed strip.  The panel is toggled via SimulationState.toggle_analysis_panel.
 
     Returns:
         A Reflex component for the collapsible analysis sidebar.
     """
     return rx.box(
         rx.cond(
-            AppState.analysis_panel_open,
+            SimulationState.analysis_panel_open,
             _expanded_panel(),
             _collapsed_strip(),
         ),

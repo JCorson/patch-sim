@@ -1,7 +1,8 @@
-"""Application state for the patch_sim web UI.
+"""Simulation state for the patch_sim web UI.
 
-All reactive variables and event handlers live here. The state drives
-the Reflex component tree via computed properties.
+SimulationState owns simulation results, sweep collections, continuous mode,
+and the figure computed var.  Cross-cutting state lives in the sibling
+substates (NeuronState, ProtocolState, VisibilityState, AnalysisState, LogState).
 """
 
 import asyncio
@@ -18,218 +19,32 @@ import patch_sim
 import patch_sim.clamp_simulations
 from patch_sim.constants import (
     CURRENT_CLAMP,
-    DEFAULT_C_M,
-    DEFAULT_CA_IN,
-    DEFAULT_CA_OUT,
-    DEFAULT_CL_IN,
-    DEFAULT_CL_OUT,
-    DEFAULT_G_ICAL,
-    DEFAULT_G_ICAN,
-    DEFAULT_G_ICAT,
-    DEFAULT_G_IH,
-    DEFAULT_G_IKA,
-    DEFAULT_G_IKCA,
-    DEFAULT_G_IKIR,
-    DEFAULT_G_IKV31,
-    DEFAULT_G_IM,
-    DEFAULT_G_K,
-    DEFAULT_G_L,
-    DEFAULT_G_NA,
-    DEFAULT_G_NAP,
-    DEFAULT_G_NAR,
-    DEFAULT_K_IN,
-    DEFAULT_K_OUT,
-    DEFAULT_NA_IN,
-    DEFAULT_NA_OUT,
-    DEFAULT_T,
-    DEFAULT_V_REST,
     VOLTAGE_CLAMP,
 )
-from patch_sim.presets import (
-    NEURON_PROTOCOL_ADJUSTMENTS,
-    PROTOCOL_PRESETS,
-)
-from patch_sim.protocols.builders import (
-    build_current_protocol,
-    build_voltage_protocol,
-)
-from patch_sim_ui import constants, presets
-from patch_sim_ui.log_handler import MAX_LOG_ENTRIES, StateLogHandler, UILogRecord
+from patch_sim_ui import constants
 from patch_sim_ui.plotting import (
     Sweep,
     TraceVisibility,
     build_figure,
-    build_iv_figure,
     compute_trace_visibility_map,
 )
-
-logger = logging.getLogger("patch_sim_ui.state")
-
-# ------------------------------------------------------------------ #
-# Additional-channel visibility field maps                          #
-# ------------------------------------------------------------------ #
-# Maps from additional-channel sweep keys to show_* field names.    #
-# Used by compute_trace_visibility_map and _apply_visibility_js.    #
-
-_ADDITIONAL_CURRENT_FIELD_MAP: dict[str, str] = {
-    "Ih": "show_ih_current",
-    "IKa": "show_ika_current",
-    "IKv31": "show_ikv31_current",
-    "INaP": "show_inap_current",
-    "INaR": "show_inar_current",
-    "IM": "show_im_current",
-    "IKir": "show_ikir_current",
-    "IKCa": "show_ikca_current",
-    "ICaL": "show_ical_current",
-    "ICaT": "show_icat_current",
-    "ICaN": "show_ican_current",
-}
-
-_ADDITIONAL_GATING_FIELD_MAP: dict[str, str] = {
-    "r": "show_ih_gating",
-    "a": "show_ika_gating",
-    "b": "show_ika_gating",
-    "nk": "show_ikv31_gating",
-    "p": "show_inap_gating",
-    "s": "show_inar_gating",
-    "hr": "show_inar_gating",
-    "w": "show_im_gating",
-    "kir": "show_ikir_gating",
-    "q": "show_ikca_gating",
-    "d": "show_ical_gating",
-    "f": "show_ical_gating",
-    "dt": "show_icat_gating",
-    "ft": "show_icat_gating",
-    "dn": "show_ican_gating",
-    "fn": "show_ican_gating",
-}
-
-# ------------------------------------------------------------------ #
-# Float setter generation                                            #
-# ------------------------------------------------------------------ #
-# Reflex's auto-generated set_X handlers are typed `value: float`,   #
-# but rx.input.on_change passes str and rx.slider.on_change passes   #
-# list[float].  The generated setters below coerce both via          #
-# AppState._set_float.                                               #
-
-_FLOAT_FIELDS: list[str] = [
-    # Neuron parameters
-    "g_Na",
-    "g_K",
-    "g_L",
-    "C_m",
-    "v_rest",
-    "Na_out",
-    "Na_in",
-    "K_out",
-    "K_in",
-    "Cl_out",
-    "Cl_in",
-    "Ca_out",
-    "Ca_in",
-    "T",
-    # Protocol params — shared
-    "pre_stimulus_duration",
-    "stimulus_duration",
-    "post_stimulus_duration",
-    # Current clamp protocol params
-    "start_current",
-    "end_current",
-    "pulse_amplitude",
-    "pulse_width",
-    "pulse_interval",
-    "dc_offset",
-    "amplitude",
-    "frequency",
-    "start_frequency",
-    "end_frequency",
-    "mean_current",
-    "std_current",
-    # Voltage clamp protocol params
-    "holding_voltage",
-    "vc_start_voltage",
-    "vc_end_voltage",
-    "vc_pulse_amplitude",
-    "vc_pulse_width",
-    "vc_pulse_interval",
-    # Additional channel params
-    "ih_g_max",
-    "ika_g_max",
-    "ikv31_g_max",
-    "inap_g_max",
-    "inar_g_max",
-    "im_g_max",
-    "ikir_g_max",
-    "ikca_g_max",
-    "ical_g_max",
-    "icat_g_max",
-    "ican_g_max",
-]
-
-
-# Visibility fields: show_* — toggled client-side via Plotly.restyle.
-_VISIBILITY_FIELDS: list[str] = [
-    "show_voltage",
-    "show_total_current",
-    "show_sodium_current",
-    "show_potassium_current",
-    "show_leak_current",
-    "show_potassium_activation",
-    "show_sodium_activation",
-    "show_sodium_inactivation",
-    # Additional channel visibility
-    "show_ih_current",
-    "show_ih_gating",
-    "show_ika_current",
-    "show_ika_gating",
-    "show_ikv31_current",
-    "show_ikv31_gating",
-    "show_inap_current",
-    "show_inap_gating",
-    "show_inar_current",
-    "show_inar_gating",
-    "show_im_current",
-    "show_im_gating",
-    "show_ikir_current",
-    "show_ikir_gating",
-    "show_ikca_current",
-    "show_ikca_gating",
-    "show_ical_current",
-    "show_ical_gating",
-    "show_icat_current",
-    "show_icat_gating",
-    "show_ican_current",
-    "show_ican_gating",
-]
-
-# Non-visibility bool fields: channel enable/disable toggles.
-_NON_VISIBILITY_BOOL_FIELDS: list[str] = [
-    "ih_enabled",
-    "ika_enabled",
-    "ikv31_enabled",
-    "inap_enabled",
-    "inar_enabled",
-    "im_enabled",
-    "ikir_enabled",
-    "ikca_enabled",
-    "ical_enabled",
-    "icat_enabled",
-    "ican_enabled",
-]
-
-# Kept for backward compatibility; callers outside this module may reference it.
-_BOOL_FIELDS: list[str] = _VISIBILITY_FIELDS + _NON_VISIBILITY_BOOL_FIELDS
-
-# Shared JS snippet for targeting the Plotly graph element.
-_PLOTLY_GD_JS = "var gd=document.querySelector('.js-plotly-plot');"
-
-# Scroll the log panel viewport to the top so the newest entry (displayed
-# first in newest-first order) is always visible after a refresh.
-_LOG_SCROLL_JS = (
-    "var vp=document.querySelector("
-    "'#log-scroll-area [data-radix-scroll-area-viewport]');"
-    "if(vp)vp.scrollTop=0;"
+from patch_sim_ui.state._common import (
+    _ADDITIONAL_CURRENT_FIELD_MAP,
+    _ADDITIONAL_GATING_FIELD_MAP,
+    _LOG_SCROLL_JS,
+    _PLOTLY_GD_JS,
 )
+from patch_sim_ui.state.analysis import AnalysisState
+from patch_sim_ui.state.log import LogState
+from patch_sim_ui.state.neuron import NeuronState
+from patch_sim_ui.state.protocol import ProtocolState
+from patch_sim_ui.state.visibility import VisibilityState
+
+logger = logging.getLogger(__name__)
+
+# ------------------------------------------------------------------ #
+# Module-level helpers used only by SimulationState                  #
+# ------------------------------------------------------------------ #
 
 # Client-side sweep highlight / selection module.  Injected via
 # rx.call_script() after every figure render in multi-sweep mode.
@@ -523,91 +338,8 @@ _SWEEP_HIGHLIGHT_JS = """
 """
 
 
-def _make_bool_setter(field_name: str):
-    """Factory returning a bool event handler for ``field_name``.
-
-    Args:
-        field_name: Name of the AppState attribute to update.
-
-    Returns:
-        An event handler method that sets the bool field.
-    """
-
-    def setter(self, value: bool) -> None:
-        """Set the field from a checkbox event."""
-        setattr(self, field_name, value)
-
-    setter.__name__ = f"set_{field_name}"
-    setter.__qualname__ = f"AppState.set_{field_name}"
-    setter.__doc__ = f"Set {field_name} from a checkbox event."
-    return setter
-
-
-def _make_visibility_setter(field_name: str):
-    """Factory returning a visibility event handler for ``field_name``.
-
-    The generated handler updates the server-side state var and issues a
-    ``Plotly.restyle`` call to toggle the corresponding trace(s) client-side,
-    avoiding a full figure rebuild for what is otherwise a trivial DOM change.
-
-    Args:
-        field_name: Name of the AppState show_* attribute to update.
-
-    Returns:
-        An event handler method that sets the bool field and yields a
-        ``rx.call_script`` event to apply the visibility change in-browser.
-    """
-
-    def setter(self, value: bool):
-        """Set the visibility flag and apply a client-side Plotly restyle."""
-        setattr(self, field_name, value)
-        trace_map = compute_trace_visibility_map(
-            current_sweeps=self.current_sweeps,
-            saved_sweeps=self.saved_sweeps,
-            clamp_mode=self.clamp_mode,
-            additional_current_field_map=_ADDITIONAL_CURRENT_FIELD_MAP,
-            additional_gating_field_map=_ADDITIONAL_GATING_FIELD_MAP,
-            stored_traces=self.stored_traces,
-        )
-        indices = trace_map.get(field_name, [])
-        if indices:
-            visible_js = "true" if value else "false"
-            js = (
-                f"{_PLOTLY_GD_JS}"
-                f"if(gd&&gd.data)Plotly.restyle(gd,"
-                f"{{visible:{visible_js}}},{json.dumps(indices)})"
-            )
-            return rx.call_script(js)
-
-    setter.__name__ = f"set_{field_name}"
-    setter.__qualname__ = f"AppState.set_{field_name}"
-    setter.__doc__ = f"Set {field_name} and apply client-side visibility restyle."
-    return setter
-
-
-def _make_float_setter(field_name: str):
-    """Factory returning a float-coercing event handler for ``field_name``.
-
-    Args:
-        field_name: Name of the AppState attribute to update.
-
-    Returns:
-        An event handler method that accepts ``str | list[float] | float``
-        and delegates to ``AppState._set_float``.
-    """
-
-    def setter(self, value: "str | list[float] | float") -> None:
-        """Set the field from an input or slider event."""
-        self._set_float(field_name, value)
-
-    setter.__name__ = f"set_{field_name}"
-    setter.__qualname__ = f"AppState.set_{field_name}"
-    setter.__doc__ = f"Set {field_name} from an input or slider event."
-    return setter
-
-
 def _compute_iv_data(
-    sweeps: list[Sweep],
+    sweeps: "list[Sweep]",
     min_stimulus: float,
     max_stimulus: float,
     stimulus_step: float,
@@ -645,14 +377,14 @@ def _compute_iv_data(
     if len(sweeps) != len(voltage_steps):
         return {}
 
-    time = np.array(sweeps[0].time)
+    time_arr = np.array(sweeps[0].time)
     currents = [np.array(s.total_current) for s in sweeps]
 
     stim_start = pre_stimulus_duration
     stim_end = pre_stimulus_duration + stimulus_duration
 
     iv_result = patch_sim.analyze_iv(
-        time, currents, voltage_steps, stim_start, stim_end
+        time_arr, currents, voltage_steps, stim_start, stim_end
     )
     return {
         "voltages": iv_result.voltage_steps,
@@ -662,144 +394,22 @@ def _compute_iv_data(
     }
 
 
-class AppState(rx.State):
-    """Top-level application state."""
+class SimulationState(rx.State):
+    """State for simulation results, sweep collections, and figure rendering."""
 
-    # ------------------------------------------------------------------ #
-    # Neuron parameters                                                   #
-    # ------------------------------------------------------------------ #
-    g_Na: float = DEFAULT_G_NA
-    g_K: float = DEFAULT_G_K
-    g_L: float = DEFAULT_G_L
-    C_m: float = DEFAULT_C_M
-    v_rest: float = DEFAULT_V_REST
-    Na_out: float = DEFAULT_NA_OUT
-    Na_in: float = DEFAULT_NA_IN
-    K_out: float = DEFAULT_K_OUT
-    K_in: float = DEFAULT_K_IN
-    Cl_out: float = DEFAULT_CL_OUT
-    Cl_in: float = DEFAULT_CL_IN
-    Ca_out: float = DEFAULT_CA_OUT
-    Ca_in: float = DEFAULT_CA_IN
-    T: float = DEFAULT_T
+    # Synced copy of NeuronState.active_neuron_type used by add_sweep /
+    # store_trace for labelling (avoids making those handlers async).
+    _label_neuron_type: str = "Squid Giant Axon (Classic HH)"
+    # Synced copy of ProtocolState.clamp_mode used by figure_data and
+    # _apply_visibility_js (both are synchronous, cannot call get_state).
+    _figure_clamp_mode: str = CURRENT_CLAMP
 
-    # ------------------------------------------------------------------ #
-    # Additional channels                                                 #
-    # ------------------------------------------------------------------ #
-    ih_enabled: bool = False
-    ih_g_max: float = DEFAULT_G_IH
-    ika_enabled: bool = False
-    ika_g_max: float = DEFAULT_G_IKA
-    ikv31_enabled: bool = False
-    ikv31_g_max: float = DEFAULT_G_IKV31
-    inap_enabled: bool = False
-    inap_g_max: float = DEFAULT_G_NAP
-    inar_enabled: bool = False
-    inar_g_max: float = DEFAULT_G_NAR
-    im_enabled: bool = False
-    im_g_max: float = DEFAULT_G_IM
-    ikir_enabled: bool = False
-    ikir_g_max: float = DEFAULT_G_IKIR
-    ikca_enabled: bool = False
-    ikca_g_max: float = DEFAULT_G_IKCA
-    ical_enabled: bool = False
-    ical_g_max: float = DEFAULT_G_ICAL
-    icat_enabled: bool = False
-    icat_g_max: float = DEFAULT_G_ICAT
-    ican_enabled: bool = False
-    ican_g_max: float = DEFAULT_G_ICAN
-
-    # ------------------------------------------------------------------ #
-    # Experiment mode                                                     #
-    # ------------------------------------------------------------------ #
-    active_neuron_type: str = "Squid Giant Axon (Classic HH)"  # selected preset
-    clamp_mode: str = CURRENT_CLAMP  # CURRENT_CLAMP | VOLTAGE_CLAMP
-
-    # ------------------------------------------------------------------ #
-    # Protocol parameters                                                #
-    # ------------------------------------------------------------------ #
-    protocol_type: str = "Step"
-    pre_stimulus_duration: float = 10.0
-    stimulus_duration: float = 30.0
-    post_stimulus_duration: float = 10.0
-
-    # Stimulus amplitude params — shared (units depend on clamp_mode)
-    min_stimulus: float = 10.0
-    max_stimulus: float = 10.0
-    stimulus_step: float = 0.0
-
-    # Current clamp protocol params
-    start_current: float = 0.0
-    end_current: float = 15.0
-    pulse_amplitude: float = 10.0
-    pulse_width: float = 2.0
-    pulse_interval: float = 10.0
-    dc_offset: float = 8.0
-    amplitude: float = 4.0
-    frequency: float = 50.0
-    start_frequency: float = 1.0
-    end_frequency: float = 100.0
-    mean_current: float = 8.0
-    std_current: float = 2.0
-
-    # Voltage clamp protocol params
-    holding_voltage: float = -70.0
-    vc_start_voltage: float = -70.0
-    vc_end_voltage: float = 40.0
-    vc_pulse_amplitude: float = 20.0
-    vc_pulse_width: float = 2.0
-    vc_pulse_interval: float = 10.0
     # ------------------------------------------------------------------ #
     # Simulation results                                                  #
     # ------------------------------------------------------------------ #
     current_sweeps: list[Sweep] = []  # Latest simulation result
     saved_sweeps: list[Sweep] = []  # User-saved sweeps for comparison overlay
     stored_traces: list[Sweep] = []  # Oscilloscope-style stored reference traces
-
-    # ------------------------------------------------------------------ #
-    # AP analysis results                                                #
-    # ------------------------------------------------------------------ #
-    ap_metrics: list[dict[str, Any]] = []  # Per-spike metrics (serialized)
-    ap_summary: dict[str, Any] = {}  # Aggregate summary statistics
-
-    # ------------------------------------------------------------------ #
-    # I-V analysis results                                                #
-    # ------------------------------------------------------------------ #
-    iv_data: dict[str, Any] = {}  # Serialized IVAnalysisResult for the UI
-
-    # ------------------------------------------------------------------ #
-    # Trace visibility checkboxes                                        #
-    # ------------------------------------------------------------------ #
-    show_voltage: bool = True
-    show_total_current: bool = True
-    show_sodium_current: bool = True
-    show_potassium_current: bool = True
-    show_leak_current: bool = False
-    show_potassium_activation: bool = True
-    show_sodium_activation: bool = True
-    show_sodium_inactivation: bool = True
-    show_ih_current: bool = True
-    show_ih_gating: bool = True
-    show_ika_current: bool = True
-    show_ika_gating: bool = True
-    show_ikv31_current: bool = True
-    show_ikv31_gating: bool = True
-    show_inap_current: bool = True
-    show_inap_gating: bool = True
-    show_inar_current: bool = True
-    show_inar_gating: bool = True
-    show_im_current: bool = True
-    show_im_gating: bool = True
-    show_ikir_current: bool = True
-    show_ikir_gating: bool = True
-    show_ikca_current: bool = True
-    show_ikca_gating: bool = True
-    show_ical_current: bool = True
-    show_ical_gating: bool = True
-    show_icat_current: bool = True
-    show_icat_gating: bool = True
-    show_ican_current: bool = True
-    show_ican_gating: bool = True
 
     # ------------------------------------------------------------------ #
     # Continuous simulation mode                                        #
@@ -838,68 +448,8 @@ class AppState(rx.State):
     analysis_panel_open: bool = True
 
     # ------------------------------------------------------------------ #
-    # Log panel state                                                    #
+    # Computed properties                                               #
     # ------------------------------------------------------------------ #
-    log_panel_open: bool = False
-    log_entries: list[UILogRecord] = []
-    log_level_filter: str = "DEBUG"
-
-    # ------------------------------------------------------------------ #
-    # AP analysis computed properties                                   #
-    # ------------------------------------------------------------------ #
-    @rx.var
-    def has_ap_metrics(self) -> bool:
-        """Return True when AP analysis results are available for display."""
-        return len(self.ap_metrics) > 0
-
-    # ------------------------------------------------------------------ #
-    # I-V analysis computed properties                                    #
-    # ------------------------------------------------------------------ #
-    @rx.var
-    def has_iv_data(self) -> bool:
-        """Return True when I-V analysis results are available for display."""
-        return len(self.iv_data) > 0
-
-    @rx.var
-    def iv_figure(self) -> go.Figure:
-        """Return a Plotly I-V curve figure.
-
-        Returns an empty figure when no I-V data is available.
-        """
-        if not self.iv_data:
-            return go.Figure()
-        return build_iv_figure(self.iv_data)
-
-    # ------------------------------------------------------------------ #
-    # Derived reversal potentials (shown as read-only in neuron panel)  #
-    # ------------------------------------------------------------------ #
-    @rx.var
-    def E_Na(self) -> float:
-        """Sodium reversal potential in mV."""
-        return float(patch_sim.nernst_potential(1, self.T, self.Na_out, self.Na_in))
-
-    @rx.var
-    def E_K(self) -> float:
-        """Potassium reversal potential in mV."""
-        return float(patch_sim.nernst_potential(1, self.T, self.K_out, self.K_in))
-
-    @rx.var
-    def E_L(self) -> float:
-        """Leak reversal potential in mV."""
-        return float(patch_sim.nernst_potential(-1, self.T, self.Cl_out, self.Cl_in))
-
-    @rx.var
-    def E_Ca(self) -> float:
-        """Calcium reversal potential in mV (z=+2)."""
-        return float(patch_sim.nernst_potential(2, self.T, self.Ca_out, self.Ca_in))
-
-    @rx.var
-    def protocol_options(self) -> list[str]:
-        """Protocol type options filtered by clamp mode."""
-        if self.clamp_mode == CURRENT_CLAMP:
-            return constants.CURRENT_PROTOCOLS
-        return constants.VOLTAGE_PROTOCOLS
-
     @rx.var
     def has_result(self) -> bool:
         """Whether a simulation result is available."""
@@ -914,47 +464,6 @@ class AppState(rx.State):
     def continuous_active(self) -> bool:
         """True when continuous mode is enabled and the loop is running."""
         return self.continuous_mode and self.continuous_loop_running
-
-    @rx.var
-    def is_step_single_sweep(self) -> bool:
-        """True when the Step protocol is configured as a single sweep.
-
-        A single sweep is produced whenever min_stimulus == max_stimulus,
-        regardless of the stimulus_step value.
-
-        Returns:
-            True if min_stimulus equals max_stimulus, False otherwise.
-        """
-        return self.min_stimulus == self.max_stimulus
-
-    @rx.var
-    def can_run_continuous(self) -> bool:
-        """True when the active protocol is compatible with continuous mode.
-
-        Multi-sweep Step configurations (min_stimulus != max_stimulus) are
-        excluded; all other protocols run as a single sweep and are compatible.
-        """
-        if self.protocol_type != "Step":
-            return True
-        return self.is_step_single_sweep
-
-    @rx.var
-    def filtered_log_entries(self) -> list[UILogRecord]:
-        """Log entries filtered to the selected minimum level, newest first.
-
-        Returns:
-            Entries whose numeric level is >= the selected filter level,
-            in reverse chronological order so the most recent entry is
-            always visible at the top of the panel without scrolling.
-        """
-        min_level = logging.getLevelName(self.log_level_filter)
-        if not isinstance(min_level, int):
-            min_level = logging.DEBUG
-        return [
-            e
-            for e in reversed(self.log_entries)
-            if logging.getLevelName(e.level) >= min_level
-        ]
 
     @rx.var
     def figure_data(self) -> go.Figure:
@@ -974,68 +483,39 @@ class AppState(rx.State):
             current_sweeps=self.current_sweeps,
             saved_sweeps=self.saved_sweeps,
             visibility=TraceVisibility(),  # all visible; toggling handled client-side
-            clamp_mode=self.clamp_mode,
+            clamp_mode=self._figure_clamp_mode,
             stored_traces=self.stored_traces,
             show_hover=self.show_hover,
         )
 
     # ------------------------------------------------------------------ #
-    # Log panel event handlers                                          #
-    # ------------------------------------------------------------------ #
-    def toggle_log_panel(self):
-        """Toggle the log panel open/closed, refreshing logs on open."""
-        self.log_panel_open = not self.log_panel_open
-        if self.log_panel_open:
-            self._refresh_logs()
-            return rx.call_script(_LOG_SCROLL_JS)
-
-    def refresh_logs(self):
-        """Public event handler: drain buffered records into state."""
-        self._refresh_logs()
-        return rx.call_script(_LOG_SCROLL_JS)
-
-    def _refresh_logs(self) -> None:
-        """Drain buffered log records into state, capping at MAX_LOG_ENTRIES."""
-        new_records = StateLogHandler.drain()
-        combined = list(self.log_entries) + new_records
-        self.log_entries = combined[-MAX_LOG_ENTRIES:]
-
-    def clear_logs(self) -> None:
-        """Clear all displayed log entries."""
-        self.log_entries = []
-
-    def set_log_level_filter(self, value: str) -> None:
-        """Set the minimum display level for log entries.
-
-        Args:
-            value: Level name string (e.g. ``"DEBUG"``, ``"INFO"``).
-        """
-        self.log_level_filter = value
-
-    # ------------------------------------------------------------------ #
     # Event handlers                                                     #
     # ------------------------------------------------------------------ #
-    def set_protocol_type(self, value: str) -> None:
-        """Set protocol_type from a select event."""
-        self.protocol_type = value
+    def _clear_for_new_protocol(self) -> None:
+        """Clear all simulation results and reset continuous state.
 
-    def set_clamp_mode(self, mode: str) -> None:
-        """Switch between Current Clamp and Voltage Clamp modes."""
-        self.clamp_mode = mode
-        # Reset protocol type to first option for the new mode
-        if mode == CURRENT_CLAMP:
-            self.protocol_type = constants.CURRENT_PROTOCOLS[0]
-        else:
-            self.protocol_type = constants.VOLTAGE_PROTOCOLS[0]
+        Called by ProtocolState when the clamp mode or a protocol preset
+        changes, ensuring stale results are not shown for the new protocol.
+        """
         self.current_sweeps = []
         self.saved_sweeps = []
         self.stored_traces = []
         self._cont_has_state = False
         self.selected_sweep = -1
 
-    def reset_to_defaults(self) -> None:
-        """Reset all parameters and sweeps to their class-level defaults."""
+    async def reset_to_defaults(self) -> None:
+        """Reset all state vars across all substates to their class-level defaults."""
         self.reset()
+        neuron_st = await self.get_state(NeuronState)
+        neuron_st.reset()
+        proto_st = await self.get_state(ProtocolState)
+        proto_st.reset()
+        vis_st = await self.get_state(VisibilityState)
+        vis_st.reset()
+        analysis_st = await self.get_state(AnalysisState)
+        analysis_st.reset()
+        log_st = await self.get_state(LogState)
+        log_st.reset()
 
     def toggle_analysis_panel(self) -> None:
         """Toggle the right-hand analysis sidebar open or closed."""
@@ -1065,144 +545,10 @@ class AppState(rx.State):
         )
         return rx.call_script(js)
 
-    def load_neuron_preset(self, name: str) -> None:
-        """Load a neuron-type preset, updating only neuron parameters.
-
-        Sets conductances and auxiliary channel configuration for the selected
-        neuron type without touching any protocol settings.  Records the active
-        neuron type so that subsequent protocol preset loads can apply
-        neuron-specific adjustments via NEURON_PROTOCOL_ADJUSTMENTS.
-
-        Args:
-            name: Key into ``patch_sim_ui.presets.NEURON_UI_PRESETS``.
-                Ignored if not found.
-        """
-        if name not in presets.NEURON_UI_PRESETS:
-            logger.debug("load_neuron_preset: unknown preset %r ignored", name)
-            return
-        logger.info("Loaded neuron preset: %s", name)
-        config = presets.NEURON_UI_PRESETS[name]
-        for key, value in config.items():
-            setattr(self, key, value)
-        self.active_neuron_type = name
-        self.current_sweeps = []
-        self._cont_has_state = False
-
-    def load_protocol_preset(self, name: str) -> None:
-        """Load a protocol preset, applying neuron-type adjustments if active.
-
-        Applies the base protocol preset, then overlays any entries from
-        NEURON_PROTOCOL_ADJUSTMENTS for the currently active neuron type so
-        that the stimulus parameters suit the selected cell type.
-
-        Args:
-            name: Key into PROTOCOL_PRESETS.  Ignored if not found.
-        """
-        if name not in PROTOCOL_PRESETS:
-            logger.debug("load_protocol_preset: unknown preset %r ignored", name)
-            return
-        logger.info("Loaded protocol preset: %s", name)
-        config = dict(PROTOCOL_PRESETS[name])
-        adjustments = NEURON_PROTOCOL_ADJUSTMENTS.get(self.active_neuron_type, {}).get(
-            name, {}
-        )
-        config.update(adjustments)
-        config.update(presets.PROTOCOL_NEURON_OVERRIDES.get(name, {}))
-        for key, value in config.items():
-            setattr(self, key, value)
-        self.current_sweeps = []
-        self.saved_sweeps = []
-        self.stored_traces = []
-        self._cont_has_state = False
-
-    # ------------------------------------------------------------------ #
-    # Numeric field setters                                              #
-    # ------------------------------------------------------------------ #
-    def _set_float(self, field: str, value: "str | list[float] | float") -> None:
-        """Coerce value to float and set the named field.
-
-        Args:
-            field: Name of the AppState attribute to update.
-            value: Raw value from an input or slider event.
-        """
-        v = value[0] if isinstance(value, list) else value
-        try:
-            setattr(self, field, float(v))
-        except (ValueError, TypeError):
-            pass
-
-    # One setter per float field — generated at class-definition time so
-    # Reflex's metaclass sees them as regular event handlers.
-    for _f in _FLOAT_FIELDS:
-        vars()[f"set_{_f}"] = _make_float_setter(_f)
-
-    # Stimulus range setters — custom logic to keep stimulus_step valid.
-    def set_min_stimulus(self, value: str | float) -> None:
-        """Set min_stimulus, auto-setting stimulus_step when a range is opened.
-
-        If the new min_stimulus differs from max_stimulus and stimulus_step is
-        currently 0, stimulus_step is set to 1.0 so the Step protocol remains
-        in a valid multi-sweep state without requiring a separate user action.
-
-        Args:
-            value: Raw input value from the UI field.
-        """
-        self._set_float("min_stimulus", value)
-        if self.min_stimulus != self.max_stimulus and self.stimulus_step == 0.0:
-            self.stimulus_step = 1.0
-
-    def set_max_stimulus(self, value: str | float) -> None:
-        """Set max_stimulus, auto-setting stimulus_step when a range is opened.
-
-        If the new max_stimulus differs from min_stimulus and stimulus_step is
-        currently 0, stimulus_step is set to 1.0 so the Step protocol remains
-        in a valid multi-sweep state without requiring a separate user action.
-
-        Args:
-            value: Raw input value from the UI field.
-        """
-        self._set_float("max_stimulus", value)
-        if self.min_stimulus != self.max_stimulus and self.stimulus_step == 0.0:
-            self.stimulus_step = 1.0
-
-    def set_stimulus_step(self, value: str | float) -> None:
-        """Set stimulus_step, rejecting non-positive values when min != max.
-
-        When min_stimulus differs from max_stimulus a step of 0 (or negative)
-        would produce an invalid multi-sweep configuration.  Such values are
-        ignored, leaving the previous step unchanged.  When
-        min_stimulus == max_stimulus (single-sweep mode) any value is accepted.
-
-        Args:
-            value: Raw input value from the UI text field.
-        """
-        try:
-            parsed = float(value)
-        except (ValueError, TypeError):
-            logger.debug("set_stimulus_step: could not parse %r as float", value)
-            return
-        if self.min_stimulus != self.max_stimulus and parsed <= 0.0:
-            logger.debug(
-                "set_stimulus_step: rejected value %s"
-                " (non-positive step in multi-sweep mode)",
-                parsed,
-            )
-            self.stimulus_step = 1.0
-            return
-        self.stimulus_step = parsed
-
-    # Non-visibility bool setters (channel enable/disable).
-    for _f in _NON_VISIBILITY_BOOL_FIELDS:
-        vars()[f"set_{_f}"] = _make_bool_setter(_f)
-
-    # Visibility setters: update state + issue client-side Plotly.restyle.
-    for _f in _VISIBILITY_FIELDS:
-        vars()[f"set_{_f}"] = _make_visibility_setter(_f)
-
     # ------------------------------------------------------------------ #
     # Sweep management                                                   #
     # ------------------------------------------------------------------ #
-    def _apply_visibility_js(self) -> str | None:
+    def _apply_visibility_js(self, vis_st: "VisibilityState") -> str | None:
         """Build a JS snippet to re-apply trace visibility, hover, and sweep highlight.
 
         Called after any operation that triggers a full figure rebuild (run
@@ -1211,6 +557,11 @@ class AppState(rx.State):
         current ``show_hover`` flag, and sweep highlight listeners are
         (re-)attached in multi-sweep mode.
 
+        Args:
+            vis_st: Current VisibilityState instance providing show_* values.
+                Passed in by the caller rather than fetched via ``self.get_state``
+                because this method is synchronous and ``get_state`` is async-only.
+
         Returns:
             A JS string that re-applies trace visibility, hover mode, and
             sweep highlight, or ``None`` when nothing needs to be applied.
@@ -1218,14 +569,14 @@ class AppState(rx.State):
         trace_map = compute_trace_visibility_map(
             current_sweeps=self.current_sweeps,
             saved_sweeps=self.saved_sweeps,
-            clamp_mode=self.clamp_mode,
+            clamp_mode=self._figure_clamp_mode,
             additional_current_field_map=_ADDITIONAL_CURRENT_FIELD_MAP,
             additional_gating_field_map=_ADDITIONAL_GATING_FIELD_MAP,
             stored_traces=self.stored_traces,
         )
         hidden: list[int] = []
         for field_name, indices in trace_map.items():
-            if not getattr(self, field_name):
+            if not getattr(vis_st, field_name, True):
                 hidden.extend(indices)
 
         parts: list[str] = []
@@ -1267,8 +618,12 @@ class AppState(rx.State):
             .replace("/*SELECTED_SWEEP*/", str(self.selected_sweep))
         )
 
-    def add_sweep(self):
-        """Promote current simulation result to the saved sweep overlay."""
+    def _do_add_sweep(self) -> None:
+        """Append current sweeps to the saved overlay without applying visibility JS.
+
+        Core logic extracted so tests can call it synchronously without
+        triggering the async ``get_state`` path.
+        """
         if not self.has_result:
             return
         logger.debug("Adding %d sweep(s) to overlay", len(self.current_sweeps))
@@ -1279,158 +634,74 @@ class AppState(rx.State):
                 sweep.model_copy(
                     update={
                         "color": color,
-                        "label": f"Sweep {idx + 1} ({self.active_neuron_type})",
+                        "label": f"Sweep {idx + 1} ({self._label_neuron_type})",
                     }
                 )
             )
-        js = self._apply_visibility_js()
+
+    async def add_sweep(self):
+        """Promote current simulation result to the saved sweep overlay."""
+        self._do_add_sweep()
+        vis_st = await self.get_state(VisibilityState)
+        js = self._apply_visibility_js(vis_st)
         if js:
             return rx.call_script(js)
 
-    def clear_sweeps(self):
-        """Remove all saved sweeps."""
+    def _do_clear_sweeps(self) -> None:
+        """Empty the saved sweep overlay without applying visibility JS.
+
+        Core logic extracted so tests can call it synchronously.
+        """
         logger.debug("Cleared %d saved sweep(s)", len(self.saved_sweeps))
         self.saved_sweeps = []
-        js = self._apply_visibility_js()
+
+    async def clear_sweeps(self):
+        """Remove all saved sweeps."""
+        self._do_clear_sweeps()
+        vis_st = await self.get_state(VisibilityState)
+        js = self._apply_visibility_js(vis_st)
         if js:
             return rx.call_script(js)
 
     # ------------------------------------------------------------------ #
     # Stored trace management                                            #
     # ------------------------------------------------------------------ #
-    def store_trace(self) -> None:
-        """Snapshot the current sweep into the oscilloscope stored traces."""
+    def _do_store_trace(self) -> None:
+        """Snapshot the current sweep into stored traces without applying visibility JS.
+
+        Core logic extracted so tests can call it synchronously.
+        """
         if not self.has_result:
             return
         idx = len(self.stored_traces)
         color = constants.STORED_TRACE_COLORS[idx % len(constants.STORED_TRACE_COLORS)]
-        label = f"Stored {idx + 1} ({self.active_neuron_type})"
+        label = f"Stored {idx + 1} ({self._label_neuron_type})"
         self.stored_traces.append(
             self.current_sweeps[0].model_copy(update={"color": color, "label": label})
         )
-        js = self._apply_visibility_js()
+
+    async def store_trace(self) -> None:
+        """Snapshot the current sweep into the oscilloscope stored traces."""
+        self._do_store_trace()
+        vis_st = await self.get_state(VisibilityState)
+        js = self._apply_visibility_js(vis_st)
         if js:
             return rx.call_script(js)
 
-    def clear_stored_traces(self) -> None:
-        """Remove all oscilloscope stored traces."""
+    def _do_clear_stored_traces(self) -> None:
+        """Remove all stored traces without applying visibility JS.
+
+        Core logic extracted so tests can call it synchronously.
+        """
         self.stored_traces = []
-        js = self._apply_visibility_js()
+
+    async def clear_stored_traces(self) -> None:
+        """Remove all oscilloscope stored traces."""
+        self._do_clear_stored_traces()
+        vis_st = await self.get_state(VisibilityState)
+        js = self._apply_visibility_js(vis_st)
         if js:
             return rx.call_script(js)
-
-    # ------------------------------------------------------------------ #
-    # Simulation helpers (called while holding the state lock)          #
-    # ------------------------------------------------------------------ #
-    def _build_neuron(self) -> "patch_sim.Neuron":
-        """Construct a Neuron from current state parameters."""
-        channels = tuple(
-            patch_sim.ChannelConfig(factory, g_max=getattr(self, f"{name}_g_max"))
-            for name, factory in patch_sim.CHANNEL_REGISTRY.items()
-            if getattr(self, f"{name}_enabled")
-        )
-        config = patch_sim.NeuronConfig(
-            g_Na=self.g_Na,
-            g_K=self.g_K,
-            g_L=self.g_L,
-            C_m=self.C_m,
-            v_rest=self.v_rest,
-            Na_out=self.Na_out,
-            Na_in=self.Na_in,
-            K_out=self.K_out,
-            K_in=self.K_in,
-            Cl_out=self.Cl_out,
-            Cl_in=self.Cl_in,
-            Ca_out=self.Ca_out,
-            Ca_in=self.Ca_in,
-            T=self.T,
-            channels=channels,
-        )
-        return patch_sim.make_neuron(config=config)
-
-    def _attach_step_labels(
-        self, arrays: "np.ndarray", fmt: str
-    ) -> "list[tuple[np.ndarray, str]]":
-        """Pair rows of a 2-D stimulus array with formatted step labels.
-
-        Re-derives the stimulus values from ``min_stimulus``, ``max_stimulus``,
-        and ``stimulus_step`` using the same formula as the builder, so the
-        labels always match the arrays.
-
-        Args:
-            arrays: 2-D stimulus array of shape ``(n_sweeps, n_samples)``
-                returned by a builder function.
-            fmt: Format string applied to each stimulus value (e.g.
-                ``"{:+.1f} µA/cm²"``).
-
-        Returns:
-            List of (array, label) pairs with one entry per sweep.
-        """
-        n_steps = (
-            round((self.max_stimulus - self.min_stimulus) / self.stimulus_step) + 1
-        )
-        values = np.linspace(self.min_stimulus, self.max_stimulus, n_steps)
-        return [(row, fmt.format(v)) for row, v in zip(arrays, values)]
-
-    def _build_protocols(self) -> "list[tuple[np.ndarray, str]]":
-        """Build stimulus arrays from current protocol state with sweep labels.
-
-        Labels are generated here in the UI layer: multi-sweep Step protocols
-        produce descriptive labels per sweep; all other protocols use an empty
-        string.
-
-        Returns:
-            List of (stimulus_array, sweep_label) pairs. Single-sweep protocols
-            return a one-element list with an empty label; multi-sweep protocols
-            (e.g. I-V Curve) return one entry per sweep with a descriptive label.
-        """
-        fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
-        if self.clamp_mode == "Current Clamp":
-            arrays = build_current_protocol(
-                protocol_type=self.protocol_type,
-                sampling_frequency=fs,
-                pre_stimulus_duration=self.pre_stimulus_duration,
-                stimulus_duration=self.stimulus_duration,
-                post_stimulus_duration=self.post_stimulus_duration,
-                min_stimulus=self.min_stimulus,
-                max_stimulus=self.max_stimulus,
-                stimulus_step=self.stimulus_step,
-                start_current=self.start_current,
-                end_current=self.end_current,
-                pulse_amplitude=self.pulse_amplitude,
-                pulse_width=self.pulse_width,
-                pulse_interval=self.pulse_interval,
-                dc_offset=self.dc_offset,
-                amplitude=self.amplitude,
-                frequency=self.frequency,
-                start_frequency=self.start_frequency,
-                end_frequency=self.end_frequency,
-                mean_current=self.mean_current,
-                std_current=self.std_current,
-            )
-            if arrays.shape[0] > 1:
-                return self._attach_step_labels(arrays, "{:+.1f} µA/cm²")
-            return [(arrays[0], "")]
-        else:
-            arrays = build_voltage_protocol(
-                protocol_type=self.protocol_type,
-                sampling_frequency=fs,
-                pre_stimulus_duration=self.pre_stimulus_duration,
-                stimulus_duration=self.stimulus_duration,
-                post_stimulus_duration=self.post_stimulus_duration,
-                holding_voltage=self.holding_voltage,
-                start_voltage=self.vc_start_voltage,
-                end_voltage=self.vc_end_voltage,
-                pulse_amplitude=self.vc_pulse_amplitude,
-                pulse_width=self.vc_pulse_width,
-                pulse_interval=self.vc_pulse_interval,
-                min_stimulus=self.min_stimulus,
-                max_stimulus=self.max_stimulus,
-                stimulus_step=self.stimulus_step,
-            )
-            if arrays.shape[0] > 1:
-                return self._attach_step_labels(arrays, "{:+.0f} mV")
-            return [(arrays[0], "")]
 
     # ------------------------------------------------------------------ #
     # Continuous simulation mode                                        #
@@ -1442,7 +713,10 @@ class AppState(rx.State):
             self.continuous_mode = False
         else:
             self.continuous_mode = True
-            return AppState.run_continuous  # type: ignore[return-value]
+            # Returning an event from a sync handler chains it: Reflex will
+            # dispatch run_continuous immediately after toggle_continuous_mode
+            # completes, without requiring this handler to be async.
+            return SimulationState.run_continuous  # type: ignore[return-value]
 
     @rx.event(background=True)
     async def run_continuous(self) -> AsyncGenerator[Any, None]:
@@ -1457,10 +731,12 @@ class AppState(rx.State):
             self.continuous_loop_running = True
             self.error_message = ""
 
+        async with self:
+            proto_st = await self.get_state(ProtocolState)
         logger.info(
             "Continuous simulation started: mode=%s, protocol=%s",
-            self.clamp_mode,
-            self.protocol_type,
+            proto_st.clamp_mode,
+            proto_st.protocol_type,
         )
         _iteration = 0
         try:
@@ -1471,10 +747,12 @@ class AppState(rx.State):
                     if not self.continuous_mode:
                         break
 
-                    mode = self.clamp_mode
-                    ptype = self.protocol_type
-                    neuron = self._build_neuron()
-                    stimulus = self._build_protocols()[0][0]
+                    proto_st = await self.get_state(ProtocolState)
+                    mode = proto_st.clamp_mode
+                    ptype = proto_st.protocol_type
+                    neuron_st = await self.get_state(NeuronState)
+                    neuron = neuron_st._build_neuron()
+                    stimulus = proto_st._build_protocols()[0][0]
                     use_prior_state = self._cont_has_state
                     prior_V = self._cont_V
                     prior_gating = dict(self._cont_gating)
@@ -1573,8 +851,10 @@ class AppState(rx.State):
                 logger.info(
                     "Continuous simulation stopped after %d iteration(s)", _iteration
                 )
-                self._refresh_logs()
-            js = self._apply_visibility_js()
+                log_st = await self.get_state(LogState)
+                log_st._refresh_logs()
+                vis_st = await self.get_state(VisibilityState)
+            js = self._apply_visibility_js(vis_st)
             if js:
                 yield rx.call_script(js)
             yield rx.call_script(_LOG_SCROLL_JS)
@@ -1593,11 +873,13 @@ class AppState(rx.State):
             self.is_running = True
             self.error_message = ""
             self.selected_sweep = -1
-            neuron = self._build_neuron()
-            mode = self.clamp_mode
-            ptype = self.protocol_type
+            neuron_st = await self.get_state(NeuronState)
+            neuron = neuron_st._build_neuron()
+            proto_st = await self.get_state(ProtocolState)
+            mode = proto_st.clamp_mode
+            ptype = proto_st.protocol_type
             try:
-                protocols = self._build_protocols()
+                protocols = proto_st._build_protocols()
             except ValueError as exc:
                 logger.exception("Simulation error: %s", exc)
                 self.error_message = str(exc)
@@ -1645,19 +927,20 @@ class AppState(rx.State):
                 new_sweeps = await loop.run_in_executor(None, _run_batch)
                 async with self:
                     self.current_sweeps = new_sweeps
-                    self.ap_metrics = []
-                    self.ap_summary = {}
+                    analysis_st = await self.get_state(AnalysisState)
+                    analysis_st.ap_metrics = []
+                    analysis_st.ap_summary = {}
                     if mode == VOLTAGE_CLAMP:
-                        self.iv_data = _compute_iv_data(
+                        analysis_st.iv_data = _compute_iv_data(
                             new_sweeps,
-                            self.min_stimulus,
-                            self.max_stimulus,
-                            self.stimulus_step,
-                            self.pre_stimulus_duration,
-                            self.stimulus_duration,
+                            proto_st.min_stimulus,
+                            proto_st.max_stimulus,
+                            proto_st.stimulus_step,
+                            proto_st.pre_stimulus_duration,
+                            proto_st.stimulus_duration,
                         )
                     else:
-                        self.iv_data = {}
+                        analysis_st.iv_data = {}
 
             else:
                 stimulus, _ = protocols[0]
@@ -1666,9 +949,10 @@ class AppState(rx.State):
                     self.current_sweeps = [
                         Sweep.from_result(result, stimulus, "", "", mode)
                     ]
+                    analysis_st = await self.get_state(AnalysisState)
                     if mode == CURRENT_CLAMP:
                         ap_result = patch_sim.analyze_aps_from_result(result)
-                        self.ap_metrics = [
+                        analysis_st.ap_metrics = [
                             {
                                 "index": s.index,
                                 "threshold_voltage": f"{s.threshold_voltage:.1f}",
@@ -1683,7 +967,7 @@ class AppState(rx.State):
                             }
                             for s in ap_result.spikes
                         ]
-                        self.ap_summary = {
+                        analysis_st.ap_summary = {
                             "spike_count": str(ap_result.spike_count),
                             "mean_threshold_voltage": (
                                 f"{ap_result.mean_threshold_voltage:.1f}"
@@ -1721,10 +1005,11 @@ class AppState(rx.State):
                                 else "\u2014"
                             ),
                         }
+                        analysis_st.iv_data = {}
                     else:
-                        self.ap_metrics = []
-                        self.ap_summary = {}
-                        self.iv_data = {}
+                        analysis_st.ap_metrics = []
+                        analysis_st.ap_summary = {}
+                        analysis_st.iv_data = {}
 
         except ValueError as exc:
             logger.exception("Simulation error: %s", exc)
@@ -1736,8 +1021,10 @@ class AppState(rx.State):
         finally:
             async with self:
                 self.is_running = False
-                self._refresh_logs()
-            js = self._apply_visibility_js()
+                log_st = await self.get_state(LogState)
+                log_st._refresh_logs()
+                vis_st = await self.get_state(VisibilityState)
+            js = self._apply_visibility_js(vis_st)
             if js:
                 yield rx.call_script(js)
             yield rx.call_script(_LOG_SCROLL_JS)
