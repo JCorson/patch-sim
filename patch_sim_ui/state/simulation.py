@@ -338,6 +338,63 @@ _SWEEP_HIGHLIGHT_JS = """
 """
 
 
+def _compute_fi_data(
+    sweeps: "list[Sweep]",
+    min_stimulus: float,
+    max_stimulus: float,
+    stimulus_step: float,
+    pre_stimulus_duration: float,
+    stimulus_duration: float,
+) -> dict[str, Any]:
+    """Compute F-I analysis data from multi-sweep current clamp results.
+
+    Derives current step values from the protocol parameters, extracts voltage
+    arrays from each sweep, and calls :func:`patch_sim.analyze_fi`.
+    The result is serialised into a plain dict suitable for use as a Reflex
+    state variable.
+
+    Args:
+        sweeps: Ordered list of :class:`Sweep` objects from the simulation.
+        min_stimulus: Minimum injected current step (µA/cm²).
+        max_stimulus: Maximum injected current step (µA/cm²).
+        stimulus_step: Step size between current commands (µA/cm²).
+        pre_stimulus_duration: Duration before the step begins (ms).
+        stimulus_duration: Duration of the current step (ms).
+
+    Returns:
+        A dict with keys ``current_steps``, ``mean_firing_rates``,
+        ``initial_firing_rates``, and ``steady_state_firing_rates``, each a
+        list aligned by index (rate values may be ``None`` for silent steps),
+        sorted by current step.  Returns an empty dict when fewer than two
+        sweeps are provided or when the number of sweeps does not match the
+        number of current steps derived from the protocol parameters.
+    """
+    if len(sweeps) < 2:
+        return {}
+
+    n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
+    current_steps = list(np.linspace(min_stimulus, max_stimulus, n_steps))
+
+    if len(sweeps) != len(current_steps):
+        return {}
+
+    time_arr = np.array(sweeps[0].time)
+    voltages = [np.array(s.voltage) for s in sweeps]
+
+    stim_start = pre_stimulus_duration
+    stim_end = pre_stimulus_duration + stimulus_duration
+
+    fi_result = patch_sim.analyze_fi(
+        time_arr, voltages, current_steps, stim_start, stim_end
+    )
+    return {
+        "current_steps": fi_result.current_steps,
+        "mean_firing_rates": fi_result.mean_firing_rates,
+        "initial_firing_rates": fi_result.initial_firing_rates,
+        "steady_state_firing_rates": fi_result.steady_state_firing_rates,
+    }
+
+
 def _compute_iv_data(
     sweeps: "list[Sweep]",
     min_stimulus: float,
@@ -931,6 +988,7 @@ class SimulationState(rx.State):
                     analysis_st.ap_metrics = []
                     analysis_st.ap_summary = {}
                     if mode == VOLTAGE_CLAMP:
+                        analysis_st.fi_data = {}
                         analysis_st.iv_data = _compute_iv_data(
                             new_sweeps,
                             proto_st.min_stimulus,
@@ -941,6 +999,14 @@ class SimulationState(rx.State):
                         )
                     else:
                         analysis_st.iv_data = {}
+                        analysis_st.fi_data = _compute_fi_data(
+                            new_sweeps,
+                            proto_st.min_stimulus,
+                            proto_st.max_stimulus,
+                            proto_st.stimulus_step,
+                            proto_st.pre_stimulus_duration,
+                            proto_st.stimulus_duration,
+                        )
 
             else:
                 stimulus, _ = protocols[0]
@@ -1006,10 +1072,12 @@ class SimulationState(rx.State):
                             ),
                         }
                         analysis_st.iv_data = {}
+                        analysis_st.fi_data = {}
                     else:
                         analysis_st.ap_metrics = []
                         analysis_st.ap_summary = {}
                         analysis_st.iv_data = {}
+                        analysis_st.fi_data = {}
 
         except ValueError as exc:
             logger.exception("Simulation error: %s", exc)

@@ -134,6 +134,42 @@ def _ap_metrics_tab() -> rx.Component:
     )
 
 
+def _fi_curve_tab() -> rx.Component:
+    """Render the F-I Curve tab content.
+
+    Shows a Plotly F-I curve with mean, initial, and steady-state firing rate
+    traces when current clamp multi-sweep data is available.  Displays a
+    placeholder message otherwise.
+
+    Returns:
+        The full tab content as a flex column.
+    """
+    return rx.cond(
+        AnalysisState.has_fi_data,
+        rx.flex(
+            rx.plotly(
+                data=AnalysisState.fi_figure,
+                width="100%",
+            ),
+            direction="column",
+            height="100%",
+            width="100%",
+            overflow="hidden",
+            padding="1",
+        ),
+        rx.flex(
+            rx.text(
+                "Run a current clamp multi-sweep simulation to see the F-I curve.",
+                size="1",
+                color="gray",
+                text_align="center",
+            ),
+            padding="4",
+            justify="center",
+        ),
+    )
+
+
 def _iv_curve_tab() -> rx.Component:
     """Render the I-V Curve tab content.
 
@@ -199,6 +235,7 @@ def _expanded_panel() -> rx.Component:
         rx.tabs.root(
             rx.tabs.list(
                 rx.tabs.trigger("AP Metrics", value="ap", size="1"),
+                rx.tabs.trigger("F-I Curve", value="fi", size="1"),
                 rx.tabs.trigger("I-V Curve", value="iv", size="1"),
                 padding_x="3",
                 padding_y="1",
@@ -207,6 +244,14 @@ def _expanded_panel() -> rx.Component:
             rx.tabs.content(
                 _ap_metrics_tab(),
                 value="ap",
+                flex_grow="1",
+                min_height="0",
+                overflow="hidden",
+                padding="0",
+            ),
+            rx.tabs.content(
+                _fi_curve_tab(),
+                value="fi",
                 flex_grow="1",
                 min_height="0",
                 overflow="hidden",
