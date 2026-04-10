@@ -65,7 +65,26 @@ _LOG_SCROLL_JS = (
 # ------------------------------------------------------------------ #
 
 
-def _make_float_setter(field_name: str, class_name: str = "SimulationState"):
+def _set_float(obj: object, field: str, value: "str | list[float] | float") -> None:
+    """Coerce value to float and set the named attribute on obj.
+
+    Accepts plain floats, strings (from ``rx.input.on_change``), and
+    single-element lists (from ``rx.slider.on_change``).  Silently
+    ignores values that cannot be parsed as float.
+
+    Args:
+        obj: The state instance on which to set the attribute.
+        field: Name of the attribute to update.
+        value: Raw value from an input or slider event.
+    """
+    v = value[0] if isinstance(value, list) else value
+    try:
+        setattr(obj, field, float(v))
+    except (ValueError, TypeError):
+        pass
+
+
+def _make_float_setter(field_name: str, class_name: str):
     """Factory returning a float-coercing event handler for ``field_name``.
 
     Args:
@@ -74,12 +93,12 @@ def _make_float_setter(field_name: str, class_name: str = "SimulationState"):
 
     Returns:
         An event handler method that accepts ``str | list[float] | float``
-        and delegates to ``_set_float``.
+        and delegates to :func:`_set_float`.
     """
 
     def setter(self, value: "str | list[float] | float") -> None:
         """Set the field from an input or slider event."""
-        self._set_float(field_name, value)
+        _set_float(self, field_name, value)
 
     setter.__name__ = f"set_{field_name}"
     setter.__qualname__ = f"{class_name}.set_{field_name}"

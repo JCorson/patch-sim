@@ -11,7 +11,7 @@ from patch_sim.constants import CURRENT_CLAMP
 from patch_sim.presets import NEURON_PROTOCOL_ADJUSTMENTS, PROTOCOL_PRESETS
 from patch_sim.protocols.builders import build_current_protocol, build_voltage_protocol
 from patch_sim_ui import constants, presets
-from patch_sim_ui.state._common import _make_float_setter
+from patch_sim_ui.state._common import _make_float_setter, _set_float
 
 _PROTOCOL_FLOAT_FIELDS: list[str] = [
     # Shared timing
@@ -218,11 +218,7 @@ class ProtocolState(rx.State):
             field: Name of the ProtocolState attribute to update.
             value: Raw value from an input or slider event.
         """
-        v = value[0] if isinstance(value, list) else value
-        try:
-            setattr(self, field, float(v))
-        except (ValueError, TypeError):
-            pass
+        _set_float(self, field, value)
 
     # One setter per protocol float field — generated at class-definition time
     # so Reflex's metaclass sees them as regular event handlers.

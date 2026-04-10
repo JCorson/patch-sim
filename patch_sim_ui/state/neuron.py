@@ -33,7 +33,7 @@ from patch_sim.constants import (
     DEFAULT_V_REST,
 )
 from patch_sim_ui import presets
-from patch_sim_ui.state._common import _make_float_setter
+from patch_sim_ui.state._common import _make_float_setter, _set_float
 
 _NEURON_FLOAT_FIELDS: list[str] = [
     "g_Na",
@@ -238,11 +238,7 @@ class NeuronState(rx.State):
             field: Name of the NeuronState attribute to update.
             value: Raw value from an input or slider event.
         """
-        v = value[0] if isinstance(value, list) else value
-        try:
-            setattr(self, field, float(v))
-        except (ValueError, TypeError):
-            pass
+        _set_float(self, field, value)
 
     for _f in _NEURON_FLOAT_FIELDS + _CHANNEL_FLOAT_FIELDS:
         vars()[f"set_{_f}"] = _make_float_setter(_f, "NeuronState")

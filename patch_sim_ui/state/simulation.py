@@ -6,6 +6,7 @@ substates (NeuronState, ProtocolState, VisibilityState, AnalysisState, LogState)
 """
 
 import asyncio
+import json
 import logging
 import time
 from typing import Any, AsyncGenerator
@@ -563,8 +564,6 @@ class SimulationState(rx.State):
             A JS string that re-applies trace visibility, hover mode, and
             sweep highlight, or ``None`` when nothing needs to be applied.
         """
-        import json
-
         trace_map = compute_trace_visibility_map(
             current_sweeps=self.current_sweeps,
             saved_sweeps=self.saved_sweeps,
