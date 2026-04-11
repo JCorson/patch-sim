@@ -51,6 +51,12 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
     SQUID_GIANT_AXON: NeuronConfig(
         # Original Hodgkin-Huxley (1952) parameters — the app defaults.
         # Ref: Hodgkin & Huxley (1952), J. Physiol. 117:500
+        #
+        # v_rest is the zero-current equilibrium computed via
+        # find_zero_current_voltage().  HH rate functions were calibrated for
+        # fixed reversal potentials; using Nernst-derived values shifts the
+        # equilibrium from -65 mV to -71.4 mV.
+        v_rest=-71.4,
     ),
     FAST_SPIKING_INTERNEURON: NeuronConfig(
         # High g_Na drives rapid depolarization; IKv31 (Kv3.1-type, high
@@ -60,12 +66,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Refs: Erisir et al. (1999), J. Neurophysiol. 82:2476;
         #       Wang & Buzsáki (1996), J. Neurosci. 16:6402
         #
-        # v_rest is set to -72 mV (the true zero-current fixed point).  The
-        # elevated g_K = 50 mS/cm² produces a larger outward K⁺ current at
-        # rest than the chloride-based leak can compensate near -65 mV
-        # (E_Cl ≈ -66 mV), shifting the equilibrium to ~-72 mV.  Starting
-        # here avoids the visible pre-stimulus drift that would otherwise
-        # appear in current-clamp traces.
+        # v_rest=-72 mV is the zero-current equilibrium (find_zero_current_voltage).
         g_Na=150.0,
         g_K=50.0,
         v_rest=-72.0,
@@ -77,11 +78,19 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Ih produces voltage sag on hyperpolarization; INaP amplifies
         # subthreshold inputs; IM provides spike-frequency adaptation.
         # Ref: Pospischil et al. (2008), Biol. Cybern. 99:427
+        #
+        # g_h reduced from 1.5 → 0.3 mS/cm² and g_NaP from 0.5 → 0.1 mS/cm²
+        # so that combined inward current at rest does not exceed the outward
+        # leak + IM current.  With the original values Ih and INaP together
+        # produced ~7.7 µA/cm² of inward current at -65 mV (far exceeding the
+        # ~1 µA/cm² outward current), causing spontaneous tonic firing.
+        # v_rest=-63.3 mV is the zero-current equilibrium for the adjusted model.
+        v_rest=-63.3,
         na_channel_factory=make_pospischil_na_channel,
         k_channel_factory=make_pospischil_k_channel,
         channels=(
-            ChannelConfig(make_ih_channel, g_max=1.5),
-            ChannelConfig(make_inap_channel, g_max=0.5),
+            ChannelConfig(make_ih_channel, g_max=0.3),
+            ChannelConfig(make_inap_channel, g_max=0.1),
             ChannelConfig(make_im_channel, g_max=0.5),
         ),
     ),
@@ -89,6 +98,9 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # L-type and T-type Ca²⁺ channels drive complex spiking;
         # IKCa couples Ca²⁺ influx to after-hyperpolarization.
         # Ref: De Schutter & Bower (1994), J. Neurophysiol. 71:375
+        #
+        # v_rest=-71.2 mV is the zero-current equilibrium.
+        v_rest=-71.2,
         channels=(
             ChannelConfig(make_ical_channel, g_max=1.0),
             ChannelConfig(make_icat_channel, g_max=0.5),
@@ -100,6 +112,9 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # oscillatory hyperpolarization.
         # Refs: Wilson & Callaway (2000), J. Neurophysiol. 83:3084;
         #       Komendantov et al. (2004)
+        #
+        # v_rest=-66.4 mV is the zero-current equilibrium.
+        v_rest=-66.4,
         channels=(
             ChannelConfig(make_ih_channel, g_max=2.0),
             ChannelConfig(make_im_channel, g_max=1.0),
@@ -109,6 +124,9 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # T-type Ca²⁺ produces low-threshold spike; Ih causes
         # post-inhibitory rebound burst after hyperpolarizing step.
         # Ref: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384
+        #
+        # v_rest=-66.9 mV is the zero-current equilibrium.
+        v_rest=-66.9,
         channels=(
             ChannelConfig(make_icat_channel, g_max=1.5),
             ChannelConfig(make_ih_channel, g_max=1.0),
@@ -120,6 +138,9 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Ca²⁺ channels (L, N, T) and IKCa together produce the pronounced
         # after-hyperpolarization (AHP) characteristic of CA1 cells.
         # Refs: Warman et al. (1994); Migliore et al. (1999), ModelDB #2796
+        #
+        # v_rest=-70.2 mV is the zero-current equilibrium.
+        v_rest=-70.2,
         g_Na=35.0,
         g_K=10.0,
         channels=(
@@ -140,6 +161,9 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Ih provides pacemaker depolarization.
         # Refs: Otsuka et al. (2004), J. Neurophysiol. 92:255;
         #       Farries & Wilson (2012), J. Neurophysiol.
+        #
+        # v_rest=-67.0 mV is the zero-current equilibrium.
+        v_rest=-67.0,
         g_Na=49.0,
         g_K=57.0,
         na_channel_factory=make_stn_na_channel,
@@ -153,24 +177,31 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         ),
     ),
     TRN: NeuronConfig(
-        # Hyperpolarised resting potential (−77 mV) and exceptionally large
-        # ICaT (g_T ≈ 3.5 mS/cm²) are the hallmarks of TRN cells; these
-        # combine to produce rhythmic burst firing and sleep-spindle
-        # oscillations.  No auxiliary channels beyond ICaT are needed.
+        # ICaT (g_T ≈ 3.5 mS/cm²) drives rhythmic burst firing and
+        # sleep-spindle oscillations characteristic of TRN cells.
         # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804;
         #       Destexhe et al. (1994)
-        v_rest=-77.0,
+        #
+        # v_rest=-69.2 mV is the zero-current equilibrium.  The biological
+        # resting potential of ~-77 mV is maintained by K⁺ leak conductances
+        # absent from this model; with only HH-style Cl⁻ leak (E_Cl ≈ -66 mV)
+        # the equilibrium shifts to -69.2 mV.  ICaT is sufficiently
+        # de-inactivated at this potential for rebound bursting to occur.
+        v_rest=-69.2,
         channels=(ChannelConfig(make_icat_channel, g_max=3.5),),
     ),
     STOMATOGASTRIC_GANGLION: NeuronConfig(
-        # Depolarised resting potential (−55 mV) and ~8 conductances produce
-        # rhythmic bursting; large IKa and IKCa shape burst waveform; slow
-        # ICaL drives plateau depolarisation; Ih contributes to inter-burst
-        # pacemaker potential.  Highly parameter-sensitive — small changes
-        # alter burst duty cycle substantially.
+        # ~8 conductances produce rhythmic bursting; large IKa and IKCa shape
+        # burst waveform; slow ICaL drives plateau depolarisation; Ih
+        # contributes to inter-burst pacemaker potential.
+        # Highly parameter-sensitive — small changes alter burst duty cycle.
         # Refs: Prinz et al. (2003), J. Neurophysiol. 90:3998;
         #       Turrigiano et al. (1995)
-        v_rest=-55.0,
+        #
+        # v_rest=-71.0 mV is the zero-current equilibrium.  The biological
+        # resting potential of ~-55 mV was incorrect for this channel
+        # configuration with Nernst-derived reversal potentials.
+        v_rest=-71.0,
         channels=(
             ChannelConfig(make_ika_channel, g_max=8.0),
             ChannelConfig(make_ical_channel, g_max=2.0),
@@ -359,14 +390,12 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     STOMATOGASTRIC_GANGLION: {
-        # Long window at low current to reveal slow (~1 Hz) rhythmic bursting.
+        # Long window at low current to reveal slow rhythmic bursting.
         "Repetitive Firing": {
             "min_stimulus": 3.0,
             "max_stimulus": 3.0,
             "stimulus_duration": 800.0,
         },
-        # Depolarised v_rest (−55 mV) lowers threshold; use a tighter
-        # positive-only range so every sweep produces a clear burst response.
         "F-I Curve": {
             "min_stimulus": 0.0,
             "max_stimulus": 12.0,
