@@ -73,7 +73,6 @@ def _make_visibility_setter_async(field_name: str):
         sim_st = await self.get_state(SimulationState)
         trace_map = compute_trace_visibility_map(
             current_sweeps=sim_st.current_sweeps,
-            saved_sweeps=sim_st.saved_sweeps,
             clamp_mode=sim_st._figure_clamp_mode,
             additional_current_field_map=_ADDITIONAL_CURRENT_FIELD_MAP,
             additional_gating_field_map=_ADDITIONAL_GATING_FIELD_MAP,

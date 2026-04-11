@@ -251,7 +251,7 @@ def _all_flags_true() -> TraceVisibility:
 
 def test_build_figure_returns_go_figure() -> None:
     """build_figure returns a plotly go.Figure."""
-    fig = build_figure([], [], visibility=_all_flags_true(), clamp_mode="Current Clamp")
+    fig = build_figure([], visibility=_all_flags_true(), clamp_mode="Current Clamp")
     assert isinstance(fig, go.Figure)
 
 
@@ -259,7 +259,7 @@ def test_build_figure_cc_has_three_subplots() -> None:
     """Current Clamp figure has exactly 3 subplots (rows)."""
     sweep = _make_sweep(mode="Current Clamp")
     fig = build_figure(
-        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+        [sweep], visibility=_all_flags_true(), clamp_mode="Current Clamp"
     )
     # Each subplot contributes a distinct y-axis entry (yaxis, yaxis2, yaxis3).
     yaxes = [k for k in fig.layout.to_plotly_json() if k.startswith("yaxis")]
@@ -270,7 +270,7 @@ def test_build_figure_vc_has_three_subplots() -> None:
     """Voltage Clamp figure has exactly 3 subplots."""
     sweep = _make_sweep(mode="Voltage Clamp")
     fig = build_figure(
-        [sweep], [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+        [sweep], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
     )
     yaxes = [k for k in fig.layout.to_plotly_json() if k.startswith("yaxis")]
     assert len(yaxes) == 3
@@ -278,7 +278,7 @@ def test_build_figure_vc_has_three_subplots() -> None:
 
 def test_build_figure_empty_sweeps_no_error() -> None:
     """build_figure with no sweeps returns a valid empty figure."""
-    fig = build_figure([], [], visibility=_all_flags_true(), clamp_mode="Current Clamp")
+    fig = build_figure([], visibility=_all_flags_true(), clamp_mode="Current Clamp")
     assert isinstance(fig, go.Figure)
 
 
@@ -291,7 +291,7 @@ def test_build_figure_cc_single_sweep_trace_count() -> None:
     """Current Clamp single sweep: voltage + 3 gating + stimulus = 5 traces."""
     sweep = _make_sweep(mode="Current Clamp")
     fig = build_figure(
-        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+        [sweep], visibility=_all_flags_true(), clamp_mode="Current Clamp"
     )
     # voltage(1) + n, m, h(3) + stimulus(1) = 5
     assert len(fig.data) == 5
@@ -301,7 +301,7 @@ def test_build_figure_vc_single_sweep_trace_count() -> None:
     """Voltage Clamp single sweep: 4 current traces + 3 gating + stimulus = 8."""
     sweep = _make_sweep(mode="Voltage Clamp")
     fig = build_figure(
-        [sweep], [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+        [sweep], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
     )
     # total, Na, K, leak(4) + n, m, h(3) + stimulus(1) = 8
     assert len(fig.data) == 8
@@ -316,7 +316,7 @@ def test_build_figure_cc_voltage_uses_fixed_color() -> None:
     """Current Clamp voltage trace uses CC_VOLTAGE_COLOR, not the sweep color."""
     sweep = _make_sweep(label="", color="#ff0000", mode="Current Clamp")
     fig = build_figure(
-        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+        [sweep], visibility=_all_flags_true(), clamp_mode="Current Clamp"
     )
     voltage_traces = [t for t in fig.data if "Voltage" in (t.name or "")]
     assert len(voltage_traces) == 1, "Expected exactly one voltage trace"
@@ -330,7 +330,7 @@ def test_build_figure_cc_stimulus_uses_stimulus_color() -> None:
     """Current Clamp stimulus trace uses STIMULUS_COLOR."""
     sweep = _make_sweep(label="", color="#ff0000", mode="Current Clamp")
     fig = build_figure(
-        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+        [sweep], visibility=_all_flags_true(), clamp_mode="Current Clamp"
     )
     stim_traces = [t for t in fig.data if "Stimulus" in (t.name or "")]
     assert len(stim_traces) == 1, "Expected exactly one stimulus trace"
@@ -344,7 +344,7 @@ def test_build_figure_vc_command_uses_stimulus_color() -> None:
     """Voltage Clamp command trace uses STIMULUS_COLOR, matching CC stimulus."""
     sweep = _make_sweep(label="", color="#ff0000", mode="Voltage Clamp")
     fig = build_figure(
-        [sweep], [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+        [sweep], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
     )
     cmd_traces = [t for t in fig.data if "Command" in (t.name or "")]
     assert len(cmd_traces) == 1, "Expected exactly one Command trace"
@@ -363,7 +363,7 @@ def test_build_figure_single_sweep_hovermode_x_unified() -> None:
     """Single-sweep mode uses hovermode='x unified'."""
     sweep = _make_sweep()
     fig = build_figure(
-        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+        [sweep], visibility=_all_flags_true(), clamp_mode="Current Clamp"
     )
     assert fig.layout.hovermode == "x unified"
 
@@ -371,9 +371,7 @@ def test_build_figure_single_sweep_hovermode_x_unified() -> None:
 def test_build_figure_multi_sweep_hovermode_x() -> None:
     """Multi-sweep mode uses hovermode='x'."""
     sweeps = [_make_sweep(label=f"{v} mV") for v in [-60, -40, -20]]
-    fig = build_figure(
-        sweeps, [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
-    )
+    fig = build_figure(sweeps, visibility=_all_flags_true(), clamp_mode="Voltage Clamp")
     assert fig.layout.hovermode == "x"
 
 
@@ -382,7 +380,6 @@ def test_build_figure_show_hover_false_disables_hovermode() -> None:
     sweep = _make_sweep()
     fig = build_figure(
         [sweep],
-        [],
         visibility=_all_flags_true(),
         clamp_mode="Current Clamp",
         show_hover=False,
@@ -395,7 +392,6 @@ def test_build_figure_show_hover_false_multi_sweep() -> None:
     sweeps = [_make_sweep(label=f"{v} mV") for v in [-60, -40, -20]]
     fig = build_figure(
         sweeps,
-        [],
         visibility=_all_flags_true(),
         clamp_mode="Voltage Clamp",
         show_hover=False,
@@ -431,9 +427,7 @@ def _count_carrier_traces(fig: go.Figure) -> int:
 def test_build_figure_multi_sweep_adds_three_carrier_traces() -> None:
     """Multi-sweep mode adds exactly 3 carrier traces (one per subplot)."""
     sweeps = [_make_sweep(label=f"{v} mV") for v in [-60, -40, -20]]
-    fig = build_figure(
-        sweeps, [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
-    )
+    fig = build_figure(sweeps, visibility=_all_flags_true(), clamp_mode="Voltage Clamp")
     assert _count_carrier_traces(fig) == 3
 
 
@@ -441,7 +435,7 @@ def test_build_figure_single_sweep_has_no_carrier_traces() -> None:
     """Single-sweep mode adds no carrier traces."""
     sweep = _make_sweep()
     fig = build_figure(
-        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+        [sweep], visibility=_all_flags_true(), clamp_mode="Current Clamp"
     )
     assert _count_carrier_traces(fig) == 0
 
@@ -449,9 +443,7 @@ def test_build_figure_single_sweep_has_no_carrier_traces() -> None:
 def test_build_figure_multi_sweep_data_traces_hoverinfo_skip() -> None:
     """In multi-sweep mode, non-carrier traces have hoverinfo='skip'."""
     sweeps = [_make_sweep(label=f"{v} mV") for v in [-60, -40]]
-    fig = build_figure(
-        sweeps, [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
-    )
+    fig = build_figure(sweeps, visibility=_all_flags_true(), clamp_mode="Current Clamp")
     carrier_count = _count_carrier_traces(fig)
     for trace in fig.data:
         is_carrier = (
@@ -475,7 +467,7 @@ def test_build_figure_hidden_voltage_trace_is_present_but_not_visible() -> None:
     """Voltage trace is in fig.data but has visible=False when toggled off."""
     sweep = _make_sweep(mode="Current Clamp")
     vis = TraceVisibility(voltage=False)
-    fig = build_figure([sweep], [], visibility=vis, clamp_mode="Current Clamp")
+    fig = build_figure([sweep], visibility=vis, clamp_mode="Current Clamp")
     voltage_traces = [t for t in fig.data if "Voltage" in (t.name or "")]
     assert len(voltage_traces) == 1
     assert voltage_traces[0].visible is False
@@ -486,8 +478,8 @@ def test_build_figure_hidden_trace_does_not_remove_it() -> None:
     sweep = _make_sweep(mode="Current Clamp")
     vis_on = TraceVisibility()
     vis_off = TraceVisibility(voltage=False)
-    fig_on = build_figure([sweep], [], visibility=vis_on, clamp_mode="Current Clamp")
-    fig_off = build_figure([sweep], [], visibility=vis_off, clamp_mode="Current Clamp")
+    fig_on = build_figure([sweep], visibility=vis_on, clamp_mode="Current Clamp")
+    fig_off = build_figure([sweep], visibility=vis_off, clamp_mode="Current Clamp")
     assert len(fig_on.data) == len(fig_off.data)
 
 
@@ -500,7 +492,7 @@ def test_build_figure_gating_traces_hidden_when_flags_off() -> None:
         sodium_activation=False,
         sodium_inactivation=False,
     )
-    fig = build_figure([sweep], [], visibility=vis, clamp_mode="Current Clamp")
+    fig = build_figure([sweep], visibility=vis, clamp_mode="Current Clamp")
     gating_traces = [t for t in fig.data if t.name in ("n", "m", "h")]
     assert len(gating_traces) == 3
     assert all(tr.visible is False for tr in gating_traces)
@@ -509,30 +501,6 @@ def test_build_figure_gating_traces_hidden_when_flags_off() -> None:
 # ---------------------------------------------------------------------------
 # build_figure — saved sweeps
 # ---------------------------------------------------------------------------
-
-
-def test_build_figure_saved_sweep_adds_traces() -> None:
-    """A saved sweep adds traces on top of current sweep traces."""
-    current = _make_sweep(label="current", color="#ff0000")
-    saved = _make_sweep(label="saved", color="#888888")
-    fig_no_saved = build_figure(
-        [current], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
-    )
-    fig_with_saved = build_figure(
-        [current], [saved], visibility=_all_flags_true(), clamp_mode="Current Clamp"
-    )
-    assert len(fig_with_saved.data) > len(fig_no_saved.data)
-
-
-def test_build_figure_saved_sweep_stimulus_trace_present() -> None:
-    """A saved sweep always includes a stimulus trace on the stimulus subplot."""
-    current = _make_sweep(label="current")
-    saved = _make_sweep(label="saved_ref", color="#666666")
-    fig = build_figure(
-        [current], [saved], visibility=_all_flags_true(), clamp_mode="Current Clamp"
-    )
-    saved_stimulus_traces = [t for t in fig.data if t.name == "saved_ref"]
-    assert len(saved_stimulus_traces) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -668,7 +636,7 @@ def test_build_hover_tables_stride_2_length() -> None:
 def test_compute_trace_visibility_map_cc_single_sweep_classic_fields() -> None:
     """CC single sweep maps classic show_* fields to the correct indices."""
     sweep = _make_sweep(mode="Current Clamp")
-    result = compute_trace_visibility_map([sweep], [], "Current Clamp")
+    result = compute_trace_visibility_map([sweep], "Current Clamp")
     # trace order: voltage(0), n(1), m(2), h(3), stimulus(4, not mapped)
     assert result["show_voltage"] == [0]
     assert result["show_potassium_activation"] == [1]
@@ -680,7 +648,7 @@ def test_compute_trace_visibility_map_cc_single_sweep_classic_fields() -> None:
 def test_compute_trace_visibility_map_vc_single_sweep_classic_fields() -> None:
     """VC single sweep maps classic show_* fields to the correct indices."""
     sweep = _make_sweep(mode="Voltage Clamp")
-    result = compute_trace_visibility_map([sweep], [], "Voltage Clamp")
+    result = compute_trace_visibility_map([sweep], "Voltage Clamp")
     # trace order: total(0), Na(1), K(2), leak(3), n(4), m(5), h(6), stim(7)
     assert result["show_total_current"] == [0]
     assert result["show_sodium_current"] == [1]
@@ -695,7 +663,7 @@ def test_compute_trace_visibility_map_vc_single_sweep_classic_fields() -> None:
 def test_compute_trace_visibility_map_cc_multi_sweep_accumulates_indices() -> None:
     """Multi-sweep CC maps each field to one index per sweep."""
     sweeps = [_make_sweep(mode="Current Clamp"), _make_sweep(mode="Current Clamp")]
-    result = compute_trace_visibility_map(sweeps, [], "Current Clamp")
+    result = compute_trace_visibility_map(sweeps, "Current Clamp")
     # Sweep 0: voltage(0), n(1), m(2), h(3), stim(4)
     # Sweep 1: voltage(5), n(6), m(7), h(8), stim(9)
     assert result["show_voltage"] == [0, 5]
@@ -704,24 +672,13 @@ def test_compute_trace_visibility_map_cc_multi_sweep_accumulates_indices() -> No
     assert result["show_sodium_inactivation"] == [3, 8]
 
 
-def test_compute_trace_visibility_map_saved_sweep_does_not_shift_current_indices() -> (
-    None
-):
-    """Adding a saved sweep does not change current-sweep trace indices."""
-    current = _make_sweep(mode="Current Clamp")
-    saved = _make_sweep(mode="Current Clamp")
-    result_without = compute_trace_visibility_map([current], [], "Current Clamp")
-    result_with = compute_trace_visibility_map([current], [saved], "Current Clamp")
-    assert result_without == result_with
-
-
 def test_compute_trace_visibility_map_cc_additional_gating_mapped() -> None:
     """CC sweep with additional gating maps the field to the correct index."""
     extra = {"r": [0.0] * _N}
     sweep = _make_sweep(mode="Current Clamp", extra_cols=extra)
     gating_map = {"r": "show_ih_gating"}
     result = compute_trace_visibility_map(
-        [sweep], [], "Current Clamp", additional_gating_field_map=gating_map
+        [sweep], "Current Clamp", additional_gating_field_map=gating_map
     )
     # voltage(0), n(1), m(2), h(3), r(4), stim(5)
     assert result["show_ih_gating"] == [4]
@@ -734,7 +691,7 @@ def test_compute_trace_visibility_map_vc_additional_current_mapped() -> None:
     sweep = _make_sweep(mode="Voltage Clamp", extra_cols=extra)
     curr_map = {"IFoo": "show_foo_current"}
     result = compute_trace_visibility_map(
-        [sweep], [], "Voltage Clamp", additional_current_field_map=curr_map
+        [sweep], "Voltage Clamp", additional_current_field_map=curr_map
     )
     # total(0), Na(1), K(2), leak(3), IFoo(4), n(5), m(6), h(7), stim(8)
     assert result["show_foo_current"] == [4]
@@ -749,7 +706,7 @@ def test_compute_trace_visibility_map_multi_gating_keys_same_field() -> None:
     sweep = _make_sweep(mode="Current Clamp", extra_cols=extra)
     gating_map = {"a": "show_ika_gating", "b": "show_ika_gating"}
     result = compute_trace_visibility_map(
-        [sweep], [], "Current Clamp", additional_gating_field_map=gating_map
+        [sweep], "Current Clamp", additional_gating_field_map=gating_map
     )
     # voltage(0), n(1), m(2), h(3), a(4), b(5), stim(6)
     assert result["show_ika_gating"] == [4, 5]
@@ -759,7 +716,7 @@ def test_compute_trace_visibility_map_unknown_additional_key_advances_counter() 
     """Additional keys absent from the field map still advance the index counter."""
     extra = {"IUnknown": [0.0] * _N}
     sweep = _make_sweep(mode="Voltage Clamp", extra_cols=extra)
-    result = compute_trace_visibility_map([sweep], [], "Voltage Clamp")
+    result = compute_trace_visibility_map([sweep], "Voltage Clamp")
     # IUnknown (additional_current) advances the counter; classic gating at 5, 6, 7
     assert result["show_potassium_activation"] == [5]
     assert result["show_sodium_activation"] == [6]
@@ -777,7 +734,7 @@ def test_build_figure_with_stored_traces_does_not_raise() -> None:
     stored = _make_sweep(mode="Current Clamp")
     stored = stored.model_copy(update={"label": "Stored 1"})
     fig = build_figure(
-        [sweep], [], TraceVisibility(), "Current Clamp", stored_traces=[stored]
+        [sweep], TraceVisibility(), "Current Clamp", stored_traces=[stored]
     )
     assert isinstance(fig, go.Figure)
 
@@ -787,9 +744,9 @@ def test_build_figure_stored_traces_adds_extra_traces() -> None:
     sweep = _make_sweep(mode="Current Clamp")
     stored = _make_sweep(mode="Current Clamp")
 
-    fig_no_stored = build_figure([sweep], [], TraceVisibility(), "Current Clamp")
+    fig_no_stored = build_figure([sweep], TraceVisibility(), "Current Clamp")
     fig_with_stored = build_figure(
-        [sweep], [], TraceVisibility(), "Current Clamp", stored_traces=[stored]
+        [sweep], TraceVisibility(), "Current Clamp", stored_traces=[stored]
     )
 
     assert len(fig_with_stored.data) > len(fig_no_stored.data)
@@ -800,9 +757,9 @@ def test_compute_trace_visibility_map_with_stored_traces_advances_counter() -> N
     sweep = _make_sweep(mode="Current Clamp")
     stored = _make_sweep(mode="Current Clamp")
 
-    result_without = compute_trace_visibility_map([sweep], [], "Current Clamp")
+    result_without = compute_trace_visibility_map([sweep], "Current Clamp")
     result_with = compute_trace_visibility_map(
-        [sweep], [], "Current Clamp", stored_traces=[stored]
+        [sweep], "Current Clamp", stored_traces=[stored]
     )
 
     # The recorded show_* indices must be identical regardless of stored traces.
@@ -818,7 +775,7 @@ def test_build_figure_cc_single_sweep_stimulus_not_in_legend() -> None:
     """Current Clamp single sweep: stimulus trace is excluded from the legend."""
     sweep = _make_sweep(mode="Current Clamp")
     fig = build_figure(
-        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+        [sweep], visibility=_all_flags_true(), clamp_mode="Current Clamp"
     )
     stim_traces = [t for t in fig.data if "Stimulus" in (t.name or "")]
     assert all(t.showlegend is False for t in stim_traces), (
@@ -830,7 +787,7 @@ def test_build_figure_vc_single_sweep_command_not_in_legend() -> None:
     """Voltage Clamp single sweep: command trace is excluded from the legend."""
     sweep = _make_sweep(mode="Voltage Clamp")
     fig = build_figure(
-        [sweep], [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+        [sweep], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
     )
     cmd_traces = [t for t in fig.data if "Command" in (t.name or "")]
     assert all(t.showlegend is False for t in cmd_traces), (
@@ -842,7 +799,7 @@ def test_build_figure_cc_single_sweep_only_gating_in_legend() -> None:
     """Current Clamp single sweep: voltage is suppressed (sole trace); gating shown."""
     sweep = _make_sweep(label="", mode="Current Clamp")
     fig = build_figure(
-        [sweep], [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
+        [sweep], visibility=_all_flags_true(), clamp_mode="Current Clamp"
     )
     legend_names = {t.name for t in fig.data if t.showlegend is not False}
     # Row 1 has only Voltage — suppressed because sole entry.
@@ -857,7 +814,7 @@ def test_build_figure_vc_single_sweep_currents_and_gating_in_legend() -> None:
     """Voltage Clamp single sweep: current and gating traces appear in the legend."""
     sweep = _make_sweep(label="", mode="Voltage Clamp")
     fig = build_figure(
-        [sweep], [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+        [sweep], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
     )
     legend_traces = [t for t in fig.data if t.showlegend is not False]
     names = {t.name for t in legend_traces}
@@ -873,9 +830,7 @@ def test_build_figure_vc_single_sweep_currents_and_gating_in_legend() -> None:
 def test_build_figure_multi_sweep_only_first_sweep_in_legend() -> None:
     """Multi-sweep mode: only the first sweep's traces appear in the legend."""
     sweeps = [_make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40]]
-    fig = build_figure(
-        sweeps, [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
-    )
+    fig = build_figure(sweeps, visibility=_all_flags_true(), clamp_mode="Voltage Clamp")
     legend_names = {t.name for t in fig.data if t.showlegend is not False}
     # Traces from the second sweep must not appear.
     assert not any(n.startswith("-40 mV ") for n in legend_names), (
@@ -886,9 +841,7 @@ def test_build_figure_multi_sweep_only_first_sweep_in_legend() -> None:
 def test_build_figure_multi_sweep_legend_names_have_no_voltage_prefix() -> None:
     """Multi-sweep legends use bare names — no command level on currents or gating."""
     sweeps = [_make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40]]
-    fig = build_figure(
-        sweeps, [], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
-    )
+    fig = build_figure(sweeps, visibility=_all_flags_true(), clamp_mode="Voltage Clamp")
     legend_names = {t.name for t in fig.data if t.showlegend is not False}
     # Current traces must use bare channel labels, not "-60 mV I_total" etc.
     assert "I_total" in legend_names
@@ -912,9 +865,7 @@ def test_build_figure_cc_multi_sweep_gating_names_bare() -> None:
     sweeps = [
         _make_sweep(label=f"{c:+.1f} uA/cm^2", mode="Current Clamp") for c in [0.0, 5.0]
     ]
-    fig = build_figure(
-        sweeps, [], visibility=_all_flags_true(), clamp_mode="Current Clamp"
-    )
+    fig = build_figure(sweeps, visibility=_all_flags_true(), clamp_mode="Current Clamp")
     gating_traces = [t for t in fig.data if getattr(t, "legend", None) == "legend2"]
     assert gating_traces, "Expected gating traces with legend='legend2'"
     for trace in gating_traces:
@@ -923,25 +874,13 @@ def test_build_figure_cc_multi_sweep_gating_names_bare() -> None:
         )
 
 
-def test_build_figure_saved_sweep_stimulus_not_in_legend() -> None:
-    """Saved sweep stimulus traces are excluded from the legend."""
-    current = _make_sweep(mode="Current Clamp")
-    saved = _make_sweep(label="saved", color="#aabbcc", mode="Current Clamp")
-    fig = build_figure(
-        [current], [saved], visibility=_all_flags_true(), clamp_mode="Current Clamp"
-    )
-    # The saved sweep's stimulus trace uses sweep.label ("saved") as its name.
-    saved_stim = [t for t in fig.data if t.name == "saved" and t.showlegend is False]
-    assert len(saved_stim) >= 1, "Saved sweep stimulus must be excluded from the legend"
-
-
 def test_build_figure_stored_trace_stimulus_not_in_legend() -> None:
     """Stored trace stimulus traces are excluded from the legend."""
     sweep = _make_sweep(mode="Current Clamp")
     stored = _make_sweep(mode="Current Clamp")
     stored = stored.model_copy(update={"label": "Ref"})
     fig = build_figure(
-        [sweep], [], TraceVisibility(), "Current Clamp", stored_traces=[stored]
+        [sweep], TraceVisibility(), "Current Clamp", stored_traces=[stored]
     )
     # Stored traces add two traces named "Ref": one on row 1, one on stimulus row.
     ref_traces = [t for t in fig.data if t.name == "Ref"]
@@ -960,7 +899,7 @@ def test_sweep_meta_vc_multi_sweep() -> None:
     sweeps = [
         _make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40, -20]
     ]
-    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+    fig = build_figure(sweeps, TraceVisibility(), "Voltage Clamp")
     for trace in fig.data:
         assert trace.meta is not None, "Every trace must have meta"
         assert "sweep" in trace.meta, "Every trace meta must contain 'sweep' key"
@@ -977,7 +916,7 @@ def test_sweep_meta_vc_multi_sweep() -> None:
 def test_sweep_meta_cc_multi_sweep() -> None:
     """Multi-sweep CC figure embeds correct sweep index in trace meta."""
     sweeps = [_make_sweep(label=f"s{i}", mode="Current Clamp") for i in range(2)]
-    fig = build_figure(sweeps, [], TraceVisibility(), "Current Clamp")
+    fig = build_figure(sweeps, TraceVisibility(), "Current Clamp")
     counts = Counter(t.meta["sweep"] for t in fig.data if t.meta["sweep"] >= 0)
     assert sorted(counts.keys()) == list(range(len(sweeps))), (
         "Sweep indices should span 0..n-1"
@@ -987,27 +926,13 @@ def test_sweep_meta_cc_multi_sweep() -> None:
     )
 
 
-def test_sweep_meta_negative_for_saved_sweeps() -> None:
-    """Saved sweep traces have meta.sweep == -1."""
-    current = [_make_sweep(label="cur", mode="Current Clamp")]
-    saved = [_make_sweep(label="saved", color="#aaa", mode="Current Clamp")]
-    fig = build_figure(current, saved, TraceVisibility(), "Current Clamp")
-    # Current sweep traces use sweep=0; saved traces must all use -1.
-    non_current = [t for t in fig.data if t.meta["sweep"] != 0]
-    assert len(non_current) > 0, "Expected saved traces to be present"
-    for t in non_current:
-        assert t.meta["sweep"] == -1, (
-            f"Saved trace should have sweep=-1, got {t.meta['sweep']}"
-        )
-
-
 def test_sweep_meta_negative_for_stored_traces() -> None:
     """Stored traces have meta.sweep == -1."""
     current = [_make_sweep(mode="Current Clamp")]
     stored = [_make_sweep(mode="Current Clamp")]
     stored[0] = stored[0].model_copy(update={"label": "Ref"})
     fig = build_figure(
-        current, [], TraceVisibility(), "Current Clamp", stored_traces=stored
+        current, TraceVisibility(), "Current Clamp", stored_traces=stored
     )
     # Current sweep traces use sweep=0; stored traces must all use -1.
     non_current = [t for t in fig.data if t.meta["sweep"] != 0]
@@ -1019,7 +944,7 @@ def test_sweep_meta_negative_for_stored_traces() -> None:
 def test_sweep_meta_negative_for_carrier_traces() -> None:
     """Carrier traces in multi-sweep mode have meta.sweep == -1."""
     sweeps = [_make_sweep(label=f"s{i}", mode="Voltage Clamp") for i in range(3)]
-    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+    fig = build_figure(sweeps, TraceVisibility(), "Voltage Clamp")
     # Carrier traces are identified by their customdata hovertemplate — unique
     # to these invisible hover-proxy traces.  There should be exactly 3 (one
     # per subplot row) and each must have sweep=-1.
@@ -1040,7 +965,7 @@ def test_sweep_meta_with_additional_channels() -> None:
         _make_sweep(label="s0", mode="Voltage Clamp", extra_cols=extra),
         _make_sweep(label="s1", mode="Voltage Clamp", extra_cols=extra),
     ]
-    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+    fig = build_figure(sweeps, TraceVisibility(), "Voltage Clamp")
     counts = Counter(t.meta["sweep"] for t in fig.data if t.meta["sweep"] >= 0)
     assert sorted(counts.keys()) == list(range(len(sweeps))), (
         "Sweep indices should span 0..n-1"
@@ -1061,7 +986,7 @@ def test_sweep_traces_have_correct_yaxis_assignments() -> None:
     sweeps = [
         _make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40, -20]
     ]
-    fig = build_figure(sweeps, [], TraceVisibility(), "Voltage Clamp")
+    fig = build_figure(sweeps, TraceVisibility(), "Voltage Clamp")
 
     # Filter by meta.sweep >= 0 to exclude carrier traces at the end.
     sweep_traces = [t for t in fig.data if t.meta and t.meta.get("sweep", -1) >= 0]

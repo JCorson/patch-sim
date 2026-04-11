@@ -340,7 +340,7 @@ def _chip(sweep, color_scheme: str | None = None) -> rx.Component:
     Args:
         sweep: A ``Sweep`` instance.
         color_scheme: Optional Radix color scheme (e.g. ``"orange"`` for stored
-            traces). Omit for saved sweeps.
+            traces).
 
     Returns:
         A badge component showing the sweep colour dot and label.
@@ -361,22 +361,17 @@ def _chip(sweep, color_scheme: str | None = None) -> rx.Component:
     )
 
 
-def _sweep_chip(sweep) -> rx.Component:
-    """Render a badge for a saved sweep (for use with rx.foreach)."""
-    return _chip(sweep)
-
-
 def _stored_chip(sweep) -> rx.Component:
     """Render an orange badge for a stored trace (for use with rx.foreach)."""
     return _chip(sweep, color_scheme="orange")
 
 
 def sweep_manager() -> rx.Component:
-    """Trace visibility popover and sweep overlay management bar.
+    """Trace visibility popover and stored-trace management bar.
 
     Returns:
-        A vstack containing the Traces popover button and the sweep
-        management controls (saved sweep badges, Add sweep, Clear).
+        A vstack containing the Traces popover button, hover toggle, and the
+        stored-trace controls (Store, Clear Stored).
     """
     return rx.vstack(
         rx.hstack(
@@ -405,34 +400,24 @@ def sweep_manager() -> rx.Component:
                 variant="soft",
             ),
             rx.separator(orientation="vertical"),
-            rx.text("Sweeps:", size="2", weight="bold"),
-            rx.foreach(SimulationState.saved_sweeps, _sweep_chip),
-            rx.spacer(),
-            rx.button(
-                "Add sweep",
-                on_click=SimulationState.add_sweep,
-                size="1",
-                variant="soft",
-                disabled=~SimulationState.has_result,
-            ),
-            rx.button(
-                "Clear",
-                on_click=SimulationState.clear_sweeps,
-                size="1",
-                variant="soft",
-                color_scheme="red",
-                disabled=SimulationState.saved_sweeps.length() == 0,
-            ),
-            rx.separator(orientation="vertical"),
             rx.text("Stored:", size="2", weight="bold"),
             rx.foreach(SimulationState.stored_traces, _stored_chip),
-            rx.button(
-                "Store",
-                on_click=SimulationState.store_trace,
-                size="1",
-                variant="soft",
-                color_scheme="orange",
-                disabled=~SimulationState.has_result,
+            rx.tooltip(
+                rx.button(
+                    "Store",
+                    on_click=SimulationState.store_trace,
+                    size="1",
+                    variant="soft",
+                    color_scheme="orange",
+                    disabled=(
+                        ~SimulationState.has_result | SimulationState.is_multi_sweep
+                    ),
+                ),
+                content=rx.cond(
+                    SimulationState.is_multi_sweep,
+                    "Store is unavailable for multi-sweep protocols",
+                    "Store current trace as a reference overlay",
+                ),
             ),
             rx.button(
                 "Clear Stored",
