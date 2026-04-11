@@ -68,7 +68,7 @@ def _make_visibility_state() -> VisibilityState:
 
 
 def _make_sweep(label: str = "test", color: str = "#000000") -> Sweep:
-    """Return a minimal Sweep suitable for testing add_sweep.
+    """Return a minimal Sweep suitable for testing simulation state.
 
     Args:
         label: Human-readable label for the sweep.
@@ -218,55 +218,28 @@ async def test_generated_bool_setter_stores_true() -> None:
 
 
 # ---------------------------------------------------------------------------
-# add_sweep / clear_sweeps
+# is_multi_sweep
 # ---------------------------------------------------------------------------
 
 
-async def test_add_sweep_appends_to_saved_sweeps() -> None:
-    """add_sweep promotes the current result to saved_sweeps."""
+def test_is_multi_sweep_false_when_no_sweeps() -> None:
+    """is_multi_sweep is False when current_sweeps is empty."""
+    s = _make_state()
+    assert s.is_multi_sweep is False
+
+
+def test_is_multi_sweep_false_for_single_sweep() -> None:
+    """is_multi_sweep is False when there is exactly one current sweep."""
     s = _make_state()
     s.current_sweeps = [_make_sweep()]
-    assert len(s.saved_sweeps) == 0
-    with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        await s.add_sweep()
-    assert len(s.saved_sweeps) == 1
+    assert s.is_multi_sweep is False
 
 
-async def test_add_sweep_twice_appends_two_entries() -> None:
-    """Calling add_sweep twice creates two saved sweeps."""
+def test_is_multi_sweep_true_for_multiple_sweeps() -> None:
+    """is_multi_sweep is True when current_sweeps has more than one entry."""
     s = _make_state()
-    s.current_sweeps = [_make_sweep()]
-    with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        await s.add_sweep()
-        await s.add_sweep()
-    assert len(s.saved_sweeps) == 2
-
-
-async def test_add_sweep_does_nothing_when_no_result() -> None:
-    """add_sweep is a no-op when current_sweeps is empty."""
-    s = _make_state()
-    assert len(s.current_sweeps) == 0
-    with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        await s.add_sweep()
-    assert len(s.saved_sweeps) == 0
-
-
-async def test_clear_sweeps_empties_saved_sweeps() -> None:
-    """clear_sweeps removes all entries from saved_sweeps."""
-    s = _make_state()
-    s.saved_sweeps = [_make_sweep(), _make_sweep()]
-    assert len(s.saved_sweeps) == 2
-    with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        await s.clear_sweeps()
-    assert len(s.saved_sweeps) == 0
-
-
-async def test_clear_sweeps_on_empty_list_does_not_raise() -> None:
-    """clear_sweeps on an already-empty list raises no exception."""
-    s = _make_state()
-    with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        await s.clear_sweeps()  # must not raise
-    assert len(s.saved_sweeps) == 0
+    s.current_sweeps = [_make_sweep(), _make_sweep()]
+    assert s.is_multi_sweep is True
 
 
 # ---------------------------------------------------------------------------
@@ -316,18 +289,6 @@ async def test_set_clamp_mode_clears_current_sweeps() -> None:
     ):
         await ps.set_clamp_mode("Voltage Clamp")
     assert len(sim_st.current_sweeps) == 0
-
-
-async def test_set_clamp_mode_clears_saved_sweeps() -> None:
-    """set_clamp_mode resets saved_sweeps on the SimulationState."""
-    ps = _make_protocol_state()
-    sim_st = _make_state()
-    sim_st.saved_sweeps = [_make_sweep()]
-    with patch.object(
-        ProtocolState, "get_state", new=_make_get_state_fn({SimulationState: sim_st})
-    ):
-        await ps.set_clamp_mode("Voltage Clamp")
-    assert len(sim_st.saved_sweeps) == 0
 
 
 async def test_set_clamp_mode_clears_stored_traces() -> None:
@@ -440,20 +401,6 @@ async def test_load_neuron_preset_unknown_name_is_ignored() -> None:
     assert ns.active_neuron_type == before
 
 
-async def test_load_neuron_preset_preserves_saved_sweeps() -> None:
-    """load_neuron_preset retains saved sweeps so neuron types can be compared."""
-    sim_st = _make_state()
-    sim_st.saved_sweeps = [_make_sweep()]
-    ns = _make_neuron_state()
-    with patch.object(
-        NeuronState,
-        "get_state",
-        new=_make_get_state_fn({SimulationState: sim_st}),
-    ):
-        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
-    assert len(sim_st.saved_sweeps) == 1
-
-
 async def test_load_neuron_preset_preserves_stored_traces() -> None:
     """load_neuron_preset retains stored traces so neuron types can be compared."""
     sim_st = _make_state()
@@ -466,16 +413,6 @@ async def test_load_neuron_preset_preserves_stored_traces() -> None:
     ):
         await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
     assert len(sim_st.stored_traces) == 1
-
-
-async def test_add_sweep_label_includes_neuron_type() -> None:
-    """add_sweep includes the active neuron type in the sweep label."""
-    s = _make_state()
-    s._label_neuron_type = FAST_SPIKING_INTERNEURON
-    s.current_sweeps = [_make_sweep()]
-    with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
-        await s.add_sweep()
-    assert FAST_SPIKING_INTERNEURON in s.saved_sweeps[0].label
 
 
 async def test_store_trace_label_includes_neuron_type() -> None:
