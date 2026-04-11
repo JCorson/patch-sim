@@ -408,7 +408,7 @@ def sweep_manager() -> rx.Component:
                     on_click=SimulationState.store_trace,
                     size="1",
                     variant="soft",
-                    color_scheme="gray",
+                    color_scheme="blue",
                     disabled=(
                         ~SimulationState.has_result | SimulationState.is_multi_sweep
                     ),
