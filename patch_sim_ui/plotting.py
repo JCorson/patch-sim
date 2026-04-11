@@ -757,7 +757,7 @@ def build_figure(
         )
 
     for i, sweep in enumerate(stored_traces or []):
-        c = STORED_TRACE_COLORS[i % len(STORED_TRACE_COLORS)]
+        c = sweep.color or STORED_TRACE_COLORS[i % len(STORED_TRACE_COLORS)]
         label = sweep.label or f"Stored {i + 1}"
         if sweep.clamp_mode == CURRENT_CLAMP:
             _scatter(
