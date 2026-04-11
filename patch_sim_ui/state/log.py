@@ -39,6 +39,9 @@ class LogState(rx.State):
         if self.log_panel_open:
             self._refresh_logs()
             return rx.call_script(_LOG_SCROLL_JS)
+        return rx.call_script(
+            "setTimeout(()=>window.dispatchEvent(new Event('resize')),50)"
+        )
 
     def refresh_logs(self):
         """Public event handler: drain buffered records into state."""
