@@ -38,7 +38,12 @@ class LogState(rx.State):
         self.log_panel_open = not self.log_panel_open
         if self.log_panel_open:
             self._refresh_logs()
-            return rx.call_script(_LOG_SCROLL_JS)
+            return [
+                rx.call_script(_LOG_SCROLL_JS),
+                rx.call_script(
+                    "setTimeout(()=>window.dispatchEvent(new Event('resize')),50)"
+                ),
+            ]
         return rx.call_script(
             "setTimeout(()=>window.dispatchEvent(new Event('resize')),50)"
         )

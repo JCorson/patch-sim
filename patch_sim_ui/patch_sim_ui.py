@@ -118,26 +118,36 @@ def _sidebar() -> rx.Component:
 
 def _main_content() -> rx.Component:
     """Center content area with trace plot, log panel, and sweep controls."""
-    return rx.vstack(
+    return rx.box(
         _error_banner(),
         rx.box(
-            trace_display(),
-            padding="4",
+            rx.box(
+                trace_display(),
+                padding="4",
+                width="100%",
+                flex="1",
+                min_height="0",
+                overflow="hidden",
+            ),
+            log_panel(),
+            display="flex",
+            flex_direction="column",
             width="100%",
             flex="1",
             min_height="0",
             overflow="hidden",
         ),
-        log_panel(),
         rx.box(
             sweep_manager(),
             border_top="1px solid var(--gray-4)",
             width="100%",
             padding_y="2",
         ),
-        spacing="0",
+        display="flex",
+        flex_direction="column",
         width="100%",
         height="calc(100vh - 60px - 2 * var(--space-3))",
+        overflow="hidden",
     )
 
 
