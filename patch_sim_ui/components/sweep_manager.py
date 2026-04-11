@@ -362,8 +362,8 @@ def _chip(sweep, color_scheme: str | None = None) -> rx.Component:
 
 
 def _stored_chip(sweep) -> rx.Component:
-    """Render an orange badge for a stored trace (for use with rx.foreach)."""
-    return _chip(sweep, color_scheme="orange")
+    """Render a badge for a stored trace (for use with rx.foreach)."""
+    return _chip(sweep)
 
 
 def sweep_manager() -> rx.Component:
@@ -408,7 +408,7 @@ def sweep_manager() -> rx.Component:
                     on_click=SimulationState.store_trace,
                     size="1",
                     variant="soft",
-                    color_scheme="orange",
+                    color_scheme="blue",
                     disabled=(
                         ~SimulationState.has_result | SimulationState.is_multi_sweep
                     ),
