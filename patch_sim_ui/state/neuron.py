@@ -209,8 +209,10 @@ class NeuronState(rx.State):
         neuron type so that subsequent protocol preset loads can apply
         neuron-specific adjustments via NEURON_PROTOCOL_ADJUSTMENTS.
 
-        Clears current sweeps and continuous state via SimulationState, and
-        syncs the ``_label_neuron_type`` shadow copy used by sweep labels.
+        Clears current sweeps (unless stored traces exist) and continuous state
+        via SimulationState, and syncs the ``_label_neuron_type`` shadow copy
+        used by sweep labels.  When stored traces are present the previous
+        simulation is kept visible so the figure is not cleared mid-comparison.
 
         Args:
             name: Key into ``patch_sim_ui.presets.NEURON_UI_PRESETS``.
@@ -224,7 +226,8 @@ class NeuronState(rx.State):
         logger.info("Loaded neuron preset: %s", name)
         self._apply_neuron_preset(name)
         sim_st = await self.get_state(SimulationState)
-        sim_st.current_sweeps = []
+        if not sim_st.stored_traces:
+            sim_st.current_sweeps = []
         sim_st._cont_has_state = False
         sim_st._label_neuron_type = name
 
