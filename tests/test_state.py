@@ -415,6 +415,44 @@ async def test_load_neuron_preset_preserves_stored_traces() -> None:
     assert len(sim_st.stored_traces) == 1
 
 
+async def test_load_neuron_preset_keeps_sweeps_when_stored() -> None:
+    """load_neuron_preset preserves current_sweeps when stored traces exist.
+
+    When the user stores a trace and then changes neuron type, the previous
+    simulation should remain visible in the figure alongside the stored trace.
+    """
+    sim_st = _make_state()
+    sim_st.stored_traces = [_make_sweep()]
+    sim_st.current_sweeps = [_make_sweep()]
+    ns = _make_neuron_state()
+    with patch.object(
+        NeuronState,
+        "get_state",
+        new=_make_get_state_fn({SimulationState: sim_st}),
+    ):
+        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert len(sim_st.current_sweeps) == 1
+
+
+async def test_load_neuron_preset_clears_sweeps_without_stored() -> None:
+    """load_neuron_preset clears current_sweeps when no stored traces exist.
+
+    Without stored traces the previous simulation is stale and should be
+    removed so the figure does not show results from the wrong neuron type.
+    """
+    sim_st = _make_state()
+    sim_st.stored_traces = []
+    sim_st.current_sweeps = [_make_sweep()]
+    ns = _make_neuron_state()
+    with patch.object(
+        NeuronState,
+        "get_state",
+        new=_make_get_state_fn({SimulationState: sim_st}),
+    ):
+        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert len(sim_st.current_sweeps) == 0
+
+
 async def test_store_trace_label_includes_neuron_type() -> None:
     """store_trace includes the active neuron type in the stored trace label."""
     s = _make_state()
