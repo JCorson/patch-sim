@@ -119,8 +119,8 @@ STORED_TRACE_COLORS: list[str] = [
     "rgba(190, 90, 20, 0.45)",  # copper
 ]
 
-# Neutral grey palette for sweep overlays so saved "reference" traces are
-# visually distinct from the coloured channel / gating-variable traces.
+# Neutral grey palette for multi-sweep I-V protocol trace coloring so each
+# sweep is visually distinct from the coloured channel / gating-variable traces.
 SWEEP_COLORS: list[str] = [
     "#888888",
     "#666666",

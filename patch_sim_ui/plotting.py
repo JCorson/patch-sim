@@ -364,7 +364,6 @@ def _build_hover_tables(
 
 def compute_trace_visibility_map(
     current_sweeps: list[Sweep],
-    saved_sweeps: list[Sweep],
     clamp_mode: str,
     additional_current_field_map: dict[str, str] | None = None,
     additional_gating_field_map: dict[str, str] | None = None,
@@ -375,12 +374,11 @@ def compute_trace_visibility_map(
     Mirrors the trace-insertion order used by ``build_figure`` so callers can
     toggle individual traces via ``Plotly.restyle`` without rebuilding the
     figure.  Only current-sweep traces controlled by a ``show_*`` field are
-    mapped; saved-sweep traces, stored traces, and carrier traces advance the
-    counter but are not included (they are always visible).
+    mapped; stored traces and carrier traces advance the counter but are not
+    included (they are always visible).
 
     Args:
         current_sweeps: Latest simulation result sweeps.
-        saved_sweeps: User-saved sweeps displayed as overlays.
         clamp_mode: Active UI clamp mode (CURRENT_CLAMP or VOLTAGE_CLAMP).
         additional_current_field_map: Optional mapping from additional-current
             sweep keys (e.g. ``"Ih"``) to ``show_*`` field names
@@ -402,7 +400,6 @@ def compute_trace_visibility_map(
     idx = 0
     add_curr = additional_current_field_map or {}
     add_gating = additional_gating_field_map or {}
-    is_vc = clamp_mode == VOLTAGE_CLAMP
     is_multi_sweep = len(current_sweeps) > 1
 
     def _map(field: str) -> None:
@@ -445,20 +442,6 @@ def compute_trace_visibility_map(
 
         _skip()  # stimulus — always visible, no show_* field
 
-    for sweep in saved_sweeps:
-        # Saved sweeps are always visible; just advance the counter.
-        if sweep.clamp_mode == CURRENT_CLAMP:
-            _skip()  # voltage
-        elif is_vc:
-            # _add_vc_currents: 4 classic + additional_currents (no gating).
-            for _ in range(4):
-                _skip()
-            for _ in sweep.additional_currents:
-                _skip()
-        else:
-            _skip()  # total_current only (VC sweep shown in CC context)
-        _skip()  # stimulus
-
     for sweep in stored_traces or []:
         # Stored traces are always visible; just advance the counter.
         if sweep.clamp_mode == CURRENT_CLAMP:
@@ -477,22 +460,18 @@ def compute_trace_visibility_map(
 
 def build_figure(
     current_sweeps: list[Sweep],
-    saved_sweeps: list[Sweep],
     visibility: TraceVisibility,
     clamp_mode: str,
     stored_traces: list[Sweep] | None = None,
     show_hover: bool = True,
 ) -> go.Figure:
-    """Build a Plotly figure from current and saved sweeps.
+    """Build a Plotly figure from current sweeps and stored reference traces.
 
     Current sweeps are rendered with visibility-flag filtering applied via
     Plotly's ``visible`` property so that the subplot layout remains fixed
     regardless of which traces are toggled.  This allows ``react-plotly.js``
     to use the efficient ``Plotly.react()`` path instead of a full rebuild.
 
-    Current sweeps are rendered with visibility-flag filtering applied.
-    Saved sweeps are rendered as overlays showing the primary trace and
-    stimulus only, always visible.
     Stored traces are oscilloscope-style background reference snapshots,
     rendered with dashed faded lines; only voltage (CC) or total_current (VC)
     and stimulus are plotted.
@@ -500,8 +479,7 @@ def build_figure(
     Both **Current Clamp** and **Voltage Clamp** use a fixed 3-row layout.
     In Voltage Clamp mode all ion current channels are overlaid on a single
     subplot (row 1) with each channel identified by a fixed colour from
-    ``CHANNEL_COLORS`` and a legend entry.  Saved VC sweeps are drawn with
-    dashed lines in the same channel colours.
+    ``CHANNEL_COLORS`` and a legend entry.
 
     When there are multiple current sweeps (multi-sweep mode), hover on all
     real traces is suppressed and replaced with invisible carrier traces that
@@ -512,7 +490,6 @@ def build_figure(
     Args:
         current_sweeps: Latest simulation result (1 sweep for standard runs,
             N sweeps for multi-sweep Step).
-        saved_sweeps: User-saved sweeps for comparison overlay.
         visibility: Consolidated trace visibility flags.
         clamp_mode: Active UI clamp mode, used for layout and axis labels.
         stored_traces: Oscilloscope-style stored reference traces; rendered as
@@ -694,7 +671,6 @@ def build_figure(
     hi = "skip" if is_multi_sweep else None
 
     for sweep_idx, sweep in enumerate(current_sweeps):
-        c = sweep.color if sweep.color else None
         t = sweep.time
         sweep_mode = sweep.clamp_mode
         pfx = f"{sweep.label} " if sweep.label else ""
@@ -778,39 +754,6 @@ def build_figure(
             hoverinfo=hi,
             showlegend=False,
             sweep_index=sweep_idx,
-        )
-
-    for sweep in saved_sweeps:
-        c = sweep.color
-        if sweep.clamp_mode == CURRENT_CLAMP:
-            _scatter(
-                sweep.time,
-                sweep.voltage,
-                f"{sweep.label} V",
-                1,
-                c,
-                hoverinfo=hi,
-            )
-        elif is_vc:
-            # Saved VC sweeps: all currents overlaid on row 1, dashed lines.
-            _add_vc_currents(sweep, f"{sweep.label} ", dash="dash", hoverinfo=hi)
-        else:
-            _scatter(
-                sweep.time,
-                sweep.total_current,
-                f"{sweep.label} I_total",
-                1,
-                c,
-                hoverinfo=hi,
-            )
-        _scatter(
-            sweep.time,
-            sweep.stimulus,
-            sweep.label,
-            stimulus_row,
-            c,
-            hoverinfo=hi,
-            showlegend=False,
         )
 
     for i, sweep in enumerate(stored_traces or []):

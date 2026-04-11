@@ -507,8 +507,8 @@ def _compute_iv_data(
 class SimulationState(rx.State):
     """State for simulation results, sweep collections, and figure rendering."""
 
-    # Synced copy of NeuronState.active_neuron_type used by add_sweep /
-    # store_trace for labelling (avoids making those handlers async).
+    # Synced copy of NeuronState.active_neuron_type used by store_trace for
+    # labelling (avoids making those handlers async).
     _label_neuron_type: str = "Squid Giant Axon (Classic HH)"
     # Synced copy of ProtocolState.clamp_mode used by figure_data and
     # _apply_visibility_js (both are synchronous, cannot call get_state).
@@ -518,7 +518,6 @@ class SimulationState(rx.State):
     # Simulation results                                                  #
     # ------------------------------------------------------------------ #
     current_sweeps: list[Sweep] = []  # Latest simulation result
-    saved_sweeps: list[Sweep] = []  # User-saved sweeps for comparison overlay
     stored_traces: list[Sweep] = []  # Oscilloscope-style stored reference traces
 
     # ------------------------------------------------------------------ #
@@ -547,9 +546,9 @@ class SimulationState(rx.State):
     # is injected when the JS module is re-initialised after a figure rebuild.
     #
     # Known limitation: this field is never updated from the client side, so
-    # any figure rebuild triggered by a Python state change (e.g. add_sweep)
-    # while the user has a client-side selection active will re-seed JS with
-    # -1, silently clearing the selection.
+    # any figure rebuild triggered by a Python state change while the user has
+    # a client-side selection active will re-seed JS with -1, silently
+    # clearing the selection.
     selected_sweep: int = -1
 
     # ------------------------------------------------------------------ #
@@ -569,6 +568,11 @@ class SimulationState(rx.State):
     def has_stored_traces(self) -> bool:
         """Whether any oscilloscope-stored reference traces exist."""
         return len(self.stored_traces) > 0
+
+    @rx.var
+    def is_multi_sweep(self) -> bool:
+        """Whether the current simulation has multiple sweeps (e.g. I-V protocol)."""
+        return len(self.current_sweeps) > 1
 
     @rx.var
     def continuous_active(self) -> bool:
@@ -591,7 +595,6 @@ class SimulationState(rx.State):
         """
         return build_figure(
             current_sweeps=self.current_sweeps,
-            saved_sweeps=self.saved_sweeps,
             visibility=TraceVisibility(),  # all visible; toggling handled client-side
             clamp_mode=self._figure_clamp_mode,
             stored_traces=self.stored_traces,
@@ -608,7 +611,6 @@ class SimulationState(rx.State):
         changes, ensuring stale results are not shown for the new protocol.
         """
         self.current_sweeps = []
-        self.saved_sweeps = []
         self.stored_traces = []
         self._cont_has_state = False
         self.selected_sweep = -1
@@ -656,14 +658,14 @@ class SimulationState(rx.State):
         return rx.call_script(js)
 
     # ------------------------------------------------------------------ #
-    # Sweep management                                                   #
+    # Trace management                                                   #
     # ------------------------------------------------------------------ #
     def _apply_visibility_js(self, vis_st: "VisibilityState") -> str | None:
         """Build a JS snippet to re-apply trace visibility, hover, and sweep highlight.
 
         Called after any operation that triggers a full figure rebuild (run
-        simulation, add sweep, clear sweeps) so that traces the user has
-        toggled off are correctly hidden again, the hover mode matches the
+        simulation, store trace, clear stored traces) so that traces the user
+        has toggled off are correctly hidden again, the hover mode matches the
         current ``show_hover`` flag, and sweep highlight listeners are
         (re-)attached in multi-sweep mode.
 
@@ -678,7 +680,6 @@ class SimulationState(rx.State):
         """
         trace_map = compute_trace_visibility_map(
             current_sweeps=self.current_sweeps,
-            saved_sweeps=self.saved_sweeps,
             clamp_mode=self._figure_clamp_mode,
             additional_current_field_map=_ADDITIONAL_CURRENT_FIELD_MAP,
             additional_gating_field_map=_ADDITIONAL_GATING_FIELD_MAP,
@@ -727,51 +728,6 @@ class SimulationState(rx.State):
             .replace("/*DIM_WIDTH*/", str(constants.HIGHLIGHT_DIM_WIDTH))
             .replace("/*SELECTED_SWEEP*/", str(self.selected_sweep))
         )
-
-    def _do_add_sweep(self) -> None:
-        """Append current sweeps to the saved overlay without applying visibility JS.
-
-        Core logic extracted so tests can call it synchronously without
-        triggering the async ``get_state`` path.
-        """
-        if not self.has_result:
-            return
-        logger.debug("Adding %d sweep(s) to overlay", len(self.current_sweeps))
-        for sweep in self.current_sweeps:
-            idx = len(self.saved_sweeps)
-            color = constants.SWEEP_COLORS[idx % len(constants.SWEEP_COLORS)]
-            self.saved_sweeps.append(
-                sweep.model_copy(
-                    update={
-                        "color": color,
-                        "label": f"Sweep {idx + 1} ({self._label_neuron_type})",
-                    }
-                )
-            )
-
-    async def add_sweep(self):
-        """Promote current simulation result to the saved sweep overlay."""
-        self._do_add_sweep()
-        vis_st = await self.get_state(VisibilityState)
-        js = self._apply_visibility_js(vis_st)
-        if js:
-            return rx.call_script(js)
-
-    def _do_clear_sweeps(self) -> None:
-        """Empty the saved sweep overlay without applying visibility JS.
-
-        Core logic extracted so tests can call it synchronously.
-        """
-        logger.debug("Cleared %d saved sweep(s)", len(self.saved_sweeps))
-        self.saved_sweeps = []
-
-    async def clear_sweeps(self):
-        """Remove all saved sweeps."""
-        self._do_clear_sweeps()
-        vis_st = await self.get_state(VisibilityState)
-        js = self._apply_visibility_js(vis_st)
-        if js:
-            return rx.call_script(js)
 
     # ------------------------------------------------------------------ #
     # Stored trace management                                            #
