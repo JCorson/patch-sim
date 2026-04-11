@@ -59,11 +59,8 @@ def _reversal_str(label: str, value: rx.Var, unit: str = "mV") -> rx.Component:
     """Render a read-only reversal potential display row."""
     return rx.hstack(
         rx.text(label, size="2", color="gray"),
-        rx.badge(
-            rx.text(f"{value:.2f}", size="2"),
-            rx.text(f" {unit}", size="1", color="gray"),
-            variant="soft",
-        ),
+        rx.text(f"{value:.2f}", size="2"),
+        rx.text(f" {unit}", size="1", color="gray"),
         width="100%",
     )
 
