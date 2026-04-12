@@ -311,20 +311,20 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "post_stimulus_duration": 50.0,
         },
         # Range and duration chosen to highlight all three auxiliary-channel
-        # behaviours in a single multi-sweep figure:
-        #   Negative sweeps (−5 → 0 µA/cm²): Ih-driven voltage sag — membrane
-        #     hyperpolarizes then depolarises back toward rest over ~100–200 ms.
-        #   Subthreshold positive sweeps (~1–3 µA/cm²): INaP amplification —
-        #     plateau voltage is larger than a purely passive membrane predicts.
-        #   Suprathreshold sweeps (≥ 4 µA/cm²): spike-frequency adaptation —
-        #     ISIs lengthen progressively as IM accumulates over 500 ms.
-        # A 50 ms pre-stimulus window lets the baseline settle clearly before
-        # each step so the sag onset is unambiguous.
+        # behaviours in a single multi-sweep figure.  Seven sweeps at 2.5
+        # µA/cm² spacing (−5 → +10, evenly divided):
+        #   −5, −2.5 µA/cm²: Ih-driven voltage sag — membrane hyperpolarizes
+        #     then depolarises back toward rest over ~100–200 ms.
+        #   0, +2.5 µA/cm²: INaP amplification — subthreshold plateau is
+        #     larger than a purely passive membrane predicts.
+        #   +5, +7.5, +10 µA/cm²: spike-frequency adaptation — ISIs lengthen
+        #     as IM accumulates; 300 ms is enough to see the slowing.
+        # A 50 ms pre-stimulus window frames the sag onset clearly.
         "F-I Curve": {
             "min_stimulus": -5.0,
-            "max_stimulus": 12.0,
-            "stimulus_step": 2.0,
-            "stimulus_duration": 500.0,
+            "max_stimulus": 10.0,
+            "stimulus_step": 2.5,
+            "stimulus_duration": 300.0,
             "pre_stimulus_duration": 50.0,
             "post_stimulus_duration": 50.0,
         },
