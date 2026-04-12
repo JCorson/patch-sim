@@ -1,17 +1,23 @@
 """Default neuron parameter values and domain constants for the Hodgkin-Huxley model."""
 
 # Default neuron parameters (classic Hodgkin-Huxley values)
+#
+# Ion concentrations are set so that Nernst potentials match the reversal
+# potentials used in the original HH52 paper (E_Na ≈ +50, E_K ≈ −77,
+# E_L ≈ −54 mV).  This ensures that the HH52 rate functions — which were
+# empirically fit to squid axon data at those reversal potentials — produce
+# the correct resting potential (−65 mV) and firing dynamics.
 DEFAULT_G_NA: float = 120.0
 DEFAULT_G_K: float = 36.0
 DEFAULT_G_L: float = 0.3
 DEFAULT_C_M: float = 1.0
-DEFAULT_V_REST: float = -71.4
-DEFAULT_NA_OUT: float = 145.0
+DEFAULT_V_REST: float = -65.0
+DEFAULT_NA_OUT: float = 97.4
 DEFAULT_NA_IN: float = 15.0
-DEFAULT_K_OUT: float = 5.0
+DEFAULT_K_OUT: float = 7.8
 DEFAULT_K_IN: float = 140.0
 DEFAULT_CL_OUT: float = 120.0
-DEFAULT_CL_IN: float = 10.0
+DEFAULT_CL_IN: float = 15.8
 DEFAULT_T: float = 310.15  # Kelvin (37°C)
 DEFAULT_CA_OUT: float = 2.0  # mM extracellular Ca2+ (physiological)
 DEFAULT_CA_IN: float = 0.0001  # mM intracellular Ca2+ (physiological resting)

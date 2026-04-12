@@ -369,6 +369,11 @@ def test_large_hyperpolarizing_current_voltage_stays_bounded(hh_model):
     assert result["voltage"].max() <= 150.0
 
 
+# ---------------------------------------------------------------------------
+# Preset stability tests (issue #197)
+# ---------------------------------------------------------------------------
+
+
 @pytest.mark.parametrize("preset_name", NEURON_PRESET_NAMES)
 def test_all_presets_stable_at_rest(preset_name: str) -> None:
     """Every neuron preset stays within 1 mV of v_rest with zero stimulus.
