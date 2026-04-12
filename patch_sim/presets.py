@@ -30,7 +30,6 @@ from .constants import (
     PURKINJE,
     SQUID_GIANT_AXON,
     STN,
-    STOMATOGASTRIC_GANGLION,
     THALAMIC_RELAY,
     TRN,
     VOLTAGE_CLAMP,
@@ -194,25 +193,6 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         v_rest=-77.0,
         Cl_in=6.4,
         channels=(ChannelConfig(make_icat_channel, g_max=3.5),),
-    ),
-    STOMATOGASTRIC_GANGLION: NeuronConfig(
-        # ~8 conductances produce rhythmic bursting; large IKa and IKCa shape
-        # burst waveform; slow ICaL drives plateau depolarisation; Ih
-        # contributes to inter-burst pacemaker potential.
-        # Highly parameter-sensitive — small changes alter burst duty cycle.
-        # Refs: Prinz et al. (2003), J. Neurophysiol. 90:3998;
-        #       Turrigiano et al. (1995)
-        #
-        # Biological STG resting potential is ~−55 mV, but HH52 core kinetics
-        # cannot sustain a stable equilibrium above ~−64 mV.  Cl_in = 34.4 mM
-        # shifts E_L positive to −33 mV, placing the equilibrium at −65 mV.
-        Cl_in=34.4,
-        channels=(
-            ChannelConfig(make_ika_channel, g_max=8.0),
-            ChannelConfig(make_ical_channel, g_max=2.0),
-            ChannelConfig(make_ikca_channel, g_max=3.0),
-            ChannelConfig(make_ih_channel, g_max=1.5),
-        ),
     ),
 }
 
@@ -392,20 +372,6 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "pre_stimulus_duration": 50.0,
             "stimulus_duration": 200.0,
             "post_stimulus_duration": 150.0,
-        },
-    },
-    STOMATOGASTRIC_GANGLION: {
-        # Long window at low current to reveal slow (~1 Hz) rhythmic bursting.
-        "Repetitive Firing": {
-            "min_stimulus": 3.0,
-            "max_stimulus": 3.0,
-            "stimulus_duration": 800.0,
-        },
-        "F-I Curve": {
-            "min_stimulus": 0.0,
-            "max_stimulus": 12.0,
-            "stimulus_step": 1.5,
-            "stimulus_duration": 300.0,
         },
     },
 }
