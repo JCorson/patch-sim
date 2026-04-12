@@ -77,14 +77,16 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # subthreshold inputs; IM provides spike-frequency adaptation.
         # Ref: Pospischil et al. (2008), Biol. Cybern. 99:427
         #
-        # K_out=3.32 produces E_K ≈ −100 mV (Pospischil target); Cl_in=10.0
-        # tunes E_L so that the zero-current equilibrium is −65 mV.
+        # K_out=3.32 produces E_K ≈ −100 mV (Pospischil target); Cl_in=7.6
+        # tunes E_L so that the zero-current equilibrium is −70 mV,
+        # matching the published RS model resting potential.
         #
         # g_h reduced from 1.5 → 0.3 mS/cm² and g_NaP from 0.5 → 0.1 mS/cm²
         # so that combined inward current at rest does not exceed the outward
         # leak + IM current; the original values caused spontaneous tonic firing.
+        v_rest=-70.0,
         K_out=3.32,
-        Cl_in=10.0,
+        Cl_in=7.6,
         na_channel_factory=make_pospischil_na_channel,
         k_channel_factory=make_pospischil_k_channel,
         channels=(
@@ -97,7 +99,10 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # L-type and T-type Ca²⁺ channels drive complex spiking;
         # IKCa couples Ca²⁺ influx to after-hyperpolarization.
         # Ref: De Schutter & Bower (1994), J. Neurophysiol. 71:375
-        Cl_in=14.8,
+        #
+        # v_rest = −68 mV matches the published Purkinje cell resting potential.
+        v_rest=-68.0,
+        Cl_in=10.7,
         channels=(
             ChannelConfig(make_ical_channel, g_max=1.0),
             ChannelConfig(make_icat_channel, g_max=0.5),
@@ -109,7 +114,11 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # oscillatory hyperpolarization.
         # Refs: Wilson & Callaway (2000), J. Neurophysiol. 83:3084;
         #       Komendantov et al. (2004)
-        Cl_in=10.4,
+        #
+        # v_rest = −60 mV matches the published dopaminergic neuron resting
+        # potential.  Cl_in = 47.0 mM shifts E_L positive to achieve this.
+        v_rest=-60.0,
+        Cl_in=47.0,
         channels=(
             ChannelConfig(make_ih_channel, g_max=2.0),
             ChannelConfig(make_im_channel, g_max=1.0),
