@@ -301,11 +301,32 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     CORTICAL_PYRAMIDAL: {
-        # Longer step at moderate amplitude to reveal spike-frequency adaptation.
+        # 800 ms at 5 µA/cm² is long enough for IM to accumulate and produce
+        # clearly increasing inter-spike intervals (spike-frequency adaptation).
         "Repetitive Firing": {
-            "min_stimulus": 10.0,
-            "max_stimulus": 10.0,
-            "stimulus_duration": 280.0,
+            "min_stimulus": 5.0,
+            "max_stimulus": 5.0,
+            "stimulus_duration": 800.0,
+            "pre_stimulus_duration": 50.0,
+            "post_stimulus_duration": 50.0,
+        },
+        # Range and duration chosen to highlight all three auxiliary-channel
+        # behaviours in a single multi-sweep figure:
+        #   Negative sweeps (−5 → 0 µA/cm²): Ih-driven voltage sag — membrane
+        #     hyperpolarizes then depolarises back toward rest over ~100–200 ms.
+        #   Subthreshold positive sweeps (~1–3 µA/cm²): INaP amplification —
+        #     plateau voltage is larger than a purely passive membrane predicts.
+        #   Suprathreshold sweeps (≥ 4 µA/cm²): spike-frequency adaptation —
+        #     ISIs lengthen progressively as IM accumulates over 500 ms.
+        # A 50 ms pre-stimulus window lets the baseline settle clearly before
+        # each step so the sag onset is unambiguous.
+        "F-I Curve": {
+            "min_stimulus": -5.0,
+            "max_stimulus": 12.0,
+            "stimulus_step": 2.0,
+            "stimulus_duration": 500.0,
+            "pre_stimulus_duration": 50.0,
+            "post_stimulus_duration": 50.0,
         },
     },
     PURKINJE: {
