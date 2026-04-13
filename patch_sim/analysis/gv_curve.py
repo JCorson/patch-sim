@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from typing import Union
 
 import numpy as np
+from scipy.optimize import curve_fit
 
 from .iv_curve import IVAnalysisResult
 
@@ -95,22 +97,30 @@ class GVAnalysisResult:
         return [p.g_normalized for p in self.points]
 
 
-def boltzmann(V: float, v_half: float, k: float) -> float:
+def boltzmann(
+    V: Union[float, np.ndarray],
+    v_half: float,
+    k: float,
+) -> Union[float, np.ndarray]:
     """Evaluate the two-parameter Boltzmann sigmoid.
 
     Computes the standard voltage-dependent activation function::
 
         f(V) = 1 / (1 + exp(-(V - v_half) / k))
 
+    Accepts either a scalar float or a NumPy array for *V*, which allows the
+    function to be used directly with ``scipy.optimize.curve_fit``.
+
     Args:
-        V: Membrane voltage (mV).
+        V: Membrane voltage in mV.  May be a scalar or a 1-D NumPy array.
         v_half: Half-activation voltage (mV).
         k: Slope factor (mV).
 
     Returns:
-        Sigmoid value in [0, 1].
+        Sigmoid value in [0, 1].  Returns a NumPy array when *V* is an array,
+        or a float when *V* is a scalar.
     """
-    return 1.0 / (1.0 + float(np.exp(-(V - v_half) / k)))
+    return 1.0 / (1.0 + np.exp(-(V - v_half) / k))
 
 
 def compute_gv(
@@ -148,8 +158,6 @@ def compute_gv(
         A :class:`GVAnalysisResult` with sorted per-step conductance records
         and Boltzmann fit parameters.
     """
-    from scipy.optimize import curve_fit  # imported here to keep module-level imports clean
-
     _null_fit = BoltzmannFit(v_half=0.0, k=1.0, converged=False)
 
     if not iv_result.points:
