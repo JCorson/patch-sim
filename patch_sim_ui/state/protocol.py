@@ -87,6 +87,11 @@ class ProtocolState(rx.State):
     vc_pulse_interval: float = 10.0
 
     # ------------------------------------------------------------------ #
+    # Preset tracking                                                     #
+    # ------------------------------------------------------------------ #
+    active_protocol_preset: str = ""
+
+    # ------------------------------------------------------------------ #
     # Computed properties                                                #
     # ------------------------------------------------------------------ #
     @rx.var
@@ -183,12 +188,14 @@ class ProtocolState(rx.State):
         config.update(adjustments)
         for key, value in config.items():
             setattr(self, key, value)
+        self.active_protocol_preset = name
 
     async def load_protocol_preset(self, name: str) -> None:
         """Load a protocol preset, applying neuron-type adjustments if active.
 
         Applies the base protocol preset, overlays neuron-type-specific
-        adjustments, clears simulation results in SimulationState, and syncs the
+        adjustments, records the preset name in ``active_protocol_preset``,
+        clears simulation results in SimulationState, and syncs the
         ``_figure_clamp_mode`` shadow copy.
 
         Args:
