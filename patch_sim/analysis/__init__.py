@@ -15,6 +15,13 @@ from .ap_metrics import (
     analyze_aps_from_result,
 )
 from .fi_curve import FIAnalysisResult, FIPoint, analyze_fi, compute_fi_point
+from .gv_curve import (
+    BoltzmannFit,
+    GVAnalysisResult,
+    GVPoint,
+    boltzmann,
+    compute_gv,
+)
 from .iv_curve import IVAnalysisResult, IVPoint, analyze_iv, compute_iv_point
 
 __all__ = [
@@ -24,9 +31,14 @@ __all__ = [
     "analyze_iv",
     "compute_fi_point",
     "compute_iv_point",
+    "compute_gv",
+    "boltzmann",
     "APAnalysisResult",
+    "BoltzmannFit",
     "FIAnalysisResult",
     "FIPoint",
+    "GVAnalysisResult",
+    "GVPoint",
     "IVAnalysisResult",
     "IVPoint",
     "SpikeMetrics",
