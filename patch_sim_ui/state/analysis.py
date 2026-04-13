@@ -5,11 +5,16 @@ from typing import Any
 import plotly.graph_objects as go
 import reflex as rx
 
-from patch_sim_ui.plotting import build_fi_figure, build_gv_figure, build_iv_figure
+from patch_sim_ui.plotting import (
+    build_fi_figure,
+    build_gv_figure,
+    build_iv_figure,
+    build_sfa_figure,
+)
 
 
 class AnalysisState(rx.State):
-    """State for AP, F-I, I-V, and g-V analysis results."""
+    """State for AP, F-I, I-V, g-V, and SFA analysis results."""
 
     ap_metrics: list[dict[str, Any]] = []  # Per-spike metrics (serialized)
     ap_summary: dict[str, Any] = {}  # Aggregate summary statistics
@@ -17,6 +22,7 @@ class AnalysisState(rx.State):
     fi_data: dict[str, Any] = {}  # Serialized FIAnalysisResult for the UI
     iv_data: dict[str, Any] = {}  # Serialized IVAnalysisResult for the UI
     gv_data: dict[str, Any] = {}  # Serialized GVAnalysisResult for the UI
+    sfa_data: dict[str, Any] = {}  # Serialized SFAAnalysisResult for the UI
 
     @rx.var
     def has_ap_metrics(self) -> bool:
@@ -72,3 +78,18 @@ class AnalysisState(rx.State):
         if not self.gv_data:
             return go.Figure()
         return build_gv_figure(self.gv_data)
+
+    @rx.var
+    def has_sfa_data(self) -> bool:
+        """Return True when SFA analysis results are available for display."""
+        return len(self.sfa_data) > 0
+
+    @rx.var
+    def sfa_figure(self) -> go.Figure:
+        """Return a Plotly SFA (instantaneous frequency) figure.
+
+        Returns an empty figure when no SFA data is available.
+        """
+        if not self.sfa_data:
+            return go.Figure()
+        return build_sfa_figure(self.sfa_data)
