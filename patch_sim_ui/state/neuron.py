@@ -264,6 +264,18 @@ class NeuronState(rx.State):
             for name, factory in patch_sim.CHANNEL_REGISTRY.items()
             if getattr(self, f"{name}_enabled")
         )
+
+        # Use the core Na⁺/K⁺ channel factories from the active preset so
+        # that presets with non-default kinetics (e.g. Pospischil, STN) are
+        # honoured.  Fall back to HH52 defaults for unknown preset names.
+        preset_cfg = patch_sim.NEURON_PRESETS.get(self.active_neuron_type)
+        na_factory = (
+            preset_cfg.na_channel_factory if preset_cfg else patch_sim.make_na_channel
+        )
+        k_factory = (
+            preset_cfg.k_channel_factory if preset_cfg else patch_sim.make_k_channel
+        )
+
         config = patch_sim.NeuronConfig(
             g_Na=self.g_Na,
             g_K=self.g_K,
@@ -280,5 +292,7 @@ class NeuronState(rx.State):
             Ca_in=self.Ca_in,
             T=self.T,
             channels=channels,
+            na_channel_factory=na_factory,
+            k_channel_factory=k_factory,
         )
         return patch_sim.make_neuron(config=config)
