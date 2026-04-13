@@ -305,6 +305,7 @@ def protocol_panel() -> rx.Component:
         rx.select(
             PROTOCOL_PRESET_NAMES,
             placeholder="Load preset…",
+            value=ProtocolState.active_protocol_preset,
             on_change=ProtocolState.load_protocol_preset,
             width="100%",
             size="2",
