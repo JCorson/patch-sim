@@ -320,6 +320,8 @@ def _expanded_panel() -> rx.Component:
                 _ap_metrics_tab(),
                 _iv_curve_tab(),
             ),
+            display="flex",
+            flex_direction="column",
             flex_grow="1",
             min_height="0",
             overflow="hidden",
