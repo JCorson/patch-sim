@@ -461,6 +461,8 @@ def _compute_cc_multi_sweep_analysis(
             max_stimulus,
             stimulus_step,
         )
+        if ap_summary:
+            ap_summary["rheobase"] = "\u2014"
         return ap_metrics, ap_summary, {}, sfa_data
 
     fi_points: list[patch_sim.FIPoint] = [
@@ -470,12 +472,15 @@ def _compute_cc_multi_sweep_analysis(
 
     fi_points.sort(key=lambda p: p.current_step)
     fi_result = patch_sim.FIAnalysisResult(points=fi_points)
+    rheobase = patch_sim.estimate_rheobase(fi_result)
     fi_data: dict[str, Any] = {
         "current_steps": fi_result.current_steps,
         "mean_firing_rates": fi_result.mean_firing_rates,
         "initial_firing_rates": fi_result.initial_firing_rates,
         "steady_state_firing_rates": fi_result.steady_state_firing_rates,
     }
+    if ap_summary:
+        ap_summary["rheobase"] = f"{rheobase:.2f}" if rheobase is not None else "\u2014"
     return ap_metrics, ap_summary, fi_data, sfa_data
 
 
@@ -1200,6 +1205,11 @@ class SimulationState(rx.State):
                             "adaptation_index": (
                                 f"{sfa_curve.adaptation_index:.2f}"
                                 if sfa_curve is not None
+                                else "\u2014"
+                            ),
+                            "rheobase": (
+                                f"\u2264\u202f{proto_st.min_stimulus:.2f}"
+                                if ap_result.spike_count >= 1
                                 else "\u2014"
                             ),
                         }

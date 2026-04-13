@@ -60,6 +60,8 @@ def _ap_summary() -> rx.Component:
             rx.text(s["mean_half_width"].to(str) + " ms", size="1", align="left"),
             rx.text("AHP depth", size="1", color="gray"),
             rx.text(s["mean_ahp_depth"].to(str) + " mV", size="1", align="left"),
+            rx.text("Rheobase", size="1", color="gray"),
+            rx.text(s["rheobase"].to(str) + " µA/cm²", size="1", align="left"),
             rx.cond(
                 ~AnalysisState.ap_is_multi_sweep,
                 rx.text("ISI", size="1", color="gray"),

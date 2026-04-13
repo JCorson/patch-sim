@@ -159,6 +159,26 @@ def compute_fi_point(
     )
 
 
+def estimate_rheobase(fi_result: FIAnalysisResult) -> float | None:
+    """Estimate the rheobase from F-I analysis results.
+
+    The rheobase is the minimum injected current that elicits at least one
+    action potential.  It is identified as the lowest current step with a
+    non-zero spike count.  A single spike qualifies as suprathreshold even
+    though it produces no ISI-derived firing rate.
+
+    Args:
+        fi_result: F-I analysis result.  Points may be in any order.
+
+    Returns:
+        The rheobase current in µA/cm² (the ``current_step`` of the first
+        :class:`FIPoint` with ``spike_count >= 1``), or ``None`` when no
+        sweep produced a spike.
+    """
+    spiking = [p.current_step for p in fi_result.points if p.spike_count >= 1]
+    return min(spiking) if spiking else None
+
+
 def analyze_fi(
     time: np.ndarray,
     voltages: list[np.ndarray],
