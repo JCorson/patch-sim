@@ -5,7 +5,7 @@ protocols that can be used with current clamp simulations.
 """
 
 import numpy as np
-from scipy.signal import chirp as scipy_chirp
+from scipy.signal import chirp
 
 from .common import (
     DEFAULT_SAMPLING_FREQUENCY,
@@ -226,7 +226,7 @@ def chirp_current(
     stim_duration_seconds = stimulus_duration / 1000.0
 
     # phi=-90 converts scipy's cosine chirp to a sine chirp (sin = cos(x - 90°))
-    current_array[stim_mask] = dc_offset + amplitude * scipy_chirp(
+    current_array[stim_mask] = dc_offset + amplitude * chirp(
         stim_times_seconds,
         f0=start_frequency,
         t1=stim_duration_seconds,
