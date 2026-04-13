@@ -1004,3 +1004,131 @@ def test_build_protocols_multi_sweep_voltage_clamp_label_values() -> None:
     # -40 to +40 in steps of 40 → [-40, 0, +40] = 3 sweeps
     labels = [label for _arr, label in result]
     assert labels == ["-40 mV", "+0 mV", "+40 mV"]
+
+
+# ---------------------------------------------------------------------------
+# active_protocol_preset tracking
+# ---------------------------------------------------------------------------
+
+
+def test_active_protocol_preset_empty_by_default() -> None:
+    """active_protocol_preset is an empty string on a fresh ProtocolState."""
+    ps = _make_protocol_state()
+    assert ps.active_protocol_preset == ""
+
+
+async def test_active_protocol_preset_set_on_load() -> None:
+    """load_protocol_preset records the preset name in active_protocol_preset."""
+    ps = _make_protocol_state()
+    with patch.object(ProtocolState, "get_state", new=_make_get_state_fn({})):
+        await ps.load_protocol_preset("Repetitive Firing")
+    assert ps.active_protocol_preset == "Repetitive Firing"
+
+
+async def test_active_protocol_preset_updated_on_second_load() -> None:
+    """active_protocol_preset is overwritten when a different preset is loaded."""
+    ps = _make_protocol_state()
+    with patch.object(ProtocolState, "get_state", new=_make_get_state_fn({})):
+        await ps.load_protocol_preset("Action Potential")
+        await ps.load_protocol_preset("Repetitive Firing")
+    assert ps.active_protocol_preset == "Repetitive Firing"
+
+
+# ---------------------------------------------------------------------------
+# load_neuron_preset — protocol override re-application
+# ---------------------------------------------------------------------------
+
+
+async def test_load_neuron_preset_reapplies_active_protocol_overrides() -> None:
+    """Switching neuron type re-applies the active protocol preset with new overrides.
+
+    Load 'Repetitive Firing' (Squid defaults: duration=180 ms), then switch to
+    Dopaminergic Neuron which has a longer 480 ms duration override.  The
+    protocol params should update automatically.
+    """
+    ns = _make_neuron_state()
+    ps = _make_protocol_state()
+    ps.active_protocol_preset = "Repetitive Firing"
+    ps._apply_protocol_preset("Repetitive Firing")
+    with patch.object(
+        NeuronState,
+        "get_state",
+        new=_make_get_state_fn({ProtocolState: ps}),
+    ):
+        await ns.load_neuron_preset(DOPAMINERGIC)
+    assert ps.stimulus_duration == pytest.approx(480.0)
+    assert ps.min_stimulus == pytest.approx(5.0)
+
+
+async def test_load_neuron_preset_no_active_protocol_skips_override() -> None:
+    """Switching neuron type with no active preset leaves protocol params unchanged."""
+    ns = _make_neuron_state()
+    ps = _make_protocol_state()
+    # active_protocol_preset is empty — no override should be applied
+    original_duration = ps.stimulus_duration
+    with patch.object(
+        NeuronState,
+        "get_state",
+        new=_make_get_state_fn({ProtocolState: ps}),
+    ):
+        await ns.load_neuron_preset(DOPAMINERGIC)
+    assert ps.stimulus_duration == pytest.approx(original_duration)
+
+
+async def test_load_neuron_preset_squid_uses_base_protocol_params() -> None:
+    """Switching to Squid Giant Axon applies the base preset params (no adjustments)."""
+    ns = _make_neuron_state()
+    ps = _make_protocol_state()
+    ps.active_protocol_preset = "Repetitive Firing"
+    ps._apply_protocol_preset("Repetitive Firing")
+    with patch.object(
+        NeuronState,
+        "get_state",
+        new=_make_get_state_fn({ProtocolState: ps}),
+    ):
+        await ns.load_neuron_preset(SQUID_GIANT_AXON)
+    # Squid Giant Axon has no Repetitive Firing entry in NEURON_PROTOCOL_ADJUSTMENTS
+    assert ps.stimulus_duration == pytest.approx(180.0)
+    assert ps.min_stimulus == pytest.approx(15.0)
+
+
+async def test_load_neuron_preset_reapplies_protocol_neuron_overrides() -> None:
+    """Switching neuron type re-applies PROTOCOL_NEURON_OVERRIDES on top of preset.
+
+    The 'Na+ Channel Activation' preset sets g_K=0.  Loading a new neuron
+    preset would normally restore g_K to its default value, but the override
+    must be re-applied on top so that g_K stays at 0.
+    """
+    ns = _make_neuron_state()
+    ps = _make_protocol_state()
+    ps.active_protocol_preset = "Na+ Channel Activation"
+    ps._apply_protocol_preset("Na+ Channel Activation")
+    with patch.object(
+        NeuronState,
+        "get_state",
+        new=_make_get_state_fn({ProtocolState: ps}),
+    ):
+        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
+    assert ns.g_K == pytest.approx(0.0)
+
+
+async def test_load_neuron_preset_syncs_figure_clamp_mode() -> None:
+    """load_neuron_preset syncs _figure_clamp_mode on SimulationState."""
+    ns = _make_neuron_state()
+    ps = _make_protocol_state()
+    ps.active_protocol_preset = "Repetitive Firing"
+    ps._apply_protocol_preset("Repetitive Firing")
+    sim_st = _make_state()
+    sim_st._figure_clamp_mode = "Voltage Clamp"
+
+    async def _get_state(_self, cls):
+        """Return the appropriate state instance for the given class."""
+        if cls is ProtocolState:
+            return ps
+        if cls is SimulationState:
+            return sim_st
+        return MagicMock()
+
+    with patch.object(NeuronState, "get_state", new=_get_state):
+        await ns.load_neuron_preset(DOPAMINERGIC)
+    assert sim_st._figure_clamp_mode == ps.clamp_mode
