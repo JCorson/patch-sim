@@ -181,7 +181,6 @@ class ProtocolState(rx.State):
         config = dict(PROTOCOL_PRESETS[name])
         adjustments = NEURON_PROTOCOL_ADJUSTMENTS.get(neuron_type, {}).get(name, {})
         config.update(adjustments)
-        config.update(presets.PROTOCOL_NEURON_OVERRIDES.get(name, {}))
         for key, value in config.items():
             setattr(self, key, value)
 
@@ -204,6 +203,8 @@ class ProtocolState(rx.State):
         logger.info("Loaded protocol preset: %s", name)
         neuron_st = await self.get_state(NeuronState)
         self._apply_protocol_preset(name, neuron_st.active_neuron_type)
+        for key, value in presets.PROTOCOL_NEURON_OVERRIDES.get(name, {}).items():
+            setattr(neuron_st, key, value)
         sim_st = await self.get_state(SimulationState)
         sim_st._clear_for_new_protocol()
         sim_st._figure_clamp_mode = self.clamp_mode
