@@ -346,12 +346,12 @@ def _compute_cc_multi_sweep_analysis(
     stimulus_step: float,
     pre_stimulus_duration: float,
     stimulus_duration: float,
-) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
-    """Compute AP metrics and F-I data from multi-sweep current clamp results.
+) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Compute AP metrics, F-I data, and SFA data from multi-sweep CC results.
 
-    Runs spike detection once per sweep and derives both outputs from those
+    Runs spike detection once per sweep and derives all three outputs from those
     results, avoiding the redundant ``analyze_aps`` call that would occur if
-    the AP and F-I helpers were called separately.
+    the AP, F-I, and SFA helpers were called separately.
 
     Args:
         sweeps: Ordered list of :class:`Sweep` objects from the simulation.
@@ -362,13 +362,15 @@ def _compute_cc_multi_sweep_analysis(
         stimulus_duration: Duration of the current step (ms).
 
     Returns:
-        A 3-tuple ``(ap_metrics, ap_summary, fi_data)``  where ``ap_metrics``
-        is a list of per-spike dicts (pooled and renumbered across all sweeps),
-        ``ap_summary`` is an aggregate dict without ``mean_isi`` / ``firing_rate``
-        (those are shown in the F-I curve), and ``fi_data`` is a serialised
-        :class:`~patch_sim.FIAnalysisResult` dict.  ``ap_metrics`` and
-        ``ap_summary`` are empty when no spikes are detected.  ``fi_data`` is
-        empty when the sweep count does not match the derived step count.
+        A 4-tuple ``(ap_metrics, ap_summary, fi_data, sfa_data)`` where
+        ``ap_metrics`` is a list of per-spike dicts (pooled and renumbered
+        across all sweeps), ``ap_summary`` is an aggregate dict without
+        ``mean_isi`` / ``firing_rate`` (those are shown in the F-I curve),
+        ``fi_data`` is a serialised :class:`~patch_sim.FIAnalysisResult` dict,
+        and ``sfa_data`` is a serialised SFA dict with one curve per sweep that
+        had at least two spikes.  ``ap_metrics`` and ``ap_summary`` are empty
+        when no spikes are detected.  ``fi_data`` is empty when the sweep count
+        does not match the derived step count.
     """
     n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
     current_steps = list(np.linspace(min_stimulus, max_stimulus, n_steps))
@@ -419,6 +421,26 @@ def _compute_cc_multi_sweep_analysis(
         ap_metrics = []
         ap_summary = {}
 
+    # --- SFA data (one curve per sweep with >= 2 spikes) ---
+    sfa_curves = [
+        patch_sim.compute_sfa(ap_result, label=f"{i_step:.1f} µA/cm²")
+        for ap_result, i_step in zip(per_sweep_ap, current_steps)
+    ]
+    sfa_data: dict[str, Any] = {
+        "curves": [
+            {
+                "spike_indices": c.spike_indices,
+                "instantaneous_frequencies": c.instantaneous_frequencies,
+                "adaptation_index": c.adaptation_index,
+                "label": c.label,
+            }
+            for c in sfa_curves
+            if c is not None
+        ]
+    }
+    if not sfa_data["curves"]:
+        sfa_data = {}
+
     # --- F-I data (derived from the same per-sweep AP results) ---
     if len(sweeps) != len(current_steps):
         logger.warning(
@@ -430,7 +452,7 @@ def _compute_cc_multi_sweep_analysis(
             max_stimulus,
             stimulus_step,
         )
-        return ap_metrics, ap_summary, {}
+        return ap_metrics, ap_summary, {}, sfa_data
 
     fi_points: list[patch_sim.FIPoint] = [
         _fi_point_from_ap_result(ap_result, i_step, stim_start, stim_end)
@@ -445,7 +467,7 @@ def _compute_cc_multi_sweep_analysis(
         "initial_firing_rates": fi_result.initial_firing_rates,
         "steady_state_firing_rates": fi_result.steady_state_firing_rates,
     }
-    return ap_metrics, ap_summary, fi_data
+    return ap_metrics, ap_summary, fi_data, sfa_data
 
 
 def _compute_iv_data(
@@ -1054,6 +1076,7 @@ class SimulationState(rx.State):
                         analysis_st.ap_summary = {}
                         analysis_st.ap_is_multi_sweep = False
                         analysis_st.fi_data = {}
+                        analysis_st.sfa_data = {}
                         iv_data, iv_result = _compute_iv_data(
                             new_sweeps,
                             proto_st.min_stimulus,
@@ -1084,7 +1107,7 @@ class SimulationState(rx.State):
                         else:
                             analysis_st.gv_data = {}
                     else:
-                        ms_metrics, ms_summary, ms_fi = (
+                        ms_metrics, ms_summary, ms_fi, ms_sfa = (
                             _compute_cc_multi_sweep_analysis(
                                 new_sweeps,
                                 proto_st.min_stimulus,
@@ -1100,6 +1123,7 @@ class SimulationState(rx.State):
                         analysis_st.iv_data = {}
                         analysis_st.gv_data = {}
                         analysis_st.fi_data = ms_fi
+                        analysis_st.sfa_data = ms_sfa
 
             else:
                 stimulus, _ = protocols[0]
@@ -1111,6 +1135,7 @@ class SimulationState(rx.State):
                     analysis_st = await self.get_state(AnalysisState)
                     if mode == CURRENT_CLAMP:
                         ap_result = patch_sim.analyze_aps_from_result(result)
+                        sfa_curve = patch_sim.compute_sfa(ap_result)
                         analysis_st.ap_metrics = [
                             {
                                 "index": s.index,
@@ -1163,11 +1188,32 @@ class SimulationState(rx.State):
                                 if ap_result.firing_rate is not None
                                 else "\u2014"
                             ),
+                            "adaptation_index": (
+                                f"{sfa_curve.adaptation_index:.2f}"
+                                if sfa_curve is not None
+                                else "\u2014"
+                            ),
                         }
                         analysis_st.ap_is_multi_sweep = False
                         analysis_st.iv_data = {}
                         analysis_st.gv_data = {}
                         analysis_st.fi_data = {}
+                        analysis_st.sfa_data = (
+                            {
+                                "curves": [
+                                    {
+                                        "spike_indices": sfa_curve.spike_indices,
+                                        "instantaneous_frequencies": (
+                                            sfa_curve.instantaneous_frequencies
+                                        ),
+                                        "adaptation_index": sfa_curve.adaptation_index,
+                                        "label": "",
+                                    }
+                                ]
+                            }
+                            if sfa_curve is not None
+                            else {}
+                        )
                     else:
                         analysis_st.ap_metrics = []
                         analysis_st.ap_summary = {}
@@ -1175,6 +1221,7 @@ class SimulationState(rx.State):
                         analysis_st.iv_data = {}
                         analysis_st.gv_data = {}
                         analysis_st.fi_data = {}
+                        analysis_st.sfa_data = {}
 
         except ValueError as exc:
             logger.exception("Simulation error: %s", exc)

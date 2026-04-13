@@ -80,6 +80,16 @@ def _ap_summary() -> rx.Component:
                 rx.text(s["firing_rate"].to(str) + " Hz", size="1", align="left"),
                 rx.box(),
             ),
+            rx.cond(
+                ~AnalysisState.ap_is_multi_sweep,
+                rx.text("Adapt. index", size="1", color="gray"),
+                rx.box(),
+            ),
+            rx.cond(
+                ~AnalysisState.ap_is_multi_sweep,
+                rx.text(s["adaptation_index"].to(str), size="1", align="left"),
+                rx.box(),
+            ),
             columns="2",
             spacing="2",
             width="100%",
@@ -142,6 +152,29 @@ def _ap_fi_plot() -> rx.Component:
     )
 
 
+def _ap_sfa_plot() -> rx.Component:
+    """Render the embedded SFA plot inside the AP Metrics tab.
+
+    Shown whenever SFA data is available — for single-sweep runs this is one
+    curve with an adaptation-index annotation; for multi-sweep runs it is one
+    curve per sweep.
+
+    Returns:
+        A compact Plotly SFA figure inside a flex container.
+    """
+    return rx.flex(
+        rx.plotly(
+            data=AnalysisState.sfa_figure,
+            width="100%",
+        ),
+        direction="column",
+        width="100%",
+        flex_shrink="0",
+        border_top="1px solid var(--gray-4)",
+        padding="1",
+    )
+
+
 def _ap_metrics_tab() -> rx.Component:
     """Render the AP Metrics tab content.
 
@@ -159,6 +192,7 @@ def _ap_metrics_tab() -> rx.Component:
         rx.flex(
             rx.cond(AnalysisState.has_ap_metrics, _ap_summary(), rx.box()),
             rx.cond(AnalysisState.has_fi_data, _ap_fi_plot(), rx.box()),
+            rx.cond(AnalysisState.has_sfa_data, _ap_sfa_plot(), rx.box()),
             rx.cond(AnalysisState.has_ap_metrics, _ap_spike_table(), rx.box()),
             direction="column",
             height="100%",

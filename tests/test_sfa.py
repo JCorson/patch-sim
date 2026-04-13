@@ -3,7 +3,7 @@
 import pytest
 
 from patch_sim.analysis.ap_metrics import APAnalysisResult
-from patch_sim.analysis.sfa import SFAAnalysisResult, SFACurve, analyze_sfa, compute_sfa
+from patch_sim.analysis.sfa import SFAAnalysisResult, analyze_sfa, compute_sfa
 
 
 def _make_ap_result(isis: list[float]) -> APAnalysisResult:
@@ -45,7 +45,11 @@ def test_compute_sfa_one_spike() -> None:
 
 
 def test_compute_sfa_two_spikes() -> None:
-    """compute_sfa produces a single-point curve with adaptation_index 0 for two spikes."""
+    """compute_sfa produces a single-point curve with adaptation_index 0 for two spikes.
+
+    Two spikes yield exactly one ISI, so the first and last instantaneous
+    frequency are identical and the adaptation index is 0.
+    """
     ap = _make_ap_result([10.0])
     result = compute_sfa(ap)
     assert result is not None
