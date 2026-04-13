@@ -307,7 +307,9 @@ def test_fi_curve_integration_hh(hh_model):
 # ---------------------------------------------------------------------------
 
 
-def _make_fi_result(spike_counts: list[int], current_steps: list[float]) -> FIAnalysisResult:
+def _make_fi_result(
+    spike_counts: list[int], current_steps: list[float]
+) -> FIAnalysisResult:
     """Build a synthetic FIAnalysisResult with given spike counts and current steps.
 
     Firing rate fields are left as None throughout — they are not needed for
@@ -373,7 +375,7 @@ def test_estimate_rheobase_empty_points_returns_none():
 
 
 def test_estimate_rheobase_integration_hh(hh_model):
-    """estimate_rheobase on real HH sweeps falls between subthreshold and suprathreshold steps.
+    """estimate_rheobase on real HH sweeps falls in the tested current range.
 
     Runs sweeps from clearly subthreshold to clearly suprathreshold and verifies
     that the estimated rheobase is positive and lies within the tested range.
