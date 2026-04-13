@@ -5,6 +5,8 @@ import pytest
 
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
 from patch_sim.neuron import Neuron
+from patch_sim.neuron_factory import make_neuron
+from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
 
 
 def test_simulate_current_clamp_returns_structured_array(hh_model):
@@ -102,12 +104,11 @@ def test_simulate_current_clamp_with_zero_current(hh_model):
     for col in expected_columns:
         assert col in result.dtype.names
 
-    # With zero external current, voltage should remain close to resting potential
-    # Allow for small fluctuations due to intrinsic dynamics
-    max_allowable_deviation = 15.0  # mV, maximum acceptable deviation
+    # With zero external current, voltage should remain at the resting potential.
+    max_allowable_deviation = 1.0  # mV
     voltage_range = result["voltage"].max() - result["voltage"].min()
     assert voltage_range < max_allowable_deviation, (
-        f"Voltage range {voltage_range} exceeds maximum allowed deviation"
+        f"Voltage range {voltage_range:.3f} mV exceeds {max_allowable_deviation} mV"
     )
 
 
@@ -366,3 +367,33 @@ def test_large_hyperpolarizing_current_voltage_stays_bounded(hh_model):
 
     assert result["voltage"].min() >= -150.0
     assert result["voltage"].max() <= 150.0
+
+
+# ---------------------------------------------------------------------------
+# Preset stability tests (issue #197)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("preset_name", NEURON_PRESET_NAMES)
+def test_all_presets_stable_at_rest(preset_name: str) -> None:
+    """Every neuron preset stays within 1 mV of v_rest with zero stimulus.
+
+    Regression test for issue #197: v_rest must equal the zero-current
+    equilibrium so that neurons do not drift when unstimulated.  Also
+    serves as a standard acceptance criterion for new neuron types.
+    """
+    config = NEURON_PRESETS[preset_name]
+    neuron = make_neuron(config)
+
+    duration = 50  # ms
+    num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
+    zero_current = np.zeros(num_steps)
+
+    result = simulate_current_clamp(neuron, current_external=zero_current)
+
+    max_deviation = float(np.max(np.abs(result["voltage"] - neuron.v_rest)))
+    assert max_deviation < 1.0, (
+        f"{preset_name}: voltage deviated {max_deviation:.2f} mV from "
+        f"v_rest={neuron.v_rest:.1f} mV — v_rest may not be the zero-current "
+        "equilibrium (run find_zero_current_voltage to compute the correct value)"
+    )

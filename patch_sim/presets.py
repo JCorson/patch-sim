@@ -30,7 +30,6 @@ from .constants import (
     PURKINJE,
     SQUID_GIANT_AXON,
     STN,
-    STOMATOGASTRIC_GANGLION,
     THALAMIC_RELAY,
     TRN,
     VOLTAGE_CLAMP,
@@ -49,7 +48,9 @@ from .neuron_factory import ChannelConfig, NeuronConfig
 
 NEURON_PRESETS: dict[str, NeuronConfig] = {
     SQUID_GIANT_AXON: NeuronConfig(
-        # Original Hodgkin-Huxley (1952) parameters — the app defaults.
+        # Original Hodgkin-Huxley (1952) parameters — all defaults.
+        # Default ion concentrations produce HH52 reversal potentials
+        # (E_Na ≈ +50, E_K ≈ −77, E_L ≈ −54 mV) so no overrides needed.
         # Ref: Hodgkin & Huxley (1952), J. Physiol. 117:500
     ),
     FAST_SPIKING_INTERNEURON: NeuronConfig(
@@ -60,15 +61,12 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Refs: Erisir et al. (1999), J. Neurophysiol. 82:2476;
         #       Wang & Buzsáki (1996), J. Neurosci. 16:6402
         #
-        # v_rest is set to -72 mV (the true zero-current fixed point).  The
-        # elevated g_K = 50 mS/cm² produces a larger outward K⁺ current at
-        # rest than the chloride-based leak can compensate near -65 mV
-        # (E_Cl ≈ -66 mV), shifting the equilibrium to ~-72 mV.  Starting
-        # here avoids the visible pre-stimulus drift that would otherwise
-        # appear in current-clamp traces.
+        # Elevated Cl_in (19.0 mM) compensates for the large outward K⁺
+        # current from g_K=50 by shifting E_L more positive, keeping the
+        # zero-current equilibrium at −65 mV.
         g_Na=150.0,
         g_K=50.0,
-        v_rest=-72.0,
+        Cl_in=19.0,
         channels=(ChannelConfig(make_ikv31_channel, g_max=40.0),),
     ),
     CORTICAL_PYRAMIDAL: NeuronConfig(
@@ -77,11 +75,22 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Ih produces voltage sag on hyperpolarization; INaP amplifies
         # subthreshold inputs; IM provides spike-frequency adaptation.
         # Ref: Pospischil et al. (2008), Biol. Cybern. 99:427
+        #
+        # K_out=3.32 produces E_K ≈ −100 mV (Pospischil target); Cl_in=7.6
+        # tunes E_L so that the zero-current equilibrium is −70 mV,
+        # matching the published RS model resting potential.
+        #
+        # g_h reduced from 1.5 → 0.3 mS/cm² and g_NaP from 0.5 → 0.1 mS/cm²
+        # so that combined inward current at rest does not exceed the outward
+        # leak + IM current; the original values caused spontaneous tonic firing.
+        v_rest=-70.0,
+        K_out=3.32,
+        Cl_in=7.6,
         na_channel_factory=make_pospischil_na_channel,
         k_channel_factory=make_pospischil_k_channel,
         channels=(
-            ChannelConfig(make_ih_channel, g_max=1.5),
-            ChannelConfig(make_inap_channel, g_max=0.5),
+            ChannelConfig(make_ih_channel, g_max=0.3),
+            ChannelConfig(make_inap_channel, g_max=0.1),
             ChannelConfig(make_im_channel, g_max=0.5),
         ),
     ),
@@ -89,6 +98,10 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # L-type and T-type Ca²⁺ channels drive complex spiking;
         # IKCa couples Ca²⁺ influx to after-hyperpolarization.
         # Ref: De Schutter & Bower (1994), J. Neurophysiol. 71:375
+        #
+        # v_rest = −68 mV matches the published Purkinje cell resting potential.
+        v_rest=-68.0,
+        Cl_in=10.7,
         channels=(
             ChannelConfig(make_ical_channel, g_max=1.0),
             ChannelConfig(make_icat_channel, g_max=0.5),
@@ -100,6 +113,11 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # oscillatory hyperpolarization.
         # Refs: Wilson & Callaway (2000), J. Neurophysiol. 83:3084;
         #       Komendantov et al. (2004)
+        #
+        # v_rest = −60 mV matches the published dopaminergic neuron resting
+        # potential.  Cl_in = 47.0 mM shifts E_L positive to achieve this.
+        v_rest=-60.0,
+        Cl_in=47.0,
         channels=(
             ChannelConfig(make_ih_channel, g_max=2.0),
             ChannelConfig(make_im_channel, g_max=1.0),
@@ -109,6 +127,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # T-type Ca²⁺ produces low-threshold spike; Ih causes
         # post-inhibitory rebound burst after hyperpolarizing step.
         # Ref: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384
+        Cl_in=10.0,
         channels=(
             ChannelConfig(make_icat_channel, g_max=1.5),
             ChannelConfig(make_ih_channel, g_max=1.0),
@@ -122,6 +141,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Refs: Warman et al. (1994); Migliore et al. (1999), ModelDB #2796
         g_Na=35.0,
         g_K=10.0,
+        Cl_in=12.4,
         channels=(
             ChannelConfig(make_ika_channel, g_max=0.5),
             ChannelConfig(make_im_channel, g_max=0.5),
@@ -140,8 +160,16 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Ih provides pacemaker depolarization.
         # Refs: Otsuka et al. (2004), J. Neurophysiol. 92:255;
         #       Farries & Wilson (2012), J. Neurophysiol.
+        #
+        # Mammalian Na⁺/K⁺ concentrations give E_Na ≈ +60.6, E_K ≈ −89.1 mV,
+        # close to the Otsuka targets (+60, −90).  v_rest = −67 mV is the
+        # stable zero-current equilibrium for this channel configuration.
         g_Na=49.0,
         g_K=57.0,
+        v_rest=-67.0,
+        Na_out=145.0,
+        K_out=5.0,
+        Cl_in=10.0,
         na_channel_factory=make_stn_na_channel,
         k_channel_factory=make_stn_k_channel,
         channels=(
@@ -153,30 +181,18 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         ),
     ),
     TRN: NeuronConfig(
-        # Hyperpolarised resting potential (−77 mV) and exceptionally large
-        # ICaT (g_T ≈ 3.5 mS/cm²) are the hallmarks of TRN cells; these
-        # combine to produce rhythmic burst firing and sleep-spindle
-        # oscillations.  No auxiliary channels beyond ICaT are needed.
+        # ICaT (g_T ≈ 3.5 mS/cm²) drives rhythmic burst firing and
+        # sleep-spindle oscillations characteristic of TRN cells.
         # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804;
         #       Destexhe et al. (1994)
+        #
+        # Cl_in = 6.4 mM yields E_L ≈ −79 mV, pulling the zero-current
+        # equilibrium to −77 mV — the biological TRN resting potential.
+        # ICaT is sufficiently de-inactivated at this potential for
+        # post-inhibitory rebound bursting.
         v_rest=-77.0,
+        Cl_in=6.4,
         channels=(ChannelConfig(make_icat_channel, g_max=3.5),),
-    ),
-    STOMATOGASTRIC_GANGLION: NeuronConfig(
-        # Depolarised resting potential (−55 mV) and ~8 conductances produce
-        # rhythmic bursting; large IKa and IKCa shape burst waveform; slow
-        # ICaL drives plateau depolarisation; Ih contributes to inter-burst
-        # pacemaker potential.  Highly parameter-sensitive — small changes
-        # alter burst duty cycle substantially.
-        # Refs: Prinz et al. (2003), J. Neurophysiol. 90:3998;
-        #       Turrigiano et al. (1995)
-        v_rest=-55.0,
-        channels=(
-            ChannelConfig(make_ika_channel, g_max=8.0),
-            ChannelConfig(make_ical_channel, g_max=2.0),
-            ChannelConfig(make_ikca_channel, g_max=3.0),
-            ChannelConfig(make_ih_channel, g_max=1.5),
-        ),
     ),
 }
 
@@ -285,11 +301,24 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     CORTICAL_PYRAMIDAL: {
-        # Longer step at moderate amplitude to reveal spike-frequency adaptation.
+        # 800 ms at 5 µA/cm² is long enough for IM to accumulate and produce
+        # clearly increasing inter-spike intervals (spike-frequency adaptation).
         "Repetitive Firing": {
-            "min_stimulus": 10.0,
-            "max_stimulus": 10.0,
-            "stimulus_duration": 280.0,
+            "min_stimulus": 5.0,
+            "max_stimulus": 5.0,
+            "stimulus_duration": 800.0,
+            "pre_stimulus_duration": 50.0,
+            "post_stimulus_duration": 50.0,
+        },
+        # Threshold is ~3–4 µA/cm²; 0 → 12 in steps of 1.5 (9 sweeps) spans
+        # the subthreshold zone through fast repetitive firing.  300 ms is
+        # long enough for IM-driven adaptation to be visible within each
+        # suprathreshold sweep.
+        "F-I Curve": {
+            "min_stimulus": 0.0,
+            "max_stimulus": 12.0,
+            "stimulus_step": 1.5,
+            "stimulus_duration": 300.0,
         },
     },
     PURKINJE: {
@@ -356,22 +385,6 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "pre_stimulus_duration": 50.0,
             "stimulus_duration": 200.0,
             "post_stimulus_duration": 150.0,
-        },
-    },
-    STOMATOGASTRIC_GANGLION: {
-        # Long window at low current to reveal slow (~1 Hz) rhythmic bursting.
-        "Repetitive Firing": {
-            "min_stimulus": 3.0,
-            "max_stimulus": 3.0,
-            "stimulus_duration": 800.0,
-        },
-        # Depolarised v_rest (−55 mV) lowers threshold; use a tighter
-        # positive-only range so every sweep produces a clear burst response.
-        "F-I Curve": {
-            "min_stimulus": 0.0,
-            "max_stimulus": 12.0,
-            "stimulus_step": 1.5,
-            "stimulus_duration": 300.0,
         },
     },
 }

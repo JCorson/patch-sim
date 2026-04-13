@@ -292,7 +292,7 @@ def test_action_potential_with_step_current(hh_model: Neuron) -> None:
 
 def test_no_ap_below_threshold_current(hh_model: Neuron) -> None:
     """Sub-threshold step current should not trigger an action potential."""
-    protocol = step_current(duration=50.0, current_amplitude=5.0)
+    protocol = step_current(duration=50.0, current_amplitude=2.0)
     result = simulate_current_clamp(hh_model, current_external=protocol)
 
     # Voltage must never cross 0 mV (AP threshold)

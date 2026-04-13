@@ -74,6 +74,7 @@ from .core_channels import (
     pospischil_beta_n,
 )
 from .electrochemistry import goldman_potential, nernst_potential
+from .equilibrium import find_zero_current_voltage
 from .neuron import Neuron
 from .neuron_factory import (
     CHANNEL_REGISTRY,
@@ -177,6 +178,7 @@ __all__ = [
     "simulate_batch",
     "nernst_potential",
     "goldman_potential",
+    "find_zero_current_voltage",
     "build_current_protocol",
     "build_voltage_protocol",
     "step_current",

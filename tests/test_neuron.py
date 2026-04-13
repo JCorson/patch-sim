@@ -119,9 +119,9 @@ def test_reversal_potentials_from_core_channels(hh_model: Neuron) -> None:
 def test_reversal_potentials_in_physiological_range(hh_model: Neuron) -> None:
     """Core channel reversal potentials are in expected physiological ranges."""
     na_ch, k_ch, leak_ch = hh_model.core_channels
-    assert 60.0 < na_ch.reversal_potential(hh_model) < 65.0
-    assert -90.0 < k_ch.reversal_potential(hh_model) < -65.0
-    assert -70.0 < leak_ch.reversal_potential(hh_model) < -40.0
+    assert 45.0 < na_ch.reversal_potential(hh_model) < 55.0
+    assert -80.0 < k_ch.reversal_potential(hh_model) < -70.0
+    assert -60.0 < leak_ch.reversal_potential(hh_model) < -50.0
 
 
 def test_custom_ion_concentrations_shift_reversal_potentials() -> None:
@@ -267,7 +267,7 @@ def test_ion_concentrations_reflects_custom_values() -> None:
     """ion_concentrations must return user-supplied concentration values."""
     model = Neuron(Na_out=200.0, K_in=100.0, Ca_out=5.0, Cl_in=20.0)
     assert model.ion_concentrations(IonSpecies.SODIUM) == pytest.approx((200.0, 15.0))
-    assert model.ion_concentrations(IonSpecies.POTASSIUM) == pytest.approx((5.0, 100.0))
+    assert model.ion_concentrations(IonSpecies.POTASSIUM) == pytest.approx((7.8, 100.0))
     assert model.ion_concentrations(IonSpecies.CALCIUM) == pytest.approx((5.0, 0.0001))
     assert model.ion_concentrations(IonSpecies.CHLORIDE) == pytest.approx((120.0, 20.0))
 
