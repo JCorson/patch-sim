@@ -422,6 +422,33 @@ class TestChirpCurrent:
         assert second_crossings > first_crossings
 
 
+def test_chirp_current_sine_phase() -> None:
+    """chirp_current uses sine phase: value at stimulus onset must be dc_offset.
+
+    scipy.signal.chirp defaults to cosine phase; phi=-90 shifts it to sine.
+    sin(0) = 0, so the first sample of the stimulus window should equal
+    dc_offset exactly (within floating-point tolerance).
+    """
+    dc_offset = 2.0
+    amplitude = 1.5
+    sampling_frequency = 10000.0  # Hz — 0.1 ms per sample
+
+    current = chirp_current(
+        duration=50.0,
+        dc_offset=dc_offset,
+        amplitude=amplitude,
+        start_frequency=5.0,
+        end_frequency=50.0,
+        stimulus_start=10.0,
+        stimulus_duration=30.0,
+        sampling_frequency=sampling_frequency,
+    )
+
+    # stimulus_start=10 ms → index = 10 ms / (1000/10000 ms) = 100
+    stim_start_index = int(10.0 / (1000.0 / sampling_frequency))
+    assert current[stim_start_index] == pytest.approx(dc_offset, abs=1e-10)
+
+
 class TestNoiseCurrent:
     """Test cases for noise_current function."""
 
