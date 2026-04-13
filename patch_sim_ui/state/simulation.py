@@ -1076,12 +1076,11 @@ class SimulationState(rx.State):
                                 ),
                                 None,
                             )
-                            e_rev = (
-                                na_channel.reversal_potential(neuron)
-                                if na_channel is not None
-                                else neuron.core_channels[0].reversal_potential(neuron)
-                            )
-                            analysis_st.gv_data = _compute_gv_data(iv_result, e_rev)
+                            if na_channel is not None:
+                                e_rev = na_channel.reversal_potential(neuron)
+                                analysis_st.gv_data = _compute_gv_data(iv_result, e_rev)
+                            else:
+                                analysis_st.gv_data = {}
                         else:
                             analysis_st.gv_data = {}
                     else:
