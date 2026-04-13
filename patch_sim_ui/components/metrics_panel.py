@@ -1,14 +1,16 @@
 """Right-hand analysis sidebar component.
 
-A collapsible panel with a tabbed layout.  Each tab hosts a different
-analysis view; currently the only tab is "AP Metrics".  The tab structure
-makes it straightforward to add further analysis views in future.
+A collapsible panel that automatically shows the relevant analysis view
+based on the active clamp mode: AP metrics for current clamp, I-V curve
+for voltage clamp.
 """
 
 import reflex as rx
 
+from patch_sim.constants import CURRENT_CLAMP
 from patch_sim_ui.state import SimulationState
 from patch_sim_ui.state.analysis import AnalysisState
+from patch_sim_ui.state.protocol import ProtocolState
 
 _PANEL_WIDTH = "300px"
 _COLLAPSED_WIDTH = "36px"
@@ -280,14 +282,23 @@ def _iv_curve_tab() -> rx.Component:
 def _expanded_panel() -> rx.Component:
     """Render the full expanded analysis sidebar.
 
+    The analysis view shown depends on the active clamp mode: AP metrics
+    are shown in current clamp mode, and the I-V curve is shown in voltage
+    clamp mode.
+
     Returns:
-        A fixed-width flex column with a header, tab strip, and tab content.
+        A fixed-width flex column with a header and the mode-appropriate
+        analysis content.
     """
     return rx.flex(
         # Header
         rx.hstack(
             rx.icon("chart-line", size=14),
-            rx.text("Analysis", size="4", weight="bold"),
+            rx.cond(
+                ProtocolState.clamp_mode == CURRENT_CLAMP,
+                rx.text("AP Analysis", size="4", weight="bold"),
+                rx.text("I-V Analysis", size="4", weight="bold"),
+            ),
             rx.spacer(),
             rx.icon_button(
                 rx.icon("panel-right-close", size=14),
@@ -302,36 +313,19 @@ def _expanded_panel() -> rx.Component:
             width="100%",
             align="center",
         ),
-        # Tabs
-        rx.tabs.root(
-            rx.tabs.list(
-                rx.tabs.trigger("AP Metrics", value="ap", size="1"),
-                rx.tabs.trigger("I-V Curve", value="iv", size="1"),
-                padding_x="3",
-                padding_y="1",
-                border_bottom="1px solid var(--gray-4)",
-            ),
-            rx.tabs.content(
+        # Analysis content — switches automatically with clamp mode
+        rx.box(
+            rx.cond(
+                ProtocolState.clamp_mode == CURRENT_CLAMP,
                 _ap_metrics_tab(),
-                value="ap",
-                flex_grow="1",
-                min_height="0",
-                overflow="hidden",
-                padding="0",
-            ),
-            rx.tabs.content(
                 _iv_curve_tab(),
-                value="iv",
-                flex_grow="1",
-                min_height="0",
-                overflow="hidden",
-                padding="0",
             ),
-            default_value="ap",
-            flex_grow="1",
-            min_height="0",
             display="flex",
             flex_direction="column",
+            flex_grow="1",
+            min_height="0",
+            overflow="hidden",
+            width="100%",
         ),
         direction="column",
         width=_PANEL_WIDTH,
@@ -367,8 +361,9 @@ def _collapsed_strip() -> rx.Component:
 def analysis_sidebar() -> rx.Component:
     """Render the right-hand analysis sidebar.
 
-    Toggles between a full panel (with tabbed analysis views) and a thin
-    collapsed strip.  The panel is toggled via SimulationState.toggle_analysis_panel.
+    Toggles between a full panel (with a mode-appropriate analysis view) and
+    a thin collapsed strip.  The panel is toggled via
+    SimulationState.toggle_analysis_panel.
 
     Returns:
         A Reflex component for the collapsible analysis sidebar.
