@@ -15,7 +15,13 @@ from .ap_metrics import (
     analyze_aps,
     analyze_aps_from_result,
 )
-from .fi_curve import FIAnalysisResult, FIPoint, analyze_fi, compute_fi_point
+from .fi_curve import (
+    FIAnalysisResult,
+    FIPoint,
+    analyze_fi,
+    compute_fi_point,
+    estimate_rheobase,
+)
 from .gv_curve import (
     BoltzmannFit,
     GVAnalysisResult,
@@ -34,6 +40,7 @@ __all__ = [
     "analyze_sfa",
     "boltzmann",
     "compute_fi_point",
+    "estimate_rheobase",
     "compute_gv",
     "compute_iv_point",
     "compute_sfa",

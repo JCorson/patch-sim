@@ -39,6 +39,7 @@ from .analysis import (
     compute_gv,
     compute_iv_point,
     compute_sfa,
+    estimate_rheobase,
 )
 from .calcium import CalciumDynamics
 from .channels import (
@@ -136,6 +137,7 @@ __all__ = [
     "boltzmann",
     "compute_fi_point",
     "compute_gv",
+    "estimate_rheobase",
     "compute_iv_point",
     "compute_sfa",
     "CURRENT_CLAMP",
