@@ -25,8 +25,8 @@ class SFACurve:
         instantaneous_frequencies: Instantaneous firing frequency in Hz
             (``1000 / ISI_ms``) for each consecutive spike pair.
         adaptation_index: ``(f_first - f_last) / f_first``, dimensionless.
-            Ranges from 0 (no adaptation) to ~1 (strong adaptation).
-            Can be negative when the neuron accelerates.
+            Positive when firing slows (adaptation), negative when firing
+            accelerates, and zero for uniform spike trains.
         label: Optional display label for multi-sweep overlay (e.g.
             ``"10.0 µA/cm²"``).  Empty string for single-sweep use.
     """

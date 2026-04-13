@@ -1008,10 +1008,10 @@ def build_sfa_figure(sfa_data: dict) -> go.Figure:
     is_multi = len(curves) > 1
 
     for i, curve in enumerate(curves):
-        x = [idx + 1 for idx in curve["spike_indices"]]
-        y = curve["instantaneous_frequencies"]
-        ai = curve["adaptation_index"]
-        label = curve["label"]
+        x = [idx + 1 for idx in curve.get("spike_indices", [])]
+        y = curve.get("instantaneous_frequencies", [])
+        ai = curve.get("adaptation_index", 0.0)
+        label = curve.get("label", "")
 
         if is_multi:
             color = SWEEP_COLORS[i % len(SWEEP_COLORS)]
@@ -1036,7 +1036,7 @@ def build_sfa_figure(sfa_data: dict) -> go.Figure:
     # For single-sweep, annotate the adaptation index directly on the plot.
     annotations = []
     if not is_multi and curves:
-        ai = curves[0]["adaptation_index"]
+        ai = curves[0].get("adaptation_index", 0.0)
         annotations.append(
             dict(
                 text=f"AI = {ai:.2f}",

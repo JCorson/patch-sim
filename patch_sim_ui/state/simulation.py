@@ -339,6 +339,24 @@ _SWEEP_HIGHLIGHT_JS = """
 """
 
 
+def _serialise_sfa_curve(curve: "patch_sim.SFACurve") -> dict[str, Any]:
+    """Serialise a single :class:`~patch_sim.SFACurve` to a plain dict.
+
+    Args:
+        curve: The SFA curve to serialise.
+
+    Returns:
+        A dict with ``spike_indices``, ``instantaneous_frequencies``,
+        ``adaptation_index``, and ``label`` keys suitable for UI state transfer.
+    """
+    return {
+        "spike_indices": curve.spike_indices,
+        "instantaneous_frequencies": curve.instantaneous_frequencies,
+        "adaptation_index": curve.adaptation_index,
+        "label": curve.label,
+    }
+
+
 def _compute_cc_multi_sweep_analysis(
     sweeps: "list[Sweep]",
     min_stimulus: float,
@@ -427,16 +445,7 @@ def _compute_cc_multi_sweep_analysis(
         for ap_result, i_step in zip(per_sweep_ap, current_steps)
     ]
     sfa_data: dict[str, Any] = {
-        "curves": [
-            {
-                "spike_indices": c.spike_indices,
-                "instantaneous_frequencies": c.instantaneous_frequencies,
-                "adaptation_index": c.adaptation_index,
-                "label": c.label,
-            }
-            for c in sfa_curves
-            if c is not None
-        ]
+        "curves": [_serialise_sfa_curve(c) for c in sfa_curves if c is not None]
     }
     if not sfa_data["curves"]:
         sfa_data = {}
@@ -1199,18 +1208,7 @@ class SimulationState(rx.State):
                         analysis_st.gv_data = {}
                         analysis_st.fi_data = {}
                         analysis_st.sfa_data = (
-                            {
-                                "curves": [
-                                    {
-                                        "spike_indices": sfa_curve.spike_indices,
-                                        "instantaneous_frequencies": (
-                                            sfa_curve.instantaneous_frequencies
-                                        ),
-                                        "adaptation_index": sfa_curve.adaptation_index,
-                                        "label": "",
-                                    }
-                                ]
-                            }
+                            {"curves": [_serialise_sfa_curve(sfa_curve)]}
                             if sfa_curve is not None
                             else {}
                         )
