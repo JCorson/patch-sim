@@ -26,6 +26,7 @@ from patch_sim.constants import (
     DOPAMINERGIC,
     FAST_SPIKING_INTERNEURON,
     PURKINJE,
+    SQUID_GIANT_AXON,
     THALAMIC_RELAY,
 )
 from patch_sim_ui import constants  # noqa: E402
@@ -469,7 +470,7 @@ async def test_store_trace_label_includes_neuron_type() -> None:
 
 
 async def test_protocol_preset_with_active_neuron_type_applies_adjustment() -> None:
-    """Repetitive Firing with Thalamic Relay applies a hyperpolarizing adjustment."""
+    """Repetitive Firing with Thalamic Relay applies a depolarizing adjustment."""
     ps = _make_protocol_state()
     mock_neuron = MagicMock()
     mock_neuron.active_neuron_type = THALAMIC_RELAY
@@ -477,7 +478,7 @@ async def test_protocol_preset_with_active_neuron_type_applies_adjustment() -> N
         ProtocolState, "get_state", new=_make_get_state_fn({NeuronState: mock_neuron})
     ):
         await ps.load_protocol_preset("Repetitive Firing")
-    assert ps.min_stimulus < 0.0
+    assert ps.min_stimulus > 0.0
 
 
 async def test_protocol_preset_without_active_neuron_type_uses_base_params() -> None:
@@ -493,10 +494,10 @@ async def test_protocol_preset_without_active_neuron_type_uses_base_params() -> 
 
 
 async def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> None:
-    """Action Potential with Thalamic Relay active falls through to base duration."""
+    """Action Potential with Squid Giant Axon active falls through to base duration."""
     ps = _make_protocol_state()
     mock_neuron = MagicMock()
-    mock_neuron.active_neuron_type = THALAMIC_RELAY
+    mock_neuron.active_neuron_type = SQUID_GIANT_AXON
     with patch.object(
         ProtocolState, "get_state", new=_make_get_state_fn({NeuronState: mock_neuron})
     ):
