@@ -455,13 +455,15 @@ def _compute_iv_data(
     stimulus_step: float,
     pre_stimulus_duration: float,
     stimulus_duration: float,
-) -> dict[str, Any]:
+) -> "tuple[dict[str, Any], patch_sim.IVAnalysisResult | None]":
     """Compute I-V analysis data from multi-sweep voltage clamp results.
 
     Derives voltage step values from the protocol parameters, extracts total
     current arrays from each sweep, and calls :func:`patch_sim.analyze_iv`.
-    The result is serialised into a plain dict suitable for use as a Reflex
-    state variable.
+    The serialised dict is suitable for use as a Reflex state variable; the
+    raw :class:`~patch_sim.IVAnalysisResult` is also returned so callers can
+    derive further analyses (e.g. the g-V curve) without re-running the
+    simulation.
 
     Args:
         sweeps: Ordered list of :class:`Sweep` objects from the simulation.
@@ -472,20 +474,21 @@ def _compute_iv_data(
         stimulus_duration: Duration of the voltage step (ms).
 
     Returns:
-        A dict with keys ``voltages``, ``peak_inward_currents``,
-        ``peak_outward_currents``, and ``steady_state_currents``, each a list
-        of floats sorted by voltage.  Returns an empty dict when fewer than
-        two sweeps are provided or when the number of sweeps does not match
-        the number of voltage steps derived from the protocol parameters.
+        A 2-tuple ``(iv_data, iv_result)`` where *iv_data* is a dict with keys
+        ``voltages``, ``peak_inward_currents``, ``peak_outward_currents``, and
+        ``steady_state_currents`` (each a list of floats sorted by voltage) and
+        *iv_result* is the underlying :class:`~patch_sim.IVAnalysisResult`.
+        Both are empty / ``None`` when fewer than two sweeps are provided or
+        when the sweep count does not match the number of voltage steps.
     """
     if len(sweeps) < 2:
-        return {}
+        return {}, None
 
     n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
     voltage_steps = list(np.linspace(min_stimulus, max_stimulus, n_steps))
 
     if len(sweeps) != len(voltage_steps):
-        return {}
+        return {}, None
 
     time_arr = np.array(sweeps[0].time)
     currents = [np.array(s.total_current) for s in sweeps]
@@ -496,11 +499,63 @@ def _compute_iv_data(
     iv_result = patch_sim.analyze_iv(
         time_arr, currents, voltage_steps, stim_start, stim_end
     )
-    return {
+    iv_data: dict[str, Any] = {
         "voltages": iv_result.voltage_steps,
         "peak_inward_currents": iv_result.peak_inward_currents,
         "peak_outward_currents": iv_result.peak_outward_currents,
         "steady_state_currents": iv_result.steady_state_currents,
+    }
+    return iv_data, iv_result
+
+
+_GV_FIT_POINTS = 200  # number of voltage points for the pre-computed Boltzmann curve
+
+
+def _compute_gv_data(
+    iv_result: "patch_sim.IVAnalysisResult",
+    reversal_potential: float,
+) -> "dict[str, Any]":
+    """Compute g-V analysis data from an I-V result and a reversal potential.
+
+    Calls :func:`patch_sim.compute_gv` to derive normalised conductance and fit
+    a Boltzmann sigmoid.  A dense voltage array (200 points) spanning the range
+    of included steps is pre-computed so the plotting function can draw a smooth
+    fit curve without importing scipy.
+
+    Args:
+        iv_result: Pre-computed I-V analysis result.
+        reversal_potential: Reversal potential for the dominant inward current
+            carrier (mV), used to compute driving force at each step.
+
+    Returns:
+        A dict with keys ``voltages``, ``g_normalized``,
+        ``reversal_potential``, ``boltzmann_converged``, ``v_half``, ``k``,
+        ``fit_voltages``, and ``fit_g_normalized``.  Returns an empty dict when
+        no valid conductance points can be extracted.
+    """
+    gv_result = patch_sim.compute_gv(iv_result, reversal_potential)
+    if not gv_result.points:
+        return {}
+
+    fit = gv_result.boltzmann
+    fit_voltages: list[float] = []
+    fit_gn: list[float] = []
+    if fit.converged and len(gv_result.voltage_steps) >= 2:
+        v_min = min(gv_result.voltage_steps)
+        v_max = max(gv_result.voltage_steps)
+        v_arr = np.linspace(v_min, v_max, _GV_FIT_POINTS)
+        fit_voltages = v_arr.tolist()
+        fit_gn = [float(patch_sim.boltzmann(v, fit.v_half, fit.k)) for v in v_arr]
+
+    return {
+        "voltages": gv_result.voltage_steps,
+        "g_normalized": gv_result.g_normalized_values,
+        "reversal_potential": gv_result.reversal_potential,
+        "boltzmann_converged": fit.converged,
+        "v_half": fit.v_half,
+        "k": fit.k,
+        "fit_voltages": fit_voltages,
+        "fit_g_normalized": fit_gn,
     }
 
 
@@ -999,7 +1054,7 @@ class SimulationState(rx.State):
                         analysis_st.ap_summary = {}
                         analysis_st.ap_is_multi_sweep = False
                         analysis_st.fi_data = {}
-                        analysis_st.iv_data = _compute_iv_data(
+                        iv_data, iv_result = _compute_iv_data(
                             new_sweeps,
                             proto_st.min_stimulus,
                             proto_st.max_stimulus,
@@ -1007,6 +1062,16 @@ class SimulationState(rx.State):
                             proto_st.pre_stimulus_duration,
                             proto_st.stimulus_duration,
                         )
+                        analysis_st.iv_data = iv_data
+                        if iv_result is not None:
+                            e_rev = neuron.core_channels[0].reversal_potential(
+                                neuron
+                            )
+                            analysis_st.gv_data = _compute_gv_data(
+                                iv_result, e_rev
+                            )
+                        else:
+                            analysis_st.gv_data = {}
                     else:
                         ms_metrics, ms_summary, ms_fi = (
                             _compute_cc_multi_sweep_analysis(
@@ -1022,6 +1087,7 @@ class SimulationState(rx.State):
                         analysis_st.ap_summary = ms_summary
                         analysis_st.ap_is_multi_sweep = True
                         analysis_st.iv_data = {}
+                        analysis_st.gv_data = {}
                         analysis_st.fi_data = ms_fi
 
             else:
@@ -1089,12 +1155,14 @@ class SimulationState(rx.State):
                         }
                         analysis_st.ap_is_multi_sweep = False
                         analysis_st.iv_data = {}
+                        analysis_st.gv_data = {}
                         analysis_st.fi_data = {}
                     else:
                         analysis_st.ap_metrics = []
                         analysis_st.ap_summary = {}
                         analysis_st.ap_is_multi_sweep = False
                         analysis_st.iv_data = {}
+                        analysis_st.gv_data = {}
                         analysis_st.fi_data = {}
 
         except ValueError as exc:
