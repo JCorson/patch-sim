@@ -13,6 +13,7 @@ from patch_sim.analysis.fi_curve import (
     FIPoint,
     analyze_fi,
     compute_fi_point,
+    estimate_rheobase,
 )
 
 # ---------------------------------------------------------------------------
@@ -299,3 +300,111 @@ def test_fi_curve_integration_hh(hh_model):
     # The highest current step should have the most spikes
     spike_counts = [p.spike_count for p in fi.points]
     assert spike_counts[-1] >= max(spike_counts[:-1])
+
+
+# ---------------------------------------------------------------------------
+# estimate_rheobase — unit tests
+# ---------------------------------------------------------------------------
+
+
+def _make_fi_result(spike_counts: list[int], current_steps: list[float]) -> FIAnalysisResult:
+    """Build a synthetic FIAnalysisResult with given spike counts and current steps.
+
+    Firing rate fields are left as None throughout — they are not needed for
+    rheobase estimation.
+
+    Args:
+        spike_counts: Number of spikes for each point, parallel to current_steps.
+        current_steps: Injected current amplitude for each point (µA/cm²).
+
+    Returns:
+        An :class:`FIAnalysisResult` with one :class:`FIPoint` per entry.
+    """
+    points = [
+        FIPoint(
+            current_step=step,
+            spike_count=count,
+            mean_firing_rate=None,
+            initial_firing_rate=None,
+            steady_state_firing_rate=None,
+        )
+        for step, count in zip(current_steps, spike_counts)
+    ]
+    return FIAnalysisResult(points=points)
+
+
+def test_estimate_rheobase_returns_first_spiking_step():
+    """estimate_rheobase returns the current step of the first spiking point.
+
+    With two silent steps followed by one spiking step, the rheobase equals
+    the current step of that first spiking point.
+    """
+    fi = _make_fi_result(spike_counts=[0, 0, 3], current_steps=[5.0, 10.0, 15.0])
+    assert estimate_rheobase(fi) == pytest.approx(15.0)
+
+
+def test_estimate_rheobase_all_silent_returns_none():
+    """estimate_rheobase returns None when no sweep produced a spike."""
+    fi = _make_fi_result(spike_counts=[0, 0, 0], current_steps=[1.0, 2.0, 3.0])
+    assert estimate_rheobase(fi) is None
+
+
+def test_estimate_rheobase_all_spiking_returns_lowest():
+    """estimate_rheobase returns the lowest current step when all sweeps spike."""
+    fi = _make_fi_result(spike_counts=[2, 4, 6], current_steps=[5.0, 10.0, 20.0])
+    assert estimate_rheobase(fi) == pytest.approx(5.0)
+
+
+def test_estimate_rheobase_single_spike_sufficient():
+    """A sweep with exactly one spike qualifies as suprathreshold.
+
+    spike_count == 1 means no ISI-derived firing rate, but the spike still
+    constitutes rheobase-level excitation.
+    """
+    fi = _make_fi_result(spike_counts=[0, 1, 5], current_steps=[5.0, 10.0, 15.0])
+    result = estimate_rheobase(fi)
+    assert result == pytest.approx(10.0)
+
+
+def test_estimate_rheobase_empty_points_returns_none():
+    """estimate_rheobase returns None for an FIAnalysisResult with no points."""
+    fi = FIAnalysisResult(points=[])
+    assert estimate_rheobase(fi) is None
+
+
+def test_estimate_rheobase_integration_hh(hh_model):
+    """estimate_rheobase on real HH sweeps falls between subthreshold and suprathreshold steps.
+
+    Runs sweeps from clearly subthreshold to clearly suprathreshold and verifies
+    that the estimated rheobase is positive and lies within the tested range.
+    """
+    stim_start = 10.0
+    stim_duration = 50.0
+    stim_end = stim_start + stim_duration
+    current_steps = [0.0, 5.0, 10.0, 20.0]
+    protocols = [
+        patch_sim.step_current(
+            duration=stim_start + stim_duration + 10.0,
+            current_amplitude=amp,
+            step_start=stim_start,
+            step_duration=stim_duration,
+        )
+        for amp in current_steps
+    ]
+    results = list(
+        patch_sim.simulate_batch(hh_model, protocols, patch_sim.simulate_current_clamp)
+    )
+    voltages = [r["voltage"] for r in results]
+    time = results[0]["time"]
+
+    fi = patch_sim.analyze_fi(time, voltages, current_steps, stim_start, stim_end)
+    rheobase = estimate_rheobase(fi)
+
+    # At least one step must be suprathreshold for the HH model
+    assert rheobase is not None
+
+    # Rheobase must be positive (subthreshold at 0 µA/cm²)
+    assert rheobase > 0.0
+
+    # Rheobase must be within the tested range
+    assert rheobase <= max(current_steps)
