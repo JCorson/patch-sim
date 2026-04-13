@@ -168,18 +168,15 @@ def estimate_rheobase(fi_result: FIAnalysisResult) -> float | None:
     though it produces no ISI-derived firing rate.
 
     Args:
-        fi_result: F-I analysis result with points sorted in ascending order
-            of current step (as produced by :func:`analyze_fi`).
+        fi_result: F-I analysis result.  Points may be in any order.
 
     Returns:
         The rheobase current in µA/cm² (the ``current_step`` of the first
         :class:`FIPoint` with ``spike_count >= 1``), or ``None`` when no
         sweep produced a spike.
     """
-    for point in fi_result.points:
-        if point.spike_count >= 1:
-            return point.current_step
-    return None
+    spiking = [p.current_step for p in fi_result.points if p.spike_count >= 1]
+    return min(spiking) if spiking else None
 
 
 def analyze_fi(
