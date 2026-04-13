@@ -178,28 +178,55 @@ def _ap_metrics_tab() -> rx.Component:
     )
 
 
+def _gv_plot() -> rx.Component:
+    """Render the g-V curve plot embedded below the I-V curve.
+
+    Returns:
+        A bordered flex container with the g-V Plotly figure.
+    """
+    return rx.flex(
+        rx.plotly(
+            data=AnalysisState.gv_figure,
+            width="100%",
+        ),
+        direction="column",
+        width="100%",
+        flex_shrink="0",
+        border_top="1px solid var(--gray-4)",
+        padding="1",
+    )
+
+
 def _iv_curve_tab() -> rx.Component:
     """Render the I-V Curve tab content.
 
     Shows a Plotly I-V curve with peak inward, peak outward, and steady-state
-    traces when voltage clamp multi-sweep data is available.  Displays a
-    placeholder message otherwise.
+    traces when voltage clamp multi-sweep data is available.  When g-V data is
+    also available, a normalised conductance plot with Boltzmann fit is shown
+    below the I-V curve.  Displays a placeholder message when no data exists.
 
     Returns:
         The full tab content as a flex column.
     """
     return rx.cond(
         AnalysisState.has_iv_data,
-        rx.flex(
-            rx.plotly(
-                data=AnalysisState.iv_figure,
+        rx.scroll_area(
+            rx.flex(
+                rx.plotly(
+                    data=AnalysisState.iv_figure,
+                    width="100%",
+                ),
+                rx.cond(
+                    AnalysisState.has_gv_data,
+                    _gv_plot(),
+                    rx.box(),
+                ),
+                direction="column",
                 width="100%",
+                padding="1",
             ),
-            direction="column",
             height="100%",
             width="100%",
-            overflow="hidden",
-            padding="1",
         ),
         rx.flex(
             rx.text(
