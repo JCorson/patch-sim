@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from scipy.optimize import brentq
+
 if TYPE_CHECKING:
     from .neuron import Neuron
 
@@ -44,11 +46,10 @@ def find_zero_current_voltage(
     v_min: float = -100.0,
     v_max: float = -20.0,
     tol: float = 1e-6,
-    max_iter: int = 100,
 ) -> float:
     """Find the membrane voltage where total ionic current is zero.
 
-    Uses bisection to locate the voltage at which the sum of all ionic
+    Uses Brent's method to locate the voltage at which the sum of all ionic
     currents (with gating variables held at their steady-state values) is
     zero.  This is the true zero-current resting potential — the voltage
     the neuron will settle to when no external current is injected.
@@ -63,9 +64,7 @@ def find_zero_current_voltage(
         v_min: Lower bound of the voltage search range in mV.  Must bracket
             the root together with *v_max*.
         v_max: Upper bound of the voltage search range in mV.
-        tol: Convergence tolerance in mV.  The search stops once the
-            bracketing interval is smaller than this value.
-        max_iter: Maximum number of bisection iterations.
+        tol: Convergence tolerance in mV.
 
     Returns:
         Voltage in mV at which total ionic current is zero.
@@ -91,20 +90,9 @@ def find_zero_current_voltage(
             "range or verify that the neuron has a stable resting point."
         )
 
-    lo, hi = v_min, v_max
-    f_lo = f_min
-
-    for _ in range(max_iter):
-        mid = (lo + hi) / 2.0
-        if (hi - lo) < tol:
-            return mid
-        f_mid = _total_ionic_current(neuron, mid, ca_i)
-        if f_mid == 0.0:
-            return mid
-        if f_lo * f_mid < 0:
-            hi = mid
-        else:
-            lo = mid
-            f_lo = f_mid
-
-    return (lo + hi) / 2.0
+    return brentq(
+        lambda V: _total_ionic_current(neuron, V, ca_i),
+        v_min,
+        v_max,
+        xtol=tol,
+    )
