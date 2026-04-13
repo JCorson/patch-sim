@@ -1064,7 +1064,23 @@ class SimulationState(rx.State):
                         )
                         analysis_st.iv_data = iv_data
                         if iv_result is not None:
-                            e_rev = neuron.core_channels[0].reversal_potential(neuron)
+                            na_channel = next(
+                                (
+                                    ch
+                                    for ch in neuron.core_channels
+                                    if isinstance(
+                                        ch.reversal_spec, patch_sim.NernstSpec
+                                    )
+                                    and ch.reversal_spec.species
+                                    is patch_sim.IonSpecies.SODIUM
+                                ),
+                                None,
+                            )
+                            e_rev = (
+                                na_channel.reversal_potential(neuron)
+                                if na_channel is not None
+                                else neuron.core_channels[0].reversal_potential(neuron)
+                            )
                             analysis_st.gv_data = _compute_gv_data(iv_result, e_rev)
                         else:
                             analysis_st.gv_data = {}

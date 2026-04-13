@@ -280,7 +280,13 @@ def test_gv_curve_integration_hh_neuron(hh_model):
     currents = [r["Itotal"] for r in results]
     iv = analyze_iv(time, currents, voltage_steps, pre_ms, pre_ms + stim_ms)
 
-    e_na = hh_model.core_channels[0].reversal_potential(hh_model)
+    na_channel = next(
+        ch
+        for ch in hh_model.core_channels
+        if isinstance(ch.reversal_spec, patch_sim.NernstSpec)
+        and ch.reversal_spec.species is patch_sim.IonSpecies.SODIUM
+    )
+    e_na = na_channel.reversal_potential(hh_model)
     result = compute_gv(iv, reversal_potential=e_na)
 
     # Should have several valid points

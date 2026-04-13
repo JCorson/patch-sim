@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from typing import Union
 
 import numpy as np
 from scipy.optimize import curve_fit
@@ -98,10 +97,10 @@ class GVAnalysisResult:
 
 
 def boltzmann(
-    V: Union[float, np.ndarray],
+    V: float | np.ndarray,
     v_half: float,
     k: float,
-) -> Union[float, np.ndarray]:
+) -> float | np.ndarray:
     """Evaluate the two-parameter Boltzmann sigmoid.
 
     Computes the standard voltage-dependent activation function::
@@ -158,6 +157,8 @@ def compute_gv(
         A :class:`GVAnalysisResult` with sorted per-step conductance records
         and Boltzmann fit parameters.
     """
+    # Sentinel returned on failure; parameter values are never exposed to the
+    # user because all callers check BoltzmannFit.converged before using them.
     _null_fit = BoltzmannFit(v_half=0.0, k=1.0, converged=False)
 
     if not iv_result.points:
