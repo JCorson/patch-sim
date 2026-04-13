@@ -5,17 +5,18 @@ from typing import Any
 import plotly.graph_objects as go
 import reflex as rx
 
-from patch_sim_ui.plotting import build_fi_figure, build_iv_figure
+from patch_sim_ui.plotting import build_fi_figure, build_gv_figure, build_iv_figure
 
 
 class AnalysisState(rx.State):
-    """State for AP, F-I, and I-V analysis results."""
+    """State for AP, F-I, I-V, and g-V analysis results."""
 
     ap_metrics: list[dict[str, Any]] = []  # Per-spike metrics (serialized)
     ap_summary: dict[str, Any] = {}  # Aggregate summary statistics
     ap_is_multi_sweep: bool = False  # True when AP data is pooled from multiple sweeps
     fi_data: dict[str, Any] = {}  # Serialized FIAnalysisResult for the UI
     iv_data: dict[str, Any] = {}  # Serialized IVAnalysisResult for the UI
+    gv_data: dict[str, Any] = {}  # Serialized GVAnalysisResult for the UI
 
     @rx.var
     def has_ap_metrics(self) -> bool:
@@ -38,6 +39,11 @@ class AnalysisState(rx.State):
         return len(self.iv_data) > 0
 
     @rx.var
+    def has_gv_data(self) -> bool:
+        """Return True when g-V analysis results are available for display."""
+        return len(self.gv_data) > 0
+
+    @rx.var
     def fi_figure(self) -> go.Figure:
         """Return a Plotly F-I curve figure.
 
@@ -56,3 +62,13 @@ class AnalysisState(rx.State):
         if not self.iv_data:
             return go.Figure()
         return build_iv_figure(self.iv_data)
+
+    @rx.var
+    def gv_figure(self) -> go.Figure:
+        """Return a Plotly g-V curve figure with Boltzmann fit overlay.
+
+        Returns an empty figure when no g-V data is available.
+        """
+        if not self.gv_data:
+            return go.Figure()
+        return build_gv_figure(self.gv_data)

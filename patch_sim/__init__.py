@@ -19,8 +19,11 @@ from .additional_channels import (
 )
 from .analysis import (
     APAnalysisResult,
+    BoltzmannFit,
     FIAnalysisResult,
     FIPoint,
+    GVAnalysisResult,
+    GVPoint,
     IVAnalysisResult,
     IVPoint,
     SpikeMetrics,
@@ -28,7 +31,9 @@ from .analysis import (
     analyze_aps_from_result,
     analyze_fi,
     analyze_iv,
+    boltzmann,
     compute_fi_point,
+    compute_gv,
     compute_iv_point,
 )
 from .calcium import CalciumDynamics
@@ -109,8 +114,11 @@ __all__ = [
     "analysis",
     "constants",
     "APAnalysisResult",
+    "BoltzmannFit",
     "FIAnalysisResult",
     "FIPoint",
+    "GVAnalysisResult",
+    "GVPoint",
     "IVAnalysisResult",
     "IVPoint",
     "SpikeMetrics",
@@ -118,7 +126,9 @@ __all__ = [
     "analyze_aps_from_result",
     "analyze_fi",
     "analyze_iv",
+    "boltzmann",
     "compute_fi_point",
+    "compute_gv",
     "compute_iv_point",
     "CURRENT_CLAMP",
     "CURRENT_PROTOCOLS",
