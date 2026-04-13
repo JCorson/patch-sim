@@ -1034,6 +1034,20 @@ async def test_active_protocol_preset_updated_on_second_load() -> None:
     assert ps.active_protocol_preset == "Repetitive Firing"
 
 
+async def test_set_clamp_mode_clears_active_protocol_preset() -> None:
+    """Switching clamp mode clears active_protocol_preset to avoid stale re-application.
+
+    If a Current Clamp preset is active and the user manually switches to
+    Voltage Clamp, the preset must be cleared so that a subsequent neuron
+    change does not re-apply the old Current Clamp preset and flip the mode back.
+    """
+    ps = _make_protocol_state()
+    ps.active_protocol_preset = "Repetitive Firing"
+    with patch.object(ProtocolState, "get_state", new=_make_get_state_fn({})):
+        await ps.set_clamp_mode("Voltage Clamp")
+    assert ps.active_protocol_preset == ""
+
+
 # ---------------------------------------------------------------------------
 # load_neuron_preset — protocol override re-application
 # ---------------------------------------------------------------------------
@@ -1050,10 +1064,11 @@ async def test_load_neuron_preset_reapplies_active_protocol_overrides() -> None:
     ps = _make_protocol_state()
     ps.active_protocol_preset = "Repetitive Firing"
     ps._apply_protocol_preset("Repetitive Firing")
+    sim_st = _make_state()
     with patch.object(
         NeuronState,
         "get_state",
-        new=_make_get_state_fn({ProtocolState: ps}),
+        new=_make_get_state_fn({ProtocolState: ps, SimulationState: sim_st}),
     ):
         await ns.load_neuron_preset(DOPAMINERGIC)
     assert ps.stimulus_duration == pytest.approx(480.0)
@@ -1066,10 +1081,11 @@ async def test_load_neuron_preset_no_active_protocol_skips_override() -> None:
     ps = _make_protocol_state()
     # active_protocol_preset is empty — no override should be applied
     original_duration = ps.stimulus_duration
+    sim_st = _make_state()
     with patch.object(
         NeuronState,
         "get_state",
-        new=_make_get_state_fn({ProtocolState: ps}),
+        new=_make_get_state_fn({ProtocolState: ps, SimulationState: sim_st}),
     ):
         await ns.load_neuron_preset(DOPAMINERGIC)
     assert ps.stimulus_duration == pytest.approx(original_duration)
@@ -1081,10 +1097,11 @@ async def test_load_neuron_preset_squid_uses_base_protocol_params() -> None:
     ps = _make_protocol_state()
     ps.active_protocol_preset = "Repetitive Firing"
     ps._apply_protocol_preset("Repetitive Firing")
+    sim_st = _make_state()
     with patch.object(
         NeuronState,
         "get_state",
-        new=_make_get_state_fn({ProtocolState: ps}),
+        new=_make_get_state_fn({ProtocolState: ps, SimulationState: sim_st}),
     ):
         await ns.load_neuron_preset(SQUID_GIANT_AXON)
     # Squid Giant Axon has no Repetitive Firing entry in NEURON_PROTOCOL_ADJUSTMENTS
@@ -1103,10 +1120,11 @@ async def test_load_neuron_preset_reapplies_protocol_neuron_overrides() -> None:
     ps = _make_protocol_state()
     ps.active_protocol_preset = "Na+ Channel Activation"
     ps._apply_protocol_preset("Na+ Channel Activation")
+    sim_st = _make_state()
     with patch.object(
         NeuronState,
         "get_state",
-        new=_make_get_state_fn({ProtocolState: ps}),
+        new=_make_get_state_fn({ProtocolState: ps, SimulationState: sim_st}),
     ):
         await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
     assert ns.g_K == pytest.approx(0.0)

@@ -138,9 +138,12 @@ class ProtocolState(rx.State):
     def _apply_clamp_mode(self, mode: str) -> None:
         """Apply clamp mode and reset protocol type synchronously.
 
-        Sets ``clamp_mode`` and resets ``protocol_type`` to the first option
-        for the new mode.  Does not touch cross-state fields (use
-        :meth:`set_clamp_mode` for the full async handler).
+        Sets ``clamp_mode``, resets ``protocol_type`` to the first option for
+        the new mode, and clears ``active_protocol_preset``.  Clearing the
+        preset prevents a stale preset from being re-applied (with the wrong
+        clamp mode) if the user subsequently switches neuron type.  Does not
+        touch cross-state fields (use :meth:`set_clamp_mode` for the full
+        async handler).
 
         Args:
             mode: New clamp mode string (``CURRENT_CLAMP`` or ``VOLTAGE_CLAMP``).
@@ -150,6 +153,7 @@ class ProtocolState(rx.State):
             self.protocol_type = constants.CURRENT_PROTOCOLS[0]
         else:
             self.protocol_type = constants.VOLTAGE_PROTOCOLS[0]
+        self.active_protocol_preset = ""
 
     async def set_clamp_mode(self, mode: str) -> None:
         """Switch between Current Clamp and Voltage Clamp modes.
