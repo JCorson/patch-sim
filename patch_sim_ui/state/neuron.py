@@ -35,7 +35,7 @@ from patch_sim.constants import (
     DEFAULT_V_REST,
 )
 from patch_sim_ui import presets
-from patch_sim_ui.state._common import _make_float_setter, _set_float
+from patch_sim_ui.state._common import _set_float
 
 _NEURON_FLOAT_FIELDS: list[str] = [
     "g_Na",
@@ -101,6 +101,46 @@ def _make_bool_setter(field_name: str, class_name: str = "NeuronState"):
     setter.__name__ = f"set_{field_name}"
     setter.__qualname__ = f"{class_name}.set_{field_name}"
     setter.__doc__ = f"Set {field_name} from a checkbox event."
+    return setter
+
+
+#: The five NeuronState fields that determine the passive-only membrane test result.
+#: Only these fields are included in ``neuron_fingerprint`` so that changing
+#: active conductances (g_Na, g_K, v_rest, auxiliary channels) does not
+#: invalidate the membrane test cache.
+_PASSIVE_PARAM_FIELDS: list[str] = ["g_L", "C_m", "Cl_out", "Cl_in", "T"]
+
+
+def _make_neuron_float_setter(field_name: str):
+    """Factory returning a float setter that also queues a membrane test re-run.
+
+    Wraps :func:`~patch_sim_ui.state._common._set_float` and then returns
+    ``SimulationState.run_membrane_test`` so that any change to a neuron
+    parameter automatically refreshes the displayed passive properties.  The
+    fingerprint-based cache inside ``run_membrane_test`` ensures the simulation
+    only re-runs when passive-relevant parameters (g_L, C_m, Cl, T) change.
+
+    Args:
+        field_name: Name of the ``NeuronState`` attribute to update.
+
+    Returns:
+        An event handler method that accepts ``str | list[float] | float``,
+        updates the field, and chains ``run_membrane_test``.
+    """
+
+    def setter(self, value: "str | list[float] | float"):
+        """Set the field from an input or slider event and queue a membrane test."""
+        # Late import avoids a circular dependency between neuron and simulation.
+        from patch_sim_ui.state.simulation import (  # noqa: PLC0415
+            SimulationState,
+        )
+
+        _set_float(self, field_name, value)
+        return SimulationState.run_membrane_test
+
+    setter.__name__ = f"set_{field_name}"
+    setter.__qualname__ = f"NeuronState.set_{field_name}"
+    setter.__doc__ = f"Set {field_name} and queue a membrane test re-run."
     return setter
 
 
@@ -184,29 +224,24 @@ class NeuronState(rx.State):
 
     @rx.var
     def neuron_fingerprint(self) -> str:
-        """SHA-256 hex digest of all biophysical parameters.
+        """SHA-256 hex digest of the passive membrane parameters.
 
-        Used to detect whether neuron parameters have changed since the last
-        membrane test run, enabling cache invalidation without re-running the
-        full simulation.
+        Only hashes the five fields that determine the passive-only membrane
+        test result (g_L, C_m, Cl_out, Cl_in, T).  Active conductances
+        (g_Na, g_K, v_rest, auxiliary channels) are excluded: the membrane
+        test blocks them internally, so changing those fields cannot change
+        R_in, τ_m, or C_m.
 
-        ``cache=True`` is intentionally omitted: dependency tracking via
-        ``getattr`` is not guaranteed across all Reflex versions, so this var
-        recomputes reactively on every state update.  The hash is cheap (string
-        concatenation + SHA-256 over ~30 values) so the overhead is negligible.
+        ``cache=True`` is intentionally omitted: ``getattr``-based dependency
+        tracking is not guaranteed across all Reflex versions, so the hash is
+        recomputed reactively on every state update.  Hashing five floats is
+        negligibly cheap.
 
         Returns:
-            A hex digest string that changes whenever any conductance, ion
-            concentration, temperature, auxiliary channel state or the active
-            neuron type changes.
+            A hex digest string that changes only when g_L, C_m, Cl_out,
+            Cl_in, or T changes.
         """
-        parts: list[str] = [self.active_neuron_type]
-        for field in _NEURON_FLOAT_FIELDS:
-            parts.append(repr(getattr(self, field)))
-        for field in _CHANNEL_FLOAT_FIELDS:
-            parts.append(repr(getattr(self, field)))
-        for field in _NON_VISIBILITY_BOOL_FIELDS:
-            parts.append(repr(getattr(self, field)))
+        parts = [repr(getattr(self, f)) for f in _PASSIVE_PARAM_FIELDS]
         return hashlib.sha256("|".join(parts).encode()).hexdigest()
 
     # ------------------------------------------------------------------ #
@@ -288,7 +323,7 @@ class NeuronState(rx.State):
         _set_float(self, field, value)
 
     for _f in _NEURON_FLOAT_FIELDS + _CHANNEL_FLOAT_FIELDS:
-        vars()[f"set_{_f}"] = _make_float_setter(_f, "NeuronState")
+        vars()[f"set_{_f}"] = _make_neuron_float_setter(_f)
 
     for _f in _NON_VISIBILITY_BOOL_FIELDS:
         vars()[f"set_{_f}"] = _make_bool_setter(_f, "NeuronState")
