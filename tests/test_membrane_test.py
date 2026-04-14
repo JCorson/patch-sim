@@ -6,6 +6,8 @@ and verifies the module-level protocol constants.
 
 from __future__ import annotations
 
+import pytest
+
 import patch_sim
 from patch_sim.analysis.membrane_test import (
     MEMBRANE_TEST_CURRENT,
@@ -18,21 +20,22 @@ from patch_sim.neuron import Neuron
 
 
 def test_run_membrane_test_default_neuron(hh_model: Neuron) -> None:
-    """Membrane test on the default HH neuron returns passive properties.
+    """Membrane test on the default HH neuron recovers the set passive parameters.
 
-    The HH model has active conductances that complicate τ extraction, so this
-    test only verifies that the function returns a result and that R_in is
-    positive and within a plausible range.  The time constant and derived
-    capacitance are checked to be positive without tight bounds because the
-    HH step response is not a pure single exponential.
+    The membrane test simulates with g_Na = g_K = 0 (channel block) and
+    v_rest = E_L, giving a clean single-exponential response.  The measured
+    R_in, τ_m, and C_m should closely match the analytically expected values
+    for the default HH parameters (g_L = 0.3 mS/cm², C_m = 1.0 µF/cm²):
+      R_in = 1/g_L ≈ 3.33 kΩ·cm²
+      τ_m  = C_m/g_L ≈ 3.33 ms
+      C_m  ≈ 1.0 µF/cm²
     """
     props = run_membrane_test(hh_model)
     assert props is not None, "Expected PassiveProperties, got None"
-    assert props.input_resistance > 0, "R_in must be positive"
-    assert props.input_resistance < 5.0, "R_in unrealistically large (> 5 kΩ·cm²)"
-    assert props.time_constant > 0, "τ_m must be positive"
-    if props.membrane_capacitance is not None:
-        assert props.membrane_capacitance > 0, "C_m must be positive"
+    assert props.input_resistance == pytest.approx(1.0 / 0.3, abs=0.1)
+    assert props.time_constant == pytest.approx(1.0 / 0.3, abs=0.1)
+    assert props.membrane_capacitance is not None
+    assert props.membrane_capacitance == pytest.approx(1.0, abs=0.1)
 
 
 def test_run_membrane_test_always_subthreshold() -> None:
@@ -52,34 +55,24 @@ def test_run_membrane_test_always_subthreshold() -> None:
 
 
 def test_membrane_test_sensitive_to_g_l() -> None:
-    """Changing g_L changes the measured R_in.
+    """Changing g_L produces the expected change in R_in.
 
-    With g_Na and g_K set to zero the model is a pure RC circuit, so R_in
-    equals 1/g_L exactly.  The neurons must be initialised at the leak
-    equilibrium potential (E_L) so that there is no drift during the
-    pre-stimulus baseline period.  Doubling g_L should halve R_in, confirming
-    that the membrane test propagates biophysical changes to the output.
+    The membrane test runs in passive mode (channels blocked internally), so
+    R_in = 1/g_L exactly.  This test verifies the relationship holds and that
+    R_in matches the analytical expectation.
     """
-    default_neuron = Neuron()
-    # Leak reversal potential (Cl⁻, z=−1) for the default ion concentrations
-    e_l = float(
-        patch_sim.nernst_potential(
-            -1, default_neuron.T, default_neuron.Cl_out, default_neuron.Cl_in
-        )
-    )
-    neuron_low_gl = Neuron(g_Na=0.0, g_K=0.0, g_L=0.15, v_rest=e_l)
-    neuron_high_gl = Neuron(g_Na=0.0, g_K=0.0, g_L=0.6, v_rest=e_l)
+    neuron_low_gl = Neuron(g_L=0.15)
+    neuron_high_gl = Neuron(g_L=0.6)
 
     props_low = run_membrane_test(neuron_low_gl)
     props_high = run_membrane_test(neuron_high_gl)
 
     assert props_low is not None
     assert props_high is not None
-    # With only leak conductance: R_in = 1/g_L (kΩ·cm²)
-    # g_L=0.15 → R_in ≈ 6.67,  g_L=0.6 → R_in ≈ 1.67
-    assert props_low.input_resistance > props_high.input_resistance, (
-        "Higher g_L should produce lower R_in"
-    )
+    # R_in = 1/g_L: g_L=0.15 → 6.67 kΩ·cm², g_L=0.6 → 1.67 kΩ·cm²
+    assert props_low.input_resistance == pytest.approx(1.0 / 0.15, abs=0.1)
+    assert props_high.input_resistance == pytest.approx(1.0 / 0.6, abs=0.1)
+    assert props_low.input_resistance > props_high.input_resistance
 
 
 def test_membrane_test_protocol_constants() -> None:
