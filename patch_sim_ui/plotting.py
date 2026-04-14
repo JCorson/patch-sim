@@ -949,11 +949,11 @@ def build_phase_plane_figure(phase_plane_data: dict) -> go.Figure:
         )
 
     fig.update_layout(
-        autosize=True,
         margin=_PLOT_MARGIN,
         template="plotly_white",
         hovermode="closest",
         showlegend=False,
+        height=260,
         xaxis_title="V (mV)",
         yaxis_title="dV/dt (mV/ms)",
     )
