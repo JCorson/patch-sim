@@ -402,6 +402,42 @@ def _compute_cc_multi_sweep_analysis(
         patch_sim.analyze_aps(time_arr, np.array(s.voltage)) for s in sweeps
     ]
 
+    # --- Passive properties (first subthreshold, non-zero-current sweep) ---
+    passive = None
+    for ap_result, sweep, i_step in zip(per_sweep_ap, sweeps, current_steps):
+        if ap_result.spike_count == 0 and i_step != 0.0:
+            passive = patch_sim.analyze_passive_properties(
+                time_arr,
+                np.array(sweep.voltage),
+                current_amplitude=i_step,
+                stim_start_ms=stim_start,
+                stim_end_ms=stim_end,
+            )
+            break
+
+    def _fmt_passive() -> dict[str, Any]:
+        """Serialise passive property results to display strings.
+
+        Returns:
+            Dict with ``input_resistance``, ``time_constant``, and
+            ``membrane_capacitance`` as pre-formatted strings.
+        """
+        if passive is None:
+            return {
+                "input_resistance": "\u2014",
+                "time_constant": "\u2014",
+                "membrane_capacitance": "\u2014",
+            }
+        return {
+            "input_resistance": f"{passive.input_resistance:.2f}",
+            "time_constant": f"{passive.time_constant:.2f}",
+            "membrane_capacitance": (
+                f"{passive.membrane_capacitance:.2f}"
+                if passive.membrane_capacitance is not None
+                else "\u2014"
+            ),
+        }
+
     # --- AP metrics (pooled across all sweeps) ---
     all_spikes = [spike for ap in per_sweep_ap for spike in ap.spikes]
 
@@ -434,6 +470,7 @@ def _compute_cc_multi_sweep_analysis(
                 f"{float(np.mean(ahp_vals)):.1f}" if ahp_vals else "\u2014"
             ),
             # mean_isi and firing_rate omitted: shown per-sweep in the F-I curve.
+            **_fmt_passive(),
         }
     else:
         ap_metrics = []
@@ -1150,6 +1187,15 @@ class SimulationState(rx.State):
                     if mode == CURRENT_CLAMP:
                         ap_result = patch_sim.analyze_aps_from_result(result)
                         sfa_curve = patch_sim.compute_sfa(ap_result)
+                        passive = patch_sim.analyze_passive_from_result(
+                            result,
+                            current_amplitude=proto_st.min_stimulus,
+                            stim_start_ms=proto_st.pre_stimulus_duration,
+                            stim_end_ms=(
+                                proto_st.pre_stimulus_duration
+                                + proto_st.stimulus_duration
+                            ),
+                        )
                         analysis_st.ap_metrics = [
                             {
                                 "index": s.index,
@@ -1210,6 +1256,22 @@ class SimulationState(rx.State):
                             "rheobase": (
                                 f"\u2264\u202f{proto_st.min_stimulus:.2f}"
                                 if ap_result.spike_count >= 1
+                                else "\u2014"
+                            ),
+                            "input_resistance": (
+                                f"{passive.input_resistance:.2f}"
+                                if passive is not None
+                                else "\u2014"
+                            ),
+                            "time_constant": (
+                                f"{passive.time_constant:.2f}"
+                                if passive is not None
+                                else "\u2014"
+                            ),
+                            "membrane_capacitance": (
+                                f"{passive.membrane_capacitance:.2f}"
+                                if passive is not None
+                                and passive.membrane_capacitance is not None
                                 else "\u2014"
                             ),
                         }

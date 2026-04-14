@@ -223,9 +223,7 @@ def analyze_passive_properties(
     # Fit window: from stim_start to stim_start + _FIT_FRACTION * stim_duration,
     # capped at _MAX_FIT_WINDOW_MS so that slow gating-variable relaxations do
     # not distort the single-exponential fit of the fast capacitative transient.
-    fit_end_ms = stim_start_ms + min(
-        _FIT_FRACTION * stim_duration, _MAX_FIT_WINDOW_MS
-    )
+    fit_end_ms = stim_start_ms + min(_FIT_FRACTION * stim_duration, _MAX_FIT_WINDOW_MS)
     fit_mask = (time >= stim_start_ms) & (time < fit_end_ms)
     if not np.any(fit_mask):
         return None
@@ -274,10 +272,12 @@ def analyze_passive_from_result(
     stim_start_ms: float,
     stim_end_ms: float,
 ) -> PassiveProperties | None:
-    """Extract passive properties from a :class:`~patch_sim.clamp_simulations.SimulationResult`.
+    """Extract passive properties from a SimulationResult structured array.
 
     Convenience wrapper around :func:`analyze_passive_properties` that pulls
-    the ``"time"`` and ``"voltage"`` fields from the structured array.
+    the ``"time"`` and ``"voltage"`` fields from the structured array.  See
+    :class:`~patch_sim.clamp_simulations.SimulationResult` for the array
+    schema.
 
     Args:
         result: A structured NumPy array returned by

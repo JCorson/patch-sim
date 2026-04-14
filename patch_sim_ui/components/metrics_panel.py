@@ -64,6 +64,14 @@ def _ap_summary() -> rx.Component:
             rx.text(s["mean_ahp_depth"].to(str) + " mV", size="1", align="left"),
             rx.text("Rheobase", size="1", color="gray"),
             rx.text(s["rheobase"].to(str) + " µA/cm²", size="1", align="left"),
+            rx.text("R_in", size="1", color="gray"),
+            rx.text(s["input_resistance"].to(str) + " kΩ·cm²", size="1", align="left"),
+            rx.text("τ_m", size="1", color="gray"),
+            rx.text(s["time_constant"].to(str) + " ms", size="1", align="left"),
+            rx.text("C_m", size="1", color="gray"),
+            rx.text(
+                s["membrane_capacitance"].to(str) + " µF/cm²", size="1", align="left"
+            ),
             rx.cond(
                 ~AnalysisState.ap_is_multi_sweep,
                 rx.text("ISI", size="1", color="gray"),
