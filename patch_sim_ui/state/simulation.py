@@ -546,6 +546,10 @@ def _compute_iv_data(
 
 _GV_FIT_POINTS = 200  # number of voltage points for the pre-computed Boltzmann curve
 
+#: Debounce window (seconds) for slider-driven membrane test requests.
+#: Slider events within this window are coalesced; only the last one proceeds.
+_MT_DEBOUNCE_S: float = 0.3
+
 
 def _compute_gv_data(
     iv_result: "patch_sim.IVAnalysisResult",
@@ -1255,12 +1259,6 @@ class SimulationState(rx.State):
                 yield rx.call_script(js)
             yield rx.call_script(_LOG_SCROLL_JS)
 
-    #: Debounce window in seconds for slider-driven membrane test requests.
-    #: Requests that arrive within this window are coalesced; only the last
-    #: one proceeds.  Chosen to be long enough to let rapid slider drags
-    #: settle without noticeably delaying single-click edits.
-    _MT_DEBOUNCE_S: float = 0.3
-
     @rx.event(background=True)
     async def run_membrane_test_debounced(self) -> AsyncGenerator[Any, None]:
         """Debounced entry point for slider-driven membrane test requests.
@@ -1279,7 +1277,7 @@ class SimulationState(rx.State):
             self._mt_request_id += 1
             my_ticket = self._mt_request_id
 
-        await asyncio.sleep(self._MT_DEBOUNCE_S)
+        await asyncio.sleep(_MT_DEBOUNCE_S)
 
         async with self:
             if self._mt_request_id != my_ticket:
