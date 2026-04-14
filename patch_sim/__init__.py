@@ -18,6 +18,10 @@ from .additional_channels import (
     make_inar_channel,
 )
 from .analysis import (
+    MEMBRANE_TEST_CURRENT,
+    MEMBRANE_TEST_POST_MS,
+    MEMBRANE_TEST_PRE_MS,
+    MEMBRANE_TEST_STEP_MS,
     APAnalysisResult,
     BoltzmannFit,
     FIAnalysisResult,
@@ -44,6 +48,7 @@ from .analysis import (
     compute_sfa,
     estimate_rheobase,
     is_subthreshold,
+    run_membrane_test,
 )
 from .calcium import CalciumDynamics
 from .channels import (
@@ -142,6 +147,11 @@ __all__ = [
     "analyze_passive_properties",
     "analyze_sfa",
     "boltzmann",
+    "MEMBRANE_TEST_CURRENT",
+    "MEMBRANE_TEST_POST_MS",
+    "MEMBRANE_TEST_PRE_MS",
+    "MEMBRANE_TEST_STEP_MS",
+    "run_membrane_test",
     "compute_fi_point",
     "compute_gv",
     "compute_iv_point",

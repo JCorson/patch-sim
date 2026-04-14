@@ -6,6 +6,7 @@ Modules:
     ap_metrics: Action potential detection and metric extraction.
     fi_curve: F-I curve construction from current clamp multi-sweep results.
     iv_curve: I-V curve construction from voltage clamp multi-sweep results.
+    membrane_test: Dedicated membrane test for passive property characterisation.
     passive_properties: Passive membrane property extraction (R_in, τₘ, Cₘ).
     sfa: Spike-frequency adaptation curves and adaptation index.
 """
@@ -31,6 +32,13 @@ from .gv_curve import (
     compute_gv,
 )
 from .iv_curve import IVAnalysisResult, IVPoint, analyze_iv, compute_iv_point
+from .membrane_test import (
+    MEMBRANE_TEST_CURRENT,
+    MEMBRANE_TEST_POST_MS,
+    MEMBRANE_TEST_PRE_MS,
+    MEMBRANE_TEST_STEP_MS,
+    run_membrane_test,
+)
 from .passive_properties import (
     PassiveProperties,
     analyze_passive_from_result,
@@ -54,6 +62,7 @@ __all__ = [
     "compute_sfa",
     "estimate_rheobase",
     "is_subthreshold",
+    "run_membrane_test",
     "APAnalysisResult",
     "BoltzmannFit",
     "FIAnalysisResult",
@@ -62,6 +71,10 @@ __all__ = [
     "GVPoint",
     "IVAnalysisResult",
     "IVPoint",
+    "MEMBRANE_TEST_CURRENT",
+    "MEMBRANE_TEST_POST_MS",
+    "MEMBRANE_TEST_PRE_MS",
+    "MEMBRANE_TEST_STEP_MS",
     "PassiveProperties",
     "SFAAnalysisResult",
     "SFACurve",
