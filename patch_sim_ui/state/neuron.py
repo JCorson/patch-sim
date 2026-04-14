@@ -112,23 +112,27 @@ _PASSIVE_PARAM_FIELDS: list[str] = ["g_L", "C_m", "Cl_out", "Cl_in", "T"]
 
 
 def _make_neuron_float_setter(field_name: str):
-    """Factory returning a float setter that also queues a membrane test re-run.
+    """Factory returning an async generator setter that chains a membrane test.
 
-    Wraps :func:`~patch_sim_ui.state._common._set_float` and then returns
+    Wraps :func:`~patch_sim_ui.state._common._set_float` and then yields
     ``SimulationState.run_membrane_test`` so that any change to a neuron
-    parameter automatically refreshes the displayed passive properties.  The
-    fingerprint-based cache inside ``run_membrane_test`` ensures the simulation
-    only re-runs when passive-relevant parameters (g_L, C_m, Cl, T) change.
+    parameter automatically refreshes the displayed passive properties.  Uses
+    ``yield`` (not ``return``) because Reflex only chains events yielded from
+    generators; returning an event from a sync handler has no effect.
+
+    The fingerprint-based cache inside ``run_membrane_test`` ensures the
+    simulation only re-runs when passive-relevant parameters (g_L, C_m, Cl, T)
+    actually change.
 
     Args:
         field_name: Name of the ``NeuronState`` attribute to update.
 
     Returns:
-        An event handler method that accepts ``str | list[float] | float``,
-        updates the field, and chains ``run_membrane_test``.
+        An async generator event handler that accepts ``str | list[float] | float``,
+        updates the field, and yields ``run_membrane_test``.
     """
 
-    def setter(self, value: "str | list[float] | float"):
+    async def setter(self, value: "str | list[float] | float"):
         """Set the field from an input or slider event and queue a membrane test."""
         # Late import avoids a circular dependency between neuron and simulation.
         from patch_sim_ui.state.simulation import (  # noqa: PLC0415
@@ -136,7 +140,7 @@ def _make_neuron_float_setter(field_name: str):
         )
 
         _set_float(self, field_name, value)
-        return SimulationState.run_membrane_test
+        yield SimulationState.run_membrane_test
 
     setter.__name__ = f"set_{field_name}"
     setter.__qualname__ = f"NeuronState.set_{field_name}"
