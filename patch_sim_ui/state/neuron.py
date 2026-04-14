@@ -147,7 +147,7 @@ def _make_neuron_float_setter(field_name: str):
         )
 
         _set_float(self, field_name, value)
-        yield SimulationState.run_membrane_test
+        yield SimulationState.run_membrane_test_debounced
 
     setter.__name__ = f"set_{field_name}"
     setter.__qualname__ = f"NeuronState.set_{field_name}"

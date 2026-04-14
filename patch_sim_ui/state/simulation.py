@@ -546,6 +546,9 @@ def _compute_iv_data(
 
 _GV_FIT_POINTS = 200  # number of voltage points for the pre-computed Boltzmann curve
 
+#: Debounce window (seconds) for slider-driven membrane test requests.
+_MT_DEBOUNCE_S: float = 0.3
+
 
 def _compute_gv_data(
     iv_result: "patch_sim.IVAnalysisResult",
@@ -623,6 +626,7 @@ class SimulationState(rx.State):
     _cont_gating: dict[str, float] = {}
     _cont_ca_i: float = 0.0
     _cont_has_state: bool = False  # True once at least one iteration has run
+    _mt_request_id: int = 0  # incremented per slider event; debounce uses this
 
     # ------------------------------------------------------------------ #
     # UI state                                                           #
@@ -1251,6 +1255,27 @@ class SimulationState(rx.State):
             yield rx.call_script(_LOG_SCROLL_JS)
 
     @rx.event(background=True)
+    async def run_membrane_test_debounced(self) -> AsyncGenerator[Any, None]:
+        """Debounced entry point for slider-driven membrane test requests.
+
+        Increments ``_mt_request_id``, sleeps :data:`_MT_DEBOUNCE_S` seconds,
+        then bails out if a newer request arrived.  Otherwise yields
+        :meth:`run_membrane_test`.  Page-load and post-simulation triggers
+        call :meth:`run_membrane_test` directly and are unaffected.
+        """
+        async with self:
+            self._mt_request_id += 1
+            my_ticket = self._mt_request_id
+
+        await asyncio.sleep(_MT_DEBOUNCE_S)
+
+        async with self:
+            if self._mt_request_id != my_ticket:
+                return
+
+        yield SimulationState.run_membrane_test
+
+    @rx.event(background=True)
     async def run_membrane_test(self) -> None:
         """Run the dedicated membrane test protocol and cache passive properties.
 
@@ -1293,10 +1318,10 @@ class SimulationState(rx.State):
                 analysis_st.mt_membrane_capacitance = "\u2014"
                 analysis_st.mt_fit_converged = False
             else:
-                analysis_st.mt_input_resistance = f"{props.input_resistance:.1f}"
-                analysis_st.mt_time_constant = f"{props.time_constant:.1f}"
+                analysis_st.mt_input_resistance = f"{props.input_resistance:.2f}"
+                analysis_st.mt_time_constant = f"{props.time_constant:.2f}"
                 analysis_st.mt_membrane_capacitance = (
-                    f"{props.membrane_capacitance:.1f}"
+                    f"{props.membrane_capacitance:.2f}"
                     if props.membrane_capacitance is not None
                     else "\u2014"
                 )
