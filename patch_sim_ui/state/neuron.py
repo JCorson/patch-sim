@@ -108,6 +108,13 @@ def _make_bool_setter(field_name: str, class_name: str = "NeuronState"):
 #: Only these fields are included in ``neuron_fingerprint`` so that changing
 #: active conductances (g_Na, g_K, v_rest, auxiliary channels) does not
 #: invalidate the membrane test cache.
+#:
+#: Na⁺, K⁺, and Ca²⁺ concentrations are intentionally omitted: the passive
+#: neuron constructed in ``run_membrane_test`` only uses Cl⁻ concentrations
+#: (to compute E_L via the chloride Nernst potential).  The other ion
+#: concentrations are passed through to the ``Neuron`` constructor but have
+#: no effect on the passive RC circuit because g_Na = g_K = 0 and no Ca²⁺
+#: channels are present, so none of their reversal potentials carry current.
 _PASSIVE_PARAM_FIELDS: list[str] = ["g_L", "C_m", "Cl_out", "Cl_in", "T"]
 
 
@@ -140,7 +147,7 @@ def _make_neuron_float_setter(field_name: str):
         )
 
         _set_float(self, field_name, value)
-        yield SimulationState.run_membrane_test
+        yield SimulationState.run_membrane_test_debounced
 
     setter.__name__ = f"set_{field_name}"
     setter.__qualname__ = f"NeuronState.set_{field_name}"
