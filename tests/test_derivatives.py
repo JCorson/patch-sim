@@ -1,7 +1,6 @@
 """Tests for patch_sim.analysis.derivatives."""
 
 import numpy as np
-import pytest
 
 from patch_sim.analysis.derivatives import compute_dvdt
 
