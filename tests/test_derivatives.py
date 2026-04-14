@@ -39,20 +39,39 @@ def test_compute_dvdt_returns_voltage_unchanged() -> None:
     np.testing.assert_array_equal(v_out, voltage)
 
 
-def test_compute_dvdt_single_point_returns_empty() -> None:
-    """A single-point input returns two empty arrays."""
+def test_compute_dvdt_single_point_returns_voltage_and_empty_dvdt() -> None:
+    """A single-point input returns the voltage and an empty dvdt array."""
     time = np.array([0.0])
     voltage = np.array([-65.0])
     v_out, dvdt = compute_dvdt(time, voltage)
-    assert len(v_out) == 0
+    np.testing.assert_array_equal(v_out, voltage)
     assert len(dvdt) == 0
+
+
+def test_compute_dvdt_two_points_returns_same_length() -> None:
+    """A two-point input is the minimum for a derivative; output lengths match."""
+    time = np.array([0.0, 1.0])
+    voltage = np.array([0.0, 2.0])
+    v_out, dvdt = compute_dvdt(time, voltage)
+    assert len(v_out) == 2  # noqa: PLR2004
+    assert len(dvdt) == 2  # noqa: PLR2004
+    # With only two points np.gradient uses forward/backward difference.
+    np.testing.assert_allclose(dvdt, 2.0, atol=1e-12)
 
 
 def test_compute_dvdt_empty_input_returns_empty() -> None:
-    """Empty input arrays return two empty arrays."""
+    """Empty input arrays return an empty voltage and an empty dvdt array."""
     v_out, dvdt = compute_dvdt(np.array([]), np.array([]))
     assert len(v_out) == 0
     assert len(dvdt) == 0
+
+
+def test_compute_dvdt_mismatched_lengths_raise() -> None:
+    """Mismatched time and voltage lengths raise ValueError."""
+    import pytest
+
+    with pytest.raises(ValueError, match="same length"):
+        compute_dvdt(np.array([0.0, 1.0, 2.0]), np.array([-65.0, -64.0]))
 
 
 def test_compute_dvdt_nonuniform_time_steps() -> None:
@@ -67,8 +86,7 @@ def test_compute_dvdt_nonuniform_time_steps() -> None:
 def test_compute_dvdt_accepts_lists() -> None:
     """Plain Python lists are accepted as input without error."""
     _, dvdt = compute_dvdt([0.0, 1.0, 2.0], [0.0, 0.0, 0.0])
-    assert len(dvdt) == 3
-    assert len(dvdt) == 3
+    assert len(dvdt) == 3  # noqa: PLR2004
     np.testing.assert_allclose(dvdt, 0.0, atol=1e-12)
 
 

@@ -36,12 +36,12 @@ from .sfa import SFAAnalysisResult, SFACurve, analyze_sfa, compute_sfa
 
 __all__ = [
     "analyze_aps",
-    "compute_dvdt",
     "analyze_aps_from_result",
     "analyze_fi",
     "analyze_iv",
     "analyze_sfa",
     "boltzmann",
+    "compute_dvdt",
     "compute_fi_point",
     "compute_gv",
     "compute_iv_point",

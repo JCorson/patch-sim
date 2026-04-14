@@ -344,7 +344,7 @@ def _build_hover_tables(
 
     resp_html = _build_rows_html(resp_cols, "additional_currents", ".2f")
 
-    # --- Gating subplot (row 2) ---
+    # --- Gating subplot (row 3) ---
     gating_cols: list[tuple[str, str, str]] = []
     if visibility.potassium_activation:
         gating_cols.append(("n", "classic", "potassium_activation"))
@@ -358,7 +358,7 @@ def _build_hover_tables(
 
     gating_html = _build_rows_html(gating_cols, "additional_gating", ".3f")
 
-    # --- Stimulus subplot (row 3) ---
+    # --- Stimulus subplot (row 4) ---
     stim_col_label = "Cmd (mV)" if is_vc else "Stim"
     stim_header = " " * label_w + f"{stim_col_label:>{col_w}}"
     # Pre-extract stimulus arrays and downsample once: (n_sweeps, n_hover_pts).
