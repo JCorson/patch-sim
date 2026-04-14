@@ -1293,10 +1293,10 @@ class SimulationState(rx.State):
                 analysis_st.mt_membrane_capacitance = "\u2014"
                 analysis_st.mt_fit_converged = False
             else:
-                analysis_st.mt_input_resistance = f"{props.input_resistance:.2f}"
-                analysis_st.mt_time_constant = f"{props.time_constant:.2f}"
+                analysis_st.mt_input_resistance = f"{props.input_resistance:.1g}"
+                analysis_st.mt_time_constant = f"{props.time_constant:.1g}"
                 analysis_st.mt_membrane_capacitance = (
-                    f"{props.membrane_capacitance:.2f}"
+                    f"{props.membrane_capacitance:.1g}"
                     if props.membrane_capacitance is not None
                     else "\u2014"
                 )
