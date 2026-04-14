@@ -216,6 +216,60 @@ def _ap_metrics_tab() -> rx.Component:
     )
 
 
+def _membrane_test_section() -> rx.Component:
+    """Render the always-visible passive membrane properties section.
+
+    Displays R_in (kΩ·cm²), τₘ (ms), and Cₘ (µF/cm²) from the dedicated
+    membrane test run.  Shown in both current clamp and voltage clamp modes
+    whenever membrane test results are available.
+
+    Returns:
+        A box with a compact 2-column grid of labelled passive property values,
+        or an empty box when no membrane test results are available.
+    """
+    s = AnalysisState
+    return rx.cond(
+        AnalysisState.has_membrane_test,
+        rx.box(
+            rx.text(
+                "Membrane Properties",
+                size="2",
+                weight="bold",
+                padding_x="3",
+                padding_top="2",
+            ),
+            rx.grid(
+                rx.text("R_in", size="1", color="gray"),
+                rx.text(
+                    s.mt_input_resistance + " kΩ·cm²",
+                    size="1",
+                    align="left",
+                ),
+                rx.text("τ_m", size="1", color="gray"),
+                rx.text(
+                    s.mt_time_constant + " ms",
+                    size="1",
+                    align="left",
+                ),
+                rx.text("C_m", size="1", color="gray"),
+                rx.text(
+                    s.mt_membrane_capacitance + " µF/cm²",
+                    size="1",
+                    align="left",
+                ),
+                columns="2",
+                spacing="2",
+                width="100%",
+                padding_x="3",
+                padding_bottom="2",
+            ),
+            border_bottom="1px solid var(--gray-4)",
+            width="100%",
+        ),
+        rx.box(),
+    )
+
+
 def _gv_plot() -> rx.Component:
     """Render the g-V curve plot embedded below the I-V curve.
 
@@ -313,6 +367,8 @@ def _expanded_panel() -> rx.Component:
             width="100%",
             align="center",
         ),
+        # Passive membrane properties — always visible in both clamp modes
+        _membrane_test_section(),
         # Analysis content — switches automatically with clamp mode
         rx.box(
             rx.cond(
