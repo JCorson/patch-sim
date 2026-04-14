@@ -1,6 +1,8 @@
 """Neuron parameter state for the patch_sim web UI."""
 
+import hashlib
 import logging
+from typing import Any, AsyncGenerator
 
 import reflex as rx
 
@@ -180,6 +182,28 @@ class NeuronState(rx.State):
         """Calcium reversal potential in mV (z=+2)."""
         return float(patch_sim.nernst_potential(2, self.T, self.Ca_out, self.Ca_in))
 
+    @rx.var(cache=True)
+    def neuron_fingerprint(self) -> str:
+        """SHA-256 hex digest of all biophysical parameters.
+
+        Used to detect whether neuron parameters have changed since the last
+        membrane test run, enabling cache invalidation without re-running the
+        full simulation.
+
+        Returns:
+            A hex digest string that changes whenever any conductance, ion
+            concentration, temperature, auxiliary channel state or the active
+            neuron type changes.
+        """
+        parts: list[str] = [self.active_neuron_type]
+        for field in _NEURON_FLOAT_FIELDS:
+            parts.append(repr(getattr(self, field)))
+        for field in _CHANNEL_FLOAT_FIELDS:
+            parts.append(repr(getattr(self, field)))
+        for field in _NON_VISIBILITY_BOOL_FIELDS:
+            parts.append(repr(getattr(self, field)))
+        return hashlib.sha256("|".join(parts).encode()).hexdigest()
+
     # ------------------------------------------------------------------ #
     # Event handlers                                                     #
     # ------------------------------------------------------------------ #
@@ -201,7 +225,7 @@ class NeuronState(rx.State):
             setattr(self, key, value)
         self.active_neuron_type = name
 
-    async def load_neuron_preset(self, name: str) -> None:
+    async def load_neuron_preset(self, name: str) -> AsyncGenerator[Any, None]:  # type: ignore[override]
         """Load a neuron-type preset and re-apply any active protocol overrides.
 
         Sets conductances and auxiliary channel configuration for the selected
@@ -242,6 +266,7 @@ class NeuronState(rx.State):
         sim_st._cont_has_state = False
         sim_st._label_neuron_type = name
         sim_st._figure_clamp_mode = proto_st.clamp_mode
+        yield SimulationState.run_membrane_test
 
     # ------------------------------------------------------------------ #
     # Numeric field setters                                              #
