@@ -339,6 +339,37 @@ _SWEEP_HIGHLIGHT_JS = """
 """
 
 
+def _fmt_passive_props(
+    passive: "patch_sim.PassiveProperties | None",
+) -> dict[str, Any]:
+    """Serialise passive membrane properties to pre-formatted display strings.
+
+    Args:
+        passive: A :class:`~patch_sim.PassiveProperties` result, or ``None``
+            when passive analysis was not performed or not applicable.
+
+    Returns:
+        A dict with ``input_resistance``, ``time_constant``, and
+        ``membrane_capacitance`` keys whose values are formatted strings
+        ready for UI display (em-dashes when data is unavailable).
+    """
+    if passive is None:
+        return {
+            "input_resistance": "\u2014",
+            "time_constant": "\u2014",
+            "membrane_capacitance": "\u2014",
+        }
+    return {
+        "input_resistance": f"{passive.input_resistance:.2f}",
+        "time_constant": f"{passive.time_constant:.2f}",
+        "membrane_capacitance": (
+            f"{passive.membrane_capacitance:.2f}"
+            if passive.membrane_capacitance is not None
+            else "\u2014"
+        ),
+    }
+
+
 def _serialise_sfa_curve(curve: "patch_sim.SFACurve") -> dict[str, Any]:
     """Serialise a single :class:`~patch_sim.SFACurve` to a plain dict.
 
@@ -415,29 +446,6 @@ def _compute_cc_multi_sweep_analysis(
             )
             break
 
-    def _fmt_passive() -> dict[str, Any]:
-        """Serialise passive property results to display strings.
-
-        Returns:
-            Dict with ``input_resistance``, ``time_constant``, and
-            ``membrane_capacitance`` as pre-formatted strings.
-        """
-        if passive is None:
-            return {
-                "input_resistance": "\u2014",
-                "time_constant": "\u2014",
-                "membrane_capacitance": "\u2014",
-            }
-        return {
-            "input_resistance": f"{passive.input_resistance:.2f}",
-            "time_constant": f"{passive.time_constant:.2f}",
-            "membrane_capacitance": (
-                f"{passive.membrane_capacitance:.2f}"
-                if passive.membrane_capacitance is not None
-                else "\u2014"
-            ),
-        }
-
     # --- AP metrics (pooled across all sweeps) ---
     all_spikes = [spike for ap in per_sweep_ap for spike in ap.spikes]
 
@@ -470,11 +478,25 @@ def _compute_cc_multi_sweep_analysis(
                 f"{float(np.mean(ahp_vals)):.1f}" if ahp_vals else "\u2014"
             ),
             # mean_isi and firing_rate omitted: shown per-sweep in the F-I curve.
-            **_fmt_passive(),
+            **_fmt_passive_props(passive),
         }
     else:
         ap_metrics = []
-        ap_summary = {}
+        # No spikes, but passive properties may still be meaningful.  Populate
+        # ap_summary with placeholder AP values so the metrics panel renders
+        # correctly when passive data is available.
+        if passive is not None:
+            ap_summary = {
+                "spike_count": "0",
+                "mean_threshold_voltage": "\u2014",
+                "mean_peak_voltage": "\u2014",
+                "mean_rise_time": "\u2014",
+                "mean_half_width": "\u2014",
+                "mean_ahp_depth": "\u2014",
+                **_fmt_passive_props(passive),
+            }
+        else:
+            ap_summary = {}
 
     # --- SFA data (one curve per sweep with >= 2 spikes) ---
     sfa_curves = [
@@ -1187,14 +1209,20 @@ class SimulationState(rx.State):
                     if mode == CURRENT_CLAMP:
                         ap_result = patch_sim.analyze_aps_from_result(result)
                         sfa_curve = patch_sim.compute_sfa(ap_result)
-                        passive = patch_sim.analyze_passive_from_result(
-                            result,
-                            current_amplitude=proto_st.min_stimulus,
-                            stim_start_ms=proto_st.pre_stimulus_duration,
-                            stim_end_ms=(
-                                proto_st.pre_stimulus_duration
-                                + proto_st.stimulus_duration
-                            ),
+                        # Passive properties require a known constant current
+                        # amplitude; only Step protocols guarantee this.
+                        passive = (
+                            patch_sim.analyze_passive_from_result(
+                                result,
+                                current_amplitude=proto_st.min_stimulus,
+                                stim_start_ms=proto_st.pre_stimulus_duration,
+                                stim_end_ms=(
+                                    proto_st.pre_stimulus_duration
+                                    + proto_st.stimulus_duration
+                                ),
+                            )
+                            if proto_st.protocol_type == "Step"
+                            else None
                         )
                         analysis_st.ap_metrics = [
                             {
@@ -1258,22 +1286,7 @@ class SimulationState(rx.State):
                                 if ap_result.spike_count >= 1
                                 else "\u2014"
                             ),
-                            "input_resistance": (
-                                f"{passive.input_resistance:.2f}"
-                                if passive is not None
-                                else "\u2014"
-                            ),
-                            "time_constant": (
-                                f"{passive.time_constant:.2f}"
-                                if passive is not None
-                                else "\u2014"
-                            ),
-                            "membrane_capacitance": (
-                                f"{passive.membrane_capacitance:.2f}"
-                                if passive is not None
-                                and passive.membrane_capacitance is not None
-                                else "\u2014"
-                            ),
+                            **_fmt_passive_props(passive),
                         }
                         analysis_st.ap_is_multi_sweep = False
                         analysis_st.iv_data = {}

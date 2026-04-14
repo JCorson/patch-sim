@@ -202,7 +202,7 @@ def _ap_metrics_tab() -> rx.Component:
     return rx.cond(
         AnalysisState.has_ap_or_fi,
         rx.flex(
-            rx.cond(AnalysisState.has_ap_metrics, _ap_summary(), rx.box()),
+            rx.cond(AnalysisState.has_ap_summary, _ap_summary(), rx.box()),
             rx.cond(AnalysisState.has_fi_data, _ap_fi_plot(), rx.box()),
             rx.cond(AnalysisState.has_sfa_data, _ap_sfa_plot(), rx.box()),
             rx.cond(AnalysisState.has_ap_metrics, _ap_spike_table(), rx.box()),

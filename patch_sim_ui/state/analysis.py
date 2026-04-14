@@ -30,9 +30,22 @@ class AnalysisState(rx.State):
         return len(self.ap_metrics) > 0
 
     @rx.var
+    def has_ap_summary(self) -> bool:
+        """Return True when the AP summary dict has been populated.
+
+        This is True both when spike analysis results are present and when
+        only passive membrane properties (no spikes) are available.
+        """
+        return len(self.ap_summary) > 0
+
+    @rx.var
     def has_ap_or_fi(self) -> bool:
-        """Return True when either AP metrics or F-I data are available."""
-        return len(self.ap_metrics) > 0 or len(self.fi_data) > 0
+        """Return True when AP metrics, F-I data, or the summary dict are available."""
+        return (
+            len(self.ap_metrics) > 0
+            or len(self.fi_data) > 0
+            or len(self.ap_summary) > 0
+        )
 
     @rx.var
     def has_fi_data(self) -> bool:

@@ -149,7 +149,14 @@ def _fallback_tau(
     if len(crossings) == 0:
         return float(t_fit[-1]) / 2.0
 
-    return float(t_fit[crossings[0]])
+    # Guard: if the first sample already crosses the 63.2% level (index 0),
+    # t_fit[0] == 0.0 which is not a meaningful time constant.  Return the
+    # midpoint of the fit window as a conservative fallback instead.
+    idx = crossings[0]
+    if idx == 0:
+        return float(t_fit[-1]) / 2.0
+
+    return float(t_fit[idx])
 
 
 def analyze_passive_properties(
@@ -256,7 +263,10 @@ def analyze_passive_properties(
         tau_m = _fallback_tau(t_fit, v_fit, v_baseline, v_ss)
 
     # --- Membrane capacitance ---
-    c_m: float | None = tau_m / r_in if r_in != 0.0 else None
+    # C_m = τ / R_in is only physically meaningful when R_in > 0.  A negative
+    # R_in can arise near threshold where active conductances dominate; in that
+    # case we return None rather than a nonsensical negative capacitance.
+    c_m: float | None = tau_m / r_in if r_in > 0.0 else None
 
     return PassiveProperties(
         input_resistance=r_in,
