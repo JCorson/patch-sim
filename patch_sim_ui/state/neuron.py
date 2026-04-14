@@ -147,7 +147,7 @@ def _make_neuron_float_setter(field_name: str):
         )
 
         _set_float(self, field_name, value)
-        yield SimulationState.run_membrane_test_debounced
+        yield SimulationState.run_membrane_test
 
     setter.__name__ = f"set_{field_name}"
     setter.__qualname__ = f"NeuronState.set_{field_name}"
@@ -233,20 +233,18 @@ class NeuronState(rx.State):
         """Calcium reversal potential in mV (z=+2)."""
         return float(patch_sim.nernst_potential(2, self.T, self.Ca_out, self.Ca_in))
 
-    @rx.var
-    def neuron_fingerprint(self) -> str:
-        """SHA-256 hex digest of the passive membrane parameters.
+    def _compute_fingerprint(self) -> str:
+        """Compute a SHA-256 hex digest of the passive membrane parameters.
+
+        Reads the raw state var values directly so that callers always get a
+        fresh result reflecting the current state.  This is intentionally a
+        plain method, not a ``@rx.var``: Reflex caches ``ComputedVar`` values
+        and may return a stale digest if called from a background task before
+        the cache has been invalidated by the latest state flush.
 
         Only hashes the five fields that determine the passive-only membrane
-        test result (g_L, C_m, Cl_out, Cl_in, T).  Active conductances
-        (g_Na, g_K, v_rest, auxiliary channels) are excluded: the membrane
-        test blocks them internally, so changing those fields cannot change
-        R_in, τ_m, or C_m.
-
-        ``cache=True`` is intentionally omitted: ``getattr``-based dependency
-        tracking is not guaranteed across all Reflex versions, so the hash is
-        recomputed reactively on every state update.  Hashing five floats is
-        negligibly cheap.
+        test result (g_L, C_m, Cl_out, Cl_in, T).  Active conductances are
+        excluded because the membrane test blocks them internally.
 
         Returns:
             A hex digest string that changes only when g_L, C_m, Cl_out,
@@ -254,6 +252,21 @@ class NeuronState(rx.State):
         """
         parts = [repr(getattr(self, f)) for f in _PASSIVE_PARAM_FIELDS]
         return hashlib.sha256("|".join(parts).encode()).hexdigest()
+
+    @rx.var
+    def neuron_fingerprint(self) -> str:
+        """SHA-256 hex digest of the passive membrane parameters (frontend var).
+
+        Delegates to :meth:`_compute_fingerprint` so the frontend can react
+        to passive parameter changes.  Do not call this from background tasks
+        — use :meth:`_compute_fingerprint` directly to bypass the
+        ``ComputedVar`` cache.
+
+        Returns:
+            A hex digest string that changes only when g_L, C_m, Cl_out,
+            Cl_in, or T changes.
+        """
+        return self._compute_fingerprint()
 
     # ------------------------------------------------------------------ #
     # Event handlers                                                     #

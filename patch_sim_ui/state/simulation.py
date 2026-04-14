@@ -546,10 +546,6 @@ def _compute_iv_data(
 
 _GV_FIT_POINTS = 200  # number of voltage points for the pre-computed Boltzmann curve
 
-#: Debounce window (seconds) for slider-driven membrane test requests.
-#: Slider events within this window are coalesced; only the last one proceeds.
-_MT_DEBOUNCE_S: float = 0.3
-
 
 def _compute_gv_data(
     iv_result: "patch_sim.IVAnalysisResult",
@@ -627,11 +623,6 @@ class SimulationState(rx.State):
     _cont_gating: dict[str, float] = {}
     _cont_ca_i: float = 0.0
     _cont_has_state: bool = False  # True once at least one iteration has run
-
-    # Debounce counter for run_membrane_test_debounced.  Each slider event
-    # increments this; a sleeping background task bails out if the value
-    # changed before it wakes.  Backend-only (underscore prefix).
-    _mt_request_id: int = 0
 
     # ------------------------------------------------------------------ #
     # UI state                                                           #
@@ -1260,38 +1251,6 @@ class SimulationState(rx.State):
             yield rx.call_script(_LOG_SCROLL_JS)
 
     @rx.event(background=True)
-    async def run_membrane_test_debounced(self) -> AsyncGenerator[Any, None]:
-        """Debounced entry point for slider-driven membrane test requests.
-
-        Each call atomically increments ``_mt_request_id`` and captures the
-        resulting ticket.  After sleeping :data:`_MT_DEBOUNCE_S` seconds, the
-        task checks whether a newer request has arrived (ticket mismatch).  If
-        so it exits silently; if not it yields :meth:`run_membrane_test` which
-        performs the fingerprint check and the actual simulation.
-
-        This prevents a rapid slider drag from spawning a new simulation on
-        every tick.  Page-load and post-simulation triggers bypass this wrapper
-        and call :meth:`run_membrane_test` directly so they are not delayed.
-        """
-        async with self:
-            self._mt_request_id += 1
-            my_ticket = self._mt_request_id
-
-        await asyncio.sleep(_MT_DEBOUNCE_S)
-
-        async with self:
-            if self._mt_request_id != my_ticket:
-                logger.debug(
-                    "run_membrane_test_debounced: superseded"
-                    " (ticket %d < %d), skipping",
-                    my_ticket,
-                    self._mt_request_id,
-                )
-                return
-
-        yield SimulationState.run_membrane_test
-
-    @rx.event(background=True)
     async def run_membrane_test(self) -> None:
         """Run the dedicated membrane test protocol and cache passive properties.
 
@@ -1304,7 +1263,10 @@ class SimulationState(rx.State):
         """
         async with self:
             neuron_st = await self.get_state(NeuronState)
-            fingerprint = neuron_st.neuron_fingerprint
+            # Use _compute_fingerprint() rather than the @rx.var: ComputedVar
+            # values are cached by Reflex and may not yet reflect the latest
+            # state when accessed from a background task.
+            fingerprint = neuron_st._compute_fingerprint()
             analysis_st = await self.get_state(AnalysisState)
             if analysis_st.mt_neuron_fingerprint == fingerprint:
                 logger.debug("run_membrane_test: cache hit, skipping")
@@ -1318,7 +1280,7 @@ class SimulationState(rx.State):
             # Re-read fingerprint: if neuron changed while we were computing,
             # discard results to avoid caching stale passive properties.
             neuron_st = await self.get_state(NeuronState)
-            current_fp = neuron_st.neuron_fingerprint
+            current_fp = neuron_st._compute_fingerprint()
             if current_fp != fingerprint:
                 logger.info(
                     "run_membrane_test: neuron changed during computation, discarding"
