@@ -57,9 +57,8 @@ _HOVER_COL_WIDTH = 8
 # Inline CSS applied to hover tooltip ``<span>`` elements.
 _HOVER_MONO_STYLE = "font-family: monospace; font-size: 11px;"
 
-# Relative row heights for the 4-row subplot layout
-# (response, phase-plane, gating, stimulus).
-_SUBPLOT_ROW_HEIGHTS = [0.40, 0.20, 0.20, 0.20]
+# Relative row heights for the 3-row subplot layout (response, gating, stimulus).
+_SUBPLOT_ROW_HEIGHTS = [0.5, 0.25, 0.25]
 
 # Vertical gap between subplot rows (fraction of total figure height).
 _SUBPLOT_VERT_SPACING = 0.08
@@ -344,7 +343,7 @@ def _build_hover_tables(
 
     resp_html = _build_rows_html(resp_cols, "additional_currents", ".2f")
 
-    # --- Gating subplot (row 3) ---
+    # --- Gating subplot (row 2) ---
     gating_cols: list[tuple[str, str, str]] = []
     if visibility.potassium_activation:
         gating_cols.append(("n", "classic", "potassium_activation"))
@@ -358,7 +357,7 @@ def _build_hover_tables(
 
     gating_html = _build_rows_html(gating_cols, "additional_gating", ".3f")
 
-    # --- Stimulus subplot (row 4) ---
+    # --- Stimulus subplot (row 3) ---
     stim_col_label = "Cmd (mV)" if is_vc else "Stim"
     stim_header = " " * label_w + f"{stim_col_label:>{col_w}}"
     # Pre-extract stimulus arrays and downsample once: (n_sweeps, n_hover_pts).
@@ -428,10 +427,6 @@ def compute_trace_visibility_map(
     for sweep in current_sweeps:
         if sweep.clamp_mode == CURRENT_CLAMP:
             _map("show_voltage")
-            # Phase-plane trace follows the voltage trace in CC mode.
-            # It is always visible and not toggled via a show_* field.
-            if sweep.dvdt:
-                _skip()  # phase-plane — always visible, no show_* field
         else:
             # Voltage Clamp: matches _add_vc_currents insertion order.
             _map("show_total_current")
@@ -462,15 +457,11 @@ def compute_trace_visibility_map(
         # Stored traces are always visible; just advance the counter.
         if sweep.clamp_mode == CURRENT_CLAMP:
             _skip()  # voltage
-            if sweep.dvdt:
-                _skip()  # phase-plane
         else:
             _skip()  # total_current
         _skip()  # stimulus
 
     # Invisible hover-carrier traces in multi-sweep mode — always visible.
-    # The phase-plane row uses voltage as its x-axis so no carrier is added
-    # for it; the three carriers cover response, gating, and stimulus.
     if is_multi_sweep and current_sweeps:
         for _ in range(3):
             _skip()
@@ -496,12 +487,10 @@ def build_figure(
     rendered with dashed faded lines; only voltage (CC) or total_current (VC)
     and stimulus are plotted.
 
-    Both **Current Clamp** and **Voltage Clamp** use a fixed 4-row layout:
-    response (row 1), phase plane (row 2), gating (row 3), stimulus (row 4).
-    In Voltage Clamp mode the phase-plane row is present but left empty.
-    In Voltage Clamp mode all ion current channels are overlaid on row 1
-    with each channel identified by a fixed colour from ``CHANNEL_COLORS``
-    and a legend entry.
+    Both **Current Clamp** and **Voltage Clamp** use a fixed 3-row layout.
+    In Voltage Clamp mode all ion current channels are overlaid on a single
+    subplot (row 1) with each channel identified by a fixed colour from
+    ``CHANNEL_COLORS`` and a legend entry.
 
     When there are multiple current sweeps (multi-sweep mode), hover on all
     real traces is suppressed and replaced with invisible carrier traces that
@@ -521,8 +510,7 @@ def build_figure(
             ``False``, ``hovermode`` is set to ``False`` to suppress tooltips.
 
     Returns:
-        A Plotly Figure with response, phase-plane, gating, and stimulus
-        subplots.
+        A Plotly Figure with response, gating, and stimulus subplots.
     """
     # Collect additional keys present in current sweeps.
     add_gating_keys: list[str] = []
@@ -538,12 +526,11 @@ def build_figure(
     is_vc = clamp_mode == VOLTAGE_CLAMP
     is_multi_sweep = len(current_sweeps) > 1
 
-    # Both modes use a fixed 4-row layout.
-    rows = 4
+    # Both modes use a fixed 3-row layout.
+    rows = 3
     row_heights = _SUBPLOT_ROW_HEIGHTS
-    phase_row = 2
-    gating_row = 3
-    stimulus_row = 4
+    gating_row = 2
+    stimulus_row = 3
 
     vert_spacing = _SUBPLOT_VERT_SPACING if rows > 1 else 0.0
     fig = make_subplots(
@@ -558,8 +545,6 @@ def build_figure(
     # legend.  After all traces are added we suppress the legend for any row
     # that ended up with only one entry (y-axis label is sufficient there).
     legend_entries: dict[int, list[int]] = {1: [], gating_row: []}
-    # phase_row traces are never entered in legend_entries; they are always
-    # visible and identified by the same sweep colour as the response row.
 
     def _scatter(
         x,
@@ -719,19 +704,6 @@ def build_figure(
                 showlegend=sl,
                 sweep_index=sweep_idx,
             )
-            # Phase-plane row: V vs dV/dt — only meaningful in Current Clamp.
-            # Skip if dvdt is empty (e.g. legacy stored sweeps with no dvdt).
-            if sweep.dvdt:
-                _scatter(
-                    sweep.voltage,
-                    sweep.dvdt,
-                    f"{pfx}Phase plane",
-                    phase_row,
-                    CC_VOLTAGE_COLOR,
-                    hoverinfo="skip",
-                    showlegend=False,
-                    sweep_index=sweep_idx,
-                )
         else:
             # Voltage Clamp: all currents overlaid on row 1 with channel colours.
             # Legend-eligible traces (first sweep) use an empty prefix so the
@@ -808,18 +780,6 @@ def build_figure(
                 dash="dash",
                 hoverinfo="skip",
             )
-            # Phase-plane trace for stored CC sweeps; skip if dvdt is absent.
-            if sweep.dvdt:
-                _scatter(
-                    sweep.voltage,
-                    sweep.dvdt,
-                    label,
-                    phase_row,
-                    c,
-                    dash="dash",
-                    hoverinfo="skip",
-                    showlegend=False,
-                )
         else:
             _scatter(
                 sweep.time,
@@ -898,9 +858,6 @@ def build_figure(
             for idx in row_traces:
                 fig.data[idx].showlegend = False
 
-    # Phase-plane row has its own independent x-axis (voltage, not time).
-    fig.update_xaxes(matches=None, row=phase_row, col=1)
-
     # Y-axis labels.
     if is_vc:
         fig.update_yaxes(title_text="Current (µA/cm²)", row=1, col=1)
@@ -912,10 +869,6 @@ def build_figure(
     # Gating row is always present in both modes.
     fig.update_yaxes(title_text="Gating", row=gating_row, col=1, range=[0, 1])
 
-    # Phase-plane row axis labels.
-    fig.update_yaxes(title_text="dV/dt (mV/ms)", row=phase_row, col=1)
-    fig.update_xaxes(title_text="V (mV)", row=phase_row, col=1)
-
     fig.update_xaxes(title_text="Time (ms)", row=stimulus_row, col=1)
 
     # Compute paper-coordinate y of the top of each subplot row so each
@@ -923,7 +876,6 @@ def build_figure(
     _scale = (1.0 - (rows - 1) * vert_spacing) / sum(_SUBPLOT_ROW_HEIGHTS)
     _row1_top = 1.0
     _row2_top = _row1_top - _SUBPLOT_ROW_HEIGHTS[0] * _scale - vert_spacing
-    _row3_top = _row2_top - _SUBPLOT_ROW_HEIGHTS[1] * _scale - vert_spacing
 
     _legend_common = dict(
         orientation="v",
@@ -943,7 +895,7 @@ def build_figure(
         hovermode=hovermode,
         showlegend=True,
         legend=dict(**_legend_common, y=_row1_top, yanchor="top"),
-        legend2=dict(**_legend_common, y=_row3_top, yanchor="top"),
+        legend2=dict(**_legend_common, y=_row2_top, yanchor="top"),
     )
     return fig
 

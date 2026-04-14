@@ -255,28 +255,25 @@ def test_build_figure_returns_go_figure() -> None:
     assert isinstance(fig, go.Figure)
 
 
-def test_build_figure_cc_has_four_subplots() -> None:
-    """Current Clamp figure has exactly 4 subplots (rows)."""
+def test_build_figure_cc_has_three_subplots() -> None:
+    """Current Clamp figure has exactly 3 subplots (rows)."""
     sweep = _make_sweep(mode="Current Clamp")
     fig = build_figure(
         [sweep], visibility=_all_flags_true(), clamp_mode="Current Clamp"
     )
-    # Each subplot contributes a distinct y-axis entry (yaxis…yaxis4).
+    # Each subplot contributes a distinct y-axis entry (yaxis, yaxis2, yaxis3).
     yaxes = [k for k in fig.layout.to_plotly_json() if k.startswith("yaxis")]
-    assert len(yaxes) == 4  # noqa: PLR2004
+    assert len(yaxes) == 3
 
 
-def test_build_figure_vc_has_four_subplots() -> None:
-    """Voltage Clamp figure has exactly 4 subplots.
-
-    The phase-plane row is present in the layout but contains no traces.
-    """
+def test_build_figure_vc_has_three_subplots() -> None:
+    """Voltage Clamp figure has exactly 3 subplots."""
     sweep = _make_sweep(mode="Voltage Clamp")
     fig = build_figure(
         [sweep], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
     )
     yaxes = [k for k in fig.layout.to_plotly_json() if k.startswith("yaxis")]
-    assert len(yaxes) == 4  # noqa: PLR2004
+    assert len(yaxes) == 3
 
 
 def test_build_figure_empty_sweeps_no_error() -> None:
@@ -291,13 +288,13 @@ def test_build_figure_empty_sweeps_no_error() -> None:
 
 
 def test_build_figure_cc_single_sweep_trace_count() -> None:
-    """Current Clamp single sweep: voltage + phase-plane + 3 gating + stimulus = 6."""
+    """Current Clamp single sweep: voltage + 3 gating + stimulus = 5 traces."""
     sweep = _make_sweep(mode="Current Clamp")
     fig = build_figure(
         [sweep], visibility=_all_flags_true(), clamp_mode="Current Clamp"
     )
-    # voltage(1) + phase-plane(1) + n, m, h(3) + stimulus(1) = 6
-    assert len(fig.data) == 6  # noqa: PLR2004
+    # voltage(1) + n, m, h(3) + stimulus(1) = 5
+    assert len(fig.data) == 5
 
 
 def test_build_figure_vc_single_sweep_trace_count() -> None:
@@ -640,12 +637,11 @@ def test_compute_trace_visibility_map_cc_single_sweep_classic_fields() -> None:
     """CC single sweep maps classic show_* fields to the correct indices."""
     sweep = _make_sweep(mode="Current Clamp")
     result = compute_trace_visibility_map([sweep], "Current Clamp")
-    # trace order: voltage(0), phase-plane(1, skipped), n(2), m(3), h(4),
-    #              stimulus(5, not mapped)
+    # trace order: voltage(0), n(1), m(2), h(3), stimulus(4, not mapped)
     assert result["show_voltage"] == [0]
-    assert result["show_potassium_activation"] == [2]
-    assert result["show_sodium_activation"] == [3]
-    assert result["show_sodium_inactivation"] == [4]
+    assert result["show_potassium_activation"] == [1]
+    assert result["show_sodium_activation"] == [2]
+    assert result["show_sodium_inactivation"] == [3]
     assert "show_leak_current" not in result
 
 
@@ -668,12 +664,12 @@ def test_compute_trace_visibility_map_cc_multi_sweep_accumulates_indices() -> No
     """Multi-sweep CC maps each field to one index per sweep."""
     sweeps = [_make_sweep(mode="Current Clamp"), _make_sweep(mode="Current Clamp")]
     result = compute_trace_visibility_map(sweeps, "Current Clamp")
-    # Sweep 0: voltage(0), phase(1, skipped), n(2), m(3), h(4), stim(5)
-    # Sweep 1: voltage(6), phase(7, skipped), n(8), m(9), h(10), stim(11)
-    assert result["show_voltage"] == [0, 6]
-    assert result["show_potassium_activation"] == [2, 8]
-    assert result["show_sodium_activation"] == [3, 9]
-    assert result["show_sodium_inactivation"] == [4, 10]
+    # Sweep 0: voltage(0), n(1), m(2), h(3), stim(4)
+    # Sweep 1: voltage(5), n(6), m(7), h(8), stim(9)
+    assert result["show_voltage"] == [0, 5]
+    assert result["show_potassium_activation"] == [1, 6]
+    assert result["show_sodium_activation"] == [2, 7]
+    assert result["show_sodium_inactivation"] == [3, 8]
 
 
 def test_compute_trace_visibility_map_cc_additional_gating_mapped() -> None:
@@ -684,9 +680,9 @@ def test_compute_trace_visibility_map_cc_additional_gating_mapped() -> None:
     result = compute_trace_visibility_map(
         [sweep], "Current Clamp", additional_gating_field_map=gating_map
     )
-    # voltage(0), phase(1, skip), n(2), m(3), h(4), r(5), stim(6)
-    assert result["show_ih_gating"] == [5]
-    assert result["show_sodium_inactivation"] == [4]
+    # voltage(0), n(1), m(2), h(3), r(4), stim(5)
+    assert result["show_ih_gating"] == [4]
+    assert result["show_sodium_inactivation"] == [3]
 
 
 def test_compute_trace_visibility_map_vc_additional_current_mapped() -> None:
@@ -712,8 +708,8 @@ def test_compute_trace_visibility_map_multi_gating_keys_same_field() -> None:
     result = compute_trace_visibility_map(
         [sweep], "Current Clamp", additional_gating_field_map=gating_map
     )
-    # voltage(0), phase(1, skip), n(2), m(3), h(4), a(5), b(6), stim(7)
-    assert result["show_ika_gating"] == [5, 6]
+    # voltage(0), n(1), m(2), h(3), a(4), b(5), stim(6)
+    assert result["show_ika_gating"] == [4, 5]
 
 
 def test_compute_trace_visibility_map_unknown_additional_key_advances_counter() -> None:
@@ -886,13 +882,11 @@ def test_build_figure_stored_trace_stimulus_not_in_legend() -> None:
     fig = build_figure(
         [sweep], TraceVisibility(), "Current Clamp", stored_traces=[stored]
     )
-    # Stored CC traces add three traces named "Ref":
-    # voltage (row 1), phase-plane (row 2), and stimulus (row 4).
+    # Stored traces add two traces named "Ref": one on row 1, one on stimulus row.
     ref_traces = [t for t in fig.data if t.name == "Ref"]
-    assert len(ref_traces) == 3  # noqa: PLR2004
-    # The phase-plane and stimulus traces must be excluded from the legend.
-    legend_ref = [t for t in ref_traces if t.showlegend is not False]
-    assert len(legend_ref) == 1, "Only the voltage stored trace should appear in legend"
+    assert len(ref_traces) == 2  # noqa: PLR2004
+    stimulus_ref = [t for t in ref_traces if t.showlegend is False]
+    assert len(stimulus_ref) == 1, "Stored trace stimulus must be excluded from legend"
 
 
 # ---------------------------------------------------------------------------
@@ -986,9 +980,8 @@ def test_sweep_traces_have_correct_yaxis_assignments() -> None:
 
     The client-side sweep-highlight JS uses gd.data[i].yaxis to group traces
     by subplot row when resolving which sweep the user clicked.  This test
-    verifies the contract: response traces use 'y', gating traces use 'y3',
-    and stimulus traces use 'y4'.  (Row 2, the phase-plane row, is 'y2' but
-    only present in CC mode.)
+    verifies the contract: response traces use 'y', gating traces use 'y2',
+    and stimulus traces use 'y3'.
     """
     sweeps = [
         _make_sweep(label=f"{v} mV", mode="Voltage Clamp") for v in [-60, -40, -20]
@@ -1000,8 +993,8 @@ def test_sweep_traces_have_correct_yaxis_assignments() -> None:
 
     yaxis_values = {t.yaxis for t in sweep_traces}
     assert "y" in yaxis_values, "Response traces must use yaxis='y'"
-    assert "y3" in yaxis_values, "Gating traces must use yaxis='y3'"
-    assert "y4" in yaxis_values, "Stimulus traces must use yaxis='y4'"
+    assert "y2" in yaxis_values, "Gating traces must use yaxis='y2'"
+    assert "y3" in yaxis_values, "Stimulus traces must use yaxis='y3'"
 
     # Every sweep trace must have a non-None yaxis.
     for i, t in enumerate(sweep_traces):
@@ -1009,62 +1002,8 @@ def test_sweep_traces_have_correct_yaxis_assignments() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Phase-plane subplot
+# Sweep.dvdt field
 # ---------------------------------------------------------------------------
-
-
-def test_build_figure_cc_phase_plane_trace_exists() -> None:
-    """Current Clamp single sweep: a phase-plane trace is added on row 2 (y2)."""
-    sweep = _make_sweep(mode="Current Clamp")
-    fig = build_figure(
-        [sweep], visibility=_all_flags_true(), clamp_mode="Current Clamp"
-    )
-    phase_traces = [t for t in fig.data if t.yaxis == "y2"]
-    assert len(phase_traces) == 1, "Expected exactly one phase-plane trace in CC mode"
-
-
-def test_build_figure_vc_has_no_phase_plane_trace() -> None:
-    """Voltage Clamp produces no phase-plane traces (row 2 is empty)."""
-    sweep = _make_sweep(mode="Voltage Clamp")
-    fig = build_figure(
-        [sweep], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
-    )
-    phase_traces = [t for t in fig.data if t.yaxis == "y2"]
-    assert len(phase_traces) == 0, "Phase-plane row must be empty in Voltage Clamp"
-
-
-def test_build_figure_cc_phase_plane_x_is_voltage() -> None:
-    """Phase-plane trace uses voltage as its x-values, not time."""
-    sweep = _make_sweep(mode="Current Clamp")
-    fig = build_figure(
-        [sweep], visibility=_all_flags_true(), clamp_mode="Current Clamp"
-    )
-    phase_traces = [t for t in fig.data if t.yaxis == "y2"]
-    assert len(phase_traces) == 1
-    # x-values should match the sweep voltage, not the time axis.
-    np.testing.assert_array_equal(phase_traces[0].x, np.asarray(sweep.voltage))
-
-
-def test_build_figure_cc_phase_plane_xaxis_is_independent() -> None:
-    """Phase-plane row x-axis is not shared with the time axis."""
-    sweep = _make_sweep(mode="Current Clamp")
-    fig = build_figure(
-        [sweep], visibility=_all_flags_true(), clamp_mode="Current Clamp"
-    )
-    layout_json = fig.layout.to_plotly_json()
-    # The phase-plane row uses xaxis2.  matches=None means it was unlinked.
-    xaxis2 = layout_json.get("xaxis2", {})
-    assert xaxis2.get("matches") is None, (
-        "Phase-plane xaxis2 must not share with the time axis"
-    )
-
-
-def test_build_figure_cc_multi_sweep_phase_plane_trace_per_sweep() -> None:
-    """In multi-sweep CC mode, one phase-plane trace is added per sweep."""
-    sweeps = [_make_sweep(label=f"s{i}", mode="Current Clamp") for i in range(3)]
-    fig = build_figure(sweeps, visibility=_all_flags_true(), clamp_mode="Current Clamp")
-    phase_traces = [t for t in fig.data if t.yaxis == "y2"]
-    assert len(phase_traces) == 3  # noqa: PLR2004
 
 
 def test_sweep_dvdt_populated_by_from_result() -> None:
