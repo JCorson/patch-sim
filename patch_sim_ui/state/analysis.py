@@ -36,11 +36,11 @@ class AnalysisState(rx.State):
     def has_membrane_test(self) -> bool:
         """Return True when the membrane test has been run at least once.
 
-        Values may be em-dashes when the test ran but analysis did not converge
-        (e.g. suprathreshold sweep).  An empty string indicates the test has
-        never run.
+        Uses ``mt_neuron_fingerprint`` as the sentinel: it is set unconditionally
+        at the end of ``run_membrane_test`` (even when the fit fails and values
+        are em-dashes), making it a more robust indicator than ``mt_input_resistance``.
         """
-        return self.mt_input_resistance != ""
+        return self.mt_neuron_fingerprint != ""
 
     @rx.var
     def has_ap_metrics(self) -> bool:

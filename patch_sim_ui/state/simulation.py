@@ -1279,7 +1279,7 @@ class SimulationState(rx.State):
             neuron_st = await self.get_state(NeuronState)
             current_fp = neuron_st.neuron_fingerprint
             if current_fp != fingerprint:
-                logger.debug(
+                logger.info(
                     "run_membrane_test: neuron changed during computation, discarding"
                 )
                 return

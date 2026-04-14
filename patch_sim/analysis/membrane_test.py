@@ -87,6 +87,9 @@ def run_membrane_test(neuron: Neuron) -> PassiveProperties | None:
 
     # Passive-only neuron: g_Na = g_K = 0, no auxiliary channels.
     # Equivalent to pharmacological channel block in a real experiment.
+    # The Neuron constructor defaults to no auxiliary channels (channels=()),
+    # so omitting that argument here is intentional — it guarantees a pure RC
+    # circuit regardless of which auxiliary channels the original neuron had.
     passive_neuron = Neuron(
         g_Na=0.0,
         g_K=0.0,

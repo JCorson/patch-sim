@@ -182,13 +182,18 @@ class NeuronState(rx.State):
         """Calcium reversal potential in mV (z=+2)."""
         return float(patch_sim.nernst_potential(2, self.T, self.Ca_out, self.Ca_in))
 
-    @rx.var(cache=True)
+    @rx.var
     def neuron_fingerprint(self) -> str:
         """SHA-256 hex digest of all biophysical parameters.
 
         Used to detect whether neuron parameters have changed since the last
         membrane test run, enabling cache invalidation without re-running the
         full simulation.
+
+        ``cache=True`` is intentionally omitted: dependency tracking via
+        ``getattr`` is not guaranteed across all Reflex versions, so this var
+        recomputes reactively on every state update.  The hash is cheap (string
+        concatenation + SHA-256 over ~30 values) so the overhead is negligible.
 
         Returns:
             A hex digest string that changes whenever any conductance, ion
@@ -225,7 +230,7 @@ class NeuronState(rx.State):
             setattr(self, key, value)
         self.active_neuron_type = name
 
-    async def load_neuron_preset(  # type: ignore[override]  # yield makes this an AsyncGenerator
+    async def load_neuron_preset(  # type: ignore[override]  # base class declares -> None; yielding events upgrades this to AsyncGenerator
         self, name: str
     ) -> AsyncGenerator[Any, None]:
         """Load a neuron-type preset and re-apply any active protocol overrides.
