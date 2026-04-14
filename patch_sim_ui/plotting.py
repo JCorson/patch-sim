@@ -928,6 +928,14 @@ def build_phase_plane_figure(phase_plane_data: dict) -> go.Figure:
             continue
         color = sweep.get("color") or CC_VOLTAGE_COLOR
         label = sweep.get("label", "")
+        hover = (
+            f"<b>{label}</b><br>"
+            "V: %{x:.1f} mV<br>"
+            "dV/dt: %{y:.1f} mV/ms"
+            "<extra></extra>"
+            if label
+            else "V: %{x:.1f} mV<br>dV/dt: %{y:.1f} mV/ms<extra></extra>"
+        )
         fig.add_trace(
             go.Scattergl(
                 x=np.asarray(voltage),
@@ -935,7 +943,8 @@ def build_phase_plane_figure(phase_plane_data: dict) -> go.Figure:
                 name=label,
                 mode="lines",
                 line={"color": color},
-                showlegend=bool(label),
+                showlegend=False,
+                hovertemplate=hover,
             )
         )
 
@@ -944,7 +953,7 @@ def build_phase_plane_figure(phase_plane_data: dict) -> go.Figure:
         margin=_PLOT_MARGIN,
         template="plotly_white",
         hovermode="closest",
-        showlegend=len(sweeps) > 1,
+        showlegend=False,
         xaxis_title="V (mV)",
         yaxis_title="dV/dt (mV/ms)",
     )
@@ -1076,21 +1085,25 @@ def build_sfa_figure(sfa_data: dict) -> go.Figure:
 
         if is_multi:
             color = SWEEP_COLORS[i % len(SWEEP_COLORS)]
-            name = (
-                f"{label} (AI: {ai:.2f})" if label else f"Sweep {i + 1} (AI: {ai:.2f})"
-            )
+            display = label if label else f"Sweep {i + 1}"
+            hover_name = f"<b>{display}</b> (AI: {ai:.2f})"
         else:
             color = "#27ae60"
-            name = "Inst. frequency"
+            hover_name = "Inst. frequency"
 
+        hover = (
+            f"{hover_name}<br>Interval: %{{x}}<br>Freq: %{{y:.1f}} Hz<extra></extra>"
+        )
         fig.add_trace(
             go.Scatter(
                 x=x,
                 y=y,
                 mode="lines+markers",
-                name=name,
+                name=hover_name,
                 line=dict(color=color),
                 marker=dict(size=6),
+                showlegend=False,
+                hovertemplate=hover,
             )
         )
 
@@ -1119,16 +1132,8 @@ def build_sfa_figure(sfa_data: dict) -> go.Figure:
         template="plotly_white",
         margin=dict(l=50, r=10, t=10, b=40),
         height=260,
-        showlegend=is_multi,
+        showlegend=False,
         annotations=annotations,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1,
-            font=dict(size=10),
-        ),
     )
     return fig
 
