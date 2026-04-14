@@ -34,7 +34,12 @@ class AnalysisState(rx.State):
 
     @rx.var
     def has_membrane_test(self) -> bool:
-        """Return True when membrane test results are available for display."""
+        """Return True when the membrane test has been run at least once.
+
+        Values may be em-dashes when the test ran but analysis did not converge
+        (e.g. suprathreshold sweep).  An empty string indicates the test has
+        never run.
+        """
         return self.mt_input_resistance != ""
 
     @rx.var

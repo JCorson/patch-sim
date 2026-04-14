@@ -1274,6 +1274,15 @@ class SimulationState(rx.State):
         props = await loop.run_in_executor(None, patch_sim.run_membrane_test, neuron)
 
         async with self:
+            # Re-read fingerprint: if neuron changed while we were computing,
+            # discard results to avoid caching stale passive properties.
+            neuron_st = await self.get_state(NeuronState)
+            current_fp = neuron_st.neuron_fingerprint
+            if current_fp != fingerprint:
+                logger.debug(
+                    "run_membrane_test: neuron changed during computation, discarding"
+                )
+                return
             analysis_st = await self.get_state(AnalysisState)
             if props is None:
                 analysis_st.mt_input_resistance = "\u2014"

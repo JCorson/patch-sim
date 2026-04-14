@@ -225,7 +225,9 @@ class NeuronState(rx.State):
             setattr(self, key, value)
         self.active_neuron_type = name
 
-    async def load_neuron_preset(self, name: str) -> AsyncGenerator[Any, None]:  # type: ignore[override]
+    async def load_neuron_preset(  # type: ignore[override]  # yield makes this an AsyncGenerator
+        self, name: str
+    ) -> AsyncGenerator[Any, None]:
         """Load a neuron-type preset and re-apply any active protocol overrides.
 
         Sets conductances and auxiliary channel configuration for the selected
