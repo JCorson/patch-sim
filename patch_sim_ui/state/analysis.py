@@ -24,6 +24,19 @@ class AnalysisState(rx.State):
     gv_data: dict[str, Any] = {}  # Serialized GVAnalysisResult for the UI
     sfa_data: dict[str, Any] = {}  # Serialized SFAAnalysisResult for the UI
 
+    # Membrane test results — persisted across protocol/simulation changes.
+    # Only invalidated when neuron parameters change (neuron_fingerprint mismatch).
+    mt_input_resistance: str = ""  # R_in formatted as string (kΩ·cm²)
+    mt_time_constant: str = ""  # τ_m formatted as string (ms)
+    mt_membrane_capacitance: str = ""  # C_m formatted as string (µF/cm²)
+    mt_neuron_fingerprint: str = ""  # fingerprint used to detect stale cache
+    mt_fit_converged: bool = True  # False when exponential fit did not converge
+
+    @rx.var
+    def has_membrane_test(self) -> bool:
+        """Return True when membrane test results are available for display."""
+        return self.mt_input_resistance != ""
+
     @rx.var
     def has_ap_metrics(self) -> bool:
         """Return True when AP analysis results are available for display."""

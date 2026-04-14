@@ -1238,6 +1238,7 @@ class SimulationState(rx.State):
         else:
             elapsed = time.monotonic() * 1000 - _start_ms
             logger.info("Simulation complete: %.0f ms", elapsed)
+            yield SimulationState.run_membrane_test
         finally:
             async with self:
                 self.is_running = False
@@ -1248,3 +1249,50 @@ class SimulationState(rx.State):
             if js:
                 yield rx.call_script(js)
             yield rx.call_script(_LOG_SCROLL_JS)
+
+    @rx.event(background=True)
+    async def run_membrane_test(self) -> None:
+        """Run the dedicated membrane test protocol and cache passive properties.
+
+        Builds the neuron from current NeuronState parameters, checks whether
+        the neuron fingerprint has changed since the last run (cache hit → skip),
+        and if stale runs a fixed small hyperpolarising current step via
+        :func:`patch_sim.run_membrane_test`.  Results are stored in
+        ``AnalysisState.mt_*`` fields and persist across protocol and simulation
+        changes until the neuron parameters change.
+        """
+        async with self:
+            neuron_st = await self.get_state(NeuronState)
+            fingerprint = neuron_st.neuron_fingerprint
+            analysis_st = await self.get_state(AnalysisState)
+            if analysis_st.mt_neuron_fingerprint == fingerprint:
+                logger.debug("run_membrane_test: cache hit, skipping")
+                return
+            neuron = neuron_st._build_neuron()
+
+        loop = asyncio.get_running_loop()
+        props = await loop.run_in_executor(None, patch_sim.run_membrane_test, neuron)
+
+        async with self:
+            analysis_st = await self.get_state(AnalysisState)
+            if props is None:
+                analysis_st.mt_input_resistance = "\u2014"
+                analysis_st.mt_time_constant = "\u2014"
+                analysis_st.mt_membrane_capacitance = "\u2014"
+                analysis_st.mt_fit_converged = False
+            else:
+                analysis_st.mt_input_resistance = f"{props.input_resistance:.2f}"
+                analysis_st.mt_time_constant = f"{props.time_constant:.2f}"
+                analysis_st.mt_membrane_capacitance = (
+                    f"{props.membrane_capacitance:.2f}"
+                    if props.membrane_capacitance is not None
+                    else "\u2014"
+                )
+                analysis_st.mt_fit_converged = props.fit_converged
+            analysis_st.mt_neuron_fingerprint = fingerprint
+            logger.info(
+                "run_membrane_test: R_in=%s kΩ·cm², τ_m=%s ms, C_m=%s µF/cm²",
+                analysis_st.mt_input_resistance,
+                analysis_st.mt_time_constant,
+                analysis_st.mt_membrane_capacitance,
+            )
