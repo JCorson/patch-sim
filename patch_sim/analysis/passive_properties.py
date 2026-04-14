@@ -31,6 +31,12 @@ _SS_FRACTION: float = 0.2
 #: Fraction of the stimulus window used as the exponential fit window.
 _FIT_FRACTION: float = 0.6
 
+#: Maximum duration of the exponential fit window in ms.  The window is
+#: capped at this value so that slow gating-variable relaxations (which occur
+#: on longer timescales) do not distort the single-exponential fit of the fast
+#: membrane capacitance charging transient.
+_MAX_FIT_WINDOW_MS: float = 25.0
+
 #: Minimum stimulus duration (ms) required to extract passive properties.
 _MIN_STIM_DURATION_MS: float = 2.0
 
@@ -214,8 +220,12 @@ def analyze_passive_properties(
     r_in = delta_v / current_amplitude  # kΩ·cm²
 
     # --- Exponential fit for τₘ ---
-    # Fit window: from stim_start to stim_start + _FIT_FRACTION * stim_duration
-    fit_end_ms = stim_start_ms + _FIT_FRACTION * stim_duration
+    # Fit window: from stim_start to stim_start + _FIT_FRACTION * stim_duration,
+    # capped at _MAX_FIT_WINDOW_MS so that slow gating-variable relaxations do
+    # not distort the single-exponential fit of the fast capacitative transient.
+    fit_end_ms = stim_start_ms + min(
+        _FIT_FRACTION * stim_duration, _MAX_FIT_WINDOW_MS
+    )
     fit_mask = (time >= stim_start_ms) & (time < fit_end_ms)
     if not np.any(fit_mask):
         return None
