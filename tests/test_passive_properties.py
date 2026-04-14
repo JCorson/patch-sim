@@ -10,7 +10,6 @@ import pytest
 
 import patch_sim
 from patch_sim.analysis.passive_properties import (
-    PassiveProperties,
     analyze_passive_from_result,
     analyze_passive_properties,
     is_subthreshold,
