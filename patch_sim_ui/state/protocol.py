@@ -87,6 +87,11 @@ class ProtocolState(rx.State):
     vc_pulse_interval: float = 10.0
 
     # ------------------------------------------------------------------ #
+    # Preset tracking                                                     #
+    # ------------------------------------------------------------------ #
+    active_protocol_preset: str = ""
+
+    # ------------------------------------------------------------------ #
     # Computed properties                                                #
     # ------------------------------------------------------------------ #
     @rx.var
@@ -133,9 +138,12 @@ class ProtocolState(rx.State):
     def _apply_clamp_mode(self, mode: str) -> None:
         """Apply clamp mode and reset protocol type synchronously.
 
-        Sets ``clamp_mode`` and resets ``protocol_type`` to the first option
-        for the new mode.  Does not touch cross-state fields (use
-        :meth:`set_clamp_mode` for the full async handler).
+        Sets ``clamp_mode``, resets ``protocol_type`` to the first option for
+        the new mode, and clears ``active_protocol_preset``.  Clearing the
+        preset prevents a stale preset from being re-applied (with the wrong
+        clamp mode) if the user subsequently switches neuron type.  Does not
+        touch cross-state fields (use :meth:`set_clamp_mode` for the full
+        async handler).
 
         Args:
             mode: New clamp mode string (``CURRENT_CLAMP`` or ``VOLTAGE_CLAMP``).
@@ -145,6 +153,7 @@ class ProtocolState(rx.State):
             self.protocol_type = constants.CURRENT_PROTOCOLS[0]
         else:
             self.protocol_type = constants.VOLTAGE_PROTOCOLS[0]
+        self.active_protocol_preset = ""
 
     async def set_clamp_mode(self, mode: str) -> None:
         """Switch between Current Clamp and Voltage Clamp modes.
@@ -183,12 +192,14 @@ class ProtocolState(rx.State):
         config.update(adjustments)
         for key, value in config.items():
             setattr(self, key, value)
+        self.active_protocol_preset = name
 
     async def load_protocol_preset(self, name: str) -> None:
         """Load a protocol preset, applying neuron-type adjustments if active.
 
         Applies the base protocol preset, overlays neuron-type-specific
-        adjustments, clears simulation results in SimulationState, and syncs the
+        adjustments, records the preset name in ``active_protocol_preset``,
+        clears simulation results in SimulationState, and syncs the
         ``_figure_clamp_mode`` shadow copy.
 
         Args:

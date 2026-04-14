@@ -202,22 +202,26 @@ class NeuronState(rx.State):
         self.active_neuron_type = name
 
     async def load_neuron_preset(self, name: str) -> None:
-        """Load a neuron-type preset, updating only neuron parameters.
+        """Load a neuron-type preset and re-apply any active protocol overrides.
 
         Sets conductances and auxiliary channel configuration for the selected
-        neuron type without touching any protocol settings.  Records the active
-        neuron type so that subsequent protocol preset loads can apply
-        neuron-specific adjustments via NEURON_PROTOCOL_ADJUSTMENTS.
+        neuron type, then re-applies the currently active protocol preset (if
+        any) with neuron-specific adjustments from NEURON_PROTOCOL_ADJUSTMENTS
+        and PROTOCOL_NEURON_OVERRIDES.  This ensures that switching neuron type
+        immediately reflects the correct protocol parameters without requiring
+        the user to re-select the protocol.
 
         Clears current sweeps (unless stored traces exist) and continuous state
-        via SimulationState, and syncs the ``_label_neuron_type`` shadow copy
-        used by sweep labels.  When stored traces are present the previous
-        simulation is kept visible so the figure is not cleared mid-comparison.
+        via SimulationState, and syncs the ``_figure_clamp_mode`` and
+        ``_label_neuron_type`` shadow copies.  When stored traces are present the
+        previous simulation is kept visible so the figure is not cleared
+        mid-comparison.
 
         Args:
             name: Key into ``patch_sim_ui.presets.NEURON_UI_PRESETS``.
                 Ignored if not found.
         """
+        from patch_sim_ui.state.protocol import ProtocolState
         from patch_sim_ui.state.simulation import SimulationState
 
         if name not in presets.NEURON_UI_PRESETS:
@@ -225,11 +229,19 @@ class NeuronState(rx.State):
             return
         logger.info("Loaded neuron preset: %s", name)
         self._apply_neuron_preset(name)
+        proto_st = await self.get_state(ProtocolState)
+        if proto_st.active_protocol_preset:
+            proto_st._apply_protocol_preset(proto_st.active_protocol_preset, name)
+            for key, value in presets.PROTOCOL_NEURON_OVERRIDES.get(
+                proto_st.active_protocol_preset, {}
+            ).items():
+                setattr(self, key, value)
         sim_st = await self.get_state(SimulationState)
         if not sim_st.stored_traces:
             sim_st.current_sweeps = []
         sim_st._cont_has_state = False
         sim_st._label_neuron_type = name
+        sim_st._figure_clamp_mode = proto_st.clamp_mode
 
     # ------------------------------------------------------------------ #
     # Numeric field setters                                              #
