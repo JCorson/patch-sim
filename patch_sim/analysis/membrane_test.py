@@ -26,9 +26,11 @@ Constants:
 
 from __future__ import annotations
 
+import dataclasses
+
 from patch_sim.analysis.passive_properties import (
     PassiveProperties,
-    analyze_passive_from_result,
+    analyze_passive_properties,
 )
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
 from patch_sim.electrochemistry import nernst_potential
@@ -87,24 +89,10 @@ def run_membrane_test(neuron: Neuron) -> PassiveProperties | None:
 
     # Passive-only neuron: g_Na = g_K = 0, no auxiliary channels.
     # Equivalent to pharmacological channel block in a real experiment.
-    # The Neuron constructor defaults to no auxiliary channels (channels=()),
-    # so omitting that argument here is intentional — it guarantees a pure RC
-    # circuit regardless of which auxiliary channels the original neuron had.
-    passive_neuron = Neuron(
-        g_Na=0.0,
-        g_K=0.0,
-        g_L=neuron.g_L,
-        C_m=neuron.C_m,
-        v_rest=e_l,
-        Na_out=neuron.Na_out,
-        Na_in=neuron.Na_in,
-        K_out=neuron.K_out,
-        K_in=neuron.K_in,
-        Cl_out=neuron.Cl_out,
-        Cl_in=neuron.Cl_in,
-        Ca_out=neuron.Ca_out,
-        Ca_in=neuron.Ca_in,
-        T=neuron.T,
+    # channels=() guarantees a pure RC circuit regardless of which auxiliary
+    # channels the original neuron had.
+    passive_neuron = dataclasses.replace(
+        neuron, g_Na=0.0, g_K=0.0, v_rest=e_l, additional_channels=()
     )
 
     total_ms = MEMBRANE_TEST_PRE_MS + MEMBRANE_TEST_STEP_MS + MEMBRANE_TEST_POST_MS
@@ -116,8 +104,9 @@ def run_membrane_test(neuron: Neuron) -> PassiveProperties | None:
         sampling_frequency=SIM_SAMPLING_FREQ,
     )
     result = simulate_current_clamp(passive_neuron, stimulus)
-    return analyze_passive_from_result(
-        result,
+    return analyze_passive_properties(
+        result["time"],
+        result["voltage"],
         current_amplitude=MEMBRANE_TEST_CURRENT,
         stim_start_ms=MEMBRANE_TEST_PRE_MS,
         stim_end_ms=MEMBRANE_TEST_PRE_MS + MEMBRANE_TEST_STEP_MS,

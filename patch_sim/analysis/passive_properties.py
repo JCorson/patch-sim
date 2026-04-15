@@ -1,9 +1,7 @@
 """Passive membrane property extraction from subthreshold current clamp steps.
 
 Provides :func:`analyze_passive_properties` for computing input resistance and
-membrane time constant from a subthreshold voltage response, and
-:func:`analyze_passive_from_result` as a convenience wrapper for
-:class:`~patch_sim.clamp_simulations.SimulationResult` structured arrays.
+membrane time constant from a subthreshold voltage response.
 
 Data classes:
     PassiveProperties: Passive membrane property measurements.
@@ -13,15 +11,11 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.optimize import curve_fit
 
 from patch_sim.analysis.ap_metrics import analyze_aps
-
-if TYPE_CHECKING:
-    from patch_sim.clamp_simulations import SimulationResult
 
 logger = logging.getLogger(__name__)
 
@@ -263,36 +257,4 @@ def analyze_passive_properties(
         time_constant=tau_m,
         membrane_capacitance=c_m,
         fit_converged=fit_converged,
-    )
-
-
-def analyze_passive_from_result(
-    result: SimulationResult,
-    current_amplitude: float,
-    stim_start_ms: float,
-    stim_end_ms: float,
-) -> PassiveProperties | None:
-    """Extract passive properties from a SimulationResult.
-
-    Convenience wrapper around :func:`analyze_passive_properties` that pulls
-    the ``"time"`` and ``"voltage"`` fields from the structured array.
-
-    Args:
-        result: A structured NumPy array returned by
-            :func:`~patch_sim.simulate_current_clamp`.  Must contain
-            ``"time"`` and ``"voltage"`` fields.
-        current_amplitude: Injected current step amplitude in µA/cm².
-        stim_start_ms: Time at which the current step begins (ms).
-        stim_end_ms: Time at which the current step ends (ms).
-
-    Returns:
-        A :class:`PassiveProperties` instance, or ``None`` when analysis is
-        not applicable.
-    """
-    return analyze_passive_properties(
-        result["time"],
-        result["voltage"],
-        current_amplitude=current_amplitude,
-        stim_start_ms=stim_start_ms,
-        stim_end_ms=stim_end_ms,
     )

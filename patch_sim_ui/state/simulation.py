@@ -1301,12 +1301,12 @@ class SimulationState(rx.State):
         """
         async with self:
             self._mt_request_id += 1
-            my_ticket = self._mt_request_id
+            request_id = self._mt_request_id
 
         await asyncio.sleep(_MT_DEBOUNCE_S)
 
         async with self:
-            if self._mt_request_id != my_ticket:
+            if self._mt_request_id != request_id:
                 return
 
         yield SimulationState.run_membrane_test

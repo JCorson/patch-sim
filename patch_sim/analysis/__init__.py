@@ -43,7 +43,6 @@ from .membrane_test import (
 )
 from .passive_properties import (
     PassiveProperties,
-    analyze_passive_from_result,
     analyze_passive_properties,
     is_subthreshold,
 )
@@ -54,7 +53,6 @@ __all__ = [
     "analyze_aps_from_result",
     "analyze_fi",
     "analyze_iv",
-    "analyze_passive_from_result",
     "analyze_passive_properties",
     "analyze_sfa",
     "boltzmann",

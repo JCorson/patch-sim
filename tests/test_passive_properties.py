@@ -10,7 +10,6 @@ import pytest
 
 import patch_sim
 from patch_sim.analysis.passive_properties import (
-    analyze_passive_from_result,
     analyze_passive_properties,
     is_subthreshold,
 )
@@ -296,8 +295,9 @@ def test_input_resistance_hh_model(hh_model: patch_sim.Neuron) -> None:
     since the exact value depends on gating variables at the new steady state.
     """
     result, stim_start, stim_end = _run_subthreshold_sim(hh_model, -1.0)
-    props = analyze_passive_from_result(
-        result,
+    props = analyze_passive_properties(
+        result["time"],
+        result["voltage"],
         current_amplitude=-1.0,
         stim_start_ms=stim_start,
         stim_end_ms=stim_end,
@@ -316,8 +316,9 @@ def test_time_constant_hh_model(hh_model: patch_sim.Neuron) -> None:
     ≈ 3.33 ms estimate, so this test verifies the order of magnitude only.
     """
     result, stim_start, stim_end = _run_subthreshold_sim(hh_model, -1.0)
-    props = analyze_passive_from_result(
-        result,
+    props = analyze_passive_properties(
+        result["time"],
+        result["voltage"],
         current_amplitude=-1.0,
         stim_start_ms=stim_start,
         stim_end_ms=stim_end,
@@ -335,8 +336,9 @@ def test_membrane_capacitance_hh_model(hh_model: patch_sim.Neuron) -> None:
     rough order of magnitude only.
     """
     result, stim_start, stim_end = _run_subthreshold_sim(hh_model, -1.0)
-    props = analyze_passive_from_result(
-        result,
+    props = analyze_passive_properties(
+        result["time"],
+        result["voltage"],
         current_amplitude=-1.0,
         stim_start_ms=stim_start,
         stim_end_ms=stim_end,
@@ -350,36 +352,12 @@ def test_membrane_capacitance_hh_model(hh_model: patch_sim.Neuron) -> None:
 def test_fit_converged_flag_hh_model(hh_model: patch_sim.Neuron) -> None:
     """Exponential fit converges for a clean subthreshold HH sweep."""
     result, stim_start, stim_end = _run_subthreshold_sim(hh_model, -1.0)
-    props = analyze_passive_from_result(
-        result,
-        current_amplitude=-1.0,
-        stim_start_ms=stim_start,
-        stim_end_ms=stim_end,
-    )
-    assert props is not None
-    assert props.fit_converged is True
-
-
-def test_analyze_passive_from_result_matches_raw(hh_model: patch_sim.Neuron) -> None:
-    """analyze_passive_from_result matches calling the raw function with arrays."""
-    result, stim_start, stim_end = _run_subthreshold_sim(hh_model, -1.0)
-
-    from_result = analyze_passive_from_result(
-        result,
-        current_amplitude=-1.0,
-        stim_start_ms=stim_start,
-        stim_end_ms=stim_end,
-    )
-    from_arrays = analyze_passive_properties(
+    props = analyze_passive_properties(
         result["time"],
         result["voltage"],
         current_amplitude=-1.0,
         stim_start_ms=stim_start,
         stim_end_ms=stim_end,
     )
-
-    assert from_result is not None
-    assert from_arrays is not None
-    assert from_result.input_resistance == pytest.approx(from_arrays.input_resistance)
-    assert from_result.time_constant == pytest.approx(from_arrays.time_constant)
-    assert from_result.fit_converged == from_arrays.fit_converged
+    assert props is not None
+    assert props.fit_converged is True
