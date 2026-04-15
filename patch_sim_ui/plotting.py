@@ -69,6 +69,15 @@ _TOTAL_CURRENT_LINE_WIDTH = 4
 # Plot margin in pixels: left, right, top, bottom.
 _PLOT_MARGIN = {"l": 60, "r": 20, "t": 30, "b": 40}
 
+# Shared layout kwargs applied to every analysis sub-figure (F-I, I-V, g-V,
+# SFA, phase-plane).  Kept separate from the main trace plot (_PLOT_MARGIN)
+# because the analysis figures are smaller and have tighter margins.
+_ANALYSIS_FIGURE_LAYOUT: dict = {
+    "template": "plotly_white",
+    "margin": {"l": 50, "r": 10, "t": 10, "b": 40},
+    "height": 260,
+}
+
 
 @dataclass
 class TraceVisibility:
@@ -949,11 +958,9 @@ def build_phase_plane_figure(phase_plane_data: dict) -> go.Figure:
         )
 
     fig.update_layout(
-        margin=_PLOT_MARGIN,
-        template="plotly_white",
+        **_ANALYSIS_FIGURE_LAYOUT,
         hovermode="closest",
         showlegend=False,
-        height=260,
         xaxis_title="V (mV)",
         yaxis_title="dV/dt (mV/ms)",
     )
@@ -1036,11 +1043,9 @@ def build_fi_figure(fi_data: dict) -> go.Figure:
             )
         )
     fig.update_layout(
+        **_ANALYSIS_FIGURE_LAYOUT,
         xaxis_title="Current (µA/cm²)",
         yaxis_title="Firing Rate (Hz)",
-        template="plotly_white",
-        margin=dict(l=50, r=10, t=10, b=40),
-        height=260,
         showlegend=True,
         legend=dict(
             orientation="h",
@@ -1127,11 +1132,9 @@ def build_sfa_figure(sfa_data: dict) -> go.Figure:
         )
 
     fig.update_layout(
+        **_ANALYSIS_FIGURE_LAYOUT,
         xaxis_title="Spike Interval #",
         yaxis_title="Inst. Frequency (Hz)",
-        template="plotly_white",
-        margin=dict(l=50, r=10, t=10, b=40),
-        height=260,
         showlegend=False,
         annotations=annotations,
     )
@@ -1188,11 +1191,9 @@ def build_iv_figure(iv_data: dict) -> go.Figure:
         )
     )
     fig.update_layout(
+        **_ANALYSIS_FIGURE_LAYOUT,
         xaxis_title="Voltage (mV)",
         yaxis_title="Current (µA/cm²)",
-        template="plotly_white",
-        margin=dict(l=50, r=10, t=10, b=40),
-        height=260,
         showlegend=True,
         legend=dict(
             orientation="h",
@@ -1262,11 +1263,9 @@ def build_gv_figure(gv_data: dict) -> go.Figure:
         )
 
     fig.update_layout(
+        **_ANALYSIS_FIGURE_LAYOUT,
         xaxis_title="Voltage (mV)",
         yaxis_title="G / G\u2098\u2090\u02e3",
-        template="plotly_white",
-        margin=dict(l=50, r=10, t=10, b=40),
-        height=260,
         showlegend=True,
         legend=dict(
             orientation="h",
