@@ -37,7 +37,9 @@ from .constants import (
     DEFAULT_K_OUT,
     DEFAULT_NA_IN,
     DEFAULT_NA_OUT,
+    DEFAULT_Q10,
     DEFAULT_T,
+    DEFAULT_T_REF,
     DEFAULT_V_REST,
 )
 from .core_channels import make_k_channel, make_leak_channel, make_na_channel
@@ -82,6 +84,8 @@ class NeuronConfig:
         Ca_out: Extracellular calcium concentration in mM.
         Ca_in: Intracellular calcium concentration in mM.
         T: Temperature in Kelvin.
+        Q10: Q10 temperature coefficient for gating kinetics (dimensionless).
+        T_ref: Reference temperature in Kelvin for Q10 scaling.
         na_channel_factory: Factory for the Na⁺ core channel. Defaults to HH52
             squid axon kinetics.
         k_channel_factory: Factory for the K⁺ core channel. Defaults to HH52
@@ -105,6 +109,8 @@ class NeuronConfig:
     Ca_out: float = DEFAULT_CA_OUT
     Ca_in: float = DEFAULT_CA_IN
     T: float = DEFAULT_T
+    Q10: float = DEFAULT_Q10
+    T_ref: float = DEFAULT_T_REF
     na_channel_factory: Callable[[float], IonChannel] = field(default=make_na_channel)
     k_channel_factory: Callable[[float], IonChannel] = field(default=make_k_channel)
     leak_channel_factory: Callable[[float], IonChannel] = field(
@@ -180,6 +186,8 @@ def make_neuron(config: NeuronConfig) -> Neuron:
         Ca_out=config.Ca_out,
         Ca_in=config.Ca_in,
         T=config.T,
+        Q10=config.Q10,
+        T_ref=config.T_ref,
         na_channel_factory=config.na_channel_factory,
         k_channel_factory=config.k_channel_factory,
         leak_channel_factory=config.leak_channel_factory,
