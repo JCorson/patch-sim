@@ -179,29 +179,56 @@ def _ap_sfa_plot() -> rx.Component:
     )
 
 
-def _ap_metrics_tab() -> rx.Component:
-    """Render the AP Metrics tab content.
+def _ap_phase_plane_plot() -> rx.Component:
+    """Render the V vs dV/dt phase-plane plot inside the Analysis tab.
 
-    For single-sweep runs: shows summary statistics (including firing rate and
-    ISI) and a per-spike detail table.  For multi-sweep current clamp runs:
-    shows pooled AP summary (without firing rate / ISI), the F-I curve plot,
-    and the pooled spike table.  When neither AP metrics nor F-I data are
-    available, a placeholder message is shown instead.
+    Shows the membrane voltage on the x-axis against its time derivative on
+    the y-axis.  One trajectory is drawn per sweep; multi-sweep runs display
+    trajectories in their respective sweep colours.
 
     Returns:
-        The full tab content as a flex column.
+        A flex container holding the phase-plane Plotly figure.
+    """
+    return rx.flex(
+        rx.plotly(
+            data=AnalysisState.phase_plane_figure,
+            width="100%",
+        ),
+        direction="column",
+        width="100%",
+        flex_shrink="0",
+        border_top="1px solid var(--gray-4)",
+        padding="1",
+    )
+
+
+def _ap_analysis_tab() -> rx.Component:
+    """Render the Analysis sub-tab within the CC pane.
+
+    Shows AP summary statistics, the F-I curve (multi-sweep), the SFA curve,
+    and the V vs dV/dt phase-plane when data are available.  Displays a
+    placeholder when no data exists yet.
+
+    Returns:
+        The analysis sub-tab content as a scrollable flex column.
     """
     return rx.cond(
         AnalysisState.has_ap_or_fi,
-        rx.flex(
-            rx.cond(AnalysisState.has_ap_metrics, _ap_summary(), rx.box()),
-            rx.cond(AnalysisState.has_fi_data, _ap_fi_plot(), rx.box()),
-            rx.cond(AnalysisState.has_sfa_data, _ap_sfa_plot(), rx.box()),
-            rx.cond(AnalysisState.has_ap_metrics, _ap_spike_table(), rx.box()),
-            direction="column",
+        rx.scroll_area(
+            rx.flex(
+                rx.cond(AnalysisState.has_ap_metrics, _ap_summary(), rx.box()),
+                rx.cond(AnalysisState.has_fi_data, _ap_fi_plot(), rx.box()),
+                rx.cond(AnalysisState.has_sfa_data, _ap_sfa_plot(), rx.box()),
+                rx.cond(
+                    AnalysisState.has_phase_plane_data,
+                    _ap_phase_plane_plot(),
+                    rx.box(),
+                ),
+                direction="column",
+                width="100%",
+            ),
             height="100%",
             width="100%",
-            overflow="hidden",
         ),
         rx.flex(
             rx.text(
@@ -213,6 +240,68 @@ def _ap_metrics_tab() -> rx.Component:
             padding="4",
             justify="center",
         ),
+    )
+
+
+def _ap_spikes_tab() -> rx.Component:
+    """Render the Spikes sub-tab showing the per-spike detail table.
+
+    Returns:
+        The per-spike table wrapped in a flex column, or a placeholder when
+        no spike data is available.
+    """
+    return rx.cond(
+        AnalysisState.has_ap_metrics,
+        _ap_spike_table(),
+        rx.flex(
+            rx.text(
+                "No spikes detected.",
+                size="1",
+                color="gray",
+                text_align="center",
+            ),
+            padding="4",
+            justify="center",
+        ),
+    )
+
+
+def _ap_metrics_tab() -> rx.Component:
+    """Render the full AP Metrics panel with two sub-tabs.
+
+    Sub-tabs:
+    - **Analysis**: AP summary statistics, F-I curve, SFA curve, phase plane.
+    - **Spikes**: Per-spike detail table.
+
+    Returns:
+        A tabbed flex column for the CC analysis pane.
+    """
+    return rx.tabs.root(
+        rx.tabs.list(
+            rx.tabs.trigger("Analysis", value="analysis", size="1"),
+            rx.tabs.trigger("Spikes", value="spikes", size="1"),
+            size="1",
+            width="100%",
+        ),
+        rx.tabs.content(
+            _ap_analysis_tab(),
+            value="analysis",
+            height="100%",
+            overflow="hidden",
+        ),
+        rx.tabs.content(
+            _ap_spikes_tab(),
+            value="spikes",
+            height="100%",
+            overflow="hidden",
+        ),
+        default_value="analysis",
+        orientation="horizontal",
+        height="100%",
+        width="100%",
+        display="flex",
+        flex_direction="column",
+        overflow="hidden",
     )
 
 

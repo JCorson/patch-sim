@@ -999,3 +999,28 @@ def test_sweep_traces_have_correct_yaxis_assignments() -> None:
     # Every sweep trace must have a non-None yaxis.
     for i, t in enumerate(sweep_traces):
         assert t.yaxis is not None, f"Trace {i} must have a yaxis assignment"
+
+
+# ---------------------------------------------------------------------------
+# Sweep.dvdt field
+# ---------------------------------------------------------------------------
+
+
+def test_sweep_dvdt_populated_by_from_result() -> None:
+    """Sweep.from_result populates the dvdt field with a non-empty list."""
+    result = _make_result()
+    stim = _make_stimulus()
+    s = Sweep.from_result(result, stim, "A", "#fff", "Current Clamp")
+    assert len(s.dvdt) == _N, "dvdt must have the same length as the time axis"
+
+
+def test_sweep_dvdt_empty_when_voltage_absent() -> None:
+    """The dvdt field is empty when the result has no voltage column."""
+    base = _make_result()
+    assert base.dtype.names is not None
+    names = [f for f in base.dtype.names if f != "voltage"]
+    result = np.empty(len(base), dtype=np.dtype([(n, np.float64) for n in names]))
+    for n in names:
+        result[n] = base[n]
+    s = Sweep.from_result(result, _make_stimulus(), "", "", "Current Clamp")
+    assert s.dvdt == []
