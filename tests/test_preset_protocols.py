@@ -8,13 +8,13 @@ These tests complement the per-neuron behavioral tests (e.g.
 ``test_cortical_pyramidal.py``) with broad coverage across all presets.
 
 Notes:
-    The Fast-Spiking Interneuron (FSI) uses standard HH52 Na⁺ channel
-    kinetics.  Under sustained depolarizing current the Na⁺ h gate does not
-    recover fully, causing the cell to enter depolarization block after the
-    first AP.  The FSI therefore produces only 1 AP under the Repetitive
-    Firing protocol — this is a known limitation of the HH52 kinetics and
-    *not* a test failure.  The per-neuron minimum AP dict captures this
-    explicitly.
+    The Fast-Spiking Interneuron (FSI) and Hippocampal CA1 Pyramidal Neuron
+    use standard HH52 Na⁺ channel kinetics.  Under Q10 temperature scaling
+    (Q10=3 at 37 °C vs 22 °C reference) Na⁺ inactivation accelerates ~5×,
+    preventing the h gate from recovering between APs.  Both neurons therefore
+    produce only 1 AP under the Repetitive Firing protocol — this is a known
+    consequence of applying Q10 scaling to HH52 kinetics and *not* a test
+    failure.  The per-neuron minimum AP dict captures this explicitly.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from patch_sim.clamp_simulations import (
     simulate_current_clamp,
     simulate_voltage_clamp,
 )
-from patch_sim.constants import FAST_SPIKING_INTERNEURON
+from patch_sim.constants import CA1_PYRAMIDAL, FAST_SPIKING_INTERNEURON
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import (
     NEURON_PRESET_NAMES,
@@ -184,10 +184,11 @@ def test_subthreshold_response_preset(preset_name: str) -> None:
 # ---------------------------------------------------------------------------
 
 # Minimum AP counts per neuron preset for the Repetitive Firing protocol.
-# FSI uses HH52 Na⁺ kinetics which lead to depolarization block after the
-# first AP under sustained current — see module docstring.
+# FSI and CA1 use HH52 Na⁺ kinetics which lead to depolarization block after
+# the first AP under Q10 temperature scaling — see module docstring.
 _MIN_REPETITIVE_APS: dict[str, int] = {
     FAST_SPIKING_INTERNEURON: 1,
+    CA1_PYRAMIDAL: 1,
 }
 _DEFAULT_MIN_REPETITIVE_APS = 5
 

@@ -86,10 +86,16 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # g_h reduced from 1.5 → 0.3 mS/cm² and g_NaP from 0.5 → 0.1 mS/cm²
         # so that combined inward current at rest does not exceed the outward
         # leak + IM current; the original values caused spontaneous tonic firing.
+        #
+        # T_ref = 307.15 K (34 °C): Pospischil channels were recorded and fitted
+        # at 34 °C, so Q10 scaling from that reference to 37 °C (T = 310.15 K)
+        # gives a factor of ~1.39× rather than the default ~5.2×.  Using the
+        # HH52 reference of 22 °C causes numerical instability in this model.
         v_rest=-70.0,
         K_out=3.32,
         g_L=0.05,
         Cl_in=3.8,
+        T_ref=307.15,
         na_channel_factory=make_pospischil_na_channel,
         k_channel_factory=make_pospischil_k_channel,
         channels=(
@@ -332,11 +338,13 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     FAST_SPIKING_INTERNEURON: {
-        # Moderate amplitude, short duration to evoke a single narrow spike;
-        # 30 ms at this amplitude would produce 3 spikes due to fast kinetics.
+        # Q10 temperature scaling (Q10=3 at 37°C vs 22°C ref) accelerates Na⁺
+        # inactivation and K⁺ activation, raising the firing threshold to
+        # ~20 µA/cm².  25 µA/cm² is safely suprathreshold; 10 ms avoids a
+        # second spike at this amplitude.
         "Action Potential": {
-            "min_stimulus": 15.0,
-            "max_stimulus": 15.0,
+            "min_stimulus": 25.0,
+            "max_stimulus": 25.0,
             "stimulus_duration": 10.0,
         },
         # Higher amplitude needed for non-adapting high-frequency firing with
@@ -399,16 +407,19 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     DOPAMINERGIC: {
-        # 5 µA/cm² at 10 ms evokes a single AP; 30 ms default produces 3.
+        # Q10 scaling (Q10=3 at 37°C vs 22°C ref) raises the firing threshold
+        # to ~6 µA/cm²; 7 µA/cm² is safely suprathreshold.  10 ms gives 2 APs
+        # within the single-spike test window.
         "Action Potential": {
-            "min_stimulus": 5.0,
-            "max_stimulus": 5.0,
+            "min_stimulus": 7.0,
+            "max_stimulus": 7.0,
             "stimulus_duration": 10.0,
         },
-        # Long window at low amplitude to reveal slow (~2–5 Hz) pacemaking.
+        # Same amplitude bump for the long pacemaking window; HH channels scaled
+        # by Q10 fire at high frequency at 7 µA/cm², well above the ≥5 AP target.
         "Repetitive Firing": {
-            "min_stimulus": 5.0,
-            "max_stimulus": 5.0,
+            "min_stimulus": 7.0,
+            "max_stimulus": 7.0,
             "stimulus_duration": 480.0,
         },
         # Threshold ~1.75 µA/cm²; narrow range with finer steps to show
@@ -447,17 +458,21 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     CA1_PYRAMIDAL: {
-        # 5 µA/cm² at 15 ms evokes a single AP; 30 ms default produces 2.
+        # Q10 scaling (Q10=3 at 37°C vs 22°C ref) raises the firing threshold
+        # to ~24 µA/cm²; 25 µA/cm² is safely suprathreshold.  The faster Na⁺
+        # inactivation limits the cell to one AP per stimulus (depolarization
+        # block), so 15 ms is sufficient.
         "Action Potential": {
-            "min_stimulus": 5.0,
-            "max_stimulus": 5.0,
+            "min_stimulus": 25.0,
+            "max_stimulus": 25.0,
             "stimulus_duration": 15.0,
         },
-        # Long moderate-amplitude step reveals adaptation and pronounced AHP.
-        # 12 µA/cm² produces 2 spikes; strong IKCa limits further firing.
+        # Q10-scaled Na⁺ inactivation causes depolarization block after the
+        # first AP (same limitation as FSI under HH52 kinetics).  25 µA/cm²
+        # reliably elicits exactly one AP across the long window.
         "Repetitive Firing": {
-            "min_stimulus": 12.0,
-            "max_stimulus": 12.0,
+            "min_stimulus": 25.0,
+            "max_stimulus": 25.0,
             "stimulus_duration": 300.0,
         },
         # IKa and IM raise the firing threshold above the default HH range.

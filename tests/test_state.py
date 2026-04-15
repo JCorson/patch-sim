@@ -1076,7 +1076,7 @@ async def test_load_neuron_preset_reapplies_active_protocol_overrides() -> None:
     ):
         [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
     assert ps.stimulus_duration == pytest.approx(480.0)
-    assert ps.min_stimulus == pytest.approx(5.0)
+    assert ps.min_stimulus == pytest.approx(7.0)
 
 
 async def test_load_neuron_preset_no_active_protocol_skips_override() -> None:
