@@ -172,8 +172,9 @@ def test_physiological_limits_and_action_potentials():
     currents = [20.0, 40.0, 60.0]  # increasing external currents in μA/cm²
     ap_threshold = 0  # mV, voltage threshold for counting action potentials
 
-    # Create a model for testing
-    custom_model = Neuron()
+    # Disable Q10 scaling so the HH kinetics match their original parameterisation
+    # and the RK4 integrator stays numerically stable at the default 0.025 ms step.
+    custom_model = Neuron(T_ref=Neuron().T)
     num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
 
     ap_counts = []

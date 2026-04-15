@@ -178,3 +178,16 @@ def test_neuron_config_default_factories_are_hh52() -> None:
     assert config.na_channel_factory is make_na_channel
     assert config.k_channel_factory is make_k_channel
     assert config.leak_channel_factory is make_leak_channel
+
+
+# ---------------------------------------------------------------------------
+# Q10 pass-through
+# ---------------------------------------------------------------------------
+
+
+def test_make_neuron_passes_q10_and_t_ref() -> None:
+    """make_neuron forwards Q10 and T_ref from NeuronConfig to Neuron."""
+    config = NeuronConfig(Q10=2.0, T_ref=300.0)
+    model = make_neuron(config)
+    assert model.Q10 == pytest.approx(2.0)
+    assert model.T_ref == pytest.approx(300.0)
