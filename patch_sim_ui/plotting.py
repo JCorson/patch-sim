@@ -188,7 +188,7 @@ class Sweep(BaseModel):
 
         time_arr = result["time"]
         if "voltage" in columns:
-            _, dvdt_arr = compute_dvdt(time_arr, result["voltage"])
+            dvdt_arr = compute_dvdt(time_arr, result["voltage"])
         else:
             dvdt_arr = np.array([])
 
