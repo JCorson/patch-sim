@@ -163,10 +163,9 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # after-hyperpolarization (AHP) characteristic of CA1 cells.
         # Refs: Warman et al. (1994); Migliore et al. (1999), ModelDB #2796
         #
-        # g_L = 0.05 mS/cm² gives τ_m ≈ 20 ms and R_in ≈ 20 kΩ·cm², reflecting
-        # the high input resistance of CA1 pyramidal cells (slightly leakier
-        # than cortical pyramidal cells).  Cl_in = 27.9 mM (E_L ≈ −39 mV)
-        # preserves v_rest = −65 mV.
+        # g_L = 0.05 mS/cm² gives τ_m ≈ 20 ms and R_in ≈ 20 kΩ·cm², matching
+        # the high input resistance measured in CA1 pyramidal cells in slice
+        # recordings.  Cl_in = 27.9 mM (E_L ≈ −39 mV) preserves v_rest = −65 mV.
         g_Na=35.0,
         g_K=10.0,
         g_L=0.05,
@@ -341,8 +340,8 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     CORTICAL_PYRAMIDAL: {
-        # Lower R_in (g_L=0.05 → R_in=20 kΩ·cm²) raises excitability; need a
-        # shorter step to avoid a second spike at 5 µA/cm².
+        # Higher R_in (g_L=0.05 → R_in=20 kΩ·cm²) raises excitability; 0.5
+        # µA/cm² is subthreshold where 1.5 µA/cm² (default) would spike.
         "Subthreshold Response": {
             "min_stimulus": 0.5,
             "max_stimulus": 0.5,
