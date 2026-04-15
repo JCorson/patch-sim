@@ -142,7 +142,7 @@ def test_subthreshold_amplification(cp_neuron: Neuron) -> None:
     """
     protocol = step_current(
         duration=200.0,
-        current_amplitude=1.0,  # µA/cm² — well below AP threshold
+        current_amplitude=0.3,  # µA/cm² — well below AP threshold with g_L=0.05
         step_start=50.0,
         step_duration=100.0,
     )

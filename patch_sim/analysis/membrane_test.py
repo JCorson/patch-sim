@@ -46,8 +46,9 @@ MEMBRANE_TEST_CURRENT: float = -0.5
 MEMBRANE_TEST_PRE_MS: float = 10.0
 
 #: Duration of the current step in ms.  Long enough to reach steady state for
-#: any physiologically plausible τ_m (< 25 ms) while keeping run time short.
-MEMBRANE_TEST_STEP_MS: float = 50.0
+#: any physiologically plausible τ_m (< 55 ms) while keeping run time short.
+#: Must span ≥5×τ_m for the slowest preset (Purkinje, τ_m ≈ 50 ms).
+MEMBRANE_TEST_STEP_MS: float = 250.0
 
 #: Duration of the post-stimulus recovery period in ms.
 MEMBRANE_TEST_POST_MS: float = 10.0
@@ -104,10 +105,14 @@ def run_membrane_test(neuron: Neuron) -> PassiveProperties | None:
         sampling_frequency=SIM_SAMPLING_FREQ,
     )
     result = simulate_current_clamp(passive_neuron, stimulus)
+    # Use an extended fit window (150 ms) because the passive-only simulation
+    # has no gating-variable relaxations to distort the fit, and Purkinje
+    # cells have τ_m ≈ 50 ms requiring ≥3×τ_m in the fit window.
     return analyze_passive_properties(
         result["time"],
         result["voltage"],
         current_amplitude=MEMBRANE_TEST_CURRENT,
         stim_start_ms=MEMBRANE_TEST_PRE_MS,
         stim_end_ms=MEMBRANE_TEST_PRE_MS + MEMBRANE_TEST_STEP_MS,
+        max_fit_window_ms=150.0,
     )

@@ -152,6 +152,7 @@ def analyze_passive_properties(
     current_amplitude: float,
     stim_start_ms: float,
     stim_end_ms: float,
+    max_fit_window_ms: float = _MAX_FIT_WINDOW_MS,
 ) -> PassiveProperties | None:
     """Extract input resistance and membrane time constant from a CC step response.
 
@@ -181,6 +182,10 @@ def analyze_passive_properties(
             non-zero for a meaningful R_in estimate.
         stim_start_ms: Time at which the current step begins (ms).
         stim_end_ms: Time at which the current step ends (ms).
+        max_fit_window_ms: Maximum duration of the exponential fit window in ms.
+            Defaults to :data:`_MAX_FIT_WINDOW_MS` (25 ms).  Pass a larger
+            value (e.g. 150 ms) when the trace comes from a passive-only
+            simulation where slow gating-variable relaxations are absent.
 
     Returns:
         A :class:`PassiveProperties` instance, or ``None`` when analysis is
@@ -215,9 +220,9 @@ def analyze_passive_properties(
 
     # --- Exponential fit for τₘ ---
     # Fit window: from stim_start to stim_start + _FIT_FRACTION * stim_duration,
-    # capped at _MAX_FIT_WINDOW_MS so that slow gating-variable relaxations do
+    # capped at max_fit_window_ms so that slow gating-variable relaxations do
     # not distort the single-exponential fit of the fast capacitative transient.
-    fit_end_ms = stim_start_ms + min(_FIT_FRACTION * stim_duration, _MAX_FIT_WINDOW_MS)
+    fit_end_ms = stim_start_ms + min(_FIT_FRACTION * stim_duration, max_fit_window_ms)
     fit_mask = (time >= stim_start_ms) & (time < fit_end_ms)
     if not np.any(fit_mask):
         return None
