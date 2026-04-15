@@ -243,6 +243,38 @@ def _ap_analysis_tab() -> rx.Component:
     )
 
 
+def _membrane_test_section() -> rx.Component:
+    """Render the always-visible passive membrane properties section.
+
+    Displays R_in (kΩ·cm²), τₘ (ms), and Cₘ (µF/cm²) from the dedicated
+    membrane test run on a single compact row.  Shown in both current clamp
+    and voltage clamp modes whenever membrane test results are available.
+
+    Returns:
+        A single-row hstack of labelled passive property values, or an empty
+        box when no membrane test results are available.
+    """
+    s = AnalysisState
+    return rx.cond(
+        AnalysisState.has_membrane_test,
+        rx.hstack(
+            rx.text("R_in", size="1", color="gray"),
+            rx.text(s.mt_input_resistance + " kΩ·cm²", size="1"),
+            rx.text("τ_m", size="1", color="gray", padding_left="2"),
+            rx.text(s.mt_time_constant + " ms", size="1"),
+            rx.text("C_m", size="1", color="gray", padding_left="2"),
+            rx.text(s.mt_membrane_capacitance + " µF/cm²", size="1"),
+            padding_x="3",
+            padding_y="2",
+            border_bottom="1px solid var(--gray-4)",
+            width="100%",
+            align="center",
+            wrap="nowrap",
+        ),
+        rx.box(),
+    )
+
+
 def _ap_spikes_tab() -> rx.Component:
     """Render the Spikes sub-tab showing the per-spike detail table.
 
@@ -402,6 +434,8 @@ def _expanded_panel() -> rx.Component:
             width="100%",
             align="center",
         ),
+        # Passive membrane properties — always visible in both clamp modes
+        _membrane_test_section(),
         # Analysis content — switches automatically with clamp mode
         rx.box(
             rx.cond(

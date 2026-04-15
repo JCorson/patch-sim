@@ -178,4 +178,9 @@ app = rx.App(
         radius="medium",
     )
 )
-app.add_page(index, route="/", title="Patch Clamp Simulator")
+app.add_page(
+    index,
+    route="/",
+    title="Patch Clamp Simulator",
+    on_load=SimulationState.run_membrane_test,
+)

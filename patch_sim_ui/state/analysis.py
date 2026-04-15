@@ -26,6 +26,24 @@ class AnalysisState(rx.State):
     sfa_data: dict[str, Any] = {}  # Serialized SFAAnalysisResult for the UI
     phase_plane_data: dict[str, Any] = {}  # Serialized V vs dV/dt sweep data
 
+    # Membrane test results — persisted across protocol/simulation changes.
+    # Only invalidated when neuron parameters change (neuron_fingerprint mismatch).
+    mt_input_resistance: str = ""  # R_in formatted as string (kΩ·cm²)
+    mt_time_constant: str = ""  # τ_m formatted as string (ms)
+    mt_membrane_capacitance: str = ""  # C_m formatted as string (µF/cm²)
+    mt_neuron_fingerprint: str = ""  # fingerprint used to detect stale cache
+    mt_fit_converged: bool = True  # False when exponential fit did not converge
+
+    @rx.var
+    def has_membrane_test(self) -> bool:
+        """Return True when the membrane test has been run at least once.
+
+        Uses ``mt_neuron_fingerprint`` as the sentinel: it is set unconditionally
+        at the end of ``run_membrane_test`` (even when the fit fails and values
+        are em-dashes), making it a more robust indicator than ``mt_input_resistance``.
+        """
+        return self.mt_neuron_fingerprint != ""
+
     @rx.var
     def has_ap_metrics(self) -> bool:
         """Return True when AP analysis results are available for display."""

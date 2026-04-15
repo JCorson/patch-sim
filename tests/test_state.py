@@ -333,7 +333,7 @@ async def test_load_neuron_preset_fast_spiking_interneuron() -> None:
     """load_neuron_preset enables IKv31 and leaves IKa disabled for Fast-Spiking."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        await ns.load_neuron_preset(FAST_SPIKING_INTERNEURON)
+        [_ async for _ in ns.load_neuron_preset(FAST_SPIKING_INTERNEURON)]
     assert ns.ikv31_enabled is True
     assert ns.ika_enabled is False
 
@@ -342,7 +342,7 @@ async def test_load_neuron_preset_sets_active_neuron_type() -> None:
     """load_neuron_preset records the selected neuron type on NeuronState."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
     assert ns.active_neuron_type == CORTICAL_PYRAMIDAL
 
 
@@ -350,9 +350,9 @@ async def test_load_neuron_preset_resets_previously_enabled_channels() -> None:
     """Loading a second neuron preset disables channels from the first."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        await ns.load_neuron_preset(FAST_SPIKING_INTERNEURON)
+        [_ async for _ in ns.load_neuron_preset(FAST_SPIKING_INTERNEURON)]
         assert ns.ikv31_enabled is True
-        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
     assert ns.ikv31_enabled is False
 
 
@@ -360,7 +360,7 @@ async def test_load_neuron_preset_pyramidal_neuron() -> None:
     """load_neuron_preset enables Ih, INaP, and IM channels for Cortical Pyramidal."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
     assert ns.ih_enabled is True
     assert ns.inap_enabled is True
     assert ns.im_enabled is True
@@ -370,7 +370,7 @@ async def test_load_neuron_preset_purkinje_cell() -> None:
     """load_neuron_preset enables ICaL, ICaT, and IKCa channels for Purkinje Cell."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        await ns.load_neuron_preset(PURKINJE)
+        [_ async for _ in ns.load_neuron_preset(PURKINJE)]
     assert ns.ical_enabled is True
     assert ns.icat_enabled is True
     assert ns.ikca_enabled is True
@@ -380,7 +380,7 @@ async def test_load_neuron_preset_dopaminergic_neuron() -> None:
     """load_neuron_preset enables Ih and IM channels for Dopaminergic Neuron."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        await ns.load_neuron_preset(DOPAMINERGIC)
+        [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
     assert ns.ih_enabled is True
     assert ns.im_enabled is True
 
@@ -389,7 +389,7 @@ async def test_load_neuron_preset_thalamic_relay() -> None:
     """load_neuron_preset enables ICaT and Ih channels for Thalamic Relay."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        await ns.load_neuron_preset(THALAMIC_RELAY)
+        [_ async for _ in ns.load_neuron_preset(THALAMIC_RELAY)]
     assert ns.icat_enabled is True
     assert ns.ih_enabled is True
 
@@ -398,7 +398,7 @@ async def test_load_neuron_preset_unknown_name_is_ignored() -> None:
     """load_neuron_preset silently ignores an unknown preset name."""
     ns = _make_neuron_state()
     before = ns.active_neuron_type
-    await ns.load_neuron_preset("NonExistentNeuron")
+    [_ async for _ in ns.load_neuron_preset("NonExistentNeuron")]
     assert ns.active_neuron_type == before
 
 
@@ -412,7 +412,7 @@ async def test_load_neuron_preset_preserves_stored_traces() -> None:
         "get_state",
         new=_make_get_state_fn({SimulationState: sim_st}),
     ):
-        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
     assert len(sim_st.stored_traces) == 1
 
 
@@ -431,7 +431,7 @@ async def test_load_neuron_preset_keeps_sweeps_when_stored() -> None:
         "get_state",
         new=_make_get_state_fn({SimulationState: sim_st}),
     ):
-        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
     assert len(sim_st.current_sweeps) == 1
 
 
@@ -450,7 +450,7 @@ async def test_load_neuron_preset_clears_sweeps_without_stored() -> None:
         "get_state",
         new=_make_get_state_fn({SimulationState: sim_st}),
     ):
-        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
     assert len(sim_st.current_sweeps) == 0
 
 
@@ -1070,7 +1070,7 @@ async def test_load_neuron_preset_reapplies_active_protocol_overrides() -> None:
         "get_state",
         new=_make_get_state_fn({ProtocolState: ps, SimulationState: sim_st}),
     ):
-        await ns.load_neuron_preset(DOPAMINERGIC)
+        [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
     assert ps.stimulus_duration == pytest.approx(480.0)
     assert ps.min_stimulus == pytest.approx(5.0)
 
@@ -1087,7 +1087,7 @@ async def test_load_neuron_preset_no_active_protocol_skips_override() -> None:
         "get_state",
         new=_make_get_state_fn({ProtocolState: ps, SimulationState: sim_st}),
     ):
-        await ns.load_neuron_preset(DOPAMINERGIC)
+        [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
     assert ps.stimulus_duration == pytest.approx(original_duration)
 
 
@@ -1103,7 +1103,7 @@ async def test_load_neuron_preset_squid_uses_base_protocol_params() -> None:
         "get_state",
         new=_make_get_state_fn({ProtocolState: ps, SimulationState: sim_st}),
     ):
-        await ns.load_neuron_preset(SQUID_GIANT_AXON)
+        [_ async for _ in ns.load_neuron_preset(SQUID_GIANT_AXON)]
     # Squid Giant Axon has no Repetitive Firing entry in NEURON_PROTOCOL_ADJUSTMENTS
     assert ps.stimulus_duration == pytest.approx(180.0)
     assert ps.min_stimulus == pytest.approx(15.0)
@@ -1126,7 +1126,7 @@ async def test_load_neuron_preset_reapplies_protocol_neuron_overrides() -> None:
         "get_state",
         new=_make_get_state_fn({ProtocolState: ps, SimulationState: sim_st}),
     ):
-        await ns.load_neuron_preset(CORTICAL_PYRAMIDAL)
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
     assert ns.g_K == pytest.approx(0.0)
 
 
@@ -1148,5 +1148,5 @@ async def test_load_neuron_preset_syncs_figure_clamp_mode() -> None:
         return MagicMock()
 
     with patch.object(NeuronState, "get_state", new=_get_state):
-        await ns.load_neuron_preset(DOPAMINERGIC)
+        [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
     assert sim_st._figure_clamp_mode == ps.clamp_mode

@@ -1,6 +1,8 @@
 """Neuron parameter state for the patch_sim web UI."""
 
+import hashlib
 import logging
+from typing import Any, AsyncGenerator
 
 import reflex as rx
 
@@ -33,7 +35,7 @@ from patch_sim.constants import (
     DEFAULT_V_REST,
 )
 from patch_sim_ui import presets
-from patch_sim_ui.state._common import _make_float_setter, _set_float
+from patch_sim_ui.state._common import _set_float
 
 _NEURON_FLOAT_FIELDS: list[str] = [
     "g_Na",
@@ -99,6 +101,57 @@ def _make_bool_setter(field_name: str, class_name: str = "NeuronState"):
     setter.__name__ = f"set_{field_name}"
     setter.__qualname__ = f"{class_name}.set_{field_name}"
     setter.__doc__ = f"Set {field_name} from a checkbox event."
+    return setter
+
+
+#: The five NeuronState fields that determine the passive-only membrane test result.
+#: Only these fields are included in ``neuron_fingerprint`` so that changing
+#: active conductances (g_Na, g_K, v_rest, auxiliary channels) does not
+#: invalidate the membrane test cache.
+#:
+#: Na⁺, K⁺, and Ca²⁺ concentrations are intentionally omitted: the passive
+#: neuron constructed in ``run_membrane_test`` only uses Cl⁻ concentrations
+#: (to compute E_L via the chloride Nernst potential).  The other ion
+#: concentrations are passed through to the ``Neuron`` constructor but have
+#: no effect on the passive RC circuit because g_Na = g_K = 0 and no Ca²⁺
+#: channels are present, so none of their reversal potentials carry current.
+_PASSIVE_PARAM_FIELDS: list[str] = ["g_L", "C_m", "Cl_out", "Cl_in", "T"]
+
+
+def _make_neuron_float_setter(field_name: str):
+    """Factory returning an async generator setter that chains a membrane test.
+
+    Wraps :func:`~patch_sim_ui.state._common._set_float` and then yields
+    ``SimulationState.run_membrane_test`` so that any change to a neuron
+    parameter automatically refreshes the displayed passive properties.  Uses
+    ``yield`` (not ``return``) because Reflex only chains events yielded from
+    generators; returning an event from a sync handler has no effect.
+
+    The fingerprint-based cache inside ``run_membrane_test`` ensures the
+    simulation only re-runs when passive-relevant parameters (g_L, C_m, Cl, T)
+    actually change.
+
+    Args:
+        field_name: Name of the ``NeuronState`` attribute to update.
+
+    Returns:
+        An async generator event handler that accepts ``str | list[float] | float``,
+        updates the field, and yields ``run_membrane_test``.
+    """
+
+    async def setter(self, value: "str | list[float] | float"):
+        """Set the field from an input or slider event and queue a membrane test."""
+        # Late import avoids a circular dependency between neuron and simulation.
+        from patch_sim_ui.state.simulation import (  # noqa: PLC0415
+            SimulationState,
+        )
+
+        _set_float(self, field_name, value)
+        yield SimulationState.run_membrane_test_debounced
+
+    setter.__name__ = f"set_{field_name}"
+    setter.__qualname__ = f"NeuronState.set_{field_name}"
+    setter.__doc__ = f"Set {field_name} and queue a membrane test re-run."
     return setter
 
 
@@ -180,6 +233,41 @@ class NeuronState(rx.State):
         """Calcium reversal potential in mV (z=+2)."""
         return float(patch_sim.nernst_potential(2, self.T, self.Ca_out, self.Ca_in))
 
+    def _compute_fingerprint(self) -> str:
+        """Compute a SHA-256 hex digest of the passive membrane parameters.
+
+        Reads the raw state var values directly so that callers always get a
+        fresh result reflecting the current state.  This is intentionally a
+        plain method, not a ``@rx.var``: Reflex caches ``ComputedVar`` values
+        and may return a stale digest if called from a background task before
+        the cache has been invalidated by the latest state flush.
+
+        Only hashes the five fields that determine the passive-only membrane
+        test result (g_L, C_m, Cl_out, Cl_in, T).  Active conductances are
+        excluded because the membrane test blocks them internally.
+
+        Returns:
+            A hex digest string that changes only when g_L, C_m, Cl_out,
+            Cl_in, or T changes.
+        """
+        parts = [repr(getattr(self, f)) for f in _PASSIVE_PARAM_FIELDS]
+        return hashlib.sha256("|".join(parts).encode()).hexdigest()
+
+    @rx.var
+    def neuron_fingerprint(self) -> str:
+        """SHA-256 hex digest of the passive membrane parameters (frontend var).
+
+        Delegates to :meth:`_compute_fingerprint` so the frontend can react
+        to passive parameter changes.  Do not call this from background tasks
+        — use :meth:`_compute_fingerprint` directly to bypass the
+        ``ComputedVar`` cache.
+
+        Returns:
+            A hex digest string that changes only when g_L, C_m, Cl_out,
+            Cl_in, or T changes.
+        """
+        return self._compute_fingerprint()
+
     # ------------------------------------------------------------------ #
     # Event handlers                                                     #
     # ------------------------------------------------------------------ #
@@ -201,7 +289,9 @@ class NeuronState(rx.State):
             setattr(self, key, value)
         self.active_neuron_type = name
 
-    async def load_neuron_preset(self, name: str) -> None:
+    async def load_neuron_preset(  # type: ignore[override]  # base class declares -> None; yielding events upgrades this to AsyncGenerator
+        self, name: str
+    ) -> AsyncGenerator[Any, None]:
         """Load a neuron-type preset and re-apply any active protocol overrides.
 
         Sets conductances and auxiliary channel configuration for the selected
@@ -242,6 +332,7 @@ class NeuronState(rx.State):
         sim_st._cont_has_state = False
         sim_st._label_neuron_type = name
         sim_st._figure_clamp_mode = proto_st.clamp_mode
+        yield SimulationState.run_membrane_test
 
     # ------------------------------------------------------------------ #
     # Numeric field setters                                              #
@@ -256,7 +347,7 @@ class NeuronState(rx.State):
         _set_float(self, field, value)
 
     for _f in _NEURON_FLOAT_FIELDS + _CHANNEL_FLOAT_FIELDS:
-        vars()[f"set_{_f}"] = _make_float_setter(_f, "NeuronState")
+        vars()[f"set_{_f}"] = _make_neuron_float_setter(_f)
 
     for _f in _NON_VISIBILITY_BOOL_FIELDS:
         vars()[f"set_{_f}"] = _make_bool_setter(_f, "NeuronState")
