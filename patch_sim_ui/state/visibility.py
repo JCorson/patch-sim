@@ -5,13 +5,17 @@ import logging
 
 import reflex as rx
 
-from patch_sim_ui.channels import ADDITIONAL_CHANNELS
-from patch_sim_ui.plotting import compute_trace_visibility_map
-from patch_sim_ui.state._common import (
-    _ADDITIONAL_CURRENT_FIELD_MAP,
-    _ADDITIONAL_GATING_FIELD_MAP,
-    _PLOTLY_GD_JS,
+from patch_sim_ui.channels import (
+    ADDITIONAL_CHANNELS,
 )
+from patch_sim_ui.channels import (
+    ADDITIONAL_CURRENT_FIELD_MAP as _ADDITIONAL_CURRENT_FIELD_MAP,
+)
+from patch_sim_ui.channels import (
+    ADDITIONAL_GATING_FIELD_MAP as _ADDITIONAL_GATING_FIELD_MAP,
+)
+from patch_sim_ui.plotting import compute_trace_visibility_map
+from patch_sim_ui.state._common import _PLOTLY_GD_JS
 
 _VISIBILITY_FIELDS: list[str] = [
     "show_voltage",

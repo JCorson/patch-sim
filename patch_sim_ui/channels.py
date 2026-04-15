@@ -197,3 +197,17 @@ ADDITIONAL_CHANNELS: tuple[ChannelMeta, ...] = (
         gating_var_colors={"dn": "#f7b6d2", "fn": "#dbdb8d"},
     ),
 )
+
+#: Maps additional-channel current keys to their show_* visibility field names.
+#: Used by VisibilityState and SimulationState.
+ADDITIONAL_CURRENT_FIELD_MAP: dict[str, str] = {
+    ch.current_key: ch.current_visibility_field for ch in ADDITIONAL_CHANNELS
+}
+
+#: Maps additional-channel gating variable names to their show_* visibility field names.
+#: Used by VisibilityState and SimulationState.
+ADDITIONAL_GATING_FIELD_MAP: dict[str, str] = {
+    gv: ch.gating_visibility_field
+    for ch in ADDITIONAL_CHANNELS
+    for gv in ch.gating_vars
+}

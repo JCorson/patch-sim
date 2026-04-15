@@ -4,25 +4,6 @@ Only items imported by two or more substate modules live here.  Items used
 exclusively within a single substate are defined in that module instead.
 """
 
-from patch_sim_ui.channels import ADDITIONAL_CHANNELS
-
-# ------------------------------------------------------------------ #
-# Additional-channel visibility field maps                           #
-# ------------------------------------------------------------------ #
-# Maps from additional-channel sweep keys to show_* field names.     #
-# Used by VisibilityState and SimulationState.                       #
-# Derived from the channel registry in patch_sim_ui.channels.        #
-
-_ADDITIONAL_CURRENT_FIELD_MAP: dict[str, str] = {
-    ch.current_key: ch.current_visibility_field for ch in ADDITIONAL_CHANNELS
-}
-
-_ADDITIONAL_GATING_FIELD_MAP: dict[str, str] = {
-    gv: ch.gating_visibility_field
-    for ch in ADDITIONAL_CHANNELS
-    for gv in ch.gating_vars
-}
-
 # ------------------------------------------------------------------ #
 # Shared JS snippets                                                 #
 # ------------------------------------------------------------------ #
