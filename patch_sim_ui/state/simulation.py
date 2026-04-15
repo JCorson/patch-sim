@@ -25,10 +25,8 @@ from patch_sim.constants import (
 )
 from patch_sim_ui import constants
 from patch_sim_ui.channels import (
-    ADDITIONAL_CURRENT_FIELD_MAP as _ADDITIONAL_CURRENT_FIELD_MAP,
-)
-from patch_sim_ui.channels import (
-    ADDITIONAL_GATING_FIELD_MAP as _ADDITIONAL_GATING_FIELD_MAP,
+    ADDITIONAL_CURRENT_FIELD_MAP,
+    ADDITIONAL_GATING_FIELD_MAP,
 )
 from patch_sim_ui.plotting import (
     TraceVisibility,
@@ -58,7 +56,7 @@ logger = logging.getLogger(__name__)
 # (/*DIM_OPACITY*/, /*HOVER_WIDTH*/, /*DIM_WIDTH*/, /*SELECTED_SWEEP*/) are
 # substituted at call time in _sweep_highlight_js().
 _SWEEP_HIGHLIGHT_JS: str = (
-    pathlib.Path(__file__).parent.parent.parent / "assets" / "sweep_highlight.js"
+    pathlib.Path(__file__).parents[2] / "assets" / "sweep_highlight.js"
 ).read_text()
 
 
@@ -559,8 +557,8 @@ class SimulationState(rx.State):
         trace_map = compute_trace_visibility_map(
             current_sweeps=self.current_sweeps,
             clamp_mode=self._figure_clamp_mode,
-            additional_current_field_map=_ADDITIONAL_CURRENT_FIELD_MAP,
-            additional_gating_field_map=_ADDITIONAL_GATING_FIELD_MAP,
+            additional_current_field_map=ADDITIONAL_CURRENT_FIELD_MAP,
+            additional_gating_field_map=ADDITIONAL_GATING_FIELD_MAP,
             stored_traces=self.stored_traces,
         )
         hidden: list[int] = []
