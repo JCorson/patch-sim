@@ -23,7 +23,9 @@ from .constants import (
     DEFAULT_K_OUT,
     DEFAULT_NA_IN,
     DEFAULT_NA_OUT,
+    DEFAULT_Q10,
     DEFAULT_T,
+    DEFAULT_T_REF,
     DEFAULT_V_REST,
 )
 from .core_channels import make_k_channel, make_leak_channel, make_na_channel
@@ -52,6 +54,12 @@ class Neuron:
         Cl_out: Extracellular chloride concentration in mM.
         Cl_in: Intracellular chloride concentration in mM.
         T: Temperature in Kelvin.
+        Q10: Q10 temperature coefficient for gating kinetics (dimensionless).
+            Gating rate constants are scaled by ``Q10^((T - T_ref) / 10)``.
+            A value of 1.0 disables temperature scaling entirely.
+        T_ref: Reference temperature in Kelvin at which the gating rate
+            constants were measured.  Defaults to 295.15 K (22 °C), matching
+            the original HH52 squid axon experimental conditions.
         na_channel_factory: Factory function that builds the Na⁺ core channel
             given a maximum conductance. Defaults to the HH52 squid axon kinetics.
         k_channel_factory: Factory function that builds the K⁺ core channel
@@ -69,6 +77,8 @@ class Neuron:
         all_channels: All channels — core_channels + additional_channels.
         all_gating_variables: Flat tuple of every gating variable across all
             channels, in channel-declaration order.
+        q10_factor: Dimensionless scaling factor ``Q10^((T - T_ref) / 10)``
+            applied to all gating rate constants at simulation time.
     """
 
     # Membrane properties
@@ -90,6 +100,10 @@ class Neuron:
 
     # Temperature in Kelvin (37°C for mammalian cells)
     T: float = DEFAULT_T
+
+    # Q10 temperature scaling for gating kinetics
+    Q10: float = DEFAULT_Q10
+    T_ref: float = DEFAULT_T_REF
 
     # Core channel factories — override to use non-HH52 kinetics
     na_channel_factory: Callable[[float], IonChannel] = field(default=make_na_channel)
@@ -116,6 +130,10 @@ class Neuron:
             raise ValueError("Membrane capacitance (C_m) must be positive.")
         if self.T <= 0:
             raise ValueError("Temperature (T) must be positive (in Kelvin).")
+        if self.Q10 <= 0:
+            raise ValueError("Q10 must be positive.")
+        if self.T_ref <= 0:
+            raise ValueError("T_ref must be positive (in Kelvin).")
         for name, value in [
             ("Na_out", self.Na_out),
             ("Na_in", self.Na_in),
@@ -142,15 +160,32 @@ class Neuron:
                 )
         logger.debug(
             "Neuron: g_Na=%.1f g_K=%.1f g_L=%.3f C_m=%.2f T=%.1f K "
+            "Q10=%.1f T_ref=%.1f K "
             "additional_channels=%s calcium=%s",
             self.g_Na,
             self.g_K,
             self.g_L,
             self.C_m,
             self.T,
+            self.Q10,
+            self.T_ref,
             ch_names if ch_names else "none",
             "enabled" if self.calcium_dynamics is not None else "disabled",
         )
+
+    @cached_property
+    def q10_factor(self) -> float:
+        """Return the Q10 temperature scaling factor for gating rate constants.
+
+        Computes ``Q10^((T - T_ref) / 10)`` where both temperatures are in
+        Kelvin.  A value of 1.0 (obtained when ``T == T_ref`` or ``Q10 == 1``)
+        means no scaling is applied.
+
+        Returns:
+            Dimensionless multiplicative factor applied to all gating alpha/beta
+            rate constants during simulation.
+        """
+        return self.Q10 ** ((self.T - self.T_ref) / 10.0)
 
     @cached_property
     def core_channels(self) -> tuple[IonChannel, ...]:

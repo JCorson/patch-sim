@@ -19,6 +19,8 @@ DEFAULT_K_IN: float = 140.0
 DEFAULT_CL_OUT: float = 120.0
 DEFAULT_CL_IN: float = 15.8
 DEFAULT_T: float = 310.15  # Kelvin (37°C)
+DEFAULT_Q10: float = 3.0  # Dimensionless Q10 temperature coefficient
+DEFAULT_T_REF: float = 295.15  # Kelvin (22°C) — HH52 experimental reference temperature
 DEFAULT_CA_OUT: float = 2.0  # mM extracellular Ca2+ (physiological)
 DEFAULT_CA_IN: float = 0.0001  # mM intracellular Ca2+ (physiological resting)
 
@@ -78,6 +80,8 @@ DEFAULT_NEURON_PARAMS: dict[str, float] = {
     "Ca_out": DEFAULT_CA_OUT,
     "Ca_in": DEFAULT_CA_IN,
     "T": DEFAULT_T,
+    "Q10": DEFAULT_Q10,
+    "T_ref": DEFAULT_T_REF,
 }
 
 # Neuron preset names
