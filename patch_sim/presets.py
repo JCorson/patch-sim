@@ -194,17 +194,18 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # close to the Otsuka targets (+60, −90).  v_rest = −67 mV is the
         # stable zero-current equilibrium for this channel configuration.
         #
-        # g_L = 0.2 mS/cm² gives τ_m ≈ 5 ms and R_in ≈ 5 kΩ·cm².  Lower
-        # values (g_L < 0.2) trigger spontaneous tonic firing from pacemaker
-        # channel interactions.  Cl_in = 10.1 mM (E_L ≈ −66 mV) preserves
-        # v_rest = −67 mV.
+        # g_L = 0.25 mS/cm² gives τ_m ≈ 4 ms and R_in ≈ 4 kΩ·cm².  Lower
+        # values (g_L < 0.25) shift the zero-current equilibrium away from
+        # v_rest, breaking the resting stability of this preset.
+        # Cl_in = 10.0 mM is unchanged; it preserves v_rest = −67 mV with
+        # the new g_L.
         g_Na=49.0,
         g_K=57.0,
         v_rest=-67.0,
         Na_out=145.0,
         K_out=5.0,
-        g_L=0.2,
-        Cl_in=10.1,
+        g_L=0.25,
+        Cl_in=10.0,
         na_channel_factory=make_stn_na_channel,
         k_channel_factory=make_stn_k_channel,
         channels=(
@@ -223,12 +224,12 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # g_L = 0.08 mS/cm² gives τ_m ≈ 12.5 ms and R_in ≈ 12.5 kΩ·cm²,
         # matching the moderate resting conductance of TRN neurons.
-        # Cl_in = 5.6 mM (E_L ≈ −82 mV) preserves v_rest = −77 mV.
+        # Cl_in = 5.72 mM (E_L ≈ −80 mV) preserves v_rest = −77 mV.
         # ICaT is sufficiently de-inactivated at this potential for
         # post-inhibitory rebound bursting.
         v_rest=-77.0,
         g_L=0.08,
-        Cl_in=5.6,
+        Cl_in=5.72,
         channels=(ChannelConfig(make_icat_channel, g_max=3.5),),
     ),
 }

@@ -9,11 +9,23 @@ import numpy as np
 import pytest
 
 import patch_sim
-from patch_sim.constants import CORTICAL_PYRAMIDAL, DOPAMINERGIC, SQUID_GIANT_AXON
+from patch_sim.analysis.membrane_test import run_membrane_test
+from patch_sim.constants import (
+    CA1_PYRAMIDAL,
+    CORTICAL_PYRAMIDAL,
+    DOPAMINERGIC,
+    FAST_SPIKING_INTERNEURON,
+    PURKINJE,
+    SQUID_GIANT_AXON,
+    STN,
+    THALAMIC_RELAY,
+    TRN,
+)
 from patch_sim.core_channels import (
     make_pospischil_k_channel,
     make_pospischil_na_channel,
 )
+from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import (
     NEURON_PRESET_NAMES,
     NEURON_PRESETS,
@@ -193,3 +205,59 @@ def test_cortical_pyramidal_uses_pospischil_k_factory() -> None:
     """Cortical Pyramidal preset wires the Pospischil K⁺ channel factory."""
     config = NEURON_PRESETS[CORTICAL_PYRAMIDAL]
     assert config.k_channel_factory is make_pospischil_k_channel
+
+
+# ---------------------------------------------------------------------------
+# Passive membrane properties are physiologically differentiated
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "preset_name, tau_lo, tau_hi, rin_lo, rin_hi",
+    [
+        # (preset_name, τ_m_min_ms, τ_m_max_ms, R_in_min_kΩcm², R_in_max_kΩcm²)
+        # Passive properties are measured on the channel-blocked neuron, so
+        # R_in = 1/g_L exactly and τ_m = C_m/g_L exactly.
+        (SQUID_GIANT_AXON, 2.5, 4.5, 2.5, 4.5),  # g_L=0.3  τ_m≈3.3 ms
+        (FAST_SPIKING_INTERNEURON, 0.4, 1.0, 0.4, 1.0),  # g_L=1.5  τ_m≈0.67 ms
+        (CORTICAL_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_L=0.05 τ_m≈20 ms
+        (PURKINJE, 45.0, 55.0, 45.0, 55.0),  # g_L=0.02 τ_m≈50 ms
+        (DOPAMINERGIC, 2.5, 4.5, 2.5, 4.5),  # g_L=0.3  τ_m≈3.3 ms
+        (THALAMIC_RELAY, 8.0, 12.0, 8.0, 12.0),  # g_L=0.1  τ_m≈10 ms
+        (CA1_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_L=0.05 τ_m≈20 ms
+        (STN, 2.5, 5.5, 2.5, 5.5),  # g_L=0.25 τ_m≈4 ms
+        (TRN, 10.0, 15.0, 10.0, 15.0),  # g_L=0.08 τ_m≈12.5 ms
+    ],
+)
+def test_preset_passive_properties_in_physiological_range(
+    preset_name: str,
+    tau_lo: float,
+    tau_hi: float,
+    rin_lo: float,
+    rin_hi: float,
+) -> None:
+    """Each preset's τ_m and R_in fall within the expected physiological range.
+
+    Passive properties are extracted from a channel-blocked copy of the neuron
+    so R_in = 1/g_L and τ_m = C_m/g_L exactly.  The ranges are centred on
+    the target values with ±35% tolerance to account for numerical integration
+    artefacts in the exponential fit.
+
+    Args:
+        preset_name: Key in NEURON_PRESETS.
+        tau_lo: Lower bound for the membrane time constant in ms.
+        tau_hi: Upper bound for the membrane time constant in ms.
+        rin_lo: Lower bound for the input resistance in kΩ·cm².
+        rin_hi: Upper bound for the input resistance in kΩ·cm².
+    """
+    neuron = make_neuron(NEURON_PRESETS[preset_name])
+    props = run_membrane_test(neuron)
+    assert props is not None, f"Preset '{preset_name}': run_membrane_test returned None"
+    assert tau_lo <= props.time_constant <= tau_hi, (
+        f"Preset '{preset_name}': τ_m = {props.time_constant:.2f} ms "
+        f"outside [{tau_lo}, {tau_hi}]"
+    )
+    assert rin_lo <= props.input_resistance <= rin_hi, (
+        f"Preset '{preset_name}': R_in = {props.input_resistance:.2f} kΩ·cm² "
+        f"outside [{rin_lo}, {rin_hi}]"
+    )
