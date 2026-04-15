@@ -7,12 +7,8 @@ import reflex as rx
 
 from patch_sim_ui.channels import (
     ADDITIONAL_CHANNELS,
-)
-from patch_sim_ui.channels import (
-    ADDITIONAL_CURRENT_FIELD_MAP as _ADDITIONAL_CURRENT_FIELD_MAP,
-)
-from patch_sim_ui.channels import (
-    ADDITIONAL_GATING_FIELD_MAP as _ADDITIONAL_GATING_FIELD_MAP,
+    ADDITIONAL_CURRENT_FIELD_MAP,
+    ADDITIONAL_GATING_FIELD_MAP,
 )
 from patch_sim_ui.plotting import compute_trace_visibility_map
 from patch_sim_ui.state._common import _PLOTLY_GD_JS
@@ -62,8 +58,8 @@ def _make_visibility_setter_async(field_name: str):
         trace_map = compute_trace_visibility_map(
             current_sweeps=sim_st.current_sweeps,
             clamp_mode=sim_st._figure_clamp_mode,
-            additional_current_field_map=_ADDITIONAL_CURRENT_FIELD_MAP,
-            additional_gating_field_map=_ADDITIONAL_GATING_FIELD_MAP,
+            additional_current_field_map=ADDITIONAL_CURRENT_FIELD_MAP,
+            additional_gating_field_map=ADDITIONAL_GATING_FIELD_MAP,
             stored_traces=sim_st.stored_traces,
         )
         indices = trace_map.get(field_name, [])
