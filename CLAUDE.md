@@ -29,7 +29,7 @@ Patch clamp experiment simulator with a core library (`patch_sim/`) and a Reflex
 ## Architecture
 
 - `patch_sim/` — pure Python library, **no Reflex dependency**. All simulation logic lives here.
-- `patch_sim_ui/` — Reflex application. State lives in `patch_sim_ui/state.py`; components are Python functions returning `rx.Component`.
+- `patch_sim_ui/` — Reflex application. State is split across `patch_sim_ui/state/` (neuron, protocol, simulation, analysis, visibility, log); components are Python functions returning `rx.Component`.
 
 Keep these layers cleanly separated: do not import Reflex types into `patch_sim/`, and do not import `patch_sim_ui` modules from `patch_sim/`.
 
@@ -113,14 +113,8 @@ Run the four checks listed below before every commit — not just at the end.
 
 Run all four checks and ensure they pass before marking a task complete:
 
-# Run the test suite
-`/uv run --frozen -m pytest --verbose`
-
-# Check formatting
-`/ruff check .`
-`/ruff format --check .`
-
-# Run Typechecking
-`/ty check`
+**Test suite:** `/uv run --frozen -m pytest --verbose`
+**Formatting:** `/ruff check .` and `/ruff format --check .`
+**Type checking:** `/ty check`
 
 All four must pass with no errors.
