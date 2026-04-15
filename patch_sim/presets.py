@@ -61,12 +61,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Refs: Erisir et al. (1999), J. Neurophysiol. 82:2476;
         #       Wang & Buzsáki (1996), J. Neurosci. 16:6402
         #
-        # Elevated Cl_in (19.0 mM) compensates for the large outward K⁺
-        # current from g_K=50 by shifting E_L more positive, keeping the
-        # zero-current equilibrium at −65 mV.
+        # g_L = 1.5 mS/cm² gives τ_m ≈ 0.67 ms — highly leaky membrane that
+        # narrows the synaptic integration window, a hallmark of FS cells.
+        # Cl_in = 11.9 mM (E_L ≈ −62 mV) preserves v_rest = −65 mV.
         g_Na=150.0,
         g_K=50.0,
-        Cl_in=19.0,
+        g_L=1.5,
+        Cl_in=11.9,
         channels=(ChannelConfig(make_ikv31_channel, g_max=40.0),),
     ),
     CORTICAL_PYRAMIDAL: NeuronConfig(
@@ -76,16 +77,19 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # subthreshold inputs; IM provides spike-frequency adaptation.
         # Ref: Pospischil et al. (2008), Biol. Cybern. 99:427
         #
-        # K_out=3.32 produces E_K ≈ −100 mV (Pospischil target); Cl_in=7.6
-        # tunes E_L so that the zero-current equilibrium is −70 mV,
-        # matching the published RS model resting potential.
+        # K_out=3.32 produces E_K ≈ −100 mV (Pospischil target).
+        #
+        # g_L = 0.05 mS/cm² gives τ_m ≈ 20 ms and R_in ≈ 20 kΩ·cm², reflecting
+        # the high input resistance (200–400 MΩ) of RS cortical pyramidal cells.
+        # Cl_in = 3.8 mM (E_L ≈ −92 mV) preserves v_rest = −70 mV.
         #
         # g_h reduced from 1.5 → 0.3 mS/cm² and g_NaP from 0.5 → 0.1 mS/cm²
         # so that combined inward current at rest does not exceed the outward
         # leak + IM current; the original values caused spontaneous tonic firing.
         v_rest=-70.0,
         K_out=3.32,
-        Cl_in=7.6,
+        g_L=0.05,
+        Cl_in=3.8,
         na_channel_factory=make_pospischil_na_channel,
         k_channel_factory=make_pospischil_k_channel,
         channels=(
@@ -100,8 +104,16 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Ref: De Schutter & Bower (1994), J. Neurophysiol. 71:375
         #
         # v_rest = −68 mV matches the published Purkinje cell resting potential.
+        #
+        # g_L = 0.02 mS/cm² gives τ_m ≈ 50 ms and R_in ≈ 50 kΩ·cm², reflecting
+        # the low somatic leak conductance of Purkinje cells.  Cl_in = 63.5 mM
+        # (E_L ≈ −17 mV) is required to preserve v_rest = −68 mV with this low
+        # g_L; the depolarised E_L counterbalances the net outward K⁺ current
+        # from IKCa.  Note: this high Cl_in arises from treating the entire
+        # leak as a chloride conductance — a simplification addressed by #224.
         v_rest=-68.0,
-        Cl_in=10.7,
+        g_L=0.02,
+        Cl_in=63.5,
         channels=(
             ChannelConfig(make_ical_channel, g_max=1.0),
             ChannelConfig(make_icat_channel, g_max=0.5),
@@ -116,6 +128,11 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # v_rest = −60 mV matches the published dopaminergic neuron resting
         # potential.  Cl_in = 47.0 mM shifts E_L positive to achieve this.
+        #
+        # g_L is kept at the default 0.3 mS/cm² (τ_m ≈ 3.3 ms).  Lowering
+        # it requires a large positive E_L shift (Cl_in > 170 mM) to balance
+        # the net resting Na⁺/K⁺ current, which is not physiologically
+        # plausible with the current single-chloride leak model.
         v_rest=-60.0,
         Cl_in=47.0,
         channels=(
@@ -127,7 +144,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # T-type Ca²⁺ produces low-threshold spike; Ih causes
         # post-inhibitory rebound burst after hyperpolarizing step.
         # Ref: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384
-        Cl_in=10.0,
+        #
+        # g_L = 0.1 mS/cm² gives τ_m ≈ 10 ms and R_in ≈ 10 kΩ·cm², matching
+        # moderate resting conductances in thalamic relay cells.  Lower values
+        # (g_L < 0.1) trigger spontaneous spiking via ICaT window current.
+        # Cl_in = 9.0 mM (E_L ≈ −69 mV) preserves v_rest = −65 mV.
+        g_L=0.1,
+        Cl_in=9.0,
         channels=(
             ChannelConfig(make_icat_channel, g_max=1.5),
             ChannelConfig(make_ih_channel, g_max=1.0),
@@ -139,9 +162,15 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Ca²⁺ channels (L, N, T) and IKCa together produce the pronounced
         # after-hyperpolarization (AHP) characteristic of CA1 cells.
         # Refs: Warman et al. (1994); Migliore et al. (1999), ModelDB #2796
+        #
+        # g_L = 0.05 mS/cm² gives τ_m ≈ 20 ms and R_in ≈ 20 kΩ·cm², reflecting
+        # the high input resistance of CA1 pyramidal cells (slightly leakier
+        # than cortical pyramidal cells).  Cl_in = 27.9 mM (E_L ≈ −39 mV)
+        # preserves v_rest = −65 mV.
         g_Na=35.0,
         g_K=10.0,
-        Cl_in=12.4,
+        g_L=0.05,
+        Cl_in=27.9,
         channels=(
             ChannelConfig(make_ika_channel, g_max=0.5),
             ChannelConfig(make_im_channel, g_max=0.5),
@@ -164,12 +193,18 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Mammalian Na⁺/K⁺ concentrations give E_Na ≈ +60.6, E_K ≈ −89.1 mV,
         # close to the Otsuka targets (+60, −90).  v_rest = −67 mV is the
         # stable zero-current equilibrium for this channel configuration.
+        #
+        # g_L = 0.2 mS/cm² gives τ_m ≈ 5 ms and R_in ≈ 5 kΩ·cm².  Lower
+        # values (g_L < 0.2) trigger spontaneous tonic firing from pacemaker
+        # channel interactions.  Cl_in = 10.1 mM (E_L ≈ −66 mV) preserves
+        # v_rest = −67 mV.
         g_Na=49.0,
         g_K=57.0,
         v_rest=-67.0,
         Na_out=145.0,
         K_out=5.0,
-        Cl_in=10.0,
+        g_L=0.2,
+        Cl_in=10.1,
         na_channel_factory=make_stn_na_channel,
         k_channel_factory=make_stn_k_channel,
         channels=(
@@ -186,12 +221,14 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804;
         #       Destexhe et al. (1994)
         #
-        # Cl_in = 6.4 mM yields E_L ≈ −79 mV, pulling the zero-current
-        # equilibrium to −77 mV — the biological TRN resting potential.
+        # g_L = 0.08 mS/cm² gives τ_m ≈ 12.5 ms and R_in ≈ 12.5 kΩ·cm²,
+        # matching the moderate resting conductance of TRN neurons.
+        # Cl_in = 5.6 mM (E_L ≈ −82 mV) preserves v_rest = −77 mV.
         # ICaT is sufficiently de-inactivated at this potential for
         # post-inhibitory rebound bursting.
         v_rest=-77.0,
-        Cl_in=6.4,
+        g_L=0.08,
+        Cl_in=5.6,
         channels=(ChannelConfig(make_icat_channel, g_max=3.5),),
     ),
 }
@@ -303,10 +340,17 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     CORTICAL_PYRAMIDAL: {
-        # 5 µA/cm² evokes a single AP; 10 µA/cm² (default) overshoots to 4.
+        # Lower R_in (g_L=0.05 → R_in=20 kΩ·cm²) raises excitability; need a
+        # shorter step to avoid a second spike at 5 µA/cm².
+        "Subthreshold Response": {
+            "min_stimulus": 0.5,
+            "max_stimulus": 0.5,
+        },
+        # 5 µA/cm² at 15 ms evokes a single AP; 30 ms default produces 2.
         "Action Potential": {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
+            "stimulus_duration": 15.0,
         },
         # 800 ms at 5 µA/cm² is long enough for IM to accumulate and produce
         # clearly increasing inter-spike intervals (spike-frequency adaptation).
@@ -328,6 +372,17 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     PURKINJE: {
+        # Low R_in at rest (active channels); 0.5 µA/cm² is subthreshold.
+        "Subthreshold Response": {
+            "min_stimulus": 0.5,
+            "max_stimulus": 0.5,
+        },
+        # 5 µA/cm² at 15 ms evokes a single AP; 30 ms default produces 2.
+        "Action Potential": {
+            "min_stimulus": 5.0,
+            "max_stimulus": 5.0,
+            "stimulus_duration": 15.0,
+        },
         # Moderate amplitude; complex Ca²⁺-driven spiking emerges within 200 ms.
         "Repetitive Firing": {
             "min_stimulus": 12.0,
@@ -357,10 +412,10 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     THALAMIC_RELAY: {
-        # Low threshold (~0.94 µA/cm²); keep subthreshold well below it.
+        # R_in increased with lower g_L; 0.2 µA/cm² is subthreshold at g_L=0.1.
         "Subthreshold Response": {
-            "min_stimulus": 0.5,
-            "max_stimulus": 0.5,
+            "min_stimulus": 0.2,
+            "max_stimulus": 0.2,
         },
         # 5 µA/cm² at 10 ms evokes a single AP; 30 ms default produces 3.
         "Action Potential": {
@@ -384,6 +439,12 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     CA1_PYRAMIDAL: {
+        # 5 µA/cm² at 15 ms evokes a single AP; 30 ms default produces 2.
+        "Action Potential": {
+            "min_stimulus": 5.0,
+            "max_stimulus": 5.0,
+            "stimulus_duration": 15.0,
+        },
         # Long moderate-amplitude step reveals adaptation and pronounced AHP.
         # 12 µA/cm² produces 2 spikes; strong IKCa limits further firing.
         "Repetitive Firing": {
@@ -427,10 +488,10 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     TRN: {
-        # Low threshold (~1.03 µA/cm²); keep subthreshold well below it.
+        # R_in increased with lower g_L; 0.1 µA/cm² is subthreshold at g_L=0.08.
         "Subthreshold Response": {
-            "min_stimulus": 0.5,
-            "max_stimulus": 0.5,
+            "min_stimulus": 0.1,
+            "max_stimulus": 0.1,
         },
         # 5 µA/cm² at 10 ms evokes a single AP; 30 ms default produces 3.
         "Action Potential": {
