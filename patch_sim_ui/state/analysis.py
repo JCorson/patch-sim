@@ -34,6 +34,21 @@ class AnalysisState(rx.State):
     mt_neuron_fingerprint: str = ""  # fingerprint used to detect stale cache
     mt_fit_converged: bool = True  # False when exponential fit did not converge
 
+    def clear_results(self) -> None:
+        """Clear all analysis result fields to their empty defaults.
+
+        Called by SimulationState before populating new analysis data so that
+        stale results from a previous run do not persist into the new one.
+        """
+        self.ap_metrics = []
+        self.ap_summary = {}
+        self.ap_is_multi_sweep = False
+        self.fi_data = {}
+        self.iv_data = {}
+        self.gv_data = {}
+        self.sfa_data = {}
+        self.phase_plane_data = {}
+
     @rx.var
     def has_membrane_test(self) -> bool:
         """Return True when the membrane test has been run at least once.

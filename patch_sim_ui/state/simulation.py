@@ -339,6 +339,42 @@ _SWEEP_HIGHLIGHT_JS = """
 """
 
 
+def _fmt_optional(value: "float | None", fmt: str) -> str:
+    """Format a float value, or return an em-dash when the value is None.
+
+    Args:
+        value: The float to format, or None.
+        fmt: Python format spec string (e.g. ``".1f"``).
+
+    Returns:
+        A formatted string or ``"—"`` when value is None.
+    """
+    return f"{value:{fmt}}" if value is not None else "\u2014"
+
+
+def _format_spike_dict(index: int, spike: "patch_sim.SpikeMetrics") -> dict[str, Any]:
+    """Serialise a single :class:`~patch_sim.APSpike` to a display dict.
+
+    Args:
+        index: Display index to assign (may differ from spike.index in
+            multi-sweep mode where spikes are renumbered globally).
+        spike: The spike to serialise.
+
+    Returns:
+        A dict with pre-formatted string values for each metric column
+        (``index``, ``threshold_voltage``, ``peak_voltage``, ``rise_time``,
+        ``half_width``, ``ahp_depth``).
+    """
+    return {
+        "index": index,
+        "threshold_voltage": f"{spike.threshold_voltage:.1f}",
+        "peak_voltage": f"{spike.peak_voltage:.1f}",
+        "rise_time": f"{spike.rise_time:.2f}",
+        "half_width": f"{spike.half_width:.2f}",
+        "ahp_depth": _fmt_optional(spike.ahp_depth, ".1f"),
+    }
+
+
 def _build_phase_plane_data(sweeps: "list[Sweep]") -> dict[str, Any]:
     """Serialise current-clamp sweeps into phase-plane data for AnalysisState.
 
@@ -435,17 +471,7 @@ def _compute_cc_multi_sweep_analysis(
 
     if all_spikes:
         ap_metrics: list[dict[str, Any]] = [
-            {
-                "index": i,
-                "threshold_voltage": f"{s.threshold_voltage:.1f}",
-                "peak_voltage": f"{s.peak_voltage:.1f}",
-                "rise_time": f"{s.rise_time:.2f}",
-                "half_width": f"{s.half_width:.2f}",
-                "ahp_depth": (
-                    f"{s.ahp_depth:.1f}" if s.ahp_depth is not None else "\u2014"
-                ),
-            }
-            for i, s in enumerate(all_spikes)
+            _format_spike_dict(i, s) for i, s in enumerate(all_spikes)
         ]
         thresh_vals = [s.threshold_voltage for s in all_spikes]
         peak_vals = [s.peak_voltage for s in all_spikes]
@@ -1118,12 +1144,7 @@ class SimulationState(rx.State):
                     self.current_sweeps = new_sweeps
                     analysis_st = await self.get_state(AnalysisState)
                     if mode == VOLTAGE_CLAMP:
-                        analysis_st.ap_metrics = []
-                        analysis_st.ap_summary = {}
-                        analysis_st.ap_is_multi_sweep = False
-                        analysis_st.fi_data = {}
-                        analysis_st.sfa_data = {}
-                        analysis_st.phase_plane_data = {}
+                        analysis_st.clear_results()
                         iv_data, iv_result = _compute_iv_data(
                             new_sweeps,
                             proto_st.min_stimulus,
@@ -1164,11 +1185,10 @@ class SimulationState(rx.State):
                                 proto_st.stimulus_duration,
                             )
                         )
+                        analysis_st.clear_results()
                         analysis_st.ap_metrics = ms_metrics
                         analysis_st.ap_summary = ms_summary
                         analysis_st.ap_is_multi_sweep = True
-                        analysis_st.iv_data = {}
-                        analysis_st.gv_data = {}
                         analysis_st.fi_data = ms_fi
                         analysis_st.sfa_data = ms_sfa
                         analysis_st.phase_plane_data = _build_phase_plane_data(
@@ -1183,61 +1203,32 @@ class SimulationState(rx.State):
                         Sweep.from_result(result, stimulus, "", "", mode)
                     ]
                     analysis_st = await self.get_state(AnalysisState)
+                    analysis_st.clear_results()
                     if mode == CURRENT_CLAMP:
                         ap_result = patch_sim.analyze_aps_from_result(result)
                         sfa_curve = patch_sim.compute_sfa(ap_result)
                         analysis_st.ap_metrics = [
-                            {
-                                "index": s.index,
-                                "threshold_voltage": f"{s.threshold_voltage:.1f}",
-                                "peak_voltage": f"{s.peak_voltage:.1f}",
-                                "rise_time": f"{s.rise_time:.2f}",
-                                "half_width": f"{s.half_width:.2f}",
-                                "ahp_depth": (
-                                    f"{s.ahp_depth:.1f}"
-                                    if s.ahp_depth is not None
-                                    else "\u2014"
-                                ),
-                            }
-                            for s in ap_result.spikes
+                            _format_spike_dict(s.index, s) for s in ap_result.spikes
                         ]
                         analysis_st.ap_summary = {
                             "spike_count": str(ap_result.spike_count),
-                            "mean_threshold_voltage": (
-                                f"{ap_result.mean_threshold_voltage:.1f}"
-                                if ap_result.mean_threshold_voltage is not None
-                                else "\u2014"
+                            "mean_threshold_voltage": _fmt_optional(
+                                ap_result.mean_threshold_voltage, ".1f"
                             ),
-                            "mean_peak_voltage": (
-                                f"{ap_result.mean_peak_voltage:.1f}"
-                                if ap_result.mean_peak_voltage is not None
-                                else "\u2014"
+                            "mean_peak_voltage": _fmt_optional(
+                                ap_result.mean_peak_voltage, ".1f"
                             ),
-                            "mean_rise_time": (
-                                f"{ap_result.mean_rise_time:.2f}"
-                                if ap_result.mean_rise_time is not None
-                                else "\u2014"
+                            "mean_rise_time": _fmt_optional(
+                                ap_result.mean_rise_time, ".2f"
                             ),
-                            "mean_half_width": (
-                                f"{ap_result.mean_half_width:.2f}"
-                                if ap_result.mean_half_width is not None
-                                else "\u2014"
+                            "mean_half_width": _fmt_optional(
+                                ap_result.mean_half_width, ".2f"
                             ),
-                            "mean_ahp_depth": (
-                                f"{ap_result.mean_ahp_depth:.1f}"
-                                if ap_result.mean_ahp_depth is not None
-                                else "\u2014"
+                            "mean_ahp_depth": _fmt_optional(
+                                ap_result.mean_ahp_depth, ".1f"
                             ),
-                            "mean_isi": (
-                                f"{ap_result.mean_isi:.1f}"
-                                if ap_result.mean_isi is not None
-                                else "\u2014"
-                            ),
-                            "firing_rate": (
-                                f"{ap_result.firing_rate:.1f}"
-                                if ap_result.firing_rate is not None
-                                else "\u2014"
-                            ),
+                            "mean_isi": _fmt_optional(ap_result.mean_isi, ".1f"),
+                            "firing_rate": _fmt_optional(ap_result.firing_rate, ".1f"),
                             "adaptation_index": (
                                 f"{sfa_curve.adaptation_index:.2f}"
                                 if sfa_curve is not None
@@ -1249,10 +1240,6 @@ class SimulationState(rx.State):
                                 else "\u2014"
                             ),
                         }
-                        analysis_st.ap_is_multi_sweep = False
-                        analysis_st.iv_data = {}
-                        analysis_st.gv_data = {}
-                        analysis_st.fi_data = {}
                         analysis_st.sfa_data = (
                             {"curves": [_serialise_sfa_curve(sfa_curve)]}
                             if sfa_curve is not None
@@ -1261,15 +1248,7 @@ class SimulationState(rx.State):
                         analysis_st.phase_plane_data = _build_phase_plane_data(
                             self.current_sweeps
                         )
-                    else:
-                        analysis_st.ap_metrics = []
-                        analysis_st.ap_summary = {}
-                        analysis_st.ap_is_multi_sweep = False
-                        analysis_st.iv_data = {}
-                        analysis_st.gv_data = {}
-                        analysis_st.fi_data = {}
-                        analysis_st.sfa_data = {}
-                        analysis_st.phase_plane_data = {}
+                    # VC single-sweep: clear_results() above leaves all fields empty.
 
         except ValueError as exc:
             logger.exception("Simulation error: %s", exc)
