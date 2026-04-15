@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+from patch_sim.constants import DEFAULT_T
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
@@ -174,7 +175,7 @@ def test_physiological_limits_and_action_potentials():
 
     # Disable Q10 scaling so the HH kinetics match their original parameterisation
     # and the RK4 integrator stays numerically stable at the default 0.025 ms step.
-    custom_model = Neuron(T_ref=Neuron().T)
+    custom_model = Neuron(T_ref=DEFAULT_T)
     num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
 
     ap_counts = []

@@ -4,18 +4,24 @@ Verifies that:
 - Q10 scaling speeds up gating kinetics (faster m-gate rise at higher T).
 - Q10 scaling does not shift steady-state gating curves (same x_inf at same V).
 - Q10 = 1.0 produces identical gating traces regardless of temperature.
+- Under current clamp, Q10 scaling produces a faster AP upstroke.
 
-All tests use voltage clamp at a fixed membrane potential so that the gating
-variable dynamics are isolated from temperature-dependent reversal potential
-shifts that would otherwise confound the results.
+Voltage-clamp tests fix membrane potential so gating dynamics are isolated
+from temperature-dependent reversal-potential shifts.  The current-clamp test
+deliberately uses the same T (and hence the same reversal potentials) while
+varying Q10 to isolate the kinetic effect.
 """
 
 import numpy as np
 import pytest
 
-from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_voltage_clamp
+from patch_sim.clamp_simulations import (
+    SIM_SAMPLING_FREQ,
+    simulate_current_clamp,
+    simulate_voltage_clamp,
+)
 from patch_sim.neuron import Neuron
-from patch_sim.protocols import step_voltage
+from patch_sim.protocols import step_current, step_voltage
 
 # Protocol must be generated at the simulation sampling frequency so that each
 # array element maps to exactly one simulation time step (dt = 1/SIM_SAMPLING_FREQ ms).
@@ -135,3 +141,51 @@ def test_q10_of_one_produces_no_temperature_effect() -> None:
             atol=1e-10,
             err_msg=f"Q10=1 should give identical {gate} traces at any temperature",
         )
+
+
+def test_q10_current_clamp_earlier_ap_onset() -> None:
+    """Q10 scaling causes the first action potential to fire sooner.
+
+    Two neurons are constructed at the same temperature (so reversal potentials
+    are identical) but with Q10=3 vs Q10=1.  A suprathreshold current step is
+    applied.  Faster gating kinetics (Q10=3) lower the effective threshold
+    crossing time, so the first AP should occur at an earlier sample.
+    """
+    # Both neurons run at T=_T_REF so reversal potentials are identical.
+    # Slow: T_ref == T → phi = 1.0 (no scaling).
+    # Fast: T_ref = T - 10 → phi = Q10^1 = 3.0 (3× faster kinetics).
+    slow = Neuron(T=_T_REF, T_ref=_T_REF, Q10=3.0)
+    fast = Neuron(T=_T_REF, T_ref=_T_REF - 10.0, Q10=3.0)
+
+    # Near-threshold current so the subthreshold buildup is long enough for the
+    # kinetic difference to shift AP onset by at least a few samples.
+    protocol = step_current(duration=50.0, current_amplitude=7.5)
+
+    slow_result = simulate_current_clamp(slow, current_external=protocol)
+    fast_result = simulate_current_clamp(fast, current_external=protocol)
+
+    def _first_ap_sample(voltage: np.ndarray) -> int:
+        """Return the sample index of the first upward crossing of 0 mV.
+
+        Args:
+            voltage: 1-D voltage trace in mV.
+
+        Returns:
+            Sample index of the first AP, or -1 if no AP detected.
+        """
+        above = False
+        for i, v in enumerate(voltage):
+            if v > 0.0 and not above:
+                return i
+            above = v > 0.0
+        return -1
+
+    slow_idx = _first_ap_sample(slow_result["voltage"])
+    fast_idx = _first_ap_sample(fast_result["voltage"])
+
+    assert slow_idx != -1, "Slow (Q10=1) neuron did not fire an AP"
+    assert fast_idx != -1, "Fast (Q10=3) neuron did not fire an AP"
+    assert fast_idx < slow_idx, (
+        f"Expected Q10=3 neuron to fire first, but Q10=3 AP at sample {fast_idx}, "
+        f"Q10=1 AP at sample {slow_idx}"
+    )
