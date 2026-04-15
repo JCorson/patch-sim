@@ -339,6 +339,34 @@ _SWEEP_HIGHLIGHT_JS = """
 """
 
 
+def _build_phase_plane_data(sweeps: "list[Sweep]") -> dict[str, Any]:
+    """Serialise current-clamp sweeps into phase-plane data for AnalysisState.
+
+    Only sweeps that have a non-empty ``dvdt`` field are included.  Voltage
+    clamp sweeps are silently skipped because their voltage is prescribed and
+    dV/dt carries no physiological information.
+
+    Args:
+        sweeps: The current sweep list from SimulationState.
+
+    Returns:
+        A dict with a ``"sweeps"`` key whose value is a list of dicts, each
+        containing ``"voltage"``, ``"dvdt"``, ``"label"``, and ``"color"``.
+        Returns an empty dict when no eligible sweeps exist.
+    """
+    eligible = [
+        {
+            "voltage": s.voltage,
+            "dvdt": s.dvdt,
+            "label": s.label,
+            "color": s.color,
+        }
+        for s in sweeps
+        if s.clamp_mode == CURRENT_CLAMP and s.dvdt
+    ]
+    return {"sweeps": eligible} if eligible else {}
+
+
 def _serialise_sfa_curve(curve: "patch_sim.SFACurve") -> dict[str, Any]:
     """Serialise a single :class:`~patch_sim.SFACurve` to a plain dict.
 
@@ -1095,6 +1123,7 @@ class SimulationState(rx.State):
                         analysis_st.ap_is_multi_sweep = False
                         analysis_st.fi_data = {}
                         analysis_st.sfa_data = {}
+                        analysis_st.phase_plane_data = {}
                         iv_data, iv_result = _compute_iv_data(
                             new_sweeps,
                             proto_st.min_stimulus,
@@ -1142,6 +1171,9 @@ class SimulationState(rx.State):
                         analysis_st.gv_data = {}
                         analysis_st.fi_data = ms_fi
                         analysis_st.sfa_data = ms_sfa
+                        analysis_st.phase_plane_data = _build_phase_plane_data(
+                            new_sweeps
+                        )
 
             else:
                 stimulus, _ = protocols[0]
@@ -1226,6 +1258,9 @@ class SimulationState(rx.State):
                             if sfa_curve is not None
                             else {}
                         )
+                        analysis_st.phase_plane_data = _build_phase_plane_data(
+                            self.current_sweeps
+                        )
                     else:
                         analysis_st.ap_metrics = []
                         analysis_st.ap_summary = {}
@@ -1234,6 +1269,7 @@ class SimulationState(rx.State):
                         analysis_st.gv_data = {}
                         analysis_st.fi_data = {}
                         analysis_st.sfa_data = {}
+                        analysis_st.phase_plane_data = {}
 
         except ValueError as exc:
             logger.exception("Simulation error: %s", exc)

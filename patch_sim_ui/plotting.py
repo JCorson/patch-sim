@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pydantic import BaseModel
 
+from patch_sim.analysis.derivatives import compute_dvdt
 from patch_sim_ui.constants import (
     CC_VOLTAGE_COLOR,
     CHANNEL_COLORS,
@@ -113,6 +114,7 @@ class Sweep(BaseModel):
         color: Hex colour string; empty string means Plotly chooses the colour.
         time: Time axis values in ms.
         voltage: Membrane voltage in mV.
+        dvdt: Time derivative of membrane voltage in mV/ms.
         sodium_current: I_Na in µA/cm².
         potassium_current: I_K in µA/cm².
         leak_current: I_L in µA/cm².
@@ -130,6 +132,7 @@ class Sweep(BaseModel):
     color: str
     time: list[float]
     voltage: list[float]
+    dvdt: list[float]
     sodium_current: list[float]
     potassium_current: list[float]
     leak_current: list[float]
@@ -183,13 +186,20 @@ class Sweep(BaseModel):
             else:
                 additional_gating[col] = result[col].tolist()
 
+        time_arr = result["time"]
+        if "voltage" in columns:
+            dvdt_arr = compute_dvdt(time_arr, result["voltage"])
+        else:
+            dvdt_arr = np.array([])
+
         return cls(
             label=label,
             color=color,
             clamp_mode=mode,
-            time=result["time"].tolist(),
+            time=time_arr.tolist(),
             stimulus=stimulus.tolist(),
             voltage=_col("voltage"),
+            dvdt=dvdt_arr.tolist(),
             sodium_current=_col("INa"),
             potassium_current=_col("IK"),
             leak_current=_col("Ileak"),
@@ -890,6 +900,66 @@ def build_figure(
     return fig
 
 
+def build_phase_plane_figure(phase_plane_data: dict) -> go.Figure:
+    """Build a V vs dV/dt phase-plane figure from serialised sweep data.
+
+    Renders one trace per sweep.  In single-sweep runs the trace uses the
+    standard current-clamp colour; in multi-sweep runs each sweep is drawn
+    with its stored colour so the trajectories are distinguishable.
+
+    Args:
+        phase_plane_data: Dict with key ``"sweeps"``, a list of dicts each
+            containing ``"voltage"`` (list[float], mV), ``"dvdt"``
+            (list[float], mV/ms), ``"label"`` (str), and ``"color"`` (str).
+
+    Returns:
+        A Plotly Figure with a single V vs dV/dt scatter subplot, or an
+        empty figure when ``phase_plane_data`` is empty.
+    """
+    sweeps = phase_plane_data.get("sweeps", [])
+    if not sweeps:
+        return go.Figure()
+
+    fig = go.Figure()
+    for sweep in sweeps:
+        voltage = sweep.get("voltage", [])
+        dvdt = sweep.get("dvdt", [])
+        if not voltage or not dvdt:
+            continue
+        color = sweep.get("color") or CC_VOLTAGE_COLOR
+        label = sweep.get("label", "")
+        hover = (
+            f"<b>{label}</b><br>"
+            "V: %{x:.1f} mV<br>"
+            "dV/dt: %{y:.1f} mV/ms"
+            "<extra></extra>"
+            if label
+            else "V: %{x:.1f} mV<br>dV/dt: %{y:.1f} mV/ms<extra></extra>"
+        )
+        fig.add_trace(
+            go.Scattergl(
+                x=np.asarray(voltage),
+                y=np.asarray(dvdt),
+                name=label,
+                mode="lines",
+                line={"color": color},
+                showlegend=False,
+                hovertemplate=hover,
+            )
+        )
+
+    fig.update_layout(
+        margin=_PLOT_MARGIN,
+        template="plotly_white",
+        hovermode="closest",
+        showlegend=False,
+        height=260,
+        xaxis_title="V (mV)",
+        yaxis_title="dV/dt (mV/ms)",
+    )
+    return fig
+
+
 def build_fi_figure(fi_data: dict) -> go.Figure:
     """Build a Plotly F-I curve figure from serialised F-I analysis results.
 
@@ -1015,21 +1085,25 @@ def build_sfa_figure(sfa_data: dict) -> go.Figure:
 
         if is_multi:
             color = SWEEP_COLORS[i % len(SWEEP_COLORS)]
-            name = (
-                f"{label} (AI: {ai:.2f})" if label else f"Sweep {i + 1} (AI: {ai:.2f})"
-            )
+            display = label if label else f"Sweep {i + 1}"
+            hover_name = f"<b>{display}</b> (AI: {ai:.2f})"
         else:
             color = "#27ae60"
-            name = "Inst. frequency"
+            hover_name = "Inst. frequency"
 
+        hover = (
+            f"{hover_name}<br>Interval: %{{x}}<br>Freq: %{{y:.1f}} Hz<extra></extra>"
+        )
         fig.add_trace(
             go.Scatter(
                 x=x,
                 y=y,
                 mode="lines+markers",
-                name=name,
+                name=hover_name,
                 line=dict(color=color),
                 marker=dict(size=6),
+                showlegend=False,
+                hovertemplate=hover,
             )
         )
 
@@ -1058,16 +1132,8 @@ def build_sfa_figure(sfa_data: dict) -> go.Figure:
         template="plotly_white",
         margin=dict(l=50, r=10, t=10, b=40),
         height=260,
-        showlegend=is_multi,
+        showlegend=False,
         annotations=annotations,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1,
-            font=dict(size=10),
-        ),
     )
     return fig
 

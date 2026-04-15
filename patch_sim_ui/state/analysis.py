@@ -9,12 +9,13 @@ from patch_sim_ui.plotting import (
     build_fi_figure,
     build_gv_figure,
     build_iv_figure,
+    build_phase_plane_figure,
     build_sfa_figure,
 )
 
 
 class AnalysisState(rx.State):
-    """State for AP, F-I, I-V, g-V, and SFA analysis results."""
+    """State for AP, F-I, I-V, g-V, SFA, and phase-plane analysis results."""
 
     ap_metrics: list[dict[str, Any]] = []  # Per-spike metrics (serialized)
     ap_summary: dict[str, Any] = {}  # Aggregate summary statistics
@@ -23,6 +24,7 @@ class AnalysisState(rx.State):
     iv_data: dict[str, Any] = {}  # Serialized IVAnalysisResult for the UI
     gv_data: dict[str, Any] = {}  # Serialized GVAnalysisResult for the UI
     sfa_data: dict[str, Any] = {}  # Serialized SFAAnalysisResult for the UI
+    phase_plane_data: dict[str, Any] = {}  # Serialized V vs dV/dt sweep data
 
     # Membrane test results — persisted across protocol/simulation changes.
     # Only invalidated when neuron parameters change (neuron_fingerprint mismatch).
@@ -111,3 +113,18 @@ class AnalysisState(rx.State):
         if not self.sfa_data:
             return go.Figure()
         return build_sfa_figure(self.sfa_data)
+
+    @rx.var
+    def has_phase_plane_data(self) -> bool:
+        """Return True when phase-plane data is available for display."""
+        return len(self.phase_plane_data) > 0
+
+    @rx.var
+    def phase_plane_figure(self) -> go.Figure:
+        """Return a Plotly V vs dV/dt phase-plane figure.
+
+        Returns an empty figure when no phase-plane data is available.
+        """
+        if not self.phase_plane_data:
+            return go.Figure()
+        return build_phase_plane_figure(self.phase_plane_data)

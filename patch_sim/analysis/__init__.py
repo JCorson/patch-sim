@@ -4,6 +4,7 @@ Provides tools for extracting quantitative metrics from simulation results.
 
 Modules:
     ap_metrics: Action potential detection and metric extraction.
+    derivatives: General-purpose derivative utilities (e.g. dV/dt).
     fi_curve: F-I curve construction from current clamp multi-sweep results.
     iv_curve: I-V curve construction from voltage clamp multi-sweep results.
     membrane_test: Dedicated membrane test for passive property characterisation.
@@ -17,6 +18,7 @@ from .ap_metrics import (
     analyze_aps,
     analyze_aps_from_result,
 )
+from .derivatives import compute_dvdt
 from .fi_curve import (
     FIAnalysisResult,
     FIPoint,
@@ -56,6 +58,7 @@ __all__ = [
     "analyze_passive_properties",
     "analyze_sfa",
     "boltzmann",
+    "compute_dvdt",
     "compute_fi_point",
     "compute_gv",
     "compute_iv_point",
