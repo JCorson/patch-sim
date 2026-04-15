@@ -28,8 +28,11 @@ _FIT_FRACTION: float = 0.6
 #: Maximum duration of the exponential fit window in ms.  The window is
 #: capped at this value so that slow gating-variable relaxations (which occur
 #: on longer timescales) do not distort the single-exponential fit of the fast
-#: membrane capacitance charging transient.
-_MAX_FIT_WINDOW_MS: float = 25.0
+#: membrane capacitance charging transient.  Set to 150 ms to span ≥3×τ_m for
+#: the slowest preset (Purkinje, τ_m ≈ 50 ms).  The membrane test runs on a
+#: passive-only neuron (no gating variables), so there are no slow relaxations
+#: to avoid; the wider window only improves fit accuracy.
+_MAX_FIT_WINDOW_MS: float = 150.0
 
 #: Minimum stimulus duration (ms) required to extract passive properties.
 _MIN_STIM_DURATION_MS: float = 2.0

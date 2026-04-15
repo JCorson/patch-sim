@@ -46,8 +46,9 @@ MEMBRANE_TEST_CURRENT: float = -0.5
 MEMBRANE_TEST_PRE_MS: float = 10.0
 
 #: Duration of the current step in ms.  Long enough to reach steady state for
-#: any physiologically plausible τ_m (< 25 ms) while keeping run time short.
-MEMBRANE_TEST_STEP_MS: float = 50.0
+#: any physiologically plausible τ_m (< 55 ms) while keeping run time short.
+#: Must span ≥5×τ_m for the slowest preset (Purkinje, τ_m ≈ 50 ms).
+MEMBRANE_TEST_STEP_MS: float = 250.0
 
 #: Duration of the post-stimulus recovery period in ms.
 MEMBRANE_TEST_POST_MS: float = 10.0
