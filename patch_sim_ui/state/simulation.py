@@ -23,7 +23,6 @@ from patch_sim.constants import (
 )
 from patch_sim_ui import constants
 from patch_sim_ui.plotting import (
-    Sweep,
     TraceVisibility,
     build_figure,
     compute_trace_visibility_map,
@@ -48,6 +47,7 @@ from patch_sim_ui.state.log import LogState
 from patch_sim_ui.state.neuron import NeuronState
 from patch_sim_ui.state.protocol import ProtocolState
 from patch_sim_ui.state.visibility import VisibilityState
+from patch_sim_ui.sweep import Sweep
 
 logger = logging.getLogger(__name__)
 

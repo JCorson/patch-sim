@@ -31,12 +31,12 @@ from patch_sim.constants import (
 )
 from patch_sim_ui import constants  # noqa: E402
 from patch_sim_ui.log_handler import UILogRecord  # noqa: E402
-from patch_sim_ui.plotting import Sweep  # noqa: E402
 from patch_sim_ui.state import SimulationState  # noqa: E402
 from patch_sim_ui.state.log import LogState  # noqa: E402
 from patch_sim_ui.state.neuron import NeuronState  # noqa: E402
 from patch_sim_ui.state.protocol import ProtocolState  # noqa: E402
 from patch_sim_ui.state.visibility import VisibilityState  # noqa: E402
+from patch_sim_ui.sweep import Sweep  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers

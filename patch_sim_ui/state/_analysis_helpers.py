@@ -16,7 +16,7 @@ import numpy as np
 import patch_sim
 from patch_sim.analysis.fi_curve import _fi_point_from_ap_result
 from patch_sim.constants import CURRENT_CLAMP
-from patch_sim_ui.plotting import Sweep
+from patch_sim_ui.sweep import Sweep
 
 logger = logging.getLogger(__name__)
 
