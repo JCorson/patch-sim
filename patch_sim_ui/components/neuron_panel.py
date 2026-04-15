@@ -55,8 +55,63 @@ def _additional_channel_row(
     )
 
 
+def _ion_row(
+    label: str,
+    var: rx.Var,
+    handler,
+    min_val: float,
+    max_val: float,
+    step: float = 1,
+) -> rx.Component:
+    """Render a single ion concentration row with a slider and numeric input.
+
+    Args:
+        label: Ion species label (e.g. ``"Na⁺ out"``).
+        var: Reactive state variable bound to the slider and input.
+        handler: Event handler called when the value changes.
+        min_val: Minimum allowed concentration (mM).
+        max_val: Maximum allowed concentration (mM).
+        step: Slider and input increment step (mM).
+
+    Returns:
+        An hstack containing a label, slider, and numeric input.
+    """
+    return rx.hstack(
+        rx.text(label, size="2", color="gray", width="70px"),
+        rx.slider(
+            min=min_val,
+            max=max_val,
+            step=step,
+            value=[var],
+            on_change=handler,
+            width="100%",
+        ),
+        rx.input(
+            value=var,
+            on_change=handler,
+            width="80px",
+            size="1",
+            type="number",
+            min=str(min_val),
+            max=str(max_val),
+            step=str(step),
+        ),
+        width="100%",
+        spacing="2",
+    )
+
+
 def _reversal_str(label: str, value: rx.Var, unit: str = "mV") -> rx.Component:
-    """Render a read-only reversal potential display row."""
+    """Render a read-only reversal potential display row.
+
+    Args:
+        label: Ion species label (e.g. ``"E_Na"``).
+        value: Reactive float var holding the computed reversal potential.
+        unit: Unit string appended after the value (default ``"mV"``).
+
+    Returns:
+        An hstack showing the label, formatted value, and unit.
+    """
     return rx.hstack(
         rx.text(label, size="2", color="gray"),
         rx.text(f"{value:.2f}", size="2"),
@@ -398,38 +453,4 @@ def neuron_panel() -> rx.Component:
         spacing="3",
         width="100%",
         padding="4",
-    )
-
-
-def _ion_row(
-    label: str,
-    var: rx.Var,
-    handler,
-    min_val: float,
-    max_val: float,
-    step: float = 1,
-) -> rx.Component:
-    """Render a single ion concentration row with input."""
-    return rx.hstack(
-        rx.text(label, size="2", color="gray", width="70px"),
-        rx.slider(
-            min=min_val,
-            max=max_val,
-            step=step,
-            value=[var],
-            on_change=handler,
-            width="100%",
-        ),
-        rx.input(
-            value=var,
-            on_change=handler,
-            width="80px",
-            size="1",
-            type="number",
-            min=str(min_val),
-            max=str(max_val),
-            step=str(step),
-        ),
-        width="100%",
-        spacing="2",
     )
