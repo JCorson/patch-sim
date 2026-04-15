@@ -5,45 +5,6 @@ exclusively within a single substate are defined in that module instead.
 """
 
 # ------------------------------------------------------------------ #
-# Additional-channel visibility field maps                           #
-# ------------------------------------------------------------------ #
-# Maps from additional-channel sweep keys to show_* field names.     #
-# Used by VisibilityState and SimulationState.                       #
-
-_ADDITIONAL_CURRENT_FIELD_MAP: dict[str, str] = {
-    "Ih": "show_ih_current",
-    "IKa": "show_ika_current",
-    "IKv31": "show_ikv31_current",
-    "INaP": "show_inap_current",
-    "INaR": "show_inar_current",
-    "IM": "show_im_current",
-    "IKir": "show_ikir_current",
-    "IKCa": "show_ikca_current",
-    "ICaL": "show_ical_current",
-    "ICaT": "show_icat_current",
-    "ICaN": "show_ican_current",
-}
-
-_ADDITIONAL_GATING_FIELD_MAP: dict[str, str] = {
-    "r": "show_ih_gating",
-    "a": "show_ika_gating",
-    "b": "show_ika_gating",
-    "nk": "show_ikv31_gating",
-    "p": "show_inap_gating",
-    "s": "show_inar_gating",
-    "hr": "show_inar_gating",
-    "w": "show_im_gating",
-    "kir": "show_ikir_gating",
-    "q": "show_ikca_gating",
-    "d": "show_ical_gating",
-    "f": "show_ical_gating",
-    "dt": "show_icat_gating",
-    "ft": "show_icat_gating",
-    "dn": "show_ican_gating",
-    "fn": "show_ican_gating",
-}
-
-# ------------------------------------------------------------------ #
 # Shared JS snippets                                                 #
 # ------------------------------------------------------------------ #
 

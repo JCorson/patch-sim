@@ -2,6 +2,7 @@
 
 import reflex as rx
 
+from patch_sim_ui.channels import ADDITIONAL_CHANNELS
 from patch_sim_ui.constants import CURRENT_CLAMP
 from patch_sim_ui.state import SimulationState
 from patch_sim_ui.state.log import LogState
@@ -85,117 +86,19 @@ def _channel_trace_group(
 
 # (header, enabled_var, current_label, current_var, current_handler,
 #  gating_label, gating_var, gating_handler)
+# Derived from the channel registry in patch_sim_ui.channels.
 _ADDITIONAL_CHANNEL_TRACE_SPECS = [
     (
-        "Ih (HCN)",
-        NeuronState.ih_enabled,
-        "I_Ih",
-        VisibilityState.show_ih_current,
-        VisibilityState.set_show_ih_current,
-        "Ih gating (r)",
-        VisibilityState.show_ih_gating,
-        VisibilityState.set_show_ih_gating,
-    ),
-    (
-        "IKa (A-type K\u207a)",
-        NeuronState.ika_enabled,
-        "I_IKa",
-        VisibilityState.show_ika_current,
-        VisibilityState.set_show_ika_current,
-        "IKa gating (a, b)",
-        VisibilityState.show_ika_gating,
-        VisibilityState.set_show_ika_gating,
-    ),
-    (
-        "IKv31 (Kv3.1-type K\u207a)",
-        NeuronState.ikv31_enabled,
-        "I_IKv31",
-        VisibilityState.show_ikv31_current,
-        VisibilityState.set_show_ikv31_current,
-        "IKv31 gating (nk)",
-        VisibilityState.show_ikv31_gating,
-        VisibilityState.set_show_ikv31_gating,
-    ),
-    (
-        "INaP (Persistent Na\u207a)",
-        NeuronState.inap_enabled,
-        "I_INaP",
-        VisibilityState.show_inap_current,
-        VisibilityState.set_show_inap_current,
-        "INaP gating (p)",
-        VisibilityState.show_inap_gating,
-        VisibilityState.set_show_inap_gating,
-    ),
-    (
-        "INaR (Resurgent Na\u207a)",
-        NeuronState.inar_enabled,
-        "I_INaR",
-        VisibilityState.show_inar_current,
-        VisibilityState.set_show_inar_current,
-        "INaR gating (s, hr)",
-        VisibilityState.show_inar_gating,
-        VisibilityState.set_show_inar_gating,
-    ),
-    (
-        "IM (Muscarinic K\u207a)",
-        NeuronState.im_enabled,
-        "I_IM",
-        VisibilityState.show_im_current,
-        VisibilityState.set_show_im_current,
-        "IM gating (w)",
-        VisibilityState.show_im_gating,
-        VisibilityState.set_show_im_gating,
-    ),
-    (
-        "IKir (Inward Rectifier K\u207a)",
-        NeuronState.ikir_enabled,
-        "I_IKir",
-        VisibilityState.show_ikir_current,
-        VisibilityState.set_show_ikir_current,
-        "IKir gating (kir)",
-        VisibilityState.show_ikir_gating,
-        VisibilityState.set_show_ikir_gating,
-    ),
-    (
-        "IKCa (Ca\u00b2\u207a-activated K\u207a)",
-        NeuronState.ikca_enabled,
-        "I_IKCa",
-        VisibilityState.show_ikca_current,
-        VisibilityState.set_show_ikca_current,
-        "IKCa gating (q)",
-        VisibilityState.show_ikca_gating,
-        VisibilityState.set_show_ikca_gating,
-    ),
-    (
-        "ICaL (L-type Ca\u00b2\u207a)",
-        NeuronState.ical_enabled,
-        "I_ICaL",
-        VisibilityState.show_ical_current,
-        VisibilityState.set_show_ical_current,
-        "ICaL gating (d, f)",
-        VisibilityState.show_ical_gating,
-        VisibilityState.set_show_ical_gating,
-    ),
-    (
-        "ICaT (T-type Ca\u00b2\u207a)",
-        NeuronState.icat_enabled,
-        "I_ICaT",
-        VisibilityState.show_icat_current,
-        VisibilityState.set_show_icat_current,
-        "ICaT gating (dt, ft)",
-        VisibilityState.show_icat_gating,
-        VisibilityState.set_show_icat_gating,
-    ),
-    (
-        "ICaN (N-type Ca\u00b2\u207a)",
-        NeuronState.ican_enabled,
-        "I_ICaN",
-        VisibilityState.show_ican_current,
-        VisibilityState.set_show_ican_current,
-        "ICaN gating (dn, fn)",
-        VisibilityState.show_ican_gating,
-        VisibilityState.set_show_ican_gating,
-    ),
+        ch.label,
+        getattr(NeuronState, ch.enabled_field),
+        ch.current_label,
+        getattr(VisibilityState, ch.current_visibility_field),
+        getattr(VisibilityState, f"set_{ch.current_visibility_field}"),
+        ch.gating_label,
+        getattr(VisibilityState, ch.gating_visibility_field),
+        getattr(VisibilityState, f"set_{ch.gating_visibility_field}"),
+    )
+    for ch in ADDITIONAL_CHANNELS
 ]
 
 

@@ -35,6 +35,7 @@ from patch_sim.constants import (
     DEFAULT_V_REST,
 )
 from patch_sim_ui import presets
+from patch_sim_ui.channels import ADDITIONAL_CHANNELS
 from patch_sim_ui.state._common import _set_float
 
 _NEURON_FLOAT_FIELDS: list[str] = [
@@ -54,32 +55,10 @@ _NEURON_FLOAT_FIELDS: list[str] = [
     "T",
 ]
 
-_CHANNEL_FLOAT_FIELDS: list[str] = [
-    "ih_g_max",
-    "ika_g_max",
-    "ikv31_g_max",
-    "inap_g_max",
-    "inar_g_max",
-    "im_g_max",
-    "ikir_g_max",
-    "ikca_g_max",
-    "ical_g_max",
-    "icat_g_max",
-    "ican_g_max",
-]
+_CHANNEL_FLOAT_FIELDS: list[str] = [ch.g_max_field for ch in ADDITIONAL_CHANNELS]
 
 _NON_VISIBILITY_BOOL_FIELDS: list[str] = [
-    "ih_enabled",
-    "ika_enabled",
-    "ikv31_enabled",
-    "inap_enabled",
-    "inar_enabled",
-    "im_enabled",
-    "ikir_enabled",
-    "ikca_enabled",
-    "ical_enabled",
-    "icat_enabled",
-    "ican_enabled",
+    ch.enabled_field for ch in ADDITIONAL_CHANNELS
 ]
 
 
