@@ -43,26 +43,9 @@ This project uses **uv**. Use `/uv run --frozen` to run commands and `/uv add` t
 
 ## Docstring requirements
 
-Every function and method — public **and** private, including dunder methods — must have a docstring. Use **Google style** consistently:
+Every function and method — public, private, and dunder — must have a Google-style docstring. Ruff enforces public items automatically; private methods (`_foo`) are not checked by ruff but are still required.
 
-```python
-def example(x: float, y: int) -> str:
-    """One-line summary.
-
-    Optional extended description.
-
-    Args:
-        x: Description of x.
-        y: Description of y.
-
-    Returns:
-        Description of the return value.
-    """
-```
-
-- Summary goes on the **first line** immediately after the opening `"""`
 - Omit type annotations from `Args:` — they are already in the signature
-- Use `Args:`, `Returns:`, `Raises:`, `Attributes:` (never `Parameters:`)
 
 ## Testing conventions
 
