@@ -494,15 +494,19 @@ async def test_protocol_preset_without_active_neuron_type_uses_base_params() -> 
 
 
 async def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> None:
-    """Action Potential with Squid Giant Axon active falls through to base duration."""
+    """Repetitive Firing with Squid Giant Axon active falls through to base duration.
+
+    SGA has no Repetitive Firing adjustment, so the base preset value (180 ms)
+    should be used unchanged.
+    """
     ps = _make_protocol_state()
     mock_neuron = MagicMock()
     mock_neuron.active_neuron_type = SQUID_GIANT_AXON
     with patch.object(
         ProtocolState, "get_state", new=_make_get_state_fn({NeuronState: mock_neuron})
     ):
-        await ps.load_protocol_preset("Action Potential")
-    assert ps.stimulus_duration == pytest.approx(30.0)
+        await ps.load_protocol_preset("Repetitive Firing")
+    assert ps.stimulus_duration == pytest.approx(180.0)
 
 
 async def test_protocol_preset_dopaminergic_repetitive_firing_long_duration() -> None:

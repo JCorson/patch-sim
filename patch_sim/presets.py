@@ -323,6 +323,14 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
 #
 # Structure: neuron_preset_name → protocol_preset_name → {field: value, …}
 NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
+    SQUID_GIANT_AXON: {
+        # 10 µA/cm² at 30 ms (default) produces 2 spikes; the membrane
+        # recovers and re-fires within the step.  10 ms is long enough to
+        # reach threshold and evoke exactly one action potential.
+        "Action Potential": {
+            "stimulus_duration": 10.0,
+        },
+    },
     FAST_SPIKING_INTERNEURON: {
         # Moderate amplitude, short duration to evoke a single narrow spike;
         # 30 ms at this amplitude would produce 3 spikes due to fast kinetics.
