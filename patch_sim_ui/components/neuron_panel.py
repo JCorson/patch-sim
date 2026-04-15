@@ -3,6 +3,7 @@
 import reflex as rx
 
 from patch_sim.presets import NEURON_PRESET_NAMES
+from patch_sim_ui.channels import ADDITIONAL_CHANNELS
 from patch_sim_ui.constants import PARAM_RANGES
 from patch_sim_ui.state.neuron import NeuronState
 
@@ -171,95 +172,17 @@ def _param_row(
 
 
 # (label, enabled_var, enabled_setter, g_var, g_setter, param_key)
+# Derived from the channel registry in patch_sim_ui.channels.
 _ADDITIONAL_CHANNEL_ROW_SPECS = [
     (
-        "Ih (HCN)",
-        NeuronState.ih_enabled,
-        NeuronState.set_ih_enabled,
-        NeuronState.ih_g_max,
-        NeuronState.set_ih_g_max,
-        "ih_g_max",
-    ),
-    (
-        "IKa (A-type K\u207a)",
-        NeuronState.ika_enabled,
-        NeuronState.set_ika_enabled,
-        NeuronState.ika_g_max,
-        NeuronState.set_ika_g_max,
-        "ika_g_max",
-    ),
-    (
-        "IKv31 (Kv3.1-type K\u207a)",
-        NeuronState.ikv31_enabled,
-        NeuronState.set_ikv31_enabled,
-        NeuronState.ikv31_g_max,
-        NeuronState.set_ikv31_g_max,
-        "ikv31_g_max",
-    ),
-    (
-        "INaP (Persistent Na\u207a)",
-        NeuronState.inap_enabled,
-        NeuronState.set_inap_enabled,
-        NeuronState.inap_g_max,
-        NeuronState.set_inap_g_max,
-        "inap_g_max",
-    ),
-    (
-        "INaR (Resurgent Na\u207a)",
-        NeuronState.inar_enabled,
-        NeuronState.set_inar_enabled,
-        NeuronState.inar_g_max,
-        NeuronState.set_inar_g_max,
-        "inar_g_max",
-    ),
-    (
-        "IM (Muscarinic K\u207a)",
-        NeuronState.im_enabled,
-        NeuronState.set_im_enabled,
-        NeuronState.im_g_max,
-        NeuronState.set_im_g_max,
-        "im_g_max",
-    ),
-    (
-        "IKir (Inward Rectifier K\u207a)",
-        NeuronState.ikir_enabled,
-        NeuronState.set_ikir_enabled,
-        NeuronState.ikir_g_max,
-        NeuronState.set_ikir_g_max,
-        "ikir_g_max",
-    ),
-    (
-        "IKCa (Ca\u00b2\u207a-activated K\u207a)",
-        NeuronState.ikca_enabled,
-        NeuronState.set_ikca_enabled,
-        NeuronState.ikca_g_max,
-        NeuronState.set_ikca_g_max,
-        "ikca_g_max",
-    ),
-    (
-        "ICaL (L-type Ca\u00b2\u207a)",
-        NeuronState.ical_enabled,
-        NeuronState.set_ical_enabled,
-        NeuronState.ical_g_max,
-        NeuronState.set_ical_g_max,
-        "ical_g_max",
-    ),
-    (
-        "ICaT (T-type Ca\u00b2\u207a)",
-        NeuronState.icat_enabled,
-        NeuronState.set_icat_enabled,
-        NeuronState.icat_g_max,
-        NeuronState.set_icat_g_max,
-        "icat_g_max",
-    ),
-    (
-        "ICaN (N-type Ca\u00b2\u207a)",
-        NeuronState.ican_enabled,
-        NeuronState.set_ican_enabled,
-        NeuronState.ican_g_max,
-        NeuronState.set_ican_g_max,
-        "ican_g_max",
-    ),
+        ch.label,
+        getattr(NeuronState, ch.enabled_field),
+        getattr(NeuronState, f"set_{ch.enabled_field}"),
+        getattr(NeuronState, ch.g_max_field),
+        getattr(NeuronState, f"set_{ch.g_max_field}"),
+        ch.g_max_field,
+    )
+    for ch in ADDITIONAL_CHANNELS
 ]
 
 

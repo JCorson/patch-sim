@@ -7,6 +7,7 @@ from patch_sim.constants import (  # noqa: F401
     VOLTAGE_CLAMP,
     VOLTAGE_PROTOCOLS,
 )
+from patch_sim_ui.channels import ADDITIONAL_CHANNELS
 
 # Slider ranges for neuron parameters
 PARAM_RANGES: dict[str, tuple[float, float, float]] = {
@@ -25,18 +26,8 @@ PARAM_RANGES: dict[str, tuple[float, float, float]] = {
     "Ca_out": (0.1, 20.0, 0.1),
     "Ca_in": (0.00001, 0.01, 0.00001),
     "T": (273.15, 323.15, 0.5),  # 0°C to 50°C
-    # Additional channel conductances
-    "ih_g_max": (0.0, 1.0, 0.01),
-    "ika_g_max": (0.0, 100.0, 0.1),
-    "ikv31_g_max": (0.0, 100.0, 0.5),
-    "inap_g_max": (0.0, 5.0, 0.01),
-    "inar_g_max": (0.0, 5.0, 0.01),
-    "im_g_max": (0.0, 5.0, 0.01),
-    "ikir_g_max": (0.0, 2.0, 0.01),
-    "ikca_g_max": (0.0, 10.0, 0.1),
-    "ical_g_max": (0.0, 5.0, 0.01),
-    "icat_g_max": (0.0, 5.0, 0.01),
-    "ican_g_max": (0.0, 5.0, 0.01),
+    # Additional channel conductances — derived from channel registry.
+    **{ch.g_max_field: ch.g_max_range for ch in ADDITIONAL_CHANNELS},
 }
 
 # Fixed colour for the Current Clamp voltage trace.  Matches the blue used for
@@ -50,57 +41,30 @@ CC_VOLTAGE_COLOR: str = "#1f77b4"
 STIMULUS_COLOR: str | None = "#888888"
 
 # Fixed colours per ion current channel (used in Voltage Clamp overlay plot).
+# Additional channel colours are derived from the channel registry.
 CHANNEL_COLORS: dict[str, str] = {
+    # Classic HH channels
     "total_current": "#1f77b4",  # blue
     "sodium_current": "#ff7f0e",  # orange
     "potassium_current": "#2ca02c",  # green
     "leak_current": "#7f7f7f",  # grey
-    "Ih": "#d62728",  # red
-    "IKa": "#9467bd",  # purple
-    "IKv31": "#DAA520",  # goldenrod
-    "INaP": "#e377c2",  # pink
-    "INaR": "#bcbd22",  # olive
-    "IM": "#17becf",  # cyan
-    "IKir": "#8c564b",  # brown
-    "IKCa": "#ff9896",  # light red
-    "ICaL": "#aec7e8",  # light blue
-    "ICaT": "#98df8a",  # light green
-    "ICaN": "#c5b0d5",  # light purple
+    # Additional channels
+    **{ch.current_key: ch.current_color for ch in ADDITIONAL_CHANNELS},
 }
 
 # Gating variable name → unique colour (each variable gets its own distinct colour).
+# Additional channel gating variable colours are derived from the channel registry.
 GATING_VAR_COLORS: dict[str, str] = {
     # Classic HH gating variables
     "n": "#1f77b4",  # blue
     "m": "#ff7f0e",  # orange
     "h": "#2ca02c",  # green
-    # Ih
-    "s": "#d62728",  # red
-    "hr": "#9467bd",  # purple
-    # IKa
-    "a": "#8c564b",  # brown
-    "b": "#e377c2",  # pink
-    # IKv31
-    "nk": "#DAA520",  # goldenrod
-    # INaP
-    "p": "#7f7f7f",  # grey
-    # INaR
-    "r": "#bcbd22",  # olive
-    # IM
-    "w": "#17becf",  # cyan
-    # IKir
-    "kir": "#aec7e8",  # light blue
-    # IKCa
-    "q": "#ffbb78",  # light orange
-    # ICaL
-    "d": "#98df8a",  # light green
-    "f": "#ff9896",  # light red
-    # ICaT
-    "dt": "#c5b0d5",  # light purple
-    "ft": "#c49c94",  # light brown
-    # ICaN
-    "dn": "#f7b6d2",  # light pink
-    "fn": "#dbdb8d",  # light olive
+    # Additional channel gating variables
+    **{
+        gv: color
+        for ch in ADDITIONAL_CHANNELS
+        for gv, color in ch.gating_var_colors.items()
+    },
 }
 
 # Distinct-hue palette for oscilloscope-style stored traces.  The rgba opacity
