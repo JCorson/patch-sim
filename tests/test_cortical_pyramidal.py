@@ -6,8 +6,6 @@ are present after the conductance reductions in PR #206, and that the
 reduced conductances prevent spontaneous tonic firing.
 """
 
-import dataclasses
-
 import numpy as np
 import pytest
 
@@ -25,16 +23,8 @@ from patch_sim.protocols import step_current
 
 @pytest.fixture
 def cp_neuron() -> Neuron:
-    """Cortical Pyramidal neuron instance for all tests in this module.
-
-    Q10 temperature scaling is disabled (T_ref == T) so these behavioral
-    tests exercise the original Pospischil channel kinetics without the
-    RK4 integrator being stressed by a 5× speed-up at physiological temperature.
-    """
-    config = NEURON_PRESETS[CORTICAL_PYRAMIDAL]
-    # Disable Q10 scaling: set T_ref equal to T so q10_factor == 1.0.
-    config = dataclasses.replace(config, T_ref=config.T)
-    return make_neuron(config)
+    """Cortical Pyramidal neuron instance for all tests in this module."""
+    return make_neuron(NEURON_PRESETS[CORTICAL_PYRAMIDAL])
 
 
 def _count_action_potentials(voltage: np.ndarray, threshold: float = 0.0) -> int:

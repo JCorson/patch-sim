@@ -64,10 +64,17 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # g_L = 1.5 mS/cm² gives τ_m ≈ 0.67 ms — highly leaky membrane that
         # narrows the synaptic integration window, a hallmark of FS cells.
         # Cl_in = 11.9 mM (E_L ≈ −62 mV) preserves v_rest = −65 mV.
+        #
+        # Q10=1.0: these channels are adapted from HH52 squid-axon kinetics
+        # without a well-defined mammalian thermal reference.  Applying a 5.2×
+        # Q10 factor (22→37 °C) drives Na⁺ inactivation so fast that the cell
+        # enters depolarization block after the first AP.  Temperature effects
+        # are already implicit in the conductance values fitted to FS cell data.
         g_Na=150.0,
         g_K=50.0,
         g_L=1.5,
         Cl_in=11.9,
+        Q10=1.0,
         channels=(ChannelConfig(make_ikv31_channel, g_max=40.0),),
     ),
     CORTICAL_PYRAMIDAL: NeuronConfig(
@@ -172,10 +179,16 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # g_L = 0.05 mS/cm² gives τ_m ≈ 20 ms and R_in ≈ 20 kΩ·cm², matching
         # the high input resistance measured in CA1 pyramidal cells in slice
         # recordings.  Cl_in = 27.9 mM (E_L ≈ −39 mV) preserves v_rest = −65 mV.
+        #
+        # Q10=1.0: as with FSI, the HH52-derived Na⁺ kinetics lack a mammalian
+        # thermal reference.  A 5.2× Q10 factor accelerates Na⁺ inactivation
+        # enough to cause depolarization block after the first AP; the
+        # conductance values are already calibrated for CA1 behavior.
         g_Na=35.0,
         g_K=10.0,
         g_L=0.05,
         Cl_in=27.9,
+        Q10=1.0,
         channels=(
             ChannelConfig(make_ika_channel, g_max=0.5),
             ChannelConfig(make_im_channel, g_max=0.5),
@@ -338,13 +351,12 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     FAST_SPIKING_INTERNEURON: {
-        # Q10 temperature scaling (Q10=3 at 37°C vs 22°C ref) accelerates Na⁺
-        # inactivation and K⁺ activation, raising the firing threshold to
-        # ~20 µA/cm².  25 µA/cm² is safely suprathreshold; 10 ms avoids a
-        # second spike at this amplitude.
+        # Elevated threshold (~10 µA/cm²) due to high g_L (1.5 mS/cm²);
+        # 15 µA/cm² is safely suprathreshold; 10 ms avoids a second spike
+        # at this amplitude.
         "Action Potential": {
-            "min_stimulus": 25.0,
-            "max_stimulus": 25.0,
+            "min_stimulus": 15.0,
+            "max_stimulus": 15.0,
             "stimulus_duration": 10.0,
         },
         # Higher amplitude needed for non-adapting high-frequency firing with
@@ -458,21 +470,17 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     CA1_PYRAMIDAL: {
-        # Q10 scaling (Q10=3 at 37°C vs 22°C ref) raises the firing threshold
-        # to ~24 µA/cm²; 25 µA/cm² is safely suprathreshold.  The faster Na⁺
-        # inactivation limits the cell to one AP per stimulus (depolarization
-        # block), so 15 ms is sufficient.
+        # 5 µA/cm² at 15 ms evokes a single AP; 30 ms default produces 2.
         "Action Potential": {
-            "min_stimulus": 25.0,
-            "max_stimulus": 25.0,
+            "min_stimulus": 5.0,
+            "max_stimulus": 5.0,
             "stimulus_duration": 15.0,
         },
-        # Q10-scaled Na⁺ inactivation causes depolarization block after the
-        # first AP (same limitation as FSI under HH52 kinetics).  25 µA/cm²
-        # reliably elicits exactly one AP across the long window.
+        # Long moderate-amplitude step reveals adaptation and pronounced AHP.
+        # 12 µA/cm² produces 2 spikes; strong IKCa limits further firing.
         "Repetitive Firing": {
-            "min_stimulus": 25.0,
-            "max_stimulus": 25.0,
+            "min_stimulus": 12.0,
+            "max_stimulus": 12.0,
             "stimulus_duration": 300.0,
         },
         # IKa and IM raise the firing threshold above the default HH range.

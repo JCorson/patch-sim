@@ -165,7 +165,7 @@ def test_q10_current_clamp_earlier_ap_onset() -> None:
     fast_result = simulate_current_clamp(fast, current_external=protocol)
 
     def _first_ap_sample(voltage: np.ndarray) -> int:
-        """Return the sample index of the first upward crossing of 0 mV.
+        """Return the sample index of the first sample exceeding 0 mV.
 
         Args:
             voltage: 1-D voltage trace in mV.
@@ -173,19 +173,15 @@ def test_q10_current_clamp_earlier_ap_onset() -> None:
         Returns:
             Sample index of the first AP, or -1 if no AP detected.
         """
-        above = False
-        for i, v in enumerate(voltage):
-            if v > 0.0 and not above:
-                return i
-            above = v > 0.0
-        return -1
+        indices = np.nonzero(voltage > 0.0)[0]
+        return int(indices[0]) if len(indices) else -1
 
     slow_idx = _first_ap_sample(slow_result["voltage"])
     fast_idx = _first_ap_sample(fast_result["voltage"])
 
-    assert slow_idx != -1, "Slow (Q10=1) neuron did not fire an AP"
-    assert fast_idx != -1, "Fast (Q10=3) neuron did not fire an AP"
+    assert slow_idx != -1, "Slow (phi=1) neuron did not fire an AP"
+    assert fast_idx != -1, "Fast (phi=3) neuron did not fire an AP"
     assert fast_idx < slow_idx, (
-        f"Expected Q10=3 neuron to fire first, but Q10=3 AP at sample {fast_idx}, "
-        f"Q10=1 AP at sample {slow_idx}"
+        f"Expected phi=3 neuron to fire first, but phi=3 AP at sample {fast_idx}, "
+        f"phi=1 AP at sample {slow_idx}"
     )
