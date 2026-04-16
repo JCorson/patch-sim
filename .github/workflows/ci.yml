@@ -30,5 +30,11 @@ jobs:
       - name: Type check
         run: uvx ty check
 
-      - name: Test
-        run: uv run --frozen -m pytest --verbose
+      - name: Unit tests
+        run: uv run --frozen -m pytest tests/unit --verbose
+
+      - name: Integration tests
+        run: uv run --frozen -m pytest tests/integration --verbose
+
+      - name: UI tests
+        run: uv run --frozen -m pytest tests/ui --verbose
