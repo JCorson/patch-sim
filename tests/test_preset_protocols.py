@@ -110,12 +110,8 @@ def test_action_potential_preset(preset_name: str) -> None:
     """Action Potential protocol elicits exactly one action potential.
 
     The adjusted single-step stimulus is tuned per neuron to produce a
-    suprathreshold response.  The test asserts:
-
-    - structural and physiological validity of the result
-    - between 1 and 3 APs (some neurons produce a second on the falling
-      edge of the stimulus window)
-    - AP peak voltage above 0 mV confirming a full-amplitude action potential
+    single suprathreshold spike.  The test asserts exactly 1 AP so that
+    miscalibrated stimuli (producing 0 or ≥2 spikes) are caught as failures.
 
     Args:
         preset_name: Name of the neuron preset under test.
@@ -127,8 +123,9 @@ def test_action_potential_preset(preset_name: str) -> None:
     _assert_current_clamp_valid(result)
 
     n_aps = _count_action_potentials(result["voltage"])
-    assert 1 <= n_aps <= 3, (
-        f"{preset_name}: expected 1–3 APs under Action Potential protocol, got {n_aps}"
+    assert n_aps == 1, (
+        f"{preset_name}: expected exactly 1 AP under Action Potential "
+        f"protocol, got {n_aps}"
     )
     assert float(result["voltage"].max()) > 0.0, (
         f"{preset_name}: AP peak {result['voltage'].max():.1f} mV is below 0 mV"
