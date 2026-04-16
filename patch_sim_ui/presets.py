@@ -74,6 +74,8 @@ def neuron_config_to_ui_state(config: NeuronConfig) -> dict[str, Any]:
         "Ca_out": config.Ca_out,
         "Ca_in": config.Ca_in,
         "T": config.T,
+        "Q10": config.Q10,
+        "T_ref": config.T_ref,
     }
 
     # Disable all auxiliary channels with default conductances.
