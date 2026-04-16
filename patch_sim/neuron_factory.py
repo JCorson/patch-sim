@@ -118,6 +118,17 @@ class NeuronConfig:
     )
     channels: tuple[ChannelConfig, ...] = ()
 
+    def __post_init__(self) -> None:
+        """Validate Q10 and T_ref on construction.
+
+        Raises:
+            ValueError: If Q10 is not positive or T_ref is not positive.
+        """
+        if self.Q10 <= 0:
+            raise ValueError("Q10 must be positive.")
+        if self.T_ref <= 0:
+            raise ValueError("T_ref must be positive (in Kelvin).")
+
 
 #: Maps short channel names to their factory functions.
 CHANNEL_REGISTRY: dict[str, Callable[..., IonChannel]] = {

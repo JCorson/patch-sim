@@ -191,3 +191,17 @@ def test_make_neuron_passes_q10_and_t_ref() -> None:
     model = make_neuron(config)
     assert model.Q10 == pytest.approx(2.0)
     assert model.T_ref == pytest.approx(300.0)
+
+
+@pytest.mark.parametrize("Q10", [0.0, -1.0])
+def test_neuron_config_non_positive_q10_raises(Q10: float) -> None:
+    """NeuronConfig rejects non-positive Q10 at construction time."""
+    with pytest.raises(ValueError, match="Q10"):
+        NeuronConfig(Q10=Q10)
+
+
+@pytest.mark.parametrize("T_ref", [0.0, -1.0])
+def test_neuron_config_non_positive_t_ref_raises(T_ref: float) -> None:
+    """NeuronConfig rejects non-positive T_ref at construction time."""
+    with pytest.raises(ValueError, match="T_ref"):
+        NeuronConfig(T_ref=T_ref)
