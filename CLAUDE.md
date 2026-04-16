@@ -49,9 +49,16 @@ Every function and method — public, private, and dunder — must have a Google
 
 ## Testing conventions
 
-- Test files live in `tests/`
+Tests are split into three buckets under `tests/`:
+
+- `tests/unit/` — fast, pure-function tests; no simulation runs. Run alone during development: `uv run --frozen -m pytest tests/unit`
+- `tests/integration/` — end-to-end protocol → simulation pipeline tests. Simulation-calling tests extracted from mixed files are named `*_simulation.py`.
+- `tests/ui/` — Reflex and plotting layer tests; skipped when `reflex` is not installed.
+
+The shared `hh_model` fixture lives in `tests/conftest.py` and is discoverable by all three subdirectories.
+
+Additional conventions:
 - Use plain functions, not test classes
-- Use the shared `hh_model` fixture from `tests/conftest.py` when a model instance is needed
 - Use `pytest.approx` for float comparisons
 - Every test function needs a Google-style docstring
 
