@@ -324,23 +324,11 @@ class NeuronState(rx.State):
             preset_cfg.k_channel_factory if preset_cfg else patch_sim.make_k_channel
         )
 
+        scalar_kwargs = {
+            name: getattr(self, name) for name in presets._NEURON_CONFIG_SCALAR_FIELDS
+        }
         config = patch_sim.NeuronConfig(
-            g_Na=self.g_Na,
-            g_K=self.g_K,
-            g_L=self.g_L,
-            C_m=self.C_m,
-            v_rest=self.v_rest,
-            Na_out=self.Na_out,
-            Na_in=self.Na_in,
-            K_out=self.K_out,
-            K_in=self.K_in,
-            Cl_out=self.Cl_out,
-            Cl_in=self.Cl_in,
-            Ca_out=self.Ca_out,
-            Ca_in=self.Ca_in,
-            T=self.T,
-            Q10=self.Q10,
-            T_ref=self.T_ref,
+            **scalar_kwargs,
             channels=channels,
             na_channel_factory=na_factory,
             k_channel_factory=k_factory,
