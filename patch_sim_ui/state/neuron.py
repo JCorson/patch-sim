@@ -112,20 +112,6 @@ class NeuronState(rx.State):
     """State for neuron biophysical parameters and auxiliary channel configuration."""
 
     # ------------------------------------------------------------------ #
-    # Neuron parameters (derived from NeuronConfig via dataclass introspection)
-    # ------------------------------------------------------------------ #
-    # Populate annotations and default values from the source-of-truth in
-    # presets.NEURON_CONFIG_SCALAR_DEFAULTS so NeuronState automatically
-    # mirrors any new scalar field added to NeuronConfig without edits here.
-    if "__annotations__" not in vars():  # type: ignore[operator]
-        __annotations__: dict = {}  # noqa: PLC0103
-    for _nc_name, _nc_default in presets.NEURON_CONFIG_SCALAR_DEFAULTS.items():
-        __annotations__[_nc_name] = float  # type: ignore[index]
-        vars()[_nc_name] = _nc_default
-    # Prevent Reflex metaclass from treating loop variables as state vars.
-    del _nc_name, _nc_default
-
-    # ------------------------------------------------------------------ #
     # Additional channels                                                 #
     # ------------------------------------------------------------------ #
     ih_enabled: bool = False
@@ -335,3 +321,9 @@ class NeuronState(rx.State):
             k_channel_factory=k_factory,
         )
         return patch_sim.make_neuron(config=config)
+
+
+# Register NeuronConfig scalar fields as NeuronState vars using Reflex's public
+# API so the class body stays free of __annotations__ manipulation.
+for _nc_name, _nc_default in presets.NEURON_CONFIG_SCALAR_DEFAULTS.items():
+    NeuronState.add_var(_nc_name, float, _nc_default)
