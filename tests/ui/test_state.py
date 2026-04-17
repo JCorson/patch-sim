@@ -31,6 +31,11 @@ from patch_sim.constants import (
 )
 from patch_sim_ui import constants  # noqa: E402
 from patch_sim_ui.log_handler import UILogRecord  # noqa: E402
+from patch_sim_ui.presets import (  # noqa: E402
+    _NEURON_CONFIG_SCALAR_DEFAULTS,
+    _NEURON_CONFIG_SCALAR_FIELDS,
+    neuron_config_to_ui_state,
+)
 from patch_sim_ui.state import SimulationState  # noqa: E402
 from patch_sim_ui.state.log import LogState  # noqa: E402
 from patch_sim_ui.state.neuron import NeuronState  # noqa: E402
@@ -1154,3 +1159,60 @@ async def test_load_neuron_preset_syncs_figure_clamp_mode() -> None:
     with patch.object(NeuronState, "get_state", new=_get_state):
         [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
     assert sim_st._figure_clamp_mode == ps.clamp_mode
+
+
+# ---------------------------------------------------------------------------
+# NeuronState↔NeuronConfig sync regression tests (#232)
+# ---------------------------------------------------------------------------
+
+
+def test_neuron_state_mirrors_all_neuron_config_scalar_fields() -> None:
+    """Every NeuronConfig scalar field appears on NeuronState with the correct default.
+
+    This test fails if a new scalar field is added to NeuronConfig without
+    the corresponding entry flowing through to NeuronState.
+    """
+    ns = _make_neuron_state()
+    for name in _NEURON_CONFIG_SCALAR_FIELDS:
+        assert hasattr(ns, name), f"NeuronState missing field: {name}"
+        assert getattr(ns, name) == pytest.approx(
+            _NEURON_CONFIG_SCALAR_DEFAULTS[name]
+        ), f"NeuronState.{name} default does not match NeuronConfig"
+
+
+def test_build_neuron_forwards_all_neuron_config_scalar_fields() -> None:
+    """_build_neuron() forwards every scalar field value to the constructed Neuron.
+
+    Mutates each NeuronState field to a distinct non-default value, calls
+    _build_neuron(), then checks the resulting NeuronConfig.  Fails if any
+    field is silently dropped in the kwargs construction.
+    """
+    ns = _make_neuron_state()
+    expected: dict[str, float] = {}
+    for i, name in enumerate(_NEURON_CONFIG_SCALAR_FIELDS):
+        sentinel = _NEURON_CONFIG_SCALAR_DEFAULTS[name] + float(i + 1) * 0.001
+        setattr(ns, name, sentinel)
+        expected[name] = sentinel
+
+    neuron = ns._build_neuron()
+    for name, value in expected.items():
+        assert getattr(neuron, name) == pytest.approx(value), (
+            f"_build_neuron dropped field: {name}"
+        )
+
+
+def test_neuron_config_to_ui_state_covers_all_scalar_fields() -> None:
+    """neuron_config_to_ui_state() returns a key for every scalar field.
+
+    Fails if a new NeuronConfig scalar field is not forwarded through to
+    the UI-state dict that loads_neuron_preset uses.
+    """
+    from patch_sim.presets import NEURON_PRESETS
+
+    config = next(iter(NEURON_PRESETS.values()))
+    state = neuron_config_to_ui_state(config)
+    for name in _NEURON_CONFIG_SCALAR_FIELDS:
+        assert name in state, f"neuron_config_to_ui_state missing key: {name}"
+        assert state[name] == pytest.approx(getattr(config, name)), (
+            f"neuron_config_to_ui_state value mismatch for: {name}"
+        )
