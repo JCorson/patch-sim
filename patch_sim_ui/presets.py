@@ -6,6 +6,8 @@ live in the core library and should be imported from ``patch_sim.presets``
 directly.
 """
 
+from dataclasses import Field
+from dataclasses import fields as dc_fields
 from typing import Any
 
 from patch_sim.constants import (
@@ -23,6 +25,25 @@ from patch_sim.constants import (
 )
 from patch_sim.neuron_factory import CHANNEL_REGISTRY, NeuronConfig
 from patch_sim.presets import NEURON_PRESETS
+
+# Enumerate NeuronConfig scalar fields once; derived constants reuse this tuple.
+_NEURON_CONFIG_SCALAR_META: tuple[Field[Any], ...] = tuple(
+    f for f in dc_fields(NeuronConfig) if f.type == "float"
+)
+
+#: Ordered tuple of NeuronConfig scalar field names — the single source of
+#: truth that drives NeuronState field declarations, neuron_config_to_ui_state,
+#: and _build_neuron kwargs.
+NEURON_CONFIG_SCALAR_FIELDS: tuple[str, ...] = tuple(
+    f.name for f in _NEURON_CONFIG_SCALAR_META
+)
+
+#: Default float values for each scalar field, keyed by field name.
+NEURON_CONFIG_SCALAR_DEFAULTS: dict[str, float] = {
+    f.name: f.default
+    for f in _NEURON_CONFIG_SCALAR_META
+    if isinstance(f.default, float)
+}
 
 # Default conductances for each auxiliary channel, keyed by channel name.
 _DEFAULT_G_MAX: dict[str, float] = {
@@ -60,22 +81,7 @@ def neuron_config_to_ui_state(config: NeuronConfig) -> dict[str, Any]:
         Flat dict of ``{field_name: value}`` pairs for ``NeuronState``.
     """
     state: dict[str, Any] = {
-        "g_Na": config.g_Na,
-        "g_K": config.g_K,
-        "g_L": config.g_L,
-        "C_m": config.C_m,
-        "v_rest": config.v_rest,
-        "Na_out": config.Na_out,
-        "Na_in": config.Na_in,
-        "K_out": config.K_out,
-        "K_in": config.K_in,
-        "Cl_out": config.Cl_out,
-        "Cl_in": config.Cl_in,
-        "Ca_out": config.Ca_out,
-        "Ca_in": config.Ca_in,
-        "T": config.T,
-        "Q10": config.Q10,
-        "T_ref": config.T_ref,
+        name: getattr(config, name) for name in NEURON_CONFIG_SCALAR_FIELDS
     }
 
     # Disable all auxiliary channels with default conductances.
