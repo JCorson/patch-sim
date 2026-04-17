@@ -94,3 +94,12 @@ THALAMIC_RELAY: str = "Thalamic Relay Neuron"
 CA1_PYRAMIDAL: str = "Hippocampal CA1 Pyramidal Neuron"
 STN: str = "Subthalamic Nucleus Neuron"
 TRN: str = "Thalamic Reticular Nucleus Neuron"
+
+# Protocol preset names
+ACTION_POTENTIAL: str = "Action Potential"
+SUBTHRESHOLD_RESPONSE: str = "Subthreshold Response"
+REPETITIVE_FIRING: str = "Repetitive Firing"
+FI_CURVE: str = "F-I Curve"
+IV_CURVE: str = "I-V Curve"
+NA_CHANNEL_ACTIVATION: str = "Na+ Channel Activation"
+FREQUENCY_RESPONSE: str = "Frequency Response"

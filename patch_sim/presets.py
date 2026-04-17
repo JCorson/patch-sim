@@ -22,14 +22,21 @@ from .additional_channels import (
     make_inap_channel,
 )
 from .constants import (
+    ACTION_POTENTIAL,
     CA1_PYRAMIDAL,
     CORTICAL_PYRAMIDAL,
     CURRENT_CLAMP,
     DOPAMINERGIC,
     FAST_SPIKING_INTERNEURON,
+    FI_CURVE,
+    FREQUENCY_RESPONSE,
+    IV_CURVE,
+    NA_CHANNEL_ACTIVATION,
     PURKINJE,
+    REPETITIVE_FIRING,
     SQUID_GIANT_AXON,
     STN,
+    SUBTHRESHOLD_RESPONSE,
     THALAMIC_RELAY,
     TRN,
     VOLTAGE_CLAMP,
@@ -263,7 +270,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
 # ---------------------------------------------------------------------------
 
 PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
-    "Action Potential": {
+    ACTION_POTENTIAL: {
         "clamp_mode": CURRENT_CLAMP,
         "protocol_type": "Step",
         "pre_stimulus_duration": 10.0,
@@ -273,7 +280,7 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "max_stimulus": 10.0,
         "stimulus_step": 0.0,
     },
-    "Subthreshold Response": {
+    SUBTHRESHOLD_RESPONSE: {
         "clamp_mode": CURRENT_CLAMP,
         "protocol_type": "Step",
         "pre_stimulus_duration": 10.0,
@@ -283,7 +290,7 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "max_stimulus": 1.5,
         "stimulus_step": 0.0,
     },
-    "Repetitive Firing": {
+    REPETITIVE_FIRING: {
         "clamp_mode": CURRENT_CLAMP,
         "protocol_type": "Step",
         "pre_stimulus_duration": 10.0,
@@ -293,7 +300,7 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "max_stimulus": 15.0,
         "stimulus_step": 0.0,
     },
-    "F-I Curve": {
+    FI_CURVE: {
         "clamp_mode": CURRENT_CLAMP,
         "protocol_type": "Step",
         "pre_stimulus_duration": 10.0,
@@ -303,7 +310,7 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "max_stimulus": 20.0,
         "stimulus_step": 2.5,
     },
-    "I-V Curve": {
+    IV_CURVE: {
         "clamp_mode": VOLTAGE_CLAMP,
         "protocol_type": "Step",
         "pre_stimulus_duration": 5.0,
@@ -314,7 +321,7 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "stimulus_step": 10.0,
         "holding_voltage": -70.0,
     },
-    "Na+ Channel Activation": {
+    NA_CHANNEL_ACTIVATION: {
         "clamp_mode": VOLTAGE_CLAMP,
         "protocol_type": "Step",
         "pre_stimulus_duration": 5.0,
@@ -325,7 +332,7 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "max_stimulus": 60.0,
         "stimulus_step": 10.0,
     },
-    "Frequency Response": {
+    FREQUENCY_RESPONSE: {
         "clamp_mode": CURRENT_CLAMP,
         "protocol_type": "Chirp",
         "pre_stimulus_duration": 0.0,
@@ -352,7 +359,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         # 10 µA/cm² at 30 ms (default) produces 2 spikes; the membrane
         # recovers and re-fires within the step.  10 ms is long enough to
         # reach threshold and evoke exactly one action potential.
-        "Action Potential": {
+        ACTION_POTENTIAL: {
             "stimulus_duration": 10.0,
         },
     },
@@ -360,14 +367,14 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         # High g_L (1.5 mS/cm²) raises the firing threshold; 20 µA/cm²
         # is safely suprathreshold.  10 ms avoids a second spike at this
         # amplitude.
-        "Action Potential": {
+        ACTION_POTENTIAL: {
             "min_stimulus": 20.0,
             "max_stimulus": 20.0,
             "stimulus_duration": 10.0,
         },
         # Higher amplitude needed for non-adapting high-frequency firing with
         # the elevated Kv3.1 conductance.
-        "Repetitive Firing": {
+        REPETITIVE_FIRING: {
             "min_stimulus": 25.0,
             "max_stimulus": 25.0,
             "stimulus_duration": 180.0,
@@ -376,19 +383,19 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
     CORTICAL_PYRAMIDAL: {
         # Higher R_in (g_L=0.05 → R_in=20 kΩ·cm²) raises excitability; 0.5
         # µA/cm² is subthreshold where 1.5 µA/cm² (default) would spike.
-        "Subthreshold Response": {
+        SUBTHRESHOLD_RESPONSE: {
             "min_stimulus": 0.5,
             "max_stimulus": 0.5,
         },
         # 5 µA/cm² at 15 ms evokes a single AP; 30 ms default produces 2.
-        "Action Potential": {
+        ACTION_POTENTIAL: {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
             "stimulus_duration": 15.0,
         },
         # 800 ms at 5 µA/cm² is long enough for IM to accumulate and produce
         # clearly increasing inter-spike intervals (spike-frequency adaptation).
-        "Repetitive Firing": {
+        REPETITIVE_FIRING: {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
             "stimulus_duration": 800.0,
@@ -399,7 +406,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         # the subthreshold zone through fast repetitive firing.  300 ms is
         # long enough for IM-driven adaptation to be visible within each
         # suprathreshold sweep.
-        "F-I Curve": {
+        FI_CURVE: {
             "max_stimulus": 12.0,
             "stimulus_step": 1.5,
             "stimulus_duration": 300.0,
@@ -407,18 +414,18 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
     },
     PURKINJE: {
         # Low R_in at rest (active channels); 0.5 µA/cm² is subthreshold.
-        "Subthreshold Response": {
+        SUBTHRESHOLD_RESPONSE: {
             "min_stimulus": 0.5,
             "max_stimulus": 0.5,
         },
         # 5 µA/cm² at 15 ms evokes a single AP; 30 ms default produces 2.
-        "Action Potential": {
+        ACTION_POTENTIAL: {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
             "stimulus_duration": 15.0,
         },
         # Moderate amplitude; complex Ca²⁺-driven spiking emerges within 200 ms.
-        "Repetitive Firing": {
+        REPETITIVE_FIRING: {
             "min_stimulus": 12.0,
             "max_stimulus": 12.0,
             "stimulus_duration": 180.0,
@@ -428,21 +435,21 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         # Q10 scaling (Q10=3 at 37°C vs 22°C ref) raises the firing threshold
         # to ~6 µA/cm²; 7 µA/cm² is safely suprathreshold.  8 ms is long
         # enough for the AP to fire but short enough to prevent a second spike.
-        "Action Potential": {
+        ACTION_POTENTIAL: {
             "min_stimulus": 7.0,
             "max_stimulus": 7.0,
             "stimulus_duration": 8.0,
         },
         # Same amplitude bump for the long pacemaking window; HH channels scaled
         # by Q10 fire at high frequency at 7 µA/cm², well above the ≥5 AP target.
-        "Repetitive Firing": {
+        REPETITIVE_FIRING: {
             "min_stimulus": 7.0,
             "max_stimulus": 7.0,
             "stimulus_duration": 480.0,
         },
         # Threshold ~1.75 µA/cm²; narrow range with finer steps to show
         # the subthreshold-to-firing transition clearly.
-        "F-I Curve": {
+        FI_CURVE: {
             "max_stimulus": 12.0,
             "stimulus_step": 1.5,
             "stimulus_duration": 200.0,
@@ -450,27 +457,27 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
     },
     THALAMIC_RELAY: {
         # R_in increased with lower g_L; 0.2 µA/cm² is subthreshold at g_L=0.1.
-        "Subthreshold Response": {
+        SUBTHRESHOLD_RESPONSE: {
             "min_stimulus": 0.2,
             "max_stimulus": 0.2,
         },
         # 5 µA/cm² at 5 ms evokes a single AP; the shorter window prevents
         # a second spike that Q10-scaled kinetics would otherwise allow.
-        "Action Potential": {
+        ACTION_POTENTIAL: {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
             "stimulus_duration": 5.0,
         },
         # Depolarizing step for sustained tonic firing via T-type Ca²⁺
         # and Ih; 5 µA/cm² gives ~12 spikes at ~58 Hz over 200 ms.
-        "Repetitive Firing": {
+        REPETITIVE_FIRING: {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
             "stimulus_duration": 200.0,
         },
         # Threshold ~0.94 µA/cm²; narrow range with 1 µA/cm² steps to
         # show the subthreshold-to-firing transition cleanly.
-        "F-I Curve": {
+        FI_CURVE: {
             "max_stimulus": 10.0,
             "stimulus_step": 1.0,
             "stimulus_duration": 100.0,
@@ -478,21 +485,21 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
     },
     CA1_PYRAMIDAL: {
         # 5 µA/cm² at 15 ms evokes a single AP; 30 ms default produces 2.
-        "Action Potential": {
+        ACTION_POTENTIAL: {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
             "stimulus_duration": 15.0,
         },
         # Long moderate-amplitude step reveals adaptation and pronounced AHP.
         # 12 µA/cm² produces 2 spikes; strong IKCa limits further firing.
-        "Repetitive Firing": {
+        REPETITIVE_FIRING: {
             "min_stimulus": 12.0,
             "max_stimulus": 12.0,
             "stimulus_duration": 300.0,
         },
         # IKa and IM raise the firing threshold above the default HH range.
         # Positive-only range; longer step to reveal spike-frequency adaptation.
-        "F-I Curve": {
+        FI_CURVE: {
             "max_stimulus": 30.0,
             "stimulus_step": 3.0,
             "stimulus_duration": 150.0,
@@ -500,26 +507,26 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
     },
     STN: {
         # Very low threshold (~0.27 µA/cm²); keep subthreshold well below it.
-        "Subthreshold Response": {
+        SUBTHRESHOLD_RESPONSE: {
             "min_stimulus": 0.15,
             "max_stimulus": 0.15,
         },
         # 2 µA/cm² at 5 ms evokes a single AP; default 30 ms produces 5.
-        "Action Potential": {
+        ACTION_POTENTIAL: {
             "min_stimulus": 2.0,
             "max_stimulus": 2.0,
             "stimulus_duration": 5.0,
         },
         # Depolarizing step for sustained tonic firing; STN pacemaker kinetics
         # yield ~16 spikes at ~77 Hz at 2 µA/cm² over 200 ms.
-        "Repetitive Firing": {
+        REPETITIVE_FIRING: {
             "min_stimulus": 2.0,
             "max_stimulus": 2.0,
             "stimulus_duration": 200.0,
         },
         # Very low threshold; fine-grained 0 → 5 µA/cm² range with 0.5 steps
         # to capture the abrupt onset of firing.
-        "F-I Curve": {
+        FI_CURVE: {
             "max_stimulus": 5.0,
             "stimulus_step": 0.5,
             "stimulus_duration": 200.0,
@@ -527,27 +534,27 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
     },
     TRN: {
         # R_in increased with lower g_L; 0.1 µA/cm² is subthreshold at g_L=0.08.
-        "Subthreshold Response": {
+        SUBTHRESHOLD_RESPONSE: {
             "min_stimulus": 0.1,
             "max_stimulus": 0.1,
         },
         # 5 µA/cm² at 5 ms evokes a single AP; the shorter window prevents
         # a second spike that Q10-scaled kinetics would otherwise allow.
-        "Action Potential": {
+        ACTION_POTENTIAL: {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
             "stimulus_duration": 5.0,
         },
         # Depolarizing step for sustained repetitive firing via ICaT;
         # 5 µA/cm² gives ~11 spikes at ~54 Hz over 200 ms.
-        "Repetitive Firing": {
+        REPETITIVE_FIRING: {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
             "stimulus_duration": 200.0,
         },
         # Threshold ~1.03 µA/cm²; narrow range with 1 µA/cm² steps to
         # show the subthreshold-to-firing transition cleanly.
-        "F-I Curve": {
+        FI_CURVE: {
             "max_stimulus": 10.0,
             "stimulus_step": 1.0,
             "stimulus_duration": 100.0,

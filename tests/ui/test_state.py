@@ -1307,20 +1307,23 @@ async def test_initialize_defaults_is_idempotent() -> None:
     assert ps.stimulus_duration == pytest.approx(duration_after_first)
 
 
-async def test_reset_to_defaults_yields_initialize_defaults() -> None:
-    """reset_to_defaults yields SimulationState.initialize_defaults as its final event.
+async def test_reset_to_defaults_preserves_current_selection() -> None:
+    """reset_to_defaults re-applies the current selection, not the startup defaults.
 
-    initialize_defaults is responsible for restoring the correct SGA preset
-    values after a reset (see test_initialize_defaults_* tests).  This test
-    checks that reset_to_defaults chains into it so that the Reset button
-    leaves the app in the same consistent state as a fresh page load.
+    The Reset button should restore preset defaults for whichever neuron and
+    protocol the user has selected, rather than switching back to the startup
+    defaults.  This test sets a non-default neuron and protocol, calls
+    reset_to_defaults, and verifies the selection is preserved.
     reset() is patched to a no-op because the Reflex parent-state chain is not
     available in isolated unit tests.
     """
+    from patch_sim.constants import CORTICAL_PYRAMIDAL
+
     ns = _make_neuron_state()
+    ns.active_neuron_type = CORTICAL_PYRAMIDAL
     ps = _make_protocol_state()
+    ps.active_protocol_preset = "Repetitive Firing"
     sim_st = _make_state()
-    # reset() walks the parent-state chain which is absent in unit tests; stub it out.
     with (
         patch.object(SimulationState, "reset", return_value=None),
         patch.object(NeuronState, "reset", return_value=None),
@@ -1332,4 +1335,8 @@ async def test_reset_to_defaults_yields_initialize_defaults() -> None:
         ),
     ):
         yielded = [e async for e in sim_st.reset_to_defaults()]
-    assert SimulationState.initialize_defaults in yielded
+
+    assert ns.active_neuron_type == CORTICAL_PYRAMIDAL
+    assert ps.active_protocol_preset == "Repetitive Firing"
+    assert SimulationState.run_membrane_test in yielded
+    assert SimulationState.initialize_defaults not in yielded

@@ -525,16 +525,20 @@ class SimulationState(rx.State):
         yield SimulationState.run_membrane_test
 
     async def reset_to_defaults(self) -> AsyncGenerator[Any, None]:
-        """Reset all state vars to class-level defaults, then re-apply startup presets.
+        """Reset state to preset defaults for the current neuron and protocol.
 
-        Resets every substate via ``reset()``, then yields
-        :meth:`initialize_defaults` so the app returns to the same consistent
-        state as a fresh page load rather than raw dataclass defaults.
+        Captures the active neuron type and protocol preset before resetting,
+        then re-applies those same selections so the user's neuron and protocol
+        choice is preserved while all parameter values are restored to their
+        preset defaults.
         """
-        self.reset()
         neuron_st = await self.get_state(NeuronState)
-        neuron_st.reset()
+        neuron_type = neuron_st.active_neuron_type
         proto_st = await self.get_state(ProtocolState)
+        protocol_preset = proto_st.active_protocol_preset
+
+        self.reset()
+        neuron_st.reset()
         proto_st.reset()
         vis_st = await self.get_state(VisibilityState)
         vis_st.reset()
@@ -542,7 +546,19 @@ class SimulationState(rx.State):
         analysis_st.reset()
         log_st = await self.get_state(LogState)
         log_st.reset()
-        yield SimulationState.initialize_defaults
+
+        neuron_st._apply_neuron_preset(neuron_type)
+        if protocol_preset:
+            proto_st._apply_protocol_preset(protocol_preset, neuron_type)
+            for key, value in presets.PROTOCOL_NEURON_OVERRIDES.get(
+                protocol_preset, {}
+            ).items():
+                setattr(neuron_st, key, value)
+
+        self._label_neuron_type = neuron_type
+        self._figure_clamp_mode = proto_st.clamp_mode
+
+        yield SimulationState.run_membrane_test
 
     def toggle_analysis_panel(self) -> None:
         """Toggle the right-hand analysis sidebar open or closed."""
