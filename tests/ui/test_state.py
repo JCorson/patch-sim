@@ -21,6 +21,7 @@ os.environ.setdefault("PYTEST_CURRENT_TEST", "test_state.py::setup")
 
 pytest.importorskip("reflex")
 
+from patch_sim import NEURON_PRESETS  # noqa: E402
 from patch_sim.constants import (
     CORTICAL_PYRAMIDAL,
     DOPAMINERGIC,
@@ -1202,7 +1203,7 @@ def test_build_neuron_forwards_all_neuron_config_scalar_fields() -> None:
         )
 
 
-@pytest.mark.parametrize("preset_name", list(__import__("patch_sim").NEURON_PRESETS))
+@pytest.mark.parametrize("preset_name", list(NEURON_PRESETS))
 def test_neuron_config_to_ui_state_covers_all_scalar_fields(
     preset_name: str,
 ) -> None:
@@ -1215,9 +1216,7 @@ def test_neuron_config_to_ui_state_covers_all_scalar_fields(
     Args:
         preset_name: Name of the preset to test.
     """
-    import patch_sim
-
-    config = patch_sim.NEURON_PRESETS[preset_name]
+    config = NEURON_PRESETS[preset_name]
     state = neuron_config_to_ui_state(config)
     for name in NEURON_CONFIG_SCALAR_FIELDS:
         assert name in state, f"neuron_config_to_ui_state missing key: {name}"
