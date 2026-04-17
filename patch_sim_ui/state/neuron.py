@@ -323,7 +323,6 @@ class NeuronState(rx.State):
         return patch_sim.make_neuron(config=config)
 
 
-# Register NeuronConfig scalar fields as NeuronState vars using Reflex's public
-# API so the class body stays free of __annotations__ manipulation.
+# Register NeuronConfig scalar fields as NeuronState vars
 for _nc_name, _nc_default in presets.NEURON_CONFIG_SCALAR_DEFAULTS.items():
     NeuronState.add_var(_nc_name, float, _nc_default)

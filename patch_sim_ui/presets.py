@@ -33,9 +33,7 @@ _NEURON_CONFIG_SCALAR_META: tuple[Field[Any], ...] = tuple(
 
 #: Ordered tuple of NeuronConfig scalar field names — the single source of
 #: truth that drives NeuronState field declarations, neuron_config_to_ui_state,
-#: and _build_neuron kwargs.  Uses a whitelist (f.type == "float") so that
-#: adding a non-float field to NeuronConfig is safely excluded rather than
-#: silently forwarded as a float.
+#: and _build_neuron kwargs.
 NEURON_CONFIG_SCALAR_FIELDS: tuple[str, ...] = tuple(
     f.name for f in _NEURON_CONFIG_SCALAR_META
 )
