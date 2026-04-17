@@ -23,10 +23,12 @@ pytest.importorskip("reflex")
 
 from patch_sim import NEURON_PRESETS  # noqa: E402
 from patch_sim.constants import (
+    ACTION_POTENTIAL,
     CORTICAL_PYRAMIDAL,
     DOPAMINERGIC,
     FAST_SPIKING_INTERNEURON,
     PURKINJE,
+    REPETITIVE_FIRING,
     SQUID_GIANT_AXON,
     THALAMIC_RELAY,
 )
@@ -260,7 +262,7 @@ async def test_load_protocol_preset_action_potential_sets_stimulus_duration() ->
     """load_protocol_preset('Action Potential') sets stimulus_duration to 30.0."""
     ps = _make_protocol_state()
     with patch.object(ProtocolState, "get_state", new=_make_get_state_fn({})):
-        await ps.load_protocol_preset("Action Potential")
+        await ps.load_protocol_preset(ACTION_POTENTIAL)
     assert ps.stimulus_duration == pytest.approx(30.0)
 
 
@@ -268,7 +270,7 @@ async def test_load_protocol_preset_action_potential_sets_clamp_mode() -> None:
     """load_protocol_preset('Action Potential') sets clamp_mode to 'Current Clamp'."""
     ps = _make_protocol_state()
     with patch.object(ProtocolState, "get_state", new=_make_get_state_fn({})):
-        await ps.load_protocol_preset("Action Potential")
+        await ps.load_protocol_preset(ACTION_POTENTIAL)
     assert ps.clamp_mode == "Current Clamp"
 
 
@@ -276,7 +278,7 @@ async def test_load_protocol_preset_repetitive_firing_sets_stimulus_duration() -
     """load_protocol_preset('Repetitive Firing') sets stimulus_duration to 180.0."""
     ps = _make_protocol_state()
     with patch.object(ProtocolState, "get_state", new=_make_get_state_fn({})):
-        await ps.load_protocol_preset("Repetitive Firing")
+        await ps.load_protocol_preset(REPETITIVE_FIRING)
     assert ps.stimulus_duration == pytest.approx(180.0)
 
 
@@ -485,7 +487,7 @@ async def test_protocol_preset_with_active_neuron_type_applies_adjustment() -> N
     with patch.object(
         ProtocolState, "get_state", new=_make_get_state_fn({NeuronState: mock_neuron})
     ):
-        await ps.load_protocol_preset("Repetitive Firing")
+        await ps.load_protocol_preset(REPETITIVE_FIRING)
     assert ps.min_stimulus > 0.0
 
 
@@ -497,7 +499,7 @@ async def test_protocol_preset_without_active_neuron_type_uses_base_params() -> 
     with patch.object(
         ProtocolState, "get_state", new=_make_get_state_fn({NeuronState: mock_neuron})
     ):
-        await ps.load_protocol_preset("Repetitive Firing")
+        await ps.load_protocol_preset(REPETITIVE_FIRING)
     assert ps.min_stimulus == pytest.approx(15.0)
 
 
@@ -513,7 +515,7 @@ async def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> No
     with patch.object(
         ProtocolState, "get_state", new=_make_get_state_fn({NeuronState: mock_neuron})
     ):
-        await ps.load_protocol_preset("Repetitive Firing")
+        await ps.load_protocol_preset(REPETITIVE_FIRING)
     assert ps.stimulus_duration == pytest.approx(180.0)
 
 
@@ -525,7 +527,7 @@ async def test_protocol_preset_dopaminergic_repetitive_firing_long_duration() ->
     with patch.object(
         ProtocolState, "get_state", new=_make_get_state_fn({NeuronState: mock_neuron})
     ):
-        await ps.load_protocol_preset("Repetitive Firing")
+        await ps.load_protocol_preset(REPETITIVE_FIRING)
     assert ps.stimulus_duration == pytest.approx(480.0)
 
 
@@ -1033,17 +1035,17 @@ async def test_active_protocol_preset_set_on_load() -> None:
     """load_protocol_preset records the preset name in active_protocol_preset."""
     ps = _make_protocol_state()
     with patch.object(ProtocolState, "get_state", new=_make_get_state_fn({})):
-        await ps.load_protocol_preset("Repetitive Firing")
-    assert ps.active_protocol_preset == "Repetitive Firing"
+        await ps.load_protocol_preset(REPETITIVE_FIRING)
+    assert ps.active_protocol_preset == REPETITIVE_FIRING
 
 
 async def test_active_protocol_preset_updated_on_second_load() -> None:
     """active_protocol_preset is overwritten when a different preset is loaded."""
     ps = _make_protocol_state()
     with patch.object(ProtocolState, "get_state", new=_make_get_state_fn({})):
-        await ps.load_protocol_preset("Action Potential")
-        await ps.load_protocol_preset("Repetitive Firing")
-    assert ps.active_protocol_preset == "Repetitive Firing"
+        await ps.load_protocol_preset(ACTION_POTENTIAL)
+        await ps.load_protocol_preset(REPETITIVE_FIRING)
+    assert ps.active_protocol_preset == REPETITIVE_FIRING
 
 
 async def test_set_clamp_mode_clears_active_protocol_preset() -> None:
@@ -1054,7 +1056,7 @@ async def test_set_clamp_mode_clears_active_protocol_preset() -> None:
     change does not re-apply the old Current Clamp preset and flip the mode back.
     """
     ps = _make_protocol_state()
-    ps.active_protocol_preset = "Repetitive Firing"
+    ps.active_protocol_preset = REPETITIVE_FIRING
     with patch.object(ProtocolState, "get_state", new=_make_get_state_fn({})):
         await ps.set_clamp_mode("Voltage Clamp")
     assert ps.active_protocol_preset == ""
@@ -1074,8 +1076,8 @@ async def test_load_neuron_preset_reapplies_active_protocol_overrides() -> None:
     """
     ns = _make_neuron_state()
     ps = _make_protocol_state()
-    ps.active_protocol_preset = "Repetitive Firing"
-    ps._apply_protocol_preset("Repetitive Firing")
+    ps.active_protocol_preset = REPETITIVE_FIRING
+    ps._apply_protocol_preset(REPETITIVE_FIRING)
     sim_st = _make_state()
     with patch.object(
         NeuronState,
@@ -1107,8 +1109,8 @@ async def test_load_neuron_preset_squid_uses_base_protocol_params() -> None:
     """Switching to Squid Giant Axon applies the base preset params (no adjustments)."""
     ns = _make_neuron_state()
     ps = _make_protocol_state()
-    ps.active_protocol_preset = "Repetitive Firing"
-    ps._apply_protocol_preset("Repetitive Firing")
+    ps.active_protocol_preset = REPETITIVE_FIRING
+    ps._apply_protocol_preset(REPETITIVE_FIRING)
     sim_st = _make_state()
     with patch.object(
         NeuronState,
@@ -1146,8 +1148,8 @@ async def test_load_neuron_preset_syncs_figure_clamp_mode() -> None:
     """load_neuron_preset syncs _figure_clamp_mode on SimulationState."""
     ns = _make_neuron_state()
     ps = _make_protocol_state()
-    ps.active_protocol_preset = "Repetitive Firing"
-    ps._apply_protocol_preset("Repetitive Firing")
+    ps.active_protocol_preset = REPETITIVE_FIRING
+    ps._apply_protocol_preset(REPETITIVE_FIRING)
     sim_st = _make_state()
     sim_st._figure_clamp_mode = "Voltage Clamp"
 
@@ -1317,12 +1319,10 @@ async def test_reset_to_defaults_preserves_current_selection() -> None:
     reset() is patched to a no-op because the Reflex parent-state chain is not
     available in isolated unit tests.
     """
-    from patch_sim.constants import CORTICAL_PYRAMIDAL
-
     ns = _make_neuron_state()
     ns.active_neuron_type = CORTICAL_PYRAMIDAL
     ps = _make_protocol_state()
-    ps.active_protocol_preset = "Repetitive Firing"
+    ps.active_protocol_preset = REPETITIVE_FIRING
     sim_st = _make_state()
     with (
         patch.object(SimulationState, "reset", return_value=None),
@@ -1337,6 +1337,6 @@ async def test_reset_to_defaults_preserves_current_selection() -> None:
         yielded = [e async for e in sim_st.reset_to_defaults()]
 
     assert ns.active_neuron_type == CORTICAL_PYRAMIDAL
-    assert ps.active_protocol_preset == "Repetitive Firing"
+    assert ps.active_protocol_preset == REPETITIVE_FIRING
     assert SimulationState.run_membrane_test in yielded
     assert SimulationState.initialize_defaults not in yielded
