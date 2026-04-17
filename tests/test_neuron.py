@@ -354,3 +354,53 @@ def test_custom_factory_replaces_all_three_core_channels() -> None:
         leak_channel_factory=alt_leak,
     )
     assert [ch.name for ch in model.core_channels] == ["Na", "K", "leak"]
+
+
+# ---------------------------------------------------------------------------
+# Q10 temperature scaling
+# ---------------------------------------------------------------------------
+
+
+def test_q10_defaults() -> None:
+    """Default Neuron has Q10=3.0 and T_ref=295.15 K."""
+    model = Neuron()
+    assert model.Q10 == pytest.approx(3.0)
+    assert model.T_ref == pytest.approx(295.15)
+
+
+def test_q10_factor_at_reference_temperature() -> None:
+    """q10_factor is exactly 1.0 when T equals T_ref."""
+    model = Neuron(T=295.15, T_ref=295.15)
+    assert model.q10_factor == pytest.approx(1.0)
+
+
+def test_q10_factor_ten_degrees_above_reference() -> None:
+    """q10_factor equals Q10 when T is exactly 10 K above T_ref."""
+    model = Neuron(T=305.15, T_ref=295.15, Q10=3.0)
+    assert model.q10_factor == pytest.approx(3.0)
+
+
+def test_q10_factor_ten_degrees_below_reference() -> None:
+    """q10_factor is the reciprocal of Q10 when T is 10 K below T_ref."""
+    model = Neuron(T=285.15, T_ref=295.15, Q10=3.0)
+    assert model.q10_factor == pytest.approx(1.0 / 3.0)
+
+
+def test_q10_of_one_gives_factor_one_regardless_of_temperature() -> None:
+    """When Q10=1.0 the scaling factor is always 1.0."""
+    model = Neuron(T=320.0, T_ref=295.15, Q10=1.0)
+    assert model.q10_factor == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("Q10", [0.0, -1.0])
+def test_non_positive_q10_raises(Q10: float) -> None:
+    """Non-positive Q10 must raise ValueError."""
+    with pytest.raises(ValueError, match="Q10"):
+        Neuron(Q10=Q10)
+
+
+@pytest.mark.parametrize("T_ref", [0.0, -1.0])
+def test_non_positive_t_ref_raises(T_ref: float) -> None:
+    """Non-positive T_ref must raise ValueError."""
+    with pytest.raises(ValueError, match="T_ref"):
+        Neuron(T_ref=T_ref)

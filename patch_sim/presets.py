@@ -52,6 +52,12 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Default ion concentrations produce HH52 reversal potentials
         # (E_Na ≈ +50, E_K ≈ −77, E_L ≈ −54 mV) so no overrides needed.
         # Ref: Hodgkin & Huxley (1952), J. Physiol. 117:500
+        #
+        # Q10=1.0: this preset IS the room-temperature squid axon model.
+        # Applying a 5.2× thermal correction to bring it to mammalian
+        # temperature is not meaningful — the kinetics are already those
+        # of the intact preparation.
+        Q10=1.0,
     ),
     FAST_SPIKING_INTERNEURON: NeuronConfig(
         # High g_Na drives rapid depolarization; IKv31 (Kv3.1-type, high
@@ -64,10 +70,17 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # g_L = 1.5 mS/cm² gives τ_m ≈ 0.67 ms — highly leaky membrane that
         # narrows the synaptic integration window, a hallmark of FS cells.
         # Cl_in = 11.9 mM (E_L ≈ −62 mV) preserves v_rest = −65 mV.
+        #
+        # Q10=1.0: these channels are adapted from HH52 squid-axon kinetics
+        # without a well-defined mammalian thermal reference.  Applying a 5.2×
+        # Q10 factor (22→37 °C) drives Na⁺ inactivation so fast that the cell
+        # enters depolarization block after the first AP.  Temperature effects
+        # are already implicit in the conductance values fitted to FS cell data.
         g_Na=150.0,
         g_K=50.0,
         g_L=1.5,
         Cl_in=11.9,
+        Q10=1.0,
         channels=(ChannelConfig(make_ikv31_channel, g_max=40.0),),
     ),
     CORTICAL_PYRAMIDAL: NeuronConfig(
@@ -86,10 +99,16 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # g_h reduced from 1.5 → 0.3 mS/cm² and g_NaP from 0.5 → 0.1 mS/cm²
         # so that combined inward current at rest does not exceed the outward
         # leak + IM current; the original values caused spontaneous tonic firing.
+        #
+        # T_ref = 307.15 K (34 °C): Pospischil channels were recorded and fitted
+        # at 34 °C, so Q10 scaling from that reference to 37 °C (T = 310.15 K)
+        # gives a factor of ~1.39× rather than the default ~5.2×.  Using the
+        # HH52 reference of 22 °C causes numerical instability in this model.
         v_rest=-70.0,
         K_out=3.32,
         g_L=0.05,
         Cl_in=3.8,
+        T_ref=307.15,
         na_channel_factory=make_pospischil_na_channel,
         k_channel_factory=make_pospischil_k_channel,
         channels=(
@@ -166,10 +185,16 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # g_L = 0.05 mS/cm² gives τ_m ≈ 20 ms and R_in ≈ 20 kΩ·cm², matching
         # the high input resistance measured in CA1 pyramidal cells in slice
         # recordings.  Cl_in = 27.9 mM (E_L ≈ −39 mV) preserves v_rest = −65 mV.
+        #
+        # Q10=1.0: as with FSI, the HH52-derived Na⁺ kinetics lack a mammalian
+        # thermal reference.  A 5.2× Q10 factor accelerates Na⁺ inactivation
+        # enough to cause depolarization block after the first AP; the
+        # conductance values are already calibrated for CA1 behavior.
         g_Na=35.0,
         g_K=10.0,
         g_L=0.05,
         Cl_in=27.9,
+        Q10=1.0,
         channels=(
             ChannelConfig(make_ika_channel, g_max=0.5),
             ChannelConfig(make_im_channel, g_max=0.5),
@@ -332,11 +357,12 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     FAST_SPIKING_INTERNEURON: {
-        # Moderate amplitude, short duration to evoke a single narrow spike;
-        # 30 ms at this amplitude would produce 3 spikes due to fast kinetics.
+        # High g_L (1.5 mS/cm²) raises the firing threshold; 20 µA/cm²
+        # is safely suprathreshold.  10 ms avoids a second spike at this
+        # amplitude.
         "Action Potential": {
-            "min_stimulus": 15.0,
-            "max_stimulus": 15.0,
+            "min_stimulus": 20.0,
+            "max_stimulus": 20.0,
             "stimulus_duration": 10.0,
         },
         # Higher amplitude needed for non-adapting high-frequency firing with
@@ -399,16 +425,19 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     DOPAMINERGIC: {
-        # 5 µA/cm² at 10 ms evokes a single AP; 30 ms default produces 3.
+        # Q10 scaling (Q10=3 at 37°C vs 22°C ref) raises the firing threshold
+        # to ~6 µA/cm²; 7 µA/cm² is safely suprathreshold.  8 ms is long
+        # enough for the AP to fire but short enough to prevent a second spike.
         "Action Potential": {
-            "min_stimulus": 5.0,
-            "max_stimulus": 5.0,
-            "stimulus_duration": 10.0,
+            "min_stimulus": 7.0,
+            "max_stimulus": 7.0,
+            "stimulus_duration": 8.0,
         },
-        # Long window at low amplitude to reveal slow (~2–5 Hz) pacemaking.
+        # Same amplitude bump for the long pacemaking window; HH channels scaled
+        # by Q10 fire at high frequency at 7 µA/cm², well above the ≥5 AP target.
         "Repetitive Firing": {
-            "min_stimulus": 5.0,
-            "max_stimulus": 5.0,
+            "min_stimulus": 7.0,
+            "max_stimulus": 7.0,
             "stimulus_duration": 480.0,
         },
         # Threshold ~1.75 µA/cm²; narrow range with finer steps to show
@@ -425,11 +454,12 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "min_stimulus": 0.2,
             "max_stimulus": 0.2,
         },
-        # 5 µA/cm² at 10 ms evokes a single AP; 30 ms default produces 3.
+        # 5 µA/cm² at 5 ms evokes a single AP; the shorter window prevents
+        # a second spike that Q10-scaled kinetics would otherwise allow.
         "Action Potential": {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
-            "stimulus_duration": 10.0,
+            "stimulus_duration": 5.0,
         },
         # Depolarizing step for sustained tonic firing via T-type Ca²⁺
         # and Ih; 5 µA/cm² gives ~12 spikes at ~58 Hz over 200 ms.
@@ -501,11 +531,12 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "min_stimulus": 0.1,
             "max_stimulus": 0.1,
         },
-        # 5 µA/cm² at 10 ms evokes a single AP; 30 ms default produces 3.
+        # 5 µA/cm² at 5 ms evokes a single AP; the shorter window prevents
+        # a second spike that Q10-scaled kinetics would otherwise allow.
         "Action Potential": {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
-            "stimulus_duration": 10.0,
+            "stimulus_duration": 5.0,
         },
         # Depolarizing step for sustained repetitive firing via ICaT;
         # 5 µA/cm² gives ~11 spikes at ~54 Hz over 200 ms.

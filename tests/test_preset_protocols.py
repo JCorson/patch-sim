@@ -6,15 +6,6 @@ either a miscalibrated neuron preset or a broken protocol adjustment.
 
 These tests complement the per-neuron behavioral tests (e.g.
 ``test_cortical_pyramidal.py``) with broad coverage across all presets.
-
-Notes:
-    The Fast-Spiking Interneuron (FSI) uses standard HH52 Na⁺ channel
-    kinetics.  Under sustained depolarizing current the Na⁺ h gate does not
-    recover fully, causing the cell to enter depolarization block after the
-    first AP.  The FSI therefore produces only 1 AP under the Repetitive
-    Firing protocol — this is a known limitation of the HH52 kinetics and
-    *not* a test failure.  The per-neuron minimum AP dict captures this
-    explicitly.
 """
 
 from __future__ import annotations
@@ -119,12 +110,8 @@ def test_action_potential_preset(preset_name: str) -> None:
     """Action Potential protocol elicits exactly one action potential.
 
     The adjusted single-step stimulus is tuned per neuron to produce a
-    suprathreshold response.  The test asserts:
-
-    - structural and physiological validity of the result
-    - between 1 and 3 APs (some neurons produce a second on the falling
-      edge of the stimulus window)
-    - AP peak voltage above 0 mV confirming a full-amplitude action potential
+    single suprathreshold spike.  The test asserts exactly 1 AP so that
+    miscalibrated stimuli (producing 0 or ≥2 spikes) are caught as failures.
 
     Args:
         preset_name: Name of the neuron preset under test.
@@ -136,8 +123,9 @@ def test_action_potential_preset(preset_name: str) -> None:
     _assert_current_clamp_valid(result)
 
     n_aps = _count_action_potentials(result["voltage"])
-    assert 1 <= n_aps <= 3, (
-        f"{preset_name}: expected 1–3 APs under Action Potential protocol, got {n_aps}"
+    assert n_aps == 1, (
+        f"{preset_name}: expected exactly 1 AP under Action Potential "
+        f"protocol, got {n_aps}"
     )
     assert float(result["voltage"].max()) > 0.0, (
         f"{preset_name}: AP peak {result['voltage'].max():.1f} mV is below 0 mV"
@@ -185,7 +173,8 @@ def test_subthreshold_response_preset(preset_name: str) -> None:
 
 # Minimum AP counts per neuron preset for the Repetitive Firing protocol.
 # FSI uses HH52 Na⁺ kinetics which lead to depolarization block after the
-# first AP under sustained current — see module docstring.
+# first AP under sustained current — a pre-existing kinetics limitation
+# unrelated to Q10 temperature scaling.
 _MIN_REPETITIVE_APS: dict[str, int] = {
     FAST_SPIKING_INTERNEURON: 1,
 }
@@ -197,9 +186,8 @@ def test_repetitive_firing_preset(preset_name: str) -> None:
     """Repetitive Firing protocol elicits multiple action potentials.
 
     The long suprathreshold step is designed to produce sustained repetitive
-    discharge.  The minimum AP count is set per neuron (see
-    ``_MIN_REPETITIVE_APS``); for the FSI the count is 1 because HH52 Na⁺
-    channel kinetics cause depolarization block under constant current.
+    discharge.  Most presets produce at least ``_DEFAULT_MIN_REPETITIVE_APS``
+    (5) APs; exceptions are listed in ``_MIN_REPETITIVE_APS``.
 
     Args:
         preset_name: Name of the neuron preset under test.

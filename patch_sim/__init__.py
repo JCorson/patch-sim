@@ -68,6 +68,8 @@ from .clamp_simulations import (
 from .constants import (
     CURRENT_CLAMP,
     CURRENT_PROTOCOLS,
+    DEFAULT_Q10,
+    DEFAULT_T_REF,
     VOLTAGE_CLAMP,
     VOLTAGE_PROTOCOLS,
 )
@@ -154,6 +156,8 @@ __all__ = [
     "run_membrane_test",
     "CURRENT_CLAMP",
     "CURRENT_PROTOCOLS",
+    "DEFAULT_Q10",
+    "DEFAULT_T_REF",
     "MEMBRANE_TEST_CURRENT",
     "MEMBRANE_TEST_POST_MS",
     "MEMBRANE_TEST_PRE_MS",

@@ -31,7 +31,9 @@ from patch_sim.constants import (
     DEFAULT_K_OUT,
     DEFAULT_NA_IN,
     DEFAULT_NA_OUT,
+    DEFAULT_Q10,
     DEFAULT_T,
+    DEFAULT_T_REF,
     DEFAULT_V_REST,
 )
 from patch_sim_ui import presets
@@ -53,6 +55,8 @@ _NEURON_FLOAT_FIELDS: list[str] = [
     "Ca_out",
     "Ca_in",
     "T",
+    "Q10",
+    "T_ref",
 ]
 
 _CHANNEL_FLOAT_FIELDS: list[str] = [ch.g_max_field for ch in ADDITIONAL_CHANNELS]
@@ -157,6 +161,8 @@ class NeuronState(rx.State):
     Ca_out: float = DEFAULT_CA_OUT
     Ca_in: float = DEFAULT_CA_IN
     T: float = DEFAULT_T
+    Q10: float = DEFAULT_Q10
+    T_ref: float = DEFAULT_T_REF
 
     # ------------------------------------------------------------------ #
     # Additional channels                                                 #
@@ -373,6 +379,8 @@ class NeuronState(rx.State):
             Ca_out=self.Ca_out,
             Ca_in=self.Ca_in,
             T=self.T,
+            Q10=self.Q10,
+            T_ref=self.T_ref,
             channels=channels,
             na_channel_factory=na_factory,
             k_channel_factory=k_factory,

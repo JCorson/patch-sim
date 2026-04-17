@@ -172,8 +172,10 @@ def test_physiological_limits_and_action_potentials():
     currents = [20.0, 40.0, 60.0]  # increasing external currents in μA/cm²
     ap_threshold = 0  # mV, voltage threshold for counting action potentials
 
-    # Create a model for testing
-    custom_model = Neuron()
+    # Bare Neuron() uses default HH52 squid giant axon kinetics.  Q10=1.0
+    # disables temperature scaling so the kinetics match their original
+    # parameterisation — this test exercises the HH52 model as published.
+    custom_model = Neuron(Q10=1.0)
     num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
 
     ap_counts = []

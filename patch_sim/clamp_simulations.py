@@ -132,10 +132,11 @@ def _gating_derivatives(
         Tuple of (derivs, dca_i) where derivs maps each gating variable name
         to its dx/dt and dca_i is 0.0 when no calcium_dynamics are configured.
     """
+    phi = neuron.q10_factor
     derivs: dict[str, float] = {}
     for gv in neuron.all_gating_variables:
         x = gating_state[gv.name]
-        derivs[gv.name] = gv.alpha(V, ca_i) * (1 - x) - gv.beta(V, ca_i) * x
+        derivs[gv.name] = phi * (gv.alpha(V, ca_i) * (1 - x) - gv.beta(V, ca_i) * x)
     if neuron.calcium_dynamics is not None:
         I_Ca = neuron.calcium_current(V, gating_state)
         dca_i = neuron.calcium_dynamics.derivative(I_Ca, ca_i)
