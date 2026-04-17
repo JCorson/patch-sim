@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  ci:
+  lint:
     runs-on: ubuntu-latest
 
     steps:
@@ -30,5 +30,24 @@ jobs:
       - name: Type check
         run: uvx ty check
 
-      - name: Test
-        run: uv run --frozen -m pytest --verbose
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [unit, integration, ui]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen --group=dev --group=ui
+
+      - name: Run ${{ matrix.suite }} tests
+        run: uv run --frozen -m pytest tests/${{ matrix.suite }} --verbose

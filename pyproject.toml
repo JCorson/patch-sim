@@ -28,7 +28,7 @@ patch_sim = {path = "./patch_sim", editable = true}
 include = ["./patch_sim", "./patch_sim_ui", "./tests"]
 
 [[tool.ty.overrides]]
-include = ["patch_sim_ui/**", "tests/test_state.py", "tests/test_plotting.py"]
+include = ["patch_sim_ui/**", "tests/ui/test_state.py", "tests/ui/test_plotting.py"]
 
 [tool.ty.overrides.analysis]
 replace-imports-with-any = ["reflex.**", "plotly.**", "patch_sim_ui.**"]
@@ -39,15 +39,15 @@ replace-imports-with-any = ["reflex.**", "plotly.**", "patch_sim_ui.**"]
 [[tool.ty.overrides]]
 include = [
     "patch_sim/clamp_simulations.py",
-    "tests/test_plotting.py",
-    "tests/test_state.py",
+    "tests/ui/test_plotting.py",
+    "tests/ui/test_state.py",
 ]
 
 [tool.ty.overrides.rules]
 invalid-assignment = "ignore"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/unit", "tests/integration", "tests/ui"]
 asyncio_mode = "auto"
 filterwarnings = [
     "ignore::pydantic.warnings.PydanticDeprecatedSince20",

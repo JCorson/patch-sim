@@ -1,18 +1,16 @@
-"""Tests for the patch_sim.analysis.ap_metrics module.
+"""Unit tests for the patch_sim.analysis.ap_metrics module.
 
-Verifies spike detection, per-spike metric extraction, and summary statistics
-under a range of conditions: no spikes, single spike, multiple spikes,
-parameter sensitivity, and integration with SimulationResult.
+Verifies spike detection and per-spike metric extraction using synthetic traces:
+no spikes, single spike, parameter sensitivity. Tests that drive a real HH
+simulation live in tests/integration/test_ap_metrics_simulation.py.
 """
 
 import numpy as np
 import pytest
 
-import patch_sim
 from patch_sim.analysis.ap_metrics import (
     APAnalysisResult,
     analyze_aps,
-    analyze_aps_from_result,
 )
 
 # ---------------------------------------------------------------------------
@@ -26,7 +24,7 @@ def _make_time(duration_ms: float) -> np.ndarray:
     """Create a time array from 0 to duration_ms with dt = 0.025 ms.
 
     Args:
-        duration_ms: Total duration in ms.
+        duration_ms: Duration of the trace in ms.
 
     Returns:
         1-D float array of time points.
@@ -195,69 +193,8 @@ def test_single_spike_half_width_geometry():
 
 
 # ---------------------------------------------------------------------------
-# Multiple spikes
-# ---------------------------------------------------------------------------
-
-
-def test_multiple_spikes_hh_model(hh_model):
-    """Suprathreshold current on the HH model produces multiple detected spikes."""
-    stimulus = np.zeros(int(100.0 / _DT))
-    # Apply 20 µA/cm² step from 10 ms to 90 ms
-    start = int(10.0 / _DT)
-    stop = int(90.0 / _DT)
-    stimulus[start:stop] = 20.0
-
-    result_sim = patch_sim.simulate_current_clamp(hh_model, stimulus)
-    analysis = analyze_aps_from_result(result_sim)
-
-    assert analysis.spike_count > 1
-    assert len(analysis.spikes) == analysis.spike_count
-    assert len(analysis.isis) == analysis.spike_count - 1
-    assert analysis.mean_isi is not None
-    assert analysis.firing_rate is not None
-    assert analysis.firing_rate == pytest.approx(1000.0 / analysis.mean_isi, rel=1e-6)
-
-
-def test_isi_length_consistent_with_spike_count(hh_model):
-    """ISI list has exactly spike_count - 1 entries."""
-    stimulus = np.zeros(int(100.0 / _DT))
-    stimulus[int(10.0 / _DT) : int(90.0 / _DT)] = 20.0
-
-    result_sim = patch_sim.simulate_current_clamp(hh_model, stimulus)
-    analysis = analyze_aps_from_result(result_sim)
-
-    assert len(analysis.isis) == max(0, analysis.spike_count - 1)
-
-
-def test_firing_rate_from_isi(hh_model):
-    """Firing rate equals 1000 / mean_isi when multiple spikes are present."""
-    stimulus = np.zeros(int(150.0 / _DT))
-    stimulus[int(10.0 / _DT) : int(140.0 / _DT)] = 15.0
-
-    result_sim = patch_sim.simulate_current_clamp(hh_model, stimulus)
-    analysis = analyze_aps_from_result(result_sim)
-
-    assert analysis.spike_count >= 2
-    assert analysis.mean_isi is not None
-    assert analysis.firing_rate == pytest.approx(1000.0 / analysis.mean_isi, rel=1e-6)
-
-
-# ---------------------------------------------------------------------------
 # Parameter sensitivity
 # ---------------------------------------------------------------------------
-
-
-def test_high_dvdt_threshold_reduces_detections(hh_model):
-    """A higher dvdt_threshold detects fewer or equal spikes than a lower one."""
-    stimulus = np.zeros(int(100.0 / _DT))
-    stimulus[int(10.0 / _DT) : int(90.0 / _DT)] = 20.0
-
-    result_sim = patch_sim.simulate_current_clamp(hh_model, stimulus)
-
-    low = analyze_aps_from_result(result_sim, dvdt_threshold=10.0)
-    high = analyze_aps_from_result(result_sim, dvdt_threshold=100.0)
-
-    assert high.spike_count <= low.spike_count
 
 
 def test_min_spike_height_filters_events():
@@ -271,25 +208,3 @@ def test_min_spike_height_filters_events():
 
     assert result_permissive.spike_count == 1
     assert result_strict.spike_count == 0
-
-
-# ---------------------------------------------------------------------------
-# analyze_aps_from_result
-# ---------------------------------------------------------------------------
-
-
-def test_analyze_aps_from_result_matches_direct_call(hh_model):
-    """analyze_aps_from_result matches calling analyze_aps with extracted arrays."""
-    stimulus = np.zeros(int(80.0 / _DT))
-    stimulus[int(5.0 / _DT) : int(75.0 / _DT)] = 20.0
-
-    result_sim = patch_sim.simulate_current_clamp(hh_model, stimulus)
-
-    via_result = analyze_aps_from_result(result_sim)
-    direct = analyze_aps(result_sim["time"], result_sim["voltage"])
-
-    assert via_result.spike_count == direct.spike_count
-    assert via_result.mean_peak_voltage == pytest.approx(
-        direct.mean_peak_voltage or 0.0, abs=1e-9
-    )
-    assert via_result.firing_rate == pytest.approx(direct.firing_rate or 0.0, abs=1e-9)
