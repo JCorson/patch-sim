@@ -94,12 +94,13 @@ def test_make_neuron_no_channels_no_calcium_dynamics() -> None:
 
 def test_make_neuron_custom_conductances() -> None:
     """Custom conductances from NeuronConfig are reflected on the HH model."""
-    config = NeuronConfig(g_Na=150.0, g_K=50.0, g_L=0.2)
+    config = NeuronConfig(g_Na=150.0, g_K=50.0, g_NaL=0.05, g_KL=0.25)
     model = make_neuron(config)
     assert isinstance(model, Neuron)
     assert model.g_Na == pytest.approx(150.0)
     assert model.g_K == pytest.approx(50.0)
-    assert model.g_L == pytest.approx(0.2)
+    assert model.g_NaL == pytest.approx(0.05)
+    assert model.g_KL == pytest.approx(0.25)
 
 
 def test_make_neuron_custom_concentrations() -> None:
@@ -153,31 +154,46 @@ def test_make_neuron_passes_k_factory() -> None:
     assert model.k_channel_factory is alt_k
 
 
-def test_make_neuron_passes_leak_factory() -> None:
-    """make_neuron forwards leak_channel_factory from NeuronConfig to Neuron."""
-    from patch_sim.core_channels import make_leak_channel
+def test_make_neuron_passes_na_leak_factory() -> None:
+    """make_neuron forwards na_leak_channel_factory from NeuronConfig to Neuron."""
+    from patch_sim.core_channels import make_na_leak_channel
 
-    def alt_leak(g_max: float) -> IonChannel:
-        """Alternate leak factory."""
-        return make_leak_channel(g_max)
+    def alt_nal(g_max: float) -> IonChannel:
+        """Alternate Na leak factory."""
+        return make_na_leak_channel(g_max)
 
-    config = NeuronConfig(leak_channel_factory=alt_leak)
+    config = NeuronConfig(na_leak_channel_factory=alt_nal)
     model = make_neuron(config)
-    assert model.leak_channel_factory is alt_leak
+    assert model.na_leak_channel_factory is alt_nal
+
+
+def test_make_neuron_passes_k_leak_factory() -> None:
+    """make_neuron forwards k_leak_channel_factory from NeuronConfig to Neuron."""
+    from patch_sim.core_channels import make_k_leak_channel
+
+    def alt_kl(g_max: float) -> IonChannel:
+        """Alternate K leak factory."""
+        return make_k_leak_channel(g_max)
+
+    config = NeuronConfig(k_leak_channel_factory=alt_kl)
+    model = make_neuron(config)
+    assert model.k_leak_channel_factory is alt_kl
 
 
 def test_neuron_config_default_factories_are_hh52() -> None:
-    """NeuronConfig default factories are the HH52 squid axon functions."""
+    """NeuronConfig default factories are the standard HH functions."""
     from patch_sim.core_channels import (
         make_k_channel,
-        make_leak_channel,
+        make_k_leak_channel,
         make_na_channel,
+        make_na_leak_channel,
     )
 
     config = NeuronConfig()
     assert config.na_channel_factory is make_na_channel
     assert config.k_channel_factory is make_k_channel
-    assert config.leak_channel_factory is make_leak_channel
+    assert config.na_leak_channel_factory is make_na_leak_channel
+    assert config.k_leak_channel_factory is make_k_leak_channel
 
 
 # ---------------------------------------------------------------------------

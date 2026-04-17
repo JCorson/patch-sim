@@ -3,13 +3,21 @@
 # Default neuron parameters (classic Hodgkin-Huxley values)
 #
 # Ion concentrations are set so that Nernst potentials match the reversal
-# potentials used in the original HH52 paper (E_Na ≈ +50, E_K ≈ −77,
-# E_L ≈ −54 mV).  This ensures that the HH52 rate functions — which were
-# empirically fit to squid axon data at those reversal potentials — produce
-# the correct resting potential (−65 mV) and firing dynamics.
+# potentials used in the original HH52 paper (E_Na ≈ +50, E_K ≈ −77 mV).
+# This ensures that the HH52 rate functions — which were empirically fit to
+# squid axon data at those reversal potentials — produce the correct resting
+# potential (−65 mV) and firing dynamics.
+#
+# The passive leak is split into Na⁺ and K⁺ background conductances:
+#   DEFAULT_G_NAL = 0.054 mS/cm²  (Na⁺ leak, E_Na ≈ +50 mV)
+#   DEFAULT_G_KL  = 0.246 mS/cm²  (K⁺ leak, E_K ≈ −77 mV)
+# These values are chosen so that g_NaL + g_KL = 0.3 mS/cm² (preserving τ_m)
+# and I_NaL + I_KL at V = −65 mV equals the old chloride-leak current
+# (g_L_old × (−65 − E_L_old)), ensuring v_rest remains at −65 mV.
 DEFAULT_G_NA: float = 120.0
 DEFAULT_G_K: float = 36.0
-DEFAULT_G_L: float = 0.3
+DEFAULT_G_NAL: float = 0.054
+DEFAULT_G_KL: float = 0.246
 DEFAULT_C_M: float = 1.0
 DEFAULT_V_REST: float = -65.0
 DEFAULT_NA_OUT: float = 97.4
@@ -68,7 +76,8 @@ VOLTAGE_PROTOCOLS: list[str] = [
 DEFAULT_NEURON_PARAMS: dict[str, float] = {
     "g_Na": DEFAULT_G_NA,
     "g_K": DEFAULT_G_K,
-    "g_L": DEFAULT_G_L,
+    "g_NaL": DEFAULT_G_NAL,
+    "g_KL": DEFAULT_G_KL,
     "C_m": DEFAULT_C_M,
     "v_rest": DEFAULT_V_REST,
     "Na_out": DEFAULT_NA_OUT,

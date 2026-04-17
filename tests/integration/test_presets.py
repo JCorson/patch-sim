@@ -219,16 +219,16 @@ def test_cortical_pyramidal_uses_pospischil_k_factory() -> None:
     [
         # (preset_name, τ_m_min_ms, τ_m_max_ms, R_in_min_kΩcm², R_in_max_kΩcm²)
         # Passive properties are measured on the channel-blocked neuron, so
-        # R_in = 1/g_L exactly and τ_m = C_m/g_L exactly.
-        (SQUID_GIANT_AXON, 2.5, 4.5, 2.5, 4.5),  # g_L=0.3  τ_m≈3.3 ms
-        (FAST_SPIKING_INTERNEURON, 0.4, 1.0, 0.4, 1.0),  # g_L=1.5  τ_m≈0.67 ms
-        (CORTICAL_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_L=0.05 τ_m≈20 ms
-        (PURKINJE, 45.0, 55.0, 45.0, 55.0),  # g_L=0.02 τ_m≈50 ms
-        (DOPAMINERGIC, 2.5, 4.5, 2.5, 4.5),  # g_L=0.3  τ_m≈3.3 ms
-        (THALAMIC_RELAY, 8.0, 12.0, 8.0, 12.0),  # g_L=0.1  τ_m≈10 ms
-        (CA1_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_L=0.05 τ_m≈20 ms
-        (STN, 2.5, 5.5, 2.5, 5.5),  # g_L=0.25 τ_m≈4 ms
-        (TRN, 10.0, 15.0, 10.0, 15.0),  # g_L=0.08 τ_m≈12.5 ms
+        # R_in = 1/(g_NaL+g_KL) and τ_m = C_m/(g_NaL+g_KL).
+        (SQUID_GIANT_AXON, 2.5, 4.5, 2.5, 4.5),  # g_total=0.3  τ_m≈3.3 ms
+        (FAST_SPIKING_INTERNEURON, 0.4, 1.0, 0.4, 1.0),  # g_total=1.5  τ_m≈0.67 ms
+        (CORTICAL_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
+        (PURKINJE, 45.0, 55.0, 45.0, 55.0),  # g_total=0.02 τ_m≈50 ms
+        (DOPAMINERGIC, 2.5, 4.5, 2.5, 4.5),  # g_total=0.3  τ_m≈3.3 ms
+        (THALAMIC_RELAY, 8.0, 12.0, 8.0, 12.0),  # g_total=0.1  τ_m≈10 ms
+        (CA1_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
+        (STN, 2.5, 5.5, 2.5, 5.5),  # g_total=0.25 τ_m≈4 ms
+        (TRN, 10.0, 15.0, 10.0, 15.0),  # g_total=0.08 τ_m≈12.5 ms
     ],
 )
 def test_preset_passive_properties_in_physiological_range(
