@@ -11,6 +11,7 @@ from dataclasses import fields as dc_fields
 from typing import Any
 
 from patch_sim.constants import (
+    ACTION_POTENTIAL,
     DEFAULT_G_ICAL,
     DEFAULT_G_ICAN,
     DEFAULT_G_ICAT,
@@ -22,6 +23,8 @@ from patch_sim.constants import (
     DEFAULT_G_IM,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
+    NA_CHANNEL_ACTIVATION,
+    SQUID_GIANT_AXON,
 )
 from patch_sim.neuron_factory import CHANNEL_REGISTRY, NeuronConfig
 from patch_sim.presets import NEURON_PRESETS
@@ -103,10 +106,16 @@ NEURON_UI_PRESETS: dict[str, dict[str, Any]] = {
     name: neuron_config_to_ui_state(cfg) for name, cfg in NEURON_PRESETS.items()
 }
 
+#: Default neuron preset applied on app startup and reset.
+DEFAULT_NEURON_PRESET: str = SQUID_GIANT_AXON
+
+#: Default protocol preset applied on app startup and reset.
+DEFAULT_PROTOCOL_PRESET: str = ACTION_POTENTIAL
+
 # Neuron-parameter overrides applied when a protocol preset is loaded,
 # regardless of which neuron type is active.  Keys must match NeuronState field
 # names exactly.
 PROTOCOL_NEURON_OVERRIDES: dict[str, dict[str, Any]] = {
     # Disable K⁺ channels so only Na⁺ current is visible.
-    "Na+ Channel Activation": {"g_K": 0.0},
+    NA_CHANNEL_ACTIVATION: {"g_K": 0.0},
 }

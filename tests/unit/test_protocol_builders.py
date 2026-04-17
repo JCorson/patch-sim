@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 import patch_sim
+from patch_sim.constants import ACTION_POTENTIAL, REPETITIVE_FIRING
 from patch_sim.presets import NEURON_PRESET_NAMES, PROTOCOL_PRESETS
 from patch_sim.protocols.builders import (
     build_current_protocol,
@@ -83,7 +84,7 @@ def test_build_protocol_from_preset_repetitive_firing_with_neuron(
 ) -> None:
     """Repetitive Firing preset with every neuron preset returns a valid protocol."""
     result = patch_sim.build_protocol_from_preset(
-        "Repetitive Firing",
+        REPETITIVE_FIRING,
         neuron_preset=neuron_name,
         sampling_frequency=SAMPLING_FREQUENCY,
     )
@@ -93,7 +94,7 @@ def test_build_protocol_from_preset_repetitive_firing_with_neuron(
 def test_build_protocol_from_preset_overrides_applied() -> None:
     """Caller overrides take precedence over the preset values."""
     result = patch_sim.build_protocol_from_preset(
-        "Action Potential",
+        ACTION_POTENTIAL,
         sampling_frequency=SAMPLING_FREQUENCY,
         min_stimulus=5.0,
         max_stimulus=5.0,

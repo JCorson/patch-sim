@@ -11,11 +11,13 @@ import pytest
 import patch_sim
 from patch_sim.analysis.membrane_test import run_membrane_test
 from patch_sim.constants import (
+    ACTION_POTENTIAL,
     CA1_PYRAMIDAL,
     CORTICAL_PYRAMIDAL,
     DOPAMINERGIC,
     FAST_SPIKING_INTERNEURON,
     PURKINJE,
+    REPETITIVE_FIRING,
     SQUID_GIANT_AXON,
     STN,
     THALAMIC_RELAY,
@@ -115,8 +117,8 @@ def test_neuron_protocol_adjustments_change_stimulus_duration() -> None:
     The Dopaminergic Neuron adjusts Repetitive Firing from 180 ms to 480 ms —
     the longer duration must result in a longer stimulus array.
     """
-    base_samples = _protocol_total_samples("Repetitive Firing", None)
-    adjusted_samples = _protocol_total_samples("Repetitive Firing", DOPAMINERGIC)
+    base_samples = _protocol_total_samples(REPETITIVE_FIRING, None)
+    adjusted_samples = _protocol_total_samples(REPETITIVE_FIRING, DOPAMINERGIC)
     assert adjusted_samples > base_samples, (
         "Dopaminergic Neuron adjustment should produce a longer array"
     )
@@ -125,8 +127,8 @@ def test_neuron_protocol_adjustments_change_stimulus_duration() -> None:
 def test_neuron_protocol_adjustments_not_applied_for_unknown_neuron() -> None:
     """Passing a neuron preset with no adjustments returns the base-preset output."""
     # "Squid Giant Axon (Classic HH)" has no adjustments defined.
-    base_samples = _protocol_total_samples("Repetitive Firing", None)
-    squid_samples = _protocol_total_samples("Repetitive Firing", SQUID_GIANT_AXON)
+    base_samples = _protocol_total_samples(REPETITIVE_FIRING, None)
+    squid_samples = _protocol_total_samples(REPETITIVE_FIRING, SQUID_GIANT_AXON)
     assert squid_samples == base_samples
 
 
@@ -136,7 +138,7 @@ def test_neuron_protocol_adjustments_not_applied_for_unknown_neuron() -> None:
         n
         for n in NEURON_PRESET_NAMES
         if n in NEURON_PROTOCOL_ADJUSTMENTS
-        and "Repetitive Firing" in NEURON_PROTOCOL_ADJUSTMENTS[n]
+        and REPETITIVE_FIRING in NEURON_PROTOCOL_ADJUSTMENTS[n]
     ],
 )
 def test_repetitive_firing_adjusted_for_all_configured_neurons(
@@ -144,7 +146,7 @@ def test_repetitive_firing_adjusted_for_all_configured_neurons(
 ) -> None:
     """Every neuron with a Repetitive Firing adjustment produces a valid protocol."""
     result = build_protocol_from_preset(
-        "Repetitive Firing",
+        REPETITIVE_FIRING,
         neuron_preset=neuron_name,
         sampling_frequency=SAMPLING_FREQUENCY,
     )
@@ -159,14 +161,14 @@ def test_caller_overrides_take_precedence_over_neuron_adjustments() -> None:
     The resulting array should match a plain 50 ms stimulus.
     """
     base_50 = build_protocol_from_preset(
-        "Repetitive Firing",
+        REPETITIVE_FIRING,
         sampling_frequency=SAMPLING_FREQUENCY,
         pre_stimulus_duration=10.0,
         stimulus_duration=50.0,
         post_stimulus_duration=10.0,
     )
     overridden = build_protocol_from_preset(
-        "Repetitive Firing",
+        REPETITIVE_FIRING,
         neuron_preset=DOPAMINERGIC,
         sampling_frequency=SAMPLING_FREQUENCY,
         pre_stimulus_duration=10.0,
@@ -185,7 +187,7 @@ def test_build_protocol_from_preset_exported_from_patch_sim() -> None:
     """build_protocol_from_preset is accessible directly from the patch_sim package."""
     assert callable(patch_sim.build_protocol_from_preset)
     result = patch_sim.build_protocol_from_preset(
-        "Action Potential", sampling_frequency=SAMPLING_FREQUENCY
+        ACTION_POTENTIAL, sampling_frequency=SAMPLING_FREQUENCY
     )
     assert isinstance(result, np.ndarray) and result.shape[0] == 1
 

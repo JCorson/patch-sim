@@ -23,7 +23,7 @@ from patch_sim.constants import (
     CURRENT_CLAMP,
     VOLTAGE_CLAMP,
 )
-from patch_sim_ui import constants
+from patch_sim_ui import constants, presets
 from patch_sim_ui.channels import (
     ADDITIONAL_CURRENT_FIELD_MAP,
     ADDITIONAL_GATING_FIELD_MAP,
@@ -491,12 +491,54 @@ class SimulationState(rx.State):
         self._cont_has_state = False
         self.selected_sweep = -1
 
-    async def reset_to_defaults(self) -> None:
-        """Reset all state vars across all substates to their class-level defaults."""
-        self.reset()
+    async def initialize_defaults(self) -> AsyncGenerator[Any, None]:
+        """Apply the default neuron and protocol presets on app startup or reset.
+
+        Reflex class-level defaults set ``active_neuron_type`` and the scalar
+        neuron fields independently, so the displayed preset can be out of sync
+        with the underlying parameters (e.g. ``Q10`` defaults to ``3.0`` from
+        :class:`~patch_sim.NeuronConfig` but the SGA preset requires ``1.0``).
+        This method bootstraps a consistent state by calling
+        :meth:`NeuronState._apply_neuron_preset` and
+        :meth:`ProtocolState._apply_protocol_preset` for the configured
+        defaults, then yields :meth:`run_membrane_test` to populate the passive
+        properties panel.
+
+        Idempotent: safe to call repeatedly.
+        """
         neuron_st = await self.get_state(NeuronState)
-        neuron_st.reset()
+        neuron_st._apply_neuron_preset(presets.DEFAULT_NEURON_PRESET)
+
         proto_st = await self.get_state(ProtocolState)
+        proto_st._apply_protocol_preset(
+            presets.DEFAULT_PROTOCOL_PRESET, presets.DEFAULT_NEURON_PRESET
+        )
+
+        for key, value in presets.PROTOCOL_NEURON_OVERRIDES.get(
+            presets.DEFAULT_PROTOCOL_PRESET, {}
+        ).items():
+            setattr(neuron_st, key, value)
+
+        self._label_neuron_type = presets.DEFAULT_NEURON_PRESET
+        self._figure_clamp_mode = proto_st.clamp_mode
+
+        yield SimulationState.run_membrane_test
+
+    async def reset_to_defaults(self) -> AsyncGenerator[Any, None]:
+        """Reset state to preset defaults for the current neuron and protocol.
+
+        Captures the active neuron type and protocol preset before resetting,
+        then re-applies those same selections so the user's neuron and protocol
+        choice is preserved while all parameter values are restored to their
+        preset defaults.
+        """
+        neuron_st = await self.get_state(NeuronState)
+        neuron_type = neuron_st.active_neuron_type
+        proto_st = await self.get_state(ProtocolState)
+        protocol_preset = proto_st.active_protocol_preset
+
+        self.reset()
+        neuron_st.reset()
         proto_st.reset()
         vis_st = await self.get_state(VisibilityState)
         vis_st.reset()
@@ -504,6 +546,19 @@ class SimulationState(rx.State):
         analysis_st.reset()
         log_st = await self.get_state(LogState)
         log_st.reset()
+
+        neuron_st._apply_neuron_preset(neuron_type)
+        if protocol_preset:
+            proto_st._apply_protocol_preset(protocol_preset, neuron_type)
+            for key, value in presets.PROTOCOL_NEURON_OVERRIDES.get(
+                protocol_preset, {}
+            ).items():
+                setattr(neuron_st, key, value)
+
+        self._label_neuron_type = neuron_type
+        self._figure_clamp_mode = proto_st.clamp_mode
+
+        yield SimulationState.run_membrane_test
 
     def toggle_analysis_panel(self) -> None:
         """Toggle the right-hand analysis sidebar open or closed."""

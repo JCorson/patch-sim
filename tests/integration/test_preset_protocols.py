@@ -17,7 +17,11 @@ from patch_sim.clamp_simulations import (
     simulate_current_clamp,
     simulate_voltage_clamp,
 )
-from patch_sim.constants import FAST_SPIKING_INTERNEURON
+from patch_sim.constants import (
+    ACTION_POTENTIAL,
+    FAST_SPIKING_INTERNEURON,
+    REPETITIVE_FIRING,
+)
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import (
     NEURON_PRESET_NAMES,
@@ -117,7 +121,7 @@ def test_action_potential_preset(preset_name: str) -> None:
         preset_name: Name of the neuron preset under test.
     """
     neuron = make_neuron(NEURON_PRESETS[preset_name])
-    protocol = build_protocol_from_preset("Action Potential", neuron_preset=preset_name)
+    protocol = build_protocol_from_preset(ACTION_POTENTIAL, neuron_preset=preset_name)
     result = simulate_current_clamp(neuron, current_external=protocol[0])
 
     _assert_current_clamp_valid(result)
@@ -193,9 +197,7 @@ def test_repetitive_firing_preset(preset_name: str) -> None:
         preset_name: Name of the neuron preset under test.
     """
     neuron = make_neuron(NEURON_PRESETS[preset_name])
-    protocol = build_protocol_from_preset(
-        "Repetitive Firing", neuron_preset=preset_name
-    )
+    protocol = build_protocol_from_preset(REPETITIVE_FIRING, neuron_preset=preset_name)
     result = simulate_current_clamp(neuron, current_external=protocol[0])
 
     _assert_current_clamp_valid(result)

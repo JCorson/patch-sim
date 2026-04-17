@@ -182,5 +182,5 @@ app.add_page(
     index,
     route="/",
     title="Patch Clamp Simulator",
-    on_load=SimulationState.run_membrane_test,
+    on_load=SimulationState.initialize_defaults,
 )
