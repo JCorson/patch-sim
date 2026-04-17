@@ -22,6 +22,7 @@ from patch_sim.constants import (
     DEFAULT_G_IM,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
+    SQUID_GIANT_AXON,
 )
 from patch_sim.neuron_factory import CHANNEL_REGISTRY, NeuronConfig
 from patch_sim.presets import NEURON_PRESETS
@@ -102,6 +103,12 @@ def neuron_config_to_ui_state(config: NeuronConfig) -> dict[str, Any]:
 NEURON_UI_PRESETS: dict[str, dict[str, Any]] = {
     name: neuron_config_to_ui_state(cfg) for name, cfg in NEURON_PRESETS.items()
 }
+
+#: Default neuron preset applied on app startup and reset.
+DEFAULT_NEURON_PRESET: str = SQUID_GIANT_AXON
+
+#: Default protocol preset applied on app startup and reset.
+DEFAULT_PROTOCOL_PRESET: str = "Action Potential"
 
 # Neuron-parameter overrides applied when a protocol preset is loaded,
 # regardless of which neuron type is active.  Keys must match NeuronState field
