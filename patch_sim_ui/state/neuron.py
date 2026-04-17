@@ -8,11 +8,6 @@ import reflex as rx
 
 import patch_sim
 from patch_sim.constants import (
-    DEFAULT_C_M,
-    DEFAULT_CA_IN,
-    DEFAULT_CA_OUT,
-    DEFAULT_CL_IN,
-    DEFAULT_CL_OUT,
     DEFAULT_G_ICAL,
     DEFAULT_G_ICAN,
     DEFAULT_G_ICAT,
@@ -22,42 +17,14 @@ from patch_sim.constants import (
     DEFAULT_G_IKIR,
     DEFAULT_G_IKV31,
     DEFAULT_G_IM,
-    DEFAULT_G_K,
-    DEFAULT_G_L,
-    DEFAULT_G_NA,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
-    DEFAULT_K_IN,
-    DEFAULT_K_OUT,
-    DEFAULT_NA_IN,
-    DEFAULT_NA_OUT,
-    DEFAULT_Q10,
-    DEFAULT_T,
-    DEFAULT_T_REF,
-    DEFAULT_V_REST,
 )
 from patch_sim_ui import presets
 from patch_sim_ui.channels import ADDITIONAL_CHANNELS
 from patch_sim_ui.state._common import _set_float
 
-_NEURON_FLOAT_FIELDS: list[str] = [
-    "g_Na",
-    "g_K",
-    "g_L",
-    "C_m",
-    "v_rest",
-    "Na_out",
-    "Na_in",
-    "K_out",
-    "K_in",
-    "Cl_out",
-    "Cl_in",
-    "Ca_out",
-    "Ca_in",
-    "T",
-    "Q10",
-    "T_ref",
-]
+_NEURON_FLOAT_FIELDS: list[str] = list(presets._NEURON_CONFIG_SCALAR_FIELDS)
 
 _CHANNEL_FLOAT_FIELDS: list[str] = [ch.g_max_field for ch in ADDITIONAL_CHANNELS]
 
@@ -145,24 +112,17 @@ class NeuronState(rx.State):
     """State for neuron biophysical parameters and auxiliary channel configuration."""
 
     # ------------------------------------------------------------------ #
-    # Neuron parameters                                                   #
+    # Neuron parameters (derived from NeuronConfig via dataclass introspection)
     # ------------------------------------------------------------------ #
-    g_Na: float = DEFAULT_G_NA
-    g_K: float = DEFAULT_G_K
-    g_L: float = DEFAULT_G_L
-    C_m: float = DEFAULT_C_M
-    v_rest: float = DEFAULT_V_REST
-    Na_out: float = DEFAULT_NA_OUT
-    Na_in: float = DEFAULT_NA_IN
-    K_out: float = DEFAULT_K_OUT
-    K_in: float = DEFAULT_K_IN
-    Cl_out: float = DEFAULT_CL_OUT
-    Cl_in: float = DEFAULT_CL_IN
-    Ca_out: float = DEFAULT_CA_OUT
-    Ca_in: float = DEFAULT_CA_IN
-    T: float = DEFAULT_T
-    Q10: float = DEFAULT_Q10
-    T_ref: float = DEFAULT_T_REF
+    # Populate annotations and default values from the source-of-truth in
+    # presets._NEURON_CONFIG_SCALAR_DEFAULTS so NeuronState automatically
+    # mirrors any new scalar field added to NeuronConfig without edits here.
+    if "__annotations__" not in vars():  # type: ignore[operator]
+        __annotations__: dict = {}  # noqa: PLC0103
+    for _nc_name, _nc_default in presets._NEURON_CONFIG_SCALAR_DEFAULTS.items():
+        __annotations__[_nc_name] = float  # type: ignore[index]
+        vars()[_nc_name] = _nc_default
+    del _nc_name, _nc_default
 
     # ------------------------------------------------------------------ #
     # Additional channels                                                 #
