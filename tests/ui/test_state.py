@@ -33,6 +33,8 @@ from patch_sim.constants import (
 from patch_sim_ui import constants  # noqa: E402
 from patch_sim_ui.log_handler import UILogRecord  # noqa: E402
 from patch_sim_ui.presets import (  # noqa: E402
+    DEFAULT_NEURON_PRESET,
+    DEFAULT_PROTOCOL_PRESET,
     NEURON_CONFIG_SCALAR_DEFAULTS,
     NEURON_CONFIG_SCALAR_FIELDS,
     neuron_config_to_ui_state,
@@ -1223,3 +1225,111 @@ def test_neuron_config_to_ui_state_covers_all_scalar_fields(
         assert state[name] == pytest.approx(getattr(config, name)), (
             f"neuron_config_to_ui_state value mismatch for: {name}"
         )
+
+
+# ---------------------------------------------------------------------------
+# initialize_defaults
+# ---------------------------------------------------------------------------
+
+
+async def test_initialize_defaults_applies_sga_q10() -> None:
+    """initialize_defaults sets Q10 to the SGA preset value (1.0).
+
+    Core regression for issue #235: the SGA preset overrides Q10 to 1.0 but
+    NeuronConfig.Q10 defaults to 3.0, so without initialize_defaults the app
+    starts with the wrong Q10.
+    """
+    ns = _make_neuron_state()
+    ps = _make_protocol_state()
+    sim_st = _make_state()
+    with patch.object(
+        SimulationState,
+        "get_state",
+        new=_make_get_state_fn({NeuronState: ns, ProtocolState: ps}),
+    ):
+        [_ async for _ in sim_st.initialize_defaults()]
+    assert ns.Q10 == pytest.approx(1.0)
+
+
+async def test_initialize_defaults_applies_action_potential_with_sga_adjustment() -> (
+    None
+):
+    """initialize_defaults applies the SGA-specific stimulus_duration=10.0 override.
+
+    The base Action Potential preset uses stimulus_duration=30.0, but the SGA
+    neuron-specific adjustment reduces it to 10.0 to elicit exactly one spike.
+    Without this override the membrane re-fires within the 30 ms window.
+    """
+    ns = _make_neuron_state()
+    ps = _make_protocol_state()
+    sim_st = _make_state()
+    with patch.object(
+        SimulationState,
+        "get_state",
+        new=_make_get_state_fn({NeuronState: ns, ProtocolState: ps}),
+    ):
+        [_ async for _ in sim_st.initialize_defaults()]
+    assert ps.stimulus_duration == pytest.approx(10.0)
+    assert ps.active_protocol_preset == DEFAULT_PROTOCOL_PRESET
+    assert ps.clamp_mode == "Current Clamp"
+
+
+async def test_initialize_defaults_syncs_simulation_shadows() -> None:
+    """initialize_defaults syncs _label_neuron_type and _figure_clamp_mode."""
+    ns = _make_neuron_state()
+    ps = _make_protocol_state()
+    sim_st = _make_state()
+    with patch.object(
+        SimulationState,
+        "get_state",
+        new=_make_get_state_fn({NeuronState: ns, ProtocolState: ps}),
+    ):
+        [_ async for _ in sim_st.initialize_defaults()]
+    assert sim_st._label_neuron_type == DEFAULT_NEURON_PRESET
+    assert sim_st._figure_clamp_mode == "Current Clamp"
+
+
+async def test_initialize_defaults_is_idempotent() -> None:
+    """Calling initialize_defaults twice leaves state unchanged on the second call."""
+    ns = _make_neuron_state()
+    ps = _make_protocol_state()
+    sim_st = _make_state()
+    with patch.object(
+        SimulationState,
+        "get_state",
+        new=_make_get_state_fn({NeuronState: ns, ProtocolState: ps}),
+    ):
+        [_ async for _ in sim_st.initialize_defaults()]
+        q10_after_first = ns.Q10
+        duration_after_first = ps.stimulus_duration
+        [_ async for _ in sim_st.initialize_defaults()]
+    assert ns.Q10 == pytest.approx(q10_after_first)
+    assert ps.stimulus_duration == pytest.approx(duration_after_first)
+
+
+async def test_reset_to_defaults_yields_initialize_defaults() -> None:
+    """reset_to_defaults yields SimulationState.initialize_defaults as its final event.
+
+    initialize_defaults is responsible for restoring the correct SGA preset
+    values after a reset (see test_initialize_defaults_* tests).  This test
+    checks that reset_to_defaults chains into it so that the Reset button
+    leaves the app in the same consistent state as a fresh page load.
+    reset() is patched to a no-op because the Reflex parent-state chain is not
+    available in isolated unit tests.
+    """
+    ns = _make_neuron_state()
+    ps = _make_protocol_state()
+    sim_st = _make_state()
+    # reset() walks the parent-state chain which is absent in unit tests; stub it out.
+    with (
+        patch.object(SimulationState, "reset", return_value=None),
+        patch.object(NeuronState, "reset", return_value=None),
+        patch.object(ProtocolState, "reset", return_value=None),
+        patch.object(
+            SimulationState,
+            "get_state",
+            new=_make_get_state_fn({NeuronState: ns, ProtocolState: ps}),
+        ),
+    ):
+        yielded = [e async for e in sim_st.reset_to_defaults()]
+    assert SimulationState.initialize_defaults in yielded
