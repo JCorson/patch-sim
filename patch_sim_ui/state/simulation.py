@@ -23,7 +23,7 @@ from patch_sim.constants import (
     CURRENT_CLAMP,
     VOLTAGE_CLAMP,
 )
-from patch_sim_ui import constants
+from patch_sim_ui import constants, presets
 from patch_sim_ui.channels import (
     ADDITIONAL_CURRENT_FIELD_MAP,
     ADDITIONAL_GATING_FIELD_MAP,
@@ -506,28 +506,31 @@ class SimulationState(rx.State):
 
         Idempotent: safe to call repeatedly.
         """
-        from patch_sim_ui.presets import (
-            DEFAULT_NEURON_PRESET,
-            DEFAULT_PROTOCOL_PRESET,
-            PROTOCOL_NEURON_OVERRIDES,
-        )
-
         neuron_st = await self.get_state(NeuronState)
-        neuron_st._apply_neuron_preset(DEFAULT_NEURON_PRESET)
+        neuron_st._apply_neuron_preset(presets.DEFAULT_NEURON_PRESET)
 
         proto_st = await self.get_state(ProtocolState)
-        proto_st._apply_protocol_preset(DEFAULT_PROTOCOL_PRESET, DEFAULT_NEURON_PRESET)
+        proto_st._apply_protocol_preset(
+            presets.DEFAULT_PROTOCOL_PRESET, presets.DEFAULT_NEURON_PRESET
+        )
 
-        for key, value in PROTOCOL_NEURON_OVERRIDES.get(DEFAULT_PROTOCOL_PRESET, {}).items():
+        for key, value in presets.PROTOCOL_NEURON_OVERRIDES.get(
+            presets.DEFAULT_PROTOCOL_PRESET, {}
+        ).items():
             setattr(neuron_st, key, value)
 
-        self._label_neuron_type = DEFAULT_NEURON_PRESET
+        self._label_neuron_type = presets.DEFAULT_NEURON_PRESET
         self._figure_clamp_mode = proto_st.clamp_mode
 
         yield SimulationState.run_membrane_test
 
     async def reset_to_defaults(self) -> AsyncGenerator[Any, None]:
-        """Reset all state vars across all substates to class-level defaults, then re-apply startup presets."""
+        """Reset all state vars to class-level defaults, then re-apply startup presets.
+
+        Resets every substate via ``reset()``, then yields
+        :meth:`initialize_defaults` so the app returns to the same consistent
+        state as a fresh page load rather than raw dataclass defaults.
+        """
         self.reset()
         neuron_st = await self.get_state(NeuronState)
         neuron_st.reset()
