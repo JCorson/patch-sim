@@ -6,7 +6,6 @@ live in the core library and should be imported from ``patch_sim.presets``
 directly.
 """
 
-from dataclasses import MISSING
 from dataclasses import fields as dc_fields
 from typing import Any
 
@@ -26,29 +25,20 @@ from patch_sim.constants import (
 from patch_sim.neuron_factory import CHANNEL_REGISTRY, NeuronConfig
 from patch_sim.presets import NEURON_PRESETS
 
-#: NeuronConfig fields that cannot be mirrored as Reflex state vars because
-#: they hold callables or tuples of non-serializable objects.
-_NON_SCALAR_CONFIG_FIELDS: frozenset[str] = frozenset(
-    {
-        "na_channel_factory",
-        "k_channel_factory",
-        "leak_channel_factory",
-        "channels",
-    }
-)
-
 #: Ordered tuple of NeuronConfig scalar field names — the single source of
 #: truth that drives NeuronState field declarations, neuron_config_to_ui_state,
-#: and _build_neuron kwargs.
-_NEURON_CONFIG_SCALAR_FIELDS: tuple[str, ...] = tuple(
-    f.name for f in dc_fields(NeuronConfig) if f.name not in _NON_SCALAR_CONFIG_FIELDS
+#: and _build_neuron kwargs.  Uses a whitelist (f.type == "float") so that
+#: adding a non-float field to NeuronConfig is safely excluded rather than
+#: silently forwarded as a float.
+NEURON_CONFIG_SCALAR_FIELDS: tuple[str, ...] = tuple(
+    f.name for f in dc_fields(NeuronConfig) if f.type == "float"
 )
 
 #: Default float values for each scalar field, keyed by field name.
-_NEURON_CONFIG_SCALAR_DEFAULTS: dict[str, float] = {
-    f.name: f.default  # type: ignore[assignment]
+NEURON_CONFIG_SCALAR_DEFAULTS: dict[str, float] = {
+    f.name: f.default
     for f in dc_fields(NeuronConfig)
-    if f.name in _NEURON_CONFIG_SCALAR_FIELDS and f.default is not MISSING
+    if f.name in NEURON_CONFIG_SCALAR_FIELDS and isinstance(f.default, float)
 }
 
 # Default conductances for each auxiliary channel, keyed by channel name.
@@ -87,7 +77,7 @@ def neuron_config_to_ui_state(config: NeuronConfig) -> dict[str, Any]:
         Flat dict of ``{field_name: value}`` pairs for ``NeuronState``.
     """
     state: dict[str, Any] = {
-        name: getattr(config, name) for name in _NEURON_CONFIG_SCALAR_FIELDS
+        name: getattr(config, name) for name in NEURON_CONFIG_SCALAR_FIELDS
     }
 
     # Disable all auxiliary channels with default conductances.

@@ -24,7 +24,7 @@ from patch_sim_ui import presets
 from patch_sim_ui.channels import ADDITIONAL_CHANNELS
 from patch_sim_ui.state._common import _set_float
 
-_NEURON_FLOAT_FIELDS: list[str] = list(presets._NEURON_CONFIG_SCALAR_FIELDS)
+_NEURON_FLOAT_FIELDS: list[str] = list(presets.NEURON_CONFIG_SCALAR_FIELDS)
 
 _CHANNEL_FLOAT_FIELDS: list[str] = [ch.g_max_field for ch in ADDITIONAL_CHANNELS]
 
@@ -115,13 +115,14 @@ class NeuronState(rx.State):
     # Neuron parameters (derived from NeuronConfig via dataclass introspection)
     # ------------------------------------------------------------------ #
     # Populate annotations and default values from the source-of-truth in
-    # presets._NEURON_CONFIG_SCALAR_DEFAULTS so NeuronState automatically
+    # presets.NEURON_CONFIG_SCALAR_DEFAULTS so NeuronState automatically
     # mirrors any new scalar field added to NeuronConfig without edits here.
     if "__annotations__" not in vars():  # type: ignore[operator]
         __annotations__: dict = {}  # noqa: PLC0103
-    for _nc_name, _nc_default in presets._NEURON_CONFIG_SCALAR_DEFAULTS.items():
+    for _nc_name, _nc_default in presets.NEURON_CONFIG_SCALAR_DEFAULTS.items():
         __annotations__[_nc_name] = float  # type: ignore[index]
         vars()[_nc_name] = _nc_default
+    # Prevent Reflex metaclass from treating loop variables as state vars.
     del _nc_name, _nc_default
 
     # ------------------------------------------------------------------ #
@@ -325,7 +326,7 @@ class NeuronState(rx.State):
         )
 
         scalar_kwargs = {
-            name: getattr(self, name) for name in presets._NEURON_CONFIG_SCALAR_FIELDS
+            name: getattr(self, name) for name in presets.NEURON_CONFIG_SCALAR_FIELDS
         }
         config = patch_sim.NeuronConfig(
             **scalar_kwargs,
