@@ -6,6 +6,7 @@ live in the core library and should be imported from ``patch_sim.presets``
 directly.
 """
 
+from dataclasses import Field
 from dataclasses import fields as dc_fields
 from typing import Any
 
@@ -25,20 +26,25 @@ from patch_sim.constants import (
 from patch_sim.neuron_factory import CHANNEL_REGISTRY, NeuronConfig
 from patch_sim.presets import NEURON_PRESETS
 
+# Enumerate NeuronConfig scalar fields once; derived constants reuse this tuple.
+_NEURON_CONFIG_SCALAR_META: tuple[Field[Any], ...] = tuple(
+    f for f in dc_fields(NeuronConfig) if f.type == "float"
+)
+
 #: Ordered tuple of NeuronConfig scalar field names — the single source of
 #: truth that drives NeuronState field declarations, neuron_config_to_ui_state,
 #: and _build_neuron kwargs.  Uses a whitelist (f.type == "float") so that
 #: adding a non-float field to NeuronConfig is safely excluded rather than
 #: silently forwarded as a float.
 NEURON_CONFIG_SCALAR_FIELDS: tuple[str, ...] = tuple(
-    f.name for f in dc_fields(NeuronConfig) if f.type == "float"
+    f.name for f in _NEURON_CONFIG_SCALAR_META
 )
 
 #: Default float values for each scalar field, keyed by field name.
 NEURON_CONFIG_SCALAR_DEFAULTS: dict[str, float] = {
     f.name: f.default
-    for f in dc_fields(NeuronConfig)
-    if f.name in NEURON_CONFIG_SCALAR_FIELDS and isinstance(f.default, float)
+    for f in _NEURON_CONFIG_SCALAR_META
+    if isinstance(f.default, float)
 }
 
 # Default conductances for each auxiliary channel, keyed by channel name.
