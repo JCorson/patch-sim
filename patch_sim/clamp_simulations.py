@@ -538,7 +538,7 @@ def simulate_voltage_clamp(
     The simulation always uses :data:`SIM_SAMPLING_FREQ` (40 kHz, dt = 0.025 ms)
     as the integration time step.
 
-    All ion channels — core (INa, IK, Ileak) and additional — are handled via a
+    All ion channels — core (INa, IK, INaL, IKL) and additional — are handled via a
     single unified loop. The result includes a field named after each channel
     for every channel and a field for every gating variable.
 
@@ -582,7 +582,7 @@ def simulate_current_clamp(
     The simulation always uses :data:`SIM_SAMPLING_FREQ` (40 kHz, dt = 0.025 ms)
     as the integration time step.
 
-    All ion channels — core (INa, IK, Ileak) and additional — are handled via a
+    All ion channels — core (INa, IK, INaL, IKL) and additional — are handled via a
     single unified loop. The result includes a field named after each channel
     for every channel (including core channels) and ``"Itotal"``.
 

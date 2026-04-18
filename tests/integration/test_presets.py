@@ -241,7 +241,8 @@ def test_preset_passive_properties_in_physiological_range(
     """Each preset's τ_m and R_in fall within the expected physiological range.
 
     Passive properties are extracted from a channel-blocked copy of the neuron
-    so R_in = 1/g_L and τ_m = C_m/g_L exactly.  The bounds in the parametrize
+    so R_in = 1/(g_NaL+g_KL) and τ_m = C_m/(g_NaL+g_KL) exactly.  Each preset's
+    bounds in the parametrize
     table are set per-preset to encompass the analytically expected value with
     enough margin to tolerate minor numerical artefacts in the exponential fit.
 

@@ -138,12 +138,11 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # g_NaL + g_KL = 0.02 mS/cm² gives τ_m ≈ 50 ms and R_in ≈ 50 kΩ·cm²,
         # reflecting the low somatic leak conductance of Purkinje cells.
-        # g_NaL = 0.0095 and g_KL = 0.0105 preserve v_rest = −68 mV: the
-        # inward Na⁺ leak current (at v_rest > E_Na is wrong; here E_Na ≈ +50 so
-        # Na leak is inward) is partially offset by outward K⁺ leak
-        # (E_K ≈ −77 < v_rest = −68, so K leak is outward).  This replaces the
-        # previous unphysiological Cl_in = 63.5 mM (#224) with the default
-        # physiological Cl_in ≈ 15.8 mM.
+        # g_NaL = 0.0095 and g_KL = 0.0105 preserve v_rest = −68 mV: Na⁺ leak
+        # is inward (v_rest = −68 mV < E_Na ≈ +50 mV); K⁺ leak is outward
+        # (v_rest = −68 mV > E_K ≈ −77 mV), partially offsetting the Na⁺ inward
+        # current.  This replaces the previous unphysiological Cl_in = 63.5 mM
+        # (#224) with the default physiological Cl_in ≈ 15.8 mM.
         v_rest=-68.0,
         g_NaL=0.0095,
         g_KL=0.0105,
@@ -378,7 +377,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     FAST_SPIKING_INTERNEURON: {
-        # High g_L (1.5 mS/cm²) raises the firing threshold; 20 µA/cm²
+        # High total leak (g_NaL+g_KL=1.5 mS/cm²) raises the firing threshold; 20 µA/cm²
         # is safely suprathreshold.  10 ms avoids a second spike at this
         # amplitude.
         ACTION_POTENTIAL: {
@@ -395,7 +394,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     CORTICAL_PYRAMIDAL: {
-        # Higher R_in (g_L=0.05 → R_in=20 kΩ·cm²) raises excitability; 0.5
+        # Higher R_in (g_NaL+g_KL=0.05 → R_in=20 kΩ·cm²) raises excitability; 0.5
         # µA/cm² is subthreshold where 1.5 µA/cm² (default) would spike.
         SUBTHRESHOLD_RESPONSE: {
             "min_stimulus": 0.5,
@@ -470,7 +469,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     THALAMIC_RELAY: {
-        # R_in increased with lower g_L; 0.2 µA/cm² is subthreshold at g_L=0.1.
+        # R_in increased with lower total leak (0.1 mS/cm²); 0.2 µA/cm² subthreshold.
         SUBTHRESHOLD_RESPONSE: {
             "min_stimulus": 0.2,
             "max_stimulus": 0.2,
@@ -547,7 +546,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     TRN: {
-        # R_in increased with lower g_L; 0.1 µA/cm² is subthreshold at g_L=0.08.
+        # R_in increased with lower total leak (g_KL=0.08); 0.1 µA/cm² subthreshold.
         SUBTHRESHOLD_RESPONSE: {
             "min_stimulus": 0.1,
             "max_stimulus": 0.1,

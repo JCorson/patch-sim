@@ -90,7 +90,7 @@ def test_returns_none_for_suprathreshold(hh_model: patch_sim.Neuron) -> None:
 def test_input_resistance_hh_model(hh_model: patch_sim.Neuron) -> None:
     """R_in from a real HH simulation is positive and in a plausible range.
 
-    The HH model at rest has g_L = 0.3 mS/cm² plus active conductances.
+    The HH model at rest has g_NaL+g_KL = 0.3 mS/cm² plus active conductances.
     Total conductance is typically 0.5–2.0 mS/cm², giving R_in in the range
     0.5–2.0 kΩ·cm².  This test verifies the sign and order of magnitude only,
     since the exact value depends on gating variables at the new steady state.
@@ -105,7 +105,7 @@ def test_input_resistance_hh_model(hh_model: patch_sim.Neuron) -> None:
     )
     assert props is not None
     assert props.input_resistance > 0.0
-    assert props.input_resistance < 5.0  # must be below 1/g_L even with tolerance
+    assert props.input_resistance < 5.0  # below 1/(g_NaL+g_KL)=3.33 with tolerance
 
 
 def test_time_constant_hh_model(hh_model: patch_sim.Neuron) -> None:
@@ -113,7 +113,7 @@ def test_time_constant_hh_model(hh_model: patch_sim.Neuron) -> None:
 
     Standard HH: C_m = 1.0 µF/cm², total g ≈ 0.5–1.5 mS/cm², so τₘ is
     expected to be between 0.5 and 20 ms.  The active conductances at rest
-    mean the effective τₘ is considerably shorter than the passive C_m / g_L
+    mean the effective τₘ is considerably shorter than the passive C_m / (g_NaL+g_KL)
     ≈ 3.33 ms estimate, so this test verifies the order of magnitude only.
     """
     result, stim_start, stim_end = _run_subthreshold_sim(hh_model, -1.0)

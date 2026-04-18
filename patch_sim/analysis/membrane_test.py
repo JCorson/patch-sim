@@ -63,13 +63,13 @@ def run_membrane_test(neuron: Neuron) -> PassiveProperties | None:
     exponential driven by the passive RC circuit, giving an accurate R_in, τ_m,
     and C_m rather than values contaminated by K⁺ channel deactivation sag.
 
-    The passive copy preserves g_L, C_m, ion concentrations, and temperature
-    from the original neuron so that R_in = 1/g_L and C_m match the configured
-    membrane parameters exactly.
+    The passive copy preserves g_NaL, g_KL, C_m, ion concentrations, and
+    temperature from the original neuron so that R_in = 1/(g_NaL+g_KL) and
+    C_m match the configured membrane parameters exactly.
 
     Args:
         neuron: A fully configured :class:`~patch_sim.neuron.Neuron` instance.
-            Its g_L, C_m, ion concentrations, and temperature are used;
+            Its g_NaL, g_KL, C_m, ion concentrations, and temperature are used;
             active conductances (g_Na, g_K, auxiliary channels) are blocked.
 
     Returns:
