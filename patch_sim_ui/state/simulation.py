@@ -162,8 +162,8 @@ def _compute_cc_multi_sweep_analysis(
     stimulus_step: float,
     pre_stimulus_duration: float,
     stimulus_duration: float,
-) -> "tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]":
-    """Compute AP metrics, F-I, SFA, and hyperpolarization data from multi-sweep CC results.
+) -> "tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]":  # noqa: E501
+    """Compute AP metrics, F-I, SFA, and hyperpolarization data from multi-sweep CC.
 
     Runs spike detection once per sweep and derives all outputs from those
     results, avoiding redundant :func:`analyze_aps` calls.

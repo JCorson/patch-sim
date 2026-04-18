@@ -27,18 +27,18 @@ from .fi_curve import (
     compute_fi_point,
     estimate_rheobase,
 )
-from .hyperpolarization import (
-    HyperpolarizationAnalysisResult,
-    SagPoint,
-    analyze_hyperpolarization,
-    compute_sag_point,
-)
 from .gv_curve import (
     BoltzmannFit,
     GVAnalysisResult,
     GVPoint,
     boltzmann,
     compute_gv,
+)
+from .hyperpolarization import (
+    HyperpolarizationAnalysisResult,
+    SagPoint,
+    analyze_hyperpolarization,
+    compute_sag_point,
 )
 from .iv_curve import IVAnalysisResult, IVPoint, analyze_iv, compute_iv_point
 from .membrane_test import (

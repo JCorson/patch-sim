@@ -25,7 +25,7 @@ class AnalysisState(rx.State):
     iv_data: dict[str, Any] = {}  # Serialized IVAnalysisResult for the UI
     gv_data: dict[str, Any] = {}  # Serialized GVAnalysisResult for the UI
     sfa_data: dict[str, Any] = {}  # Serialized SFAAnalysisResult for the UI
-    hyperpolarization_data: dict[str, Any] = {}  # Serialized HyperpolarizationAnalysisResult
+    hyperpolarization_data: dict[str, Any] = {}  # Serialized sag/rebound analysis
     phase_plane_data: dict[str, Any] = {}  # Serialized V vs dV/dt sweep data
 
     # Membrane test results — persisted across protocol/simulation changes.

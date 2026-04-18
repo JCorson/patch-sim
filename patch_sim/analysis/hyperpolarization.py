@@ -57,7 +57,7 @@ class HyperpolarizationAnalysisResult:
 
     @property
     def current_steps(self) -> list[float]:
-        """Injected current amplitudes in µA/cm², sorted ascending (most negative first)."""
+        """Injected current amplitudes (µA/cm²), most negative first."""
         return [p.current_step for p in self.points]
 
     @property
@@ -115,9 +115,7 @@ def _sag_point_from_ap_result(
 
     rebound_end_ms = stim_end_ms + rebound_window_ms
     rebound_spikes = [
-        s
-        for s in ap_result.spikes
-        if stim_end_ms <= s.threshold_time <= rebound_end_ms
+        s for s in ap_result.spikes if stim_end_ms <= s.peak_time <= rebound_end_ms
     ]
 
     return SagPoint(
