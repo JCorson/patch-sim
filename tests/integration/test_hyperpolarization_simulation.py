@@ -5,8 +5,14 @@ the full simulation pipeline and verifies:
   - Structural plausibility for every preset (no NaN, in-range voltages).
   - Ih-driven sag (steady-state depolarisation above the peak) for neurons
     known to express HCN channels.
-  - Post-inhibitory rebound spikes at step offset for neurons with sufficient
-    T-type Ca²⁺ de-inactivation.
+  - Post-step rebound spikes for every model that produces them, covering all
+    four biophysical mechanisms present in this simulator:
+
+    * ICaT de-inactivation (thalamic relay, CA1 pyramidal, STN, TRN, Purkinje)
+    * Ih-driven post-step overshoot (dopaminergic)
+    * HH anode-break excitation (squid giant axon, cortical pyramidal)
+    * Kv3.1 deactivation-gated overshoot (fast-spiking interneuron)
+
   - Absence of true sag for neurons without HCN channels.
 
 Unit tests with synthetic voltage traces live in
@@ -25,6 +31,7 @@ from patch_sim.constants import (
     CA1_PYRAMIDAL,
     CORTICAL_PYRAMIDAL,
     DOPAMINERGIC,
+    FAST_SPIKING_INTERNEURON,
     HYPERPOLARIZATION_STEPS,
     SQUID_GIANT_AXON,
     STN,
@@ -250,5 +257,89 @@ def test_rebound_burst_in_ca1_pyramidal() -> None:
     assert most_negative.rebound_spike_count >= 1, (
         f"CA1 Pyramidal: expected ≥1 rebound spike after most negative step, "
         f"got {most_negative.rebound_spike_count} "
+        f"(peak={most_negative.peak_voltage:.1f} mV)"
+    )
+
+
+# ---------------------------------------------------------------------------
+# HH anode-break, Ih overshoot, and Kv3.1 rebound — non-ICaT neurons
+# ---------------------------------------------------------------------------
+
+
+def test_anode_break_in_squid_giant_axon() -> None:
+    """Squid giant axon fires a post-hyperpolarization spike via HH anode-break.
+
+    The plain HH52 model contains only Na⁺, K⁺, and leak conductances — no
+    T-type Ca²⁺ or Ih channels.  Nevertheless, deep hyperpolarisation (~−98 mV)
+    fully de-inactivates the Na⁺ h-gate (h_inf ≈ 0.996, τ_h ≈ 2.5 ms) and
+    deactivates the K⁺ n-gate (n_inf ≈ 0.002) within the 300 ms step.  When the
+    step ends, the m-gate activates rapidly as the membrane recovers while h is
+    still elevated and g_K is negligible, triggering a post-hyperpolarization
+    action potential — classic anode-break excitation first described by Hodgkin
+    & Huxley (1952, J. Physiol. 117:500).
+    """
+    result = _run_hyperpolarization_sweeps(SQUID_GIANT_AXON)
+    most_negative = result.points[0]
+    assert most_negative.rebound_spike_count >= 1, (
+        f"Squid Giant Axon: expected ≥1 anode-break spike after most negative step, "
+        f"got {most_negative.rebound_spike_count} "
+        f"(peak={most_negative.peak_voltage:.1f} mV)"
+    )
+
+
+def test_rebound_in_cortical_pyramidal() -> None:
+    """Cortical pyramidal neuron fires a rebound spike via anode-break and Ih overshoot.
+
+    The cortical pyramidal preset reaches ~−109 mV at the most negative step
+    (−5 µA/cm²), fully de-inactivating h and deactivating n, which sets up
+    HH anode-break excitation on release.  Simultaneously, Ih (activated during
+    the step) continues to conduct after step offset, providing an inward
+    depolarising current that accelerates return to threshold.  The cell has no
+    ICaT, so the rebound is driven entirely by these Na⁺ and Ih mechanisms.
+    """
+    result = _run_hyperpolarization_sweeps(CORTICAL_PYRAMIDAL)
+    most_negative = result.points[0]
+    assert most_negative.rebound_spike_count >= 1, (
+        f"Cortical Pyramidal: expected ≥1 rebound spike after most negative step, "
+        f"got {most_negative.rebound_spike_count} "
+        f"(peak={most_negative.peak_voltage:.1f} mV)"
+    )
+
+
+def test_rebound_in_fast_spiking_interneuron() -> None:
+    """Fast-spiking interneuron fires a rebound spike via Kv3.1 deactivation.
+
+    Kv3.1 channels deactivate during hyperpolarisation, reducing outward K⁺
+    current at step release.  This lowers the net repolarising drive at the
+    moment of membrane recovery, allowing the voltage to overshoot threshold
+    and fire a single post-step spike.  The cell has no ICaT or Ih; the rebound
+    is a Kv3.1-gated variant of anode-break excitation, not a low-threshold
+    Ca²⁺ burst.  The effect is apparent at the most negative step (−20 µA/cm²).
+    """
+    result = _run_hyperpolarization_sweeps(FAST_SPIKING_INTERNEURON)
+    most_negative = result.points[0]
+    assert most_negative.rebound_spike_count >= 1, (
+        f"Fast-Spiking Interneuron: expected ≥1 rebound spike after most negative "
+        f"step, got {most_negative.rebound_spike_count} "
+        f"(peak={most_negative.peak_voltage:.1f} mV)"
+    )
+
+
+def test_rebound_in_dopaminergic() -> None:
+    """Dopaminergic neuron fires a rebound spike driven by Ih.
+
+    The dopaminergic preset has a high HCN conductance (g_Ih = 2.0 mS/cm²) but
+    no ICaT.  Even at shallow hyperpolarisation depths (−69 to −62 mV), Ih
+    activates substantially during the 300 ms step.  On release, this inward
+    current continues to depolarise the membrane above its resting state, and in
+    a cell with low firing threshold (pacemaker) the transient overshoot is
+    sufficient to trigger a spike.  Rebound appears for steps of −15 µA/cm² and
+    above.
+    """
+    result = _run_hyperpolarization_sweeps(DOPAMINERGIC)
+    most_negative = result.points[0]
+    assert most_negative.rebound_spike_count >= 1, (
+        f"Dopaminergic: expected ≥1 Ih-driven rebound spike after most negative "
+        f"step, got {most_negative.rebound_spike_count} "
         f"(peak={most_negative.peak_voltage:.1f} mV)"
     )
