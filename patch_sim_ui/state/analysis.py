@@ -8,6 +8,7 @@ import reflex as rx
 from patch_sim_ui.plotting import (
     build_fi_figure,
     build_gv_figure,
+    build_hyperpolarization_figure,
     build_iv_figure,
     build_phase_plane_figure,
     build_sfa_figure,
@@ -24,6 +25,7 @@ class AnalysisState(rx.State):
     iv_data: dict[str, Any] = {}  # Serialized IVAnalysisResult for the UI
     gv_data: dict[str, Any] = {}  # Serialized GVAnalysisResult for the UI
     sfa_data: dict[str, Any] = {}  # Serialized SFAAnalysisResult for the UI
+    hyperpolarization_data: dict[str, Any] = {}  # Serialized HyperpolarizationAnalysisResult
     phase_plane_data: dict[str, Any] = {}  # Serialized V vs dV/dt sweep data
 
     # Membrane test results — persisted across protocol/simulation changes.
@@ -47,6 +49,7 @@ class AnalysisState(rx.State):
         self.iv_data = {}
         self.gv_data = {}
         self.sfa_data = {}
+        self.hyperpolarization_data = {}
         self.phase_plane_data = {}
 
     @rx.var
@@ -66,8 +69,12 @@ class AnalysisState(rx.State):
 
     @rx.var
     def has_ap_or_fi(self) -> bool:
-        """Return True when either AP metrics or F-I data are available."""
-        return len(self.ap_metrics) > 0 or len(self.fi_data) > 0
+        """Return True when AP metrics, F-I, or hyperpolarization data are available."""
+        return (
+            len(self.ap_metrics) > 0
+            or len(self.fi_data) > 0
+            or len(self.hyperpolarization_data) > 0
+        )
 
     @rx.var
     def has_fi_data(self) -> bool:
@@ -118,6 +125,21 @@ class AnalysisState(rx.State):
     def has_sfa_data(self) -> bool:
         """Return True when SFA analysis results are available for display."""
         return len(self.sfa_data) > 0
+
+    @rx.var
+    def has_hyperpolarization_data(self) -> bool:
+        """Return True when hyperpolarization (sag/rebound) results are available."""
+        return len(self.hyperpolarization_data) > 0
+
+    @rx.var
+    def hyperpolarization_figure(self) -> go.Figure:
+        """Return a Plotly sag/rebound figure.
+
+        Returns an empty figure when no hyperpolarization data is available.
+        """
+        if not self.hyperpolarization_data:
+            return go.Figure()
+        return build_hyperpolarization_figure(self.hyperpolarization_data)
 
     @rx.var
     def sfa_figure(self) -> go.Figure:

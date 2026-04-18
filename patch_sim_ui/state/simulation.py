@@ -19,6 +19,7 @@ import reflex as rx
 import patch_sim
 import patch_sim.clamp_simulations
 from patch_sim.analysis.fi_curve import _fi_point_from_ap_result
+from patch_sim.analysis.hyperpolarization import _sag_point_from_ap_result
 from patch_sim.constants import (
     CURRENT_CLAMP,
     VOLTAGE_CLAMP,
@@ -161,12 +162,15 @@ def _compute_cc_multi_sweep_analysis(
     stimulus_step: float,
     pre_stimulus_duration: float,
     stimulus_duration: float,
-) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any], dict[str, Any]]:
-    """Compute AP metrics, F-I data, and SFA data from multi-sweep CC results.
+) -> "tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]":
+    """Compute AP metrics, F-I, SFA, and hyperpolarization data from multi-sweep CC results.
 
-    Runs spike detection once per sweep and derives all three outputs from those
-    results, avoiding the redundant ``analyze_aps`` call that would occur if
-    the AP, F-I, and SFA helpers were called separately.
+    Runs spike detection once per sweep and derives all outputs from those
+    results, avoiding redundant :func:`analyze_aps` calls.
+
+    When all current steps are negative (``max_stimulus <= 0``),
+    hyperpolarization sag and rebound analysis is returned in place of F-I data
+    (which is not meaningful for negative currents).
 
     Args:
         sweeps: Ordered list of :class:`Sweep` objects from the simulation.
@@ -177,15 +181,16 @@ def _compute_cc_multi_sweep_analysis(
         stimulus_duration: Duration of the current step (ms).
 
     Returns:
-        A 4-tuple ``(ap_metrics, ap_summary, fi_data, sfa_data)`` where
-        ``ap_metrics`` is a list of per-spike dicts (pooled and renumbered
-        across all sweeps), ``ap_summary`` is an aggregate dict without
-        ``mean_isi`` / ``firing_rate`` (those are shown in the F-I curve),
-        ``fi_data`` is a serialised :class:`~patch_sim.FIAnalysisResult` dict,
-        and ``sfa_data`` is a serialised SFA dict with one curve per sweep that
-        had at least two spikes.  ``ap_metrics`` and ``ap_summary`` are empty
-        when no spikes are detected.  ``fi_data`` is empty when the sweep count
-        does not match the derived step count.
+        A 5-tuple ``(ap_metrics, ap_summary, fi_data, sfa_data, hyp_data)``
+        where ``ap_metrics`` is a list of per-spike dicts (pooled and
+        renumbered across all sweeps), ``ap_summary`` is an aggregate dict,
+        ``fi_data`` is a serialised :class:`~patch_sim.FIAnalysisResult` dict
+        (empty when all steps are negative), ``sfa_data`` is a serialised SFA
+        dict with one curve per sweep that had at least two spikes, and
+        ``hyp_data`` is a serialised
+        :class:`~patch_sim.HyperpolarizationAnalysisResult` dict (empty when
+        any step is positive).  ``ap_metrics`` and ``ap_summary`` are empty
+        when no spikes are detected.
     """
     n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
     current_steps = list(np.linspace(min_stimulus, max_stimulus, n_steps))
@@ -237,10 +242,14 @@ def _compute_cc_multi_sweep_analysis(
     if not sfa_data["curves"]:
         sfa_data = {}
 
-    # --- F-I data (derived from the same per-sweep AP results) ---
+    # Detect whether all steps are hyperpolarizing (negative).  When true,
+    # F-I analysis is skipped in favour of sag/rebound analysis.
+    is_hyperpolarizing = max_stimulus <= 0.0
+
+    # --- F-I / hyperpolarization data ---
     if len(sweeps) != len(current_steps):
         logger.warning(
-            "F-I analysis skipped: %d sweeps but %d current steps derived "
+            "Multi-sweep analysis skipped: %d sweeps but %d current steps derived "
             "from protocol (min=%.3g, max=%.3g, step=%.3g)",
             len(sweeps),
             len(current_steps),
@@ -250,7 +259,29 @@ def _compute_cc_multi_sweep_analysis(
         )
         if ap_summary:
             ap_summary["rheobase"] = "\u2014"
-        return ap_metrics, ap_summary, {}, sfa_data
+        return ap_metrics, ap_summary, {}, sfa_data, {}
+
+    if is_hyperpolarizing:
+        time_arr = np.array(sweeps[0].time)
+        sag_points: list[patch_sim.SagPoint] = [
+            _sag_point_from_ap_result(
+                time_arr,
+                np.array(s.voltage),
+                ap_result,
+                i_step,
+                stim_start,
+                stim_end,
+            )
+            for s, ap_result, i_step in zip(sweeps, per_sweep_ap, current_steps)
+        ]
+        sag_points.sort(key=lambda p: p.current_step)
+        hyp_result = patch_sim.HyperpolarizationAnalysisResult(points=sag_points)
+        hyp_data: dict[str, Any] = {
+            "current_steps": hyp_result.current_steps,
+            "sag_amplitudes": hyp_result.sag_amplitudes,
+            "rebound_spike_counts": hyp_result.rebound_spike_counts,
+        }
+        return ap_metrics, ap_summary, {}, sfa_data, hyp_data
 
     fi_points: list[patch_sim.FIPoint] = [
         _fi_point_from_ap_result(ap_result, i_step, stim_start, stim_end)
@@ -268,7 +299,7 @@ def _compute_cc_multi_sweep_analysis(
     }
     if ap_summary:
         ap_summary["rheobase"] = f"{rheobase:.2f}" if rheobase is not None else "\u2014"
-    return ap_metrics, ap_summary, fi_data, sfa_data
+    return ap_metrics, ap_summary, fi_data, sfa_data, {}
 
 
 def _compute_iv_data(
@@ -957,7 +988,7 @@ class SimulationState(rx.State):
                         else:
                             analysis_st.gv_data = {}
                     else:
-                        ms_metrics, ms_summary, ms_fi, ms_sfa = (
+                        ms_metrics, ms_summary, ms_fi, ms_sfa, ms_hyp = (
                             _compute_cc_multi_sweep_analysis(
                                 new_sweeps,
                                 proto_st.min_stimulus,
@@ -973,6 +1004,7 @@ class SimulationState(rx.State):
                         analysis_st.ap_is_multi_sweep = True
                         analysis_st.fi_data = ms_fi
                         analysis_st.sfa_data = ms_sfa
+                        analysis_st.hyperpolarization_data = ms_hyp
                         analysis_st.phase_plane_data = _build_phase_plane_data(
                             new_sweeps
                         )

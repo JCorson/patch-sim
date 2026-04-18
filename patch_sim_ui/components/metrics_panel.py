@@ -156,6 +156,28 @@ def _ap_fi_plot() -> rx.Component:
     )
 
 
+def _hyperpolarization_plot() -> rx.Component:
+    """Render the sag/rebound plot inside the AP Metrics tab.
+
+    Shown only when hyperpolarization analysis data is available (current clamp
+    multi-sweep with all-negative steps).
+
+    Returns:
+        A compact Plotly sag/rebound figure inside a flex container.
+    """
+    return rx.flex(
+        rx.plotly(
+            data=AnalysisState.hyperpolarization_figure,
+            width="100%",
+        ),
+        direction="column",
+        width="100%",
+        flex_shrink="0",
+        border_top="1px solid var(--gray-4)",
+        padding="1",
+    )
+
+
 def _ap_sfa_plot() -> rx.Component:
     """Render the embedded SFA plot inside the AP Metrics tab.
 
@@ -218,6 +240,11 @@ def _ap_analysis_tab() -> rx.Component:
             rx.flex(
                 rx.cond(AnalysisState.has_ap_metrics, _ap_summary(), rx.box()),
                 rx.cond(AnalysisState.has_fi_data, _ap_fi_plot(), rx.box()),
+                rx.cond(
+                    AnalysisState.has_hyperpolarization_data,
+                    _hyperpolarization_plot(),
+                    rx.box(),
+                ),
                 rx.cond(AnalysisState.has_sfa_data, _ap_sfa_plot(), rx.box()),
                 rx.cond(
                     AnalysisState.has_phase_plane_data,
