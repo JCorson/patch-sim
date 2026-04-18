@@ -415,6 +415,14 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 25.0,
             "stimulus_duration": 180.0,
         },
+        # Very low R_in (~0.67 kΩ·cm²) requires large currents for noticeable
+        # hyperpolarization.  −20 → −5 µA/cm² gives peaks of −74 to −67 mV and
+        # elicits a Kv3.1-driven rebound spike on step release at −20 µA/cm².
+        HYPERPOLARIZATION_STEPS: {
+            "min_stimulus": -20.0,
+            "max_stimulus": -5.0,
+            "stimulus_step": 5.0,
+        },
     },
     CORTICAL_PYRAMIDAL: {
         # Higher R_in (g_NaL+g_KL=0.05 → R_in=20 kΩ·cm²) raises excitability; 0.5
@@ -447,6 +455,13 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_step": 1.5,
             "stimulus_duration": 300.0,
         },
+        # High R_in means small currents produce large deflections.  −5 → −1 µA/cm²
+        # gives peaks of −109 to −80 mV with Ih-driven sag of 10–25 mV per step.
+        HYPERPOLARIZATION_STEPS: {
+            "min_stimulus": -5.0,
+            "max_stimulus": -1.0,
+            "stimulus_step": 1.0,
+        },
     },
     PURKINJE: {
         # Low R_in at rest (active channels); 0.5 µA/cm² is subthreshold.
@@ -467,6 +482,14 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "min_stimulus": 12.0,
             "max_stimulus": 12.0,
             "stimulus_duration": 180.0,
+        },
+        # Very high passive R_in (50 kΩ·cm²) with many active channels; currents
+        # beyond −2 µA/cm² push the simulation to the numerical floor (−150 mV).
+        # −2 → −0.5 µA/cm² keeps peaks in −72 to −76 mV without instability.
+        HYPERPOLARIZATION_STEPS: {
+            "min_stimulus": -2.0,
+            "max_stimulus": -0.5,
+            "stimulus_step": 0.5,
         },
     },
     DOPAMINERGIC: {
@@ -490,6 +513,14 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 12.0,
             "stimulus_step": 1.5,
             "stimulus_duration": 200.0,
+        },
+        # R_in ≈ 3.5 kΩ·cm²; needs larger currents for visible hyperpolarization.
+        # −20 → −5 µA/cm² gives peaks of −69 to −62 mV with clear Ih-driven sag
+        # (2–5 mV) and a rebound spike at step release for −15 µA/cm² and above.
+        HYPERPOLARIZATION_STEPS: {
+            "min_stimulus": -20.0,
+            "max_stimulus": -5.0,
+            "stimulus_step": 5.0,
         },
     },
     THALAMIC_RELAY: {
@@ -541,6 +572,14 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 30.0,
             "stimulus_step": 3.0,
             "stimulus_duration": 150.0,
+        },
+        # High R_in (≈20 kΩ·cm²) with Ih; −6 → −2 µA/cm² gives peaks of
+        # −91 to −70 mV, Ih-driven sag of 2–5 mV, and rebound spikes for the
+        # two most negative steps (de-inactivation of low-threshold Ca²⁺ channels).
+        HYPERPOLARIZATION_STEPS: {
+            "min_stimulus": -6.0,
+            "max_stimulus": -2.0,
+            "stimulus_step": 1.0,
         },
     },
     STN: {
@@ -596,6 +635,15 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 10.0,
             "stimulus_step": 1.0,
             "stimulus_duration": 100.0,
+        },
+        # High passive R_in (≈12.5 kΩ·cm²) with Ih; −2 µA/cm² already pushes
+        # v_rest (−77 mV) to the numerical floor.  −1 → −0.25 µA/cm² in 0.25
+        # steps gives peaks of −79 to −89 mV — enough to de-inactivate ICaT —
+        # while staying far from the −150 mV boundary.
+        HYPERPOLARIZATION_STEPS: {
+            "min_stimulus": -1.0,
+            "max_stimulus": -0.25,
+            "stimulus_step": 0.25,
         },
     },
 }
