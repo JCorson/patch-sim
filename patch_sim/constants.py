@@ -24,8 +24,6 @@ DEFAULT_NA_OUT: float = 97.4
 DEFAULT_NA_IN: float = 15.0
 DEFAULT_K_OUT: float = 7.8
 DEFAULT_K_IN: float = 140.0
-DEFAULT_CL_OUT: float = 120.0
-DEFAULT_CL_IN: float = 15.8
 DEFAULT_T: float = 310.15  # Kelvin (37°C)
 DEFAULT_Q10: float = 3.0  # Dimensionless Q10 temperature coefficient
 DEFAULT_T_REF: float = 295.15  # Kelvin (22°C) — HH52 experimental reference temperature
@@ -84,8 +82,6 @@ DEFAULT_NEURON_PARAMS: dict[str, float] = {
     "Na_in": DEFAULT_NA_IN,
     "K_out": DEFAULT_K_OUT,
     "K_in": DEFAULT_K_IN,
-    "Cl_out": DEFAULT_CL_OUT,
-    "Cl_in": DEFAULT_CL_IN,
     "Ca_out": DEFAULT_CA_OUT,
     "Ca_in": DEFAULT_CA_IN,
     "T": DEFAULT_T,

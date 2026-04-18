@@ -14,8 +14,6 @@ from .constants import (
     DEFAULT_C_M,
     DEFAULT_CA_IN,
     DEFAULT_CA_OUT,
-    DEFAULT_CL_IN,
-    DEFAULT_CL_OUT,
     DEFAULT_G_K,
     DEFAULT_G_KL,
     DEFAULT_G_NA,
@@ -60,8 +58,6 @@ class Neuron:
         Na_in: Intracellular sodium concentration in mM.
         K_out: Extracellular potassium concentration in mM.
         K_in: Intracellular potassium concentration in mM.
-        Cl_out: Extracellular chloride concentration in mM.
-        Cl_in: Intracellular chloride concentration in mM.
         T: Temperature in Kelvin.
         Q10: Q10 temperature coefficient for gating kinetics (dimensionless).
             Gating rate constants are scaled by ``Q10^((T - T_ref) / 10)``.
@@ -105,8 +101,6 @@ class Neuron:
     Na_in: float = DEFAULT_NA_IN
     K_out: float = DEFAULT_K_OUT
     K_in: float = DEFAULT_K_IN
-    Cl_out: float = DEFAULT_CL_OUT
-    Cl_in: float = DEFAULT_CL_IN
     Ca_out: float = DEFAULT_CA_OUT
     Ca_in: float = DEFAULT_CA_IN
 
@@ -156,8 +150,6 @@ class Neuron:
             ("Na_in", self.Na_in),
             ("K_out", self.K_out),
             ("K_in", self.K_in),
-            ("Cl_out", self.Cl_out),
-            ("Cl_in", self.Cl_in),
             ("Ca_out", self.Ca_out),
             ("Ca_in", self.Ca_in),
         ]:
@@ -283,6 +275,4 @@ class Neuron:
             return self.K_out, self.K_in
         if species is IonSpecies.CALCIUM:
             return self.Ca_out, self.Ca_in
-        if species is IonSpecies.CHLORIDE:
-            return self.Cl_out, self.Cl_in
         raise ValueError(f"Unknown ion species: {species!r}")  # pragma: no cover
