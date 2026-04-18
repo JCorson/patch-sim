@@ -178,7 +178,6 @@ def test_ion_species_valences():
     assert IonSpecies.SODIUM.valence == 1
     assert IonSpecies.POTASSIUM.valence == 1
     assert IonSpecies.CALCIUM.valence == 2
-    assert IonSpecies.CHLORIDE.valence == -1
 
 
 def test_ion_species_symbols():
@@ -186,7 +185,6 @@ def test_ion_species_symbols():
     assert IonSpecies.SODIUM.symbol == "Na"
     assert IonSpecies.POTASSIUM.symbol == "K"
     assert IonSpecies.CALCIUM.symbol == "Ca"
-    assert IonSpecies.CHLORIDE.symbol == "Cl"
 
 
 def test_nernst_spec_stores_species():

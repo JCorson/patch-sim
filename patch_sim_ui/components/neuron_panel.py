@@ -313,18 +313,6 @@ def neuron_panel() -> rx.Component:
                         *PARAM_RANGES["K_in"],
                     ),
                     _ion_row(
-                        "Cl⁻ out",
-                        NeuronState.Cl_out,
-                        NeuronState.set_Cl_out,
-                        *PARAM_RANGES["Cl_out"],
-                    ),
-                    _ion_row(
-                        "Cl⁻ in",
-                        NeuronState.Cl_in,
-                        NeuronState.set_Cl_in,
-                        *PARAM_RANGES["Cl_in"],
-                    ),
-                    _ion_row(
                         "Ca²⁺ out",
                         NeuronState.Ca_out,
                         NeuronState.set_Ca_out,

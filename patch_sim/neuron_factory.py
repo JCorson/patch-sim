@@ -28,8 +28,6 @@ from .constants import (
     DEFAULT_C_M,
     DEFAULT_CA_IN,
     DEFAULT_CA_OUT,
-    DEFAULT_CL_IN,
-    DEFAULT_CL_OUT,
     DEFAULT_G_K,
     DEFAULT_G_KL,
     DEFAULT_G_NA,
@@ -86,8 +84,6 @@ class NeuronConfig:
         Na_in: Intracellular sodium concentration in mM.
         K_out: Extracellular potassium concentration in mM.
         K_in: Intracellular potassium concentration in mM.
-        Cl_out: Extracellular chloride concentration in mM.
-        Cl_in: Intracellular chloride concentration in mM.
         Ca_out: Extracellular calcium concentration in mM.
         Ca_in: Intracellular calcium concentration in mM.
         T: Temperature in Kelvin.
@@ -114,8 +110,6 @@ class NeuronConfig:
     Na_in: float = DEFAULT_NA_IN
     K_out: float = DEFAULT_K_OUT
     K_in: float = DEFAULT_K_IN
-    Cl_out: float = DEFAULT_CL_OUT
-    Cl_in: float = DEFAULT_CL_IN
     Ca_out: float = DEFAULT_CA_OUT
     Ca_in: float = DEFAULT_CA_IN
     T: float = DEFAULT_T
@@ -206,8 +200,6 @@ def make_neuron(config: NeuronConfig) -> Neuron:
         Na_in=config.Na_in,
         K_out=config.K_out,
         K_in=config.K_in,
-        Cl_out=config.Cl_out,
-        Cl_in=config.Cl_in,
         Ca_out=config.Ca_out,
         Ca_in=config.Ca_in,
         T=config.T,

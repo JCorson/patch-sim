@@ -236,10 +236,6 @@ def test_non_positive_temperature_raises(T: float) -> None:
         {"K_out": -1.0},
         {"K_in": 0.0},
         {"K_in": -1.0},
-        {"Cl_out": 0.0},
-        {"Cl_out": -1.0},
-        {"Cl_in": 0.0},
-        {"Cl_in": -1.0},
         {"Ca_out": 0.0},
         {"Ca_out": -1.0},
         {"Ca_in": 0.0},
@@ -263,7 +259,6 @@ def test_non_positive_ion_concentration_raises(kwargs: dict) -> None:
         (IonSpecies.SODIUM, "Na_out", "Na_in"),
         (IonSpecies.POTASSIUM, "K_out", "K_in"),
         (IonSpecies.CALCIUM, "Ca_out", "Ca_in"),
-        (IonSpecies.CHLORIDE, "Cl_out", "Cl_in"),
     ],
 )
 def test_ion_concentrations_returns_correct_pair(
@@ -280,11 +275,10 @@ def test_ion_concentrations_returns_correct_pair(
 
 def test_ion_concentrations_reflects_custom_values() -> None:
     """ion_concentrations must return user-supplied concentration values."""
-    model = Neuron(Na_out=200.0, K_in=100.0, Ca_out=5.0, Cl_in=20.0)
+    model = Neuron(Na_out=200.0, K_in=100.0, Ca_out=5.0)
     assert model.ion_concentrations(IonSpecies.SODIUM) == pytest.approx((200.0, 15.0))
     assert model.ion_concentrations(IonSpecies.POTASSIUM) == pytest.approx((7.8, 100.0))
     assert model.ion_concentrations(IonSpecies.CALCIUM) == pytest.approx((5.0, 0.0001))
-    assert model.ion_concentrations(IonSpecies.CHLORIDE) == pytest.approx((120.0, 20.0))
 
 
 # ---------------------------------------------------------------------------
