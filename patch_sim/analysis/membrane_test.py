@@ -63,13 +63,13 @@ def run_membrane_test(neuron: Neuron) -> PassiveProperties | None:
     exponential driven by the passive RC circuit, giving an accurate R_in, τ_m,
     and C_m rather than values contaminated by K⁺ channel deactivation sag.
 
-    The passive copy preserves g_L, C_m, ion concentrations, and temperature
-    from the original neuron so that R_in = 1/g_L and C_m match the configured
-    membrane parameters exactly.
+    The passive copy preserves g_NaL, g_KL, C_m, ion concentrations, and
+    temperature from the original neuron so that R_in = 1/(g_NaL+g_KL) and
+    C_m match the configured membrane parameters exactly.
 
     Args:
         neuron: A fully configured :class:`~patch_sim.neuron.Neuron` instance.
-            Its g_L, C_m, ion concentrations, and temperature are used;
+            Its g_NaL, g_KL, C_m, ion concentrations, and temperature are used;
             active conductances (g_Na, g_K, auxiliary channels) are blocked.
 
     Returns:
@@ -77,21 +77,37 @@ def run_membrane_test(neuron: Neuron) -> PassiveProperties | None:
         instance when extraction succeeds, or ``None`` when the analysis cannot
         converge (should not occur for a pure RC circuit).
     """
-    # Compute the leak equilibrium potential so the passive neuron starts at
-    # rest with no net current, preventing drift during the baseline period.
-    e_l = float(
+    # Compute the effective leak equilibrium potential from the mixed Na+K leak.
+    # This is the weighted average of E_Na and E_K, which gives the zero-current
+    # voltage of the passive Na+K leak circuit: g_NaL*(V-E_Na) + g_KL*(V-E_K) = 0.
+    e_na = float(
         nernst_potential(
-            z=-1,
+            z=1,
             T=neuron.T,
-            ion_concentration_out=neuron.Cl_out,
-            ion_concentration_in=neuron.Cl_in,
+            ion_concentration_out=neuron.Na_out,
+            ion_concentration_in=neuron.Na_in,
         )
+    )
+    e_k = float(
+        nernst_potential(
+            z=1,
+            T=neuron.T,
+            ion_concentration_out=neuron.K_out,
+            ion_concentration_in=neuron.K_in,
+        )
+    )
+    g_total = neuron.g_NaL + neuron.g_KL
+    e_l = (
+        (neuron.g_NaL * e_na + neuron.g_KL * e_k) / g_total
+        if g_total > 0
+        else neuron.v_rest
     )
 
     # Passive-only neuron: g_Na = g_K = 0, no auxiliary channels.
     # Equivalent to pharmacological channel block in a real experiment.
     # channels=() guarantees a pure RC circuit regardless of which auxiliary
-    # channels the original neuron had.
+    # channels the original neuron had.  g_NaL and g_KL are preserved so the
+    # passive RC response is driven by the mixed leak conductance.
     passive_neuron = dataclasses.replace(
         neuron, g_Na=0.0, g_K=0.0, v_rest=e_l, additional_channels=()
     )

@@ -28,11 +28,10 @@ from .constants import (
     DEFAULT_C_M,
     DEFAULT_CA_IN,
     DEFAULT_CA_OUT,
-    DEFAULT_CL_IN,
-    DEFAULT_CL_OUT,
     DEFAULT_G_K,
-    DEFAULT_G_L,
+    DEFAULT_G_KL,
     DEFAULT_G_NA,
+    DEFAULT_G_NAL,
     DEFAULT_K_IN,
     DEFAULT_K_OUT,
     DEFAULT_NA_IN,
@@ -42,7 +41,12 @@ from .constants import (
     DEFAULT_T_REF,
     DEFAULT_V_REST,
 )
-from .core_channels import make_k_channel, make_leak_channel, make_na_channel
+from .core_channels import (
+    make_k_channel,
+    make_k_leak_channel,
+    make_na_channel,
+    make_na_leak_channel,
+)
 from .neuron import Neuron
 
 
@@ -72,15 +76,14 @@ class NeuronConfig:
     Attributes:
         g_Na: Maximum sodium conductance in mS/cm².
         g_K: Maximum potassium conductance in mS/cm².
-        g_L: Leak conductance in mS/cm².
+        g_NaL: Na⁺ leak conductance in mS/cm².
+        g_KL: K⁺ leak conductance in mS/cm².
         C_m: Membrane capacitance in µF/cm².
         v_rest: Resting membrane potential in mV.
         Na_out: Extracellular sodium concentration in mM.
         Na_in: Intracellular sodium concentration in mM.
         K_out: Extracellular potassium concentration in mM.
         K_in: Intracellular potassium concentration in mM.
-        Cl_out: Extracellular chloride concentration in mM.
-        Cl_in: Intracellular chloride concentration in mM.
         Ca_out: Extracellular calcium concentration in mM.
         Ca_in: Intracellular calcium concentration in mM.
         T: Temperature in Kelvin.
@@ -90,22 +93,23 @@ class NeuronConfig:
             squid axon kinetics.
         k_channel_factory: Factory for the K⁺ core channel. Defaults to HH52
             squid axon kinetics.
-        leak_channel_factory: Factory for the leak core channel. Defaults to
-            HH52 squid axon kinetics.
+        na_leak_channel_factory: Factory for the Na⁺ leak channel. Defaults to
+            make_na_leak_channel.
+        k_leak_channel_factory: Factory for the K⁺ leak channel. Defaults to
+            make_k_leak_channel.
         channels: Tuple of additional channel configs to include.
     """
 
     g_Na: float = DEFAULT_G_NA
     g_K: float = DEFAULT_G_K
-    g_L: float = DEFAULT_G_L
+    g_NaL: float = DEFAULT_G_NAL
+    g_KL: float = DEFAULT_G_KL
     C_m: float = DEFAULT_C_M
     v_rest: float = DEFAULT_V_REST
     Na_out: float = DEFAULT_NA_OUT
     Na_in: float = DEFAULT_NA_IN
     K_out: float = DEFAULT_K_OUT
     K_in: float = DEFAULT_K_IN
-    Cl_out: float = DEFAULT_CL_OUT
-    Cl_in: float = DEFAULT_CL_IN
     Ca_out: float = DEFAULT_CA_OUT
     Ca_in: float = DEFAULT_CA_IN
     T: float = DEFAULT_T
@@ -113,8 +117,11 @@ class NeuronConfig:
     T_ref: float = DEFAULT_T_REF
     na_channel_factory: Callable[[float], IonChannel] = field(default=make_na_channel)
     k_channel_factory: Callable[[float], IonChannel] = field(default=make_k_channel)
-    leak_channel_factory: Callable[[float], IonChannel] = field(
-        default=make_leak_channel
+    na_leak_channel_factory: Callable[[float], IonChannel] = field(
+        default=make_na_leak_channel
+    )
+    k_leak_channel_factory: Callable[[float], IonChannel] = field(
+        default=make_k_leak_channel
     )
     channels: tuple[ChannelConfig, ...] = ()
 
@@ -185,15 +192,14 @@ def make_neuron(config: NeuronConfig) -> Neuron:
     return Neuron(
         g_Na=config.g_Na,
         g_K=config.g_K,
-        g_L=config.g_L,
+        g_NaL=config.g_NaL,
+        g_KL=config.g_KL,
         C_m=config.C_m,
         v_rest=config.v_rest,
         Na_out=config.Na_out,
         Na_in=config.Na_in,
         K_out=config.K_out,
         K_in=config.K_in,
-        Cl_out=config.Cl_out,
-        Cl_in=config.Cl_in,
         Ca_out=config.Ca_out,
         Ca_in=config.Ca_in,
         T=config.T,
@@ -201,7 +207,8 @@ def make_neuron(config: NeuronConfig) -> Neuron:
         T_ref=config.T_ref,
         na_channel_factory=config.na_channel_factory,
         k_channel_factory=config.k_channel_factory,
-        leak_channel_factory=config.leak_channel_factory,
+        na_leak_channel_factory=config.na_leak_channel_factory,
+        k_leak_channel_factory=config.k_leak_channel_factory,
         additional_channels=built_channels,
         calcium_dynamics=calcium_dynamics,
     )

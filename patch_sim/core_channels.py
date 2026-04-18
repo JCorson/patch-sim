@@ -1,12 +1,20 @@
 """Core Hodgkin-Huxley channel factory functions.
 
 This module provides the six classic HH rate functions as module-level
-callables and three factory functions that bundle them into IonChannel objects.
+callables and four factory functions that bundle them into IonChannel objects.
 
 Rate functions all follow the ``(V: float, ca_i: float) -> float`` signature so
 they can be used directly as :class:`~patch_sim.channels.GatingVariable` rate
 functions.  The ``ca_i`` argument is accepted but ignored; it exists only for
 interface compatibility with calcium-sensitive gating variables.
+
+The passive leak is split into two non-specific conductances:
+- :func:`make_na_leak_channel`: Na⁺ leak, reversal via Nernst equation for Na⁺.
+- :func:`make_k_leak_channel`: K⁺ leak, reversal via Nernst equation for K⁺.
+
+This mirrors the biophysical reality of background channels (TREK/TRAAK K⁺
+channels + persistent Na⁺ leak) and removes the unphysiological dependence on
+intracellular [Cl⁻] that arose when using a single chloride-Nernst leak.
 """
 
 from .channels import GatingVariable, IonChannel, IonSpecies, NernstSpec
@@ -162,23 +170,47 @@ def make_k_channel(g_max: float) -> IonChannel:
     )
 
 
-def make_leak_channel(g_max: float) -> IonChannel:
-    """Create the passive leak channel.
+def make_na_leak_channel(g_max: float) -> IonChannel:
+    """Create the sodium leak channel (Na⁺ background conductance).
 
     No gating variables — conductance is always *g_max*.  The reversal
-    potential is computed dynamically via the Nernst equation for Cl⁻.
+    potential is computed dynamically via the Nernst equation for Na⁺,
+    representing persistent sodium leak channels (e.g. NALCN).
 
     Args:
         g_max: Maximum (and constant) conductance in mS/cm².
 
     Returns:
-        An :class:`~patch_sim.channels.IonChannel` representing the leak channel.
+        An :class:`~patch_sim.channels.IonChannel` representing the Na⁺ leak
+        channel with current field ``INaL``.
     """
     return IonChannel(
-        name="leak",
+        name="NaL",
         g_max=g_max,
         gating_variables=(),
-        reversal_spec=NernstSpec(IonSpecies.CHLORIDE),
+        reversal_spec=NernstSpec(IonSpecies.SODIUM),
+    )
+
+
+def make_k_leak_channel(g_max: float) -> IonChannel:
+    """Create the potassium leak channel (K⁺ background conductance).
+
+    No gating variables — conductance is always *g_max*.  The reversal
+    potential is computed dynamically via the Nernst equation for K⁺,
+    representing two-pore-domain K⁺ background channels (e.g. TREK, TRAAK).
+
+    Args:
+        g_max: Maximum (and constant) conductance in mS/cm².
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the K⁺ leak
+        channel with current field ``IKL``.
+    """
+    return IonChannel(
+        name="KL",
+        g_max=g_max,
+        gating_variables=(),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )
 
 

@@ -23,11 +23,11 @@ def test_run_membrane_test_default_neuron(hh_model: Neuron) -> None:
     """Membrane test on the default HH neuron recovers the set passive parameters.
 
     The membrane test simulates with g_Na = g_K = 0 (channel block) and
-    v_rest = E_L, giving a clean single-exponential response.  The measured
+    v_rest = E_L_eff, giving a clean single-exponential response.  The measured
     R_in, τ_m, and C_m should closely match the analytically expected values
-    for the default HH parameters (g_L = 0.3 mS/cm², C_m = 1.0 µF/cm²):
-      R_in = 1/g_L ≈ 3.33 kΩ·cm²
-      τ_m  = C_m/g_L ≈ 3.33 ms
+    for the default HH parameters (g_NaL+g_KL = 0.3 mS/cm², C_m = 1.0 µF/cm²):
+      R_in = 1/(g_NaL+g_KL) ≈ 3.33 kΩ·cm²
+      τ_m  = C_m/(g_NaL+g_KL) ≈ 3.33 ms
       C_m  ≈ 1.0 µF/cm²
     """
     props = run_membrane_test(hh_model)
@@ -54,22 +54,22 @@ def test_run_membrane_test_always_subthreshold() -> None:
         )
 
 
-def test_membrane_test_sensitive_to_g_l() -> None:
-    """Changing g_L produces the expected change in R_in.
+def test_membrane_test_sensitive_to_g_leak() -> None:
+    """Changing total leak conductance produces the expected change in R_in.
 
     The membrane test runs in passive mode (channels blocked internally), so
-    R_in = 1/g_L exactly.  This test verifies the relationship holds and that
-    R_in matches the analytical expectation.
+    R_in = 1/(g_NaL+g_KL) exactly.  This test verifies the relationship holds
+    and that R_in matches the analytical expectation.
     """
-    neuron_low_gl = Neuron(g_L=0.15)
-    neuron_high_gl = Neuron(g_L=0.6)
+    neuron_low_gl = Neuron(g_NaL=0.027, g_KL=0.123)  # total = 0.15
+    neuron_high_gl = Neuron(g_NaL=0.108, g_KL=0.492)  # total = 0.6
 
     props_low = run_membrane_test(neuron_low_gl)
     props_high = run_membrane_test(neuron_high_gl)
 
     assert props_low is not None
     assert props_high is not None
-    # R_in = 1/g_L: g_L=0.15 → 6.67 kΩ·cm², g_L=0.6 → 1.67 kΩ·cm²
+    # R_in = 1/g_total: 0.15 → 6.67 kΩ·cm², 0.6 → 1.67 kΩ·cm²
     assert props_low.input_resistance == pytest.approx(1.0 / 0.15, abs=0.1)
     assert props_high.input_resistance == pytest.approx(1.0 / 0.6, abs=0.1)
     assert props_low.input_resistance > props_high.input_resistance

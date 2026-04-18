@@ -18,7 +18,8 @@ _VISIBILITY_FIELDS: list[str] = [
     "show_total_current",
     "show_sodium_current",
     "show_potassium_current",
-    "show_leak_current",
+    "show_na_leak_current",
+    "show_k_leak_current",
     "show_potassium_activation",
     "show_sodium_activation",
     "show_sodium_inactivation",
@@ -88,7 +89,8 @@ class VisibilityState(rx.State):
     show_total_current: bool = True
     show_sodium_current: bool = True
     show_potassium_current: bool = True
-    show_leak_current: bool = False
+    show_na_leak_current: bool = False
+    show_k_leak_current: bool = False
     show_potassium_activation: bool = True
     show_sodium_activation: bool = True
     show_sodium_inactivation: bool = True

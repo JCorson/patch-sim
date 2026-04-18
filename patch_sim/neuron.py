@@ -14,11 +14,10 @@ from .constants import (
     DEFAULT_C_M,
     DEFAULT_CA_IN,
     DEFAULT_CA_OUT,
-    DEFAULT_CL_IN,
-    DEFAULT_CL_OUT,
     DEFAULT_G_K,
-    DEFAULT_G_L,
+    DEFAULT_G_KL,
     DEFAULT_G_NA,
+    DEFAULT_G_NAL,
     DEFAULT_K_IN,
     DEFAULT_K_OUT,
     DEFAULT_NA_IN,
@@ -28,7 +27,12 @@ from .constants import (
     DEFAULT_T_REF,
     DEFAULT_V_REST,
 )
-from .core_channels import make_k_channel, make_leak_channel, make_na_channel
+from .core_channels import (
+    make_k_channel,
+    make_k_leak_channel,
+    make_na_channel,
+    make_na_leak_channel,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,14 +49,15 @@ class Neuron:
         C_m: Membrane capacitance in uF/cm^2.
         g_Na: Maximum sodium conductance in mS/cm^2.
         g_K: Maximum potassium conductance in mS/cm^2.
-        g_L: Leak conductance in mS/cm^2.
+        g_NaL: Na⁺ leak conductance in mS/cm². Together with g_KL this
+            replaces the single chloride-based leak, providing a biophysically
+            realistic mixed-cation background conductance.
+        g_KL: K⁺ leak conductance in mS/cm².
         v_rest: Resting potential in mV.
         Na_out: Extracellular sodium concentration in mM.
         Na_in: Intracellular sodium concentration in mM.
         K_out: Extracellular potassium concentration in mM.
         K_in: Intracellular potassium concentration in mM.
-        Cl_out: Extracellular chloride concentration in mM.
-        Cl_in: Intracellular chloride concentration in mM.
         T: Temperature in Kelvin.
         Q10: Q10 temperature coefficient for gating kinetics (dimensionless).
             Gating rate constants are scaled by ``Q10^((T - T_ref) / 10)``.
@@ -64,15 +69,17 @@ class Neuron:
             given a maximum conductance. Defaults to the HH52 squid axon kinetics.
         k_channel_factory: Factory function that builds the K⁺ core channel
             given a maximum conductance. Defaults to the HH52 squid axon kinetics.
-        leak_channel_factory: Factory function that builds the leak core channel
-            given a maximum conductance. Defaults to the HH52 squid axon kinetics.
+        na_leak_channel_factory: Factory function that builds the Na⁺ leak channel
+            given a maximum conductance. Defaults to make_na_leak_channel.
+        k_leak_channel_factory: Factory function that builds the K⁺ leak channel
+            given a maximum conductance. Defaults to make_k_leak_channel.
         additional_channels: Tuple of additional ion channels added on top of
-            the classic Na/K/leak triad.  Defaults to an empty tuple so that
-            all existing code is unaffected.
+            the classic Na/K/NaL/KL quartet.  Defaults to an empty tuple so
+            that all existing code is unaffected.
         calcium_dynamics: Optional calcium dynamics model.
 
     Cached properties (built on first access):
-        core_channels: Tuple of three IonChannel objects (Na, K, leak) built
+        core_channels: Tuple of four IonChannel objects (Na, K, NaL, KL) built
             from the constructor conductances and factory functions.
         all_channels: All channels — core_channels + additional_channels.
         all_gating_variables: Flat tuple of every gating variable across all
@@ -84,7 +91,8 @@ class Neuron:
     # Membrane properties
     g_Na: float = DEFAULT_G_NA
     g_K: float = DEFAULT_G_K
-    g_L: float = DEFAULT_G_L
+    g_NaL: float = DEFAULT_G_NAL
+    g_KL: float = DEFAULT_G_KL
     C_m: float = DEFAULT_C_M
     v_rest: float = DEFAULT_V_REST
 
@@ -93,8 +101,6 @@ class Neuron:
     Na_in: float = DEFAULT_NA_IN
     K_out: float = DEFAULT_K_OUT
     K_in: float = DEFAULT_K_IN
-    Cl_out: float = DEFAULT_CL_OUT
-    Cl_in: float = DEFAULT_CL_IN
     Ca_out: float = DEFAULT_CA_OUT
     Ca_in: float = DEFAULT_CA_IN
 
@@ -108,8 +114,11 @@ class Neuron:
     # Core channel factories — override to use non-HH52 kinetics
     na_channel_factory: Callable[[float], IonChannel] = field(default=make_na_channel)
     k_channel_factory: Callable[[float], IonChannel] = field(default=make_k_channel)
-    leak_channel_factory: Callable[[float], IonChannel] = field(
-        default=make_leak_channel
+    na_leak_channel_factory: Callable[[float], IonChannel] = field(
+        default=make_na_leak_channel
+    )
+    k_leak_channel_factory: Callable[[float], IonChannel] = field(
+        default=make_k_leak_channel
     )
 
     # Additional extra channels — empty by default so existing code is unaffected
@@ -124,8 +133,10 @@ class Neuron:
             raise ValueError("Sodium conductance (g_Na) must be non-negative.")
         if self.g_K < 0:
             raise ValueError("Potassium conductance (g_K) must be non-negative.")
-        if self.g_L < 0:
-            raise ValueError("Leak conductance (g_L) must be non-negative.")
+        if self.g_NaL < 0:
+            raise ValueError("Na leak conductance (g_NaL) must be non-negative.")
+        if self.g_KL < 0:
+            raise ValueError("K leak conductance (g_KL) must be non-negative.")
         if self.C_m <= 0:
             raise ValueError("Membrane capacitance (C_m) must be positive.")
         if self.T <= 0:
@@ -139,14 +150,12 @@ class Neuron:
             ("Na_in", self.Na_in),
             ("K_out", self.K_out),
             ("K_in", self.K_in),
-            ("Cl_out", self.Cl_out),
-            ("Cl_in", self.Cl_in),
             ("Ca_out", self.Ca_out),
             ("Ca_in", self.Ca_in),
         ]:
             if value <= 0:
                 raise ValueError(f"Ion concentration ({name}) must be positive.")
-        _BUILTIN_NAMES = {"Na", "K", "leak"}
+        _BUILTIN_NAMES = {"Na", "K", "NaL", "KL"}
         ch_names = [ch.name for ch in self.additional_channels]
         if len(ch_names) != len(set(ch_names)):
             raise ValueError(
@@ -156,15 +165,16 @@ class Neuron:
             if ch_name in _BUILTIN_NAMES:
                 raise ValueError(
                     f"Additional channel name '{ch_name}' collides with a built-in "
-                    "channel name (Na, K, leak)."
+                    "channel name (Na, K, NaL, KL)."
                 )
         logger.debug(
-            "Neuron: g_Na=%.1f g_K=%.1f g_L=%.3f C_m=%.2f T=%.1f K "
+            "Neuron: g_Na=%.1f g_K=%.1f g_NaL=%.3f g_KL=%.3f C_m=%.2f T=%.1f K "
             "Q10=%.1f T_ref=%.1f K "
             "additional_channels=%s calcium=%s",
             self.g_Na,
             self.g_K,
-            self.g_L,
+            self.g_NaL,
+            self.g_KL,
             self.C_m,
             self.T,
             self.Q10,
@@ -189,15 +199,16 @@ class Neuron:
 
     @cached_property
     def core_channels(self) -> tuple[IonChannel, ...]:
-        """Return the three classic core channels built from constructor conductances.
+        """Return the four core channels built from constructor conductances.
 
         Returns:
-            Tuple of (Na, K, leak) IonChannel objects in that order.
+            Tuple of (Na, K, NaL, KL) IonChannel objects in that order.
         """
         return (
             self.na_channel_factory(self.g_Na),
             self.k_channel_factory(self.g_K),
-            self.leak_channel_factory(self.g_L),
+            self.na_leak_channel_factory(self.g_NaL),
+            self.k_leak_channel_factory(self.g_KL),
         )
 
     @cached_property
@@ -264,6 +275,4 @@ class Neuron:
             return self.K_out, self.K_in
         if species is IonSpecies.CALCIUM:
             return self.Ca_out, self.Ca_in
-        if species is IonSpecies.CHLORIDE:
-            return self.Cl_out, self.Cl_in
         raise ValueError(f"Unknown ion species: {species!r}")  # pragma: no cover

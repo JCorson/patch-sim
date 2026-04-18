@@ -54,18 +54,25 @@ def _make_bool_setter(field_name: str, class_name: str = "NeuronState"):
     return setter
 
 
-#: The five NeuronState fields that determine the passive-only membrane test result.
+#: The NeuronState fields that determine the passive-only membrane test result.
 #: Only these fields are included in ``neuron_fingerprint`` so that changing
 #: active conductances (g_Na, g_K, v_rest, auxiliary channels) does not
 #: invalidate the membrane test cache.
 #:
-#: Na⁺, K⁺, and Ca²⁺ concentrations are intentionally omitted: the passive
-#: neuron constructed in ``run_membrane_test`` only uses Cl⁻ concentrations
-#: (to compute E_L via the chloride Nernst potential).  The other ion
-#: concentrations are passed through to the ``Neuron`` constructor but have
-#: no effect on the passive RC circuit because g_Na = g_K = 0 and no Ca²⁺
-#: channels are present, so none of their reversal potentials carry current.
-_PASSIVE_PARAM_FIELDS: list[str] = ["g_L", "C_m", "Cl_out", "Cl_in", "T"]
+#: Ca²⁺ concentrations are omitted: no Ca²⁺ channels are present in the
+#: passive neuron (g_Na = g_K = 0), so their reversal potentials carry no
+#: current.  Na⁺ and K⁺ concentrations ARE included because E_NaL and E_KL
+#: are used to compute the effective E_L for the passive RC circuit.
+_PASSIVE_PARAM_FIELDS: list[str] = [
+    "g_NaL",
+    "g_KL",
+    "C_m",
+    "Na_out",
+    "Na_in",
+    "K_out",
+    "K_in",
+    "T",
+]
 
 
 def _make_neuron_float_setter(field_name: str):
@@ -78,8 +85,8 @@ def _make_neuron_float_setter(field_name: str):
     generators; returning an event from a sync handler has no effect.
 
     The fingerprint-based cache inside ``run_membrane_test`` ensures the
-    simulation only re-runs when passive-relevant parameters (g_L, C_m, Cl, T)
-    actually change.
+    simulation only re-runs when passive-relevant parameters (g_NaL, g_KL,
+    C_m, ion concentrations, T) actually change.
 
     Args:
         field_name: Name of the ``NeuronState`` attribute to update.
@@ -157,8 +164,13 @@ class NeuronState(rx.State):
 
     @rx.var
     def E_L(self) -> float:
-        """Leak reversal potential in mV."""
-        return float(patch_sim.nernst_potential(-1, self.T, self.Cl_out, self.Cl_in))
+        """Effective leak reversal in mV (weighted average of E_Na and E_K)."""
+        e_na = float(patch_sim.nernst_potential(1, self.T, self.Na_out, self.Na_in))
+        e_k = float(patch_sim.nernst_potential(1, self.T, self.K_out, self.K_in))
+        g_total = self.g_NaL + self.g_KL
+        if g_total <= 0:
+            return self.v_rest
+        return (self.g_NaL * e_na + self.g_KL * e_k) / g_total
 
     @rx.var
     def E_Ca(self) -> float:
@@ -174,13 +186,12 @@ class NeuronState(rx.State):
         and may return a stale digest if called from a background task before
         the cache has been invalidated by the latest state flush.
 
-        Only hashes the five fields that determine the passive-only membrane
-        test result (g_L, C_m, Cl_out, Cl_in, T).  Active conductances are
-        excluded because the membrane test blocks them internally.
+        Only hashes the fields that determine the passive-only membrane
+        test result (g_NaL, g_KL, C_m, ion concentrations, T).  Active
+        conductances are excluded because the membrane test blocks them.
 
         Returns:
-            A hex digest string that changes only when g_L, C_m, Cl_out,
-            Cl_in, or T changes.
+            A hex digest string that changes only when passive parameters change.
         """
         parts = [repr(getattr(self, f)) for f in _PASSIVE_PARAM_FIELDS]
         return hashlib.sha256("|".join(parts).encode()).hexdigest()
@@ -195,8 +206,7 @@ class NeuronState(rx.State):
         ``ComputedVar`` cache.
 
         Returns:
-            A hex digest string that changes only when g_L, C_m, Cl_out,
-            Cl_in, or T changes.
+            A hex digest string that changes only when passive parameters change.
         """
         return self._compute_fingerprint()
 

@@ -14,15 +14,14 @@ PARAM_RANGES: dict[str, tuple[float, float, float]] = {
     # name: (min, max, step)
     "g_Na": (0.0, 300.0, 1.0),
     "g_K": (0.0, 100.0, 0.5),
-    "g_L": (0.0, 2.0, 0.01),
+    "g_NaL": (0.0, 2.0, 0.01),
+    "g_KL": (0.0, 2.0, 0.01),
     "C_m": (0.1, 5.0, 0.1),
     "v_rest": (-90.0, -40.0, 1.0),
     "Na_out": (1.0, 500.0, 1.0),
     "Na_in": (1.0, 100.0, 1.0),
     "K_out": (1.0, 50.0, 0.5),
     "K_in": (1.0, 300.0, 1.0),
-    "Cl_out": (1.0, 300.0, 1.0),
-    "Cl_in": (1.0, 100.0, 1.0),
     "Ca_out": (0.1, 20.0, 0.1),
     "Ca_in": (0.00001, 0.01, 0.00001),
     "T": (273.15, 323.15, 0.5),  # 0°C to 50°C
@@ -47,7 +46,8 @@ CHANNEL_COLORS: dict[str, str] = {
     "total_current": "#1f77b4",  # blue
     "sodium_current": "#ff7f0e",  # orange
     "potassium_current": "#2ca02c",  # green
-    "leak_current": "#7f7f7f",  # grey
+    "na_leak_current": "#7f7f7f",  # grey
+    "k_leak_current": "#bcbd22",  # olive
     # Additional channels
     **{ch.current_key: ch.current_color for ch in ADDITIONAL_CHANNELS},
 }

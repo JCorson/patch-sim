@@ -20,20 +20,18 @@ class IonSpecies(Enum):
         SODIUM: Na⁺, valence +1.
         POTASSIUM: K⁺, valence +1.
         CALCIUM: Ca²⁺, valence +2.
-        CHLORIDE: Cl⁻, valence −1.
     """
 
     SODIUM = ("Na", 1)
     POTASSIUM = ("K", 1)
     CALCIUM = ("Ca", 2)
-    CHLORIDE = ("Cl", -1)
 
     def __init__(self, symbol: str, valence: int) -> None:
         """Initialise the enum member with its symbol and valence.
 
         Args:
             symbol: Chemical symbol string (e.g. ``'Na'``).
-            valence: Signed ionic charge (e.g. ``+1`` for Na⁺, ``-1`` for Cl⁻).
+            valence: Signed ionic charge (e.g. ``+1`` for Na⁺, ``+2`` for Ca²⁺).
         """
         self._symbol = symbol
         self._valence = valence

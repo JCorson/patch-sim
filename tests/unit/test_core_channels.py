@@ -20,8 +20,9 @@ from patch_sim.core_channels import (
     beta_m,
     beta_n,
     make_k_channel,
-    make_leak_channel,
+    make_k_leak_channel,
     make_na_channel,
+    make_na_leak_channel,
     make_pospischil_k_channel,
     make_pospischil_na_channel,
     make_stn_k_channel,
@@ -178,15 +179,27 @@ def test_make_k_channel_structure() -> None:
     assert not ch.carries_calcium
 
 
-def test_make_leak_channel_structure() -> None:
-    """make_leak_channel returns a channel with no gates and Cl⁻ reversal spec."""
-    ch = make_leak_channel(g_max=0.3)
+def test_make_na_leak_channel_structure() -> None:
+    """make_na_leak_channel returns a channel with no gates and Na⁺ reversal spec."""
+    ch = make_na_leak_channel(g_max=0.054)
     assert isinstance(ch, IonChannel)
-    assert ch.name == "leak"
-    assert ch.g_max == pytest.approx(0.3)
+    assert ch.name == "NaL"
+    assert ch.g_max == pytest.approx(0.054)
     assert len(ch.gating_variables) == 0
     assert isinstance(ch.reversal_spec, NernstSpec)
-    assert ch.reversal_spec.species is IonSpecies.CHLORIDE
+    assert ch.reversal_spec.species is IonSpecies.SODIUM
+    assert not ch.carries_calcium
+
+
+def test_make_k_leak_channel_structure() -> None:
+    """make_k_leak_channel returns a channel with no gates and K⁺ reversal spec."""
+    ch = make_k_leak_channel(g_max=0.246)
+    assert isinstance(ch, IonChannel)
+    assert ch.name == "KL"
+    assert ch.g_max == pytest.approx(0.246)
+    assert len(ch.gating_variables) == 0
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
     assert not ch.carries_calcium
 
 
@@ -227,14 +240,26 @@ def test_k_channel_current_matches_inline(V: float) -> None:
 
 
 @pytest.mark.parametrize("V", [-100.0, -65.0, 0.0, 40.0])
-def test_leak_channel_current_matches_inline(V: float) -> None:
-    """Leak channel compute_current equals g_L * (V − E_L)."""
+def test_na_leak_channel_current_matches_inline(V: float) -> None:
+    """Na leak channel compute_current equals g_NaL * (V − E_Na)."""
     neuron = Neuron()
-    ch = make_leak_channel(g_max=neuron.g_L)
+    ch = make_na_leak_channel(g_max=neuron.g_NaL)
 
     result = ch.compute_current(V, {}, neuron)
-    E_L = ch.reversal_potential(neuron)
-    expected = neuron.g_L * (V - E_L)
+    E_Na = ch.reversal_potential(neuron)
+    expected = neuron.g_NaL * (V - E_Na)
+    assert result == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, 0.0, 40.0])
+def test_k_leak_channel_current_matches_inline(V: float) -> None:
+    """K leak channel compute_current equals g_KL * (V − E_K)."""
+    neuron = Neuron()
+    ch = make_k_leak_channel(g_max=neuron.g_KL)
+
+    result = ch.compute_current(V, {}, neuron)
+    E_K = ch.reversal_potential(neuron)
+    expected = neuron.g_KL * (V - E_K)
     assert result == pytest.approx(expected)
 
 

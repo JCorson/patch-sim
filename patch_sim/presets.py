@@ -74,9 +74,10 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Refs: Erisir et al. (1999), J. Neurophysiol. 82:2476;
         #       Wang & Buzsáki (1996), J. Neurosci. 16:6402
         #
-        # g_L = 1.5 mS/cm² gives τ_m ≈ 0.67 ms — highly leaky membrane that
-        # narrows the synaptic integration window, a hallmark of FS cells.
-        # Cl_in = 11.9 mM (E_L ≈ −62 mV) preserves v_rest = −65 mV.
+        # g_NaL + g_KL = 1.5 mS/cm² gives τ_m ≈ 0.67 ms — highly leaky membrane
+        # that narrows the synaptic integration window, a hallmark of FS cells.
+        # Values chosen so that g_NaL*(v_rest-E_Na) + g_KL*(v_rest-E_K) matches
+        # the previous single-leak current at rest, preserving v_rest = −65 mV.
         #
         # Q10=1.0: these channels are adapted from HH52 squid-axon kinetics
         # without a well-defined mammalian thermal reference.  Applying a 5.2×
@@ -85,8 +86,8 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # are already implicit in the conductance values fitted to FS cell data.
         g_Na=150.0,
         g_K=50.0,
-        g_L=1.5,
-        Cl_in=11.9,
+        g_NaL=0.182,
+        g_KL=1.318,
         Q10=1.0,
         channels=(ChannelConfig(make_ikv31_channel, g_max=40.0),),
     ),
@@ -99,9 +100,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # K_out=3.32 produces E_K ≈ −100 mV (Pospischil target).
         #
-        # g_L = 0.05 mS/cm² gives τ_m ≈ 20 ms and R_in ≈ 20 kΩ·cm², reflecting
-        # the high input resistance (200–400 MΩ) of RS cortical pyramidal cells.
-        # Cl_in = 3.8 mM (E_L ≈ −92 mV) preserves v_rest = −70 mV.
+        # g_NaL + g_KL = 0.05 mS/cm² gives τ_m ≈ 20 ms and R_in ≈ 20 kΩ·cm²,
+        # reflecting the high input resistance (200–400 MΩ) of RS cortical
+        # pyramidal cells.  With K_out=3.32, E_K ≈ −100 mV (Pospischil target),
+        # so K leak is outward at v_rest = −70 mV and absorbs most of the total
+        # leak conductance.  g_NaL is very small (0.0026 mS/cm²) because the Na
+        # leak inward current at −70 mV would otherwise require a large outward
+        # K component to compensate.
         #
         # g_h reduced from 1.5 → 0.3 mS/cm² and g_NaP from 0.5 → 0.1 mS/cm²
         # so that combined inward current at rest does not exceed the outward
@@ -113,8 +118,8 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # HH52 reference of 22 °C causes numerical instability in this model.
         v_rest=-70.0,
         K_out=3.32,
-        g_L=0.05,
-        Cl_in=3.8,
+        g_NaL=0.0026,
+        g_KL=0.0474,
         T_ref=307.15,
         na_channel_factory=make_pospischil_na_channel,
         k_channel_factory=make_pospischil_k_channel,
@@ -131,15 +136,16 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # v_rest = −68 mV matches the published Purkinje cell resting potential.
         #
-        # g_L = 0.02 mS/cm² gives τ_m ≈ 50 ms and R_in ≈ 50 kΩ·cm², reflecting
-        # the low somatic leak conductance of Purkinje cells.  Cl_in = 63.5 mM
-        # (E_L ≈ −17 mV) is required to preserve v_rest = −68 mV with this low
-        # g_L; the depolarised E_L counterbalances the net outward K⁺ current
-        # from IKCa.  Note: this high Cl_in arises from treating the entire
-        # leak as a chloride conductance — a simplification addressed by #224.
+        # g_NaL + g_KL = 0.02 mS/cm² gives τ_m ≈ 50 ms and R_in ≈ 50 kΩ·cm²,
+        # reflecting the low somatic leak conductance of Purkinje cells.
+        # g_NaL = 0.0095 and g_KL = 0.0105 preserve v_rest = −68 mV: Na⁺ leak
+        # is inward (v_rest = −68 mV < E_Na ≈ +50 mV); K⁺ leak is outward
+        # (v_rest = −68 mV > E_K ≈ −77 mV), partially offsetting the Na⁺ inward
+        # current.  This replaces the previous unphysiological Cl_in = 63.5 mM
+        # (#224) with the default physiological Cl_in ≈ 15.8 mM.
         v_rest=-68.0,
-        g_L=0.02,
-        Cl_in=63.5,
+        g_NaL=0.0095,
+        g_KL=0.0105,
         channels=(
             ChannelConfig(make_ical_channel, g_max=1.0),
             ChannelConfig(make_icat_channel, g_max=0.5),
@@ -153,14 +159,14 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #       Komendantov et al. (2004)
         #
         # v_rest = −60 mV matches the published dopaminergic neuron resting
-        # potential.  Cl_in = 47.0 mM shifts E_L positive to achieve this.
-        #
-        # g_L is kept at the default 0.3 mS/cm² (τ_m ≈ 3.3 ms).  Lowering
-        # it requires a large positive E_L shift (Cl_in > 170 mM) to balance
-        # the net resting Na⁺/K⁺ current, which is not physiologically
-        # plausible with the current single-chloride leak model.
+        # potential.  g_NaL + g_KL = 0.3 mS/cm² (τ_m ≈ 3.3 ms); values tuned
+        # so that g_NaL*(v_rest-E_Na) + g_KL*(v_rest-E_K) matches the previous
+        # leak current at rest, preserving v_rest = −60 mV.  This replaces the
+        # previous unphysiological Cl_in = 47.0 mM (#224) with the default
+        # physiological Cl_in ≈ 15.8 mM.
         v_rest=-60.0,
-        Cl_in=47.0,
+        g_NaL=0.123,
+        g_KL=0.177,
         channels=(
             ChannelConfig(make_ih_channel, g_max=2.0),
             ChannelConfig(make_im_channel, g_max=1.0),
@@ -171,12 +177,12 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # post-inhibitory rebound burst after hyperpolarizing step.
         # Ref: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384
         #
-        # g_L = 0.1 mS/cm² gives τ_m ≈ 10 ms and R_in ≈ 10 kΩ·cm², matching
-        # moderate resting conductances in thalamic relay cells.  Lower values
-        # (g_L < 0.1) trigger spontaneous spiking via ICaT window current.
-        # Cl_in = 9.0 mM (E_L ≈ −69 mV) preserves v_rest = −65 mV.
-        g_L=0.1,
-        Cl_in=9.0,
+        # g_NaL + g_KL = 0.1 mS/cm² gives τ_m ≈ 10 ms and R_in ≈ 10 kΩ·cm²,
+        # matching moderate resting conductances in thalamic relay cells.
+        # Lower total leak (< 0.1) triggers spontaneous spiking via ICaT window
+        # current.  Values tuned to preserve v_rest = −65 mV.
+        g_NaL=0.006,
+        g_KL=0.094,
         channels=(
             ChannelConfig(make_icat_channel, g_max=1.5),
             ChannelConfig(make_ih_channel, g_max=1.0),
@@ -189,9 +195,9 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # after-hyperpolarization (AHP) characteristic of CA1 cells.
         # Refs: Warman et al. (1994); Migliore et al. (1999), ModelDB #2796
         #
-        # g_L = 0.05 mS/cm² gives τ_m ≈ 20 ms and R_in ≈ 20 kΩ·cm², matching
-        # the high input resistance measured in CA1 pyramidal cells in slice
-        # recordings.  Cl_in = 27.9 mM (E_L ≈ −39 mV) preserves v_rest = −65 mV.
+        # g_NaL + g_KL = 0.05 mS/cm² gives τ_m ≈ 20 ms and R_in ≈ 20 kΩ·cm²,
+        # matching the high input resistance measured in CA1 pyramidal cells in
+        # slice recordings.  Values tuned to preserve v_rest = −65 mV.
         #
         # Q10=1.0: as with FSI, the HH52-derived Na⁺ kinetics lack a mammalian
         # thermal reference.  A 5.2× Q10 factor accelerates Na⁺ inactivation
@@ -199,8 +205,8 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # conductance values are already calibrated for CA1 behavior.
         g_Na=35.0,
         g_K=10.0,
-        g_L=0.05,
-        Cl_in=27.9,
+        g_NaL=0.015,
+        g_KL=0.035,
         Q10=1.0,
         channels=(
             ChannelConfig(make_ika_channel, g_max=0.5),
@@ -225,18 +231,18 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # close to the Otsuka targets (+60, −90).  v_rest = −67 mV is the
         # stable zero-current equilibrium for this channel configuration.
         #
-        # g_L = 0.25 mS/cm² gives τ_m ≈ 4 ms and R_in ≈ 4 kΩ·cm².  Lower
-        # values (g_L < 0.25) shift the zero-current equilibrium away from
-        # v_rest, breaking the resting stability of this preset.
-        # Cl_in = 10.0 mM is unchanged; it preserves v_rest = −67 mV with
-        # the new g_L.
+        # g_NaL + g_KL = 0.25 mS/cm² gives τ_m ≈ 4 ms and R_in ≈ 4 kΩ·cm².
+        # Lower total leak (< 0.25) shifts the zero-current equilibrium away
+        # from v_rest, breaking the resting stability of this preset.  Values
+        # tuned to preserve v_rest = −67 mV.  With Na_out = 145 mM (mammalian),
+        # E_Na ≈ +60.6 mV, and K_out = 5 mM gives E_K ≈ −89 mV.
         g_Na=49.0,
         g_K=57.0,
         v_rest=-67.0,
         Na_out=145.0,
         K_out=5.0,
-        g_L=0.25,
-        Cl_in=10.0,
+        g_NaL=0.038,
+        g_KL=0.212,
         na_channel_factory=make_stn_na_channel,
         k_channel_factory=make_stn_k_channel,
         channels=(
@@ -253,14 +259,21 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804;
         #       Destexhe et al. (1994)
         #
-        # g_L = 0.08 mS/cm² gives τ_m ≈ 12.5 ms and R_in ≈ 12.5 kΩ·cm²,
-        # matching the moderate resting conductance of TRN neurons.
-        # Cl_in = 5.72 mM (E_L ≈ −80 mV) preserves v_rest = −77 mV.
-        # ICaT is sufficiently de-inactivated at this potential for
-        # post-inhibitory rebound bursting.
-        v_rest=-77.0,
-        g_L=0.08,
-        Cl_in=5.72,
+        # g_KL = 0.08 mS/cm² gives τ_m ≈ 12.5 ms and R_in ≈ 12.5 kΩ·cm²,
+        # matching the moderate resting conductance of TRN neurons.  ICaT is
+        # sufficiently de-inactivated at v_rest ≈ −66 mV for post-inhibitory
+        # rebound bursting.
+        #
+        # Note: TRN has v_rest ≈ E_K ≈ −77 mV in slice recordings, but the
+        # Na+K split leak model cannot reproduce this while also preserving τ_m.
+        # The K⁺ leak alone (E_KL = E_K ≈ −77 mV) has essentially zero driving
+        # force at the published resting potential, so the equilibrium settles
+        # at −66 mV where the ICaT window current is balanced by K⁺ leak outward
+        # current.  g_NaL = 0.0 is used so that the Na⁺ inward leak does not
+        # further depolarize the cell away from E_K.
+        v_rest=-66.0,
+        g_NaL=0.0,
+        g_KL=0.08,
         channels=(ChannelConfig(make_icat_channel, g_max=3.5),),
     ),
 }
@@ -364,7 +377,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     FAST_SPIKING_INTERNEURON: {
-        # High g_L (1.5 mS/cm²) raises the firing threshold; 20 µA/cm²
+        # High total leak (g_NaL+g_KL=1.5 mS/cm²) raises the firing threshold; 20 µA/cm²
         # is safely suprathreshold.  10 ms avoids a second spike at this
         # amplitude.
         ACTION_POTENTIAL: {
@@ -381,7 +394,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     CORTICAL_PYRAMIDAL: {
-        # Higher R_in (g_L=0.05 → R_in=20 kΩ·cm²) raises excitability; 0.5
+        # Higher R_in (g_NaL+g_KL=0.05 → R_in=20 kΩ·cm²) raises excitability; 0.5
         # µA/cm² is subthreshold where 1.5 µA/cm² (default) would spike.
         SUBTHRESHOLD_RESPONSE: {
             "min_stimulus": 0.5,
@@ -456,7 +469,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     THALAMIC_RELAY: {
-        # R_in increased with lower g_L; 0.2 µA/cm² is subthreshold at g_L=0.1.
+        # R_in increased with lower total leak (0.1 mS/cm²); 0.2 µA/cm² subthreshold.
         SUBTHRESHOLD_RESPONSE: {
             "min_stimulus": 0.2,
             "max_stimulus": 0.2,
@@ -533,7 +546,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     TRN: {
-        # R_in increased with lower g_L; 0.1 µA/cm² is subthreshold at g_L=0.08.
+        # R_in increased with lower total leak (g_KL=0.08); 0.1 µA/cm² subthreshold.
         SUBTHRESHOLD_RESPONSE: {
             "min_stimulus": 0.1,
             "max_stimulus": 0.1,
