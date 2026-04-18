@@ -140,8 +140,8 @@ def compute_sag_point(
 
     Peak voltage is the minimum of the voltage trace during the step.
     Steady-state voltage is the mean over the last ``steady_state_fraction`` of
-    the step duration.  Rebound spikes are action potentials whose threshold
-    time falls within ``[stim_end_ms, stim_end_ms + rebound_window_ms]``.
+    the step duration.  Rebound spikes are action potentials whose peak time
+    falls within ``[stim_end_ms, stim_end_ms + rebound_window_ms]``.
 
     Args:
         time: Time axis array in ms.

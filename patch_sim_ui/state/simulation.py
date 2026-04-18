@@ -244,7 +244,7 @@ def _compute_cc_multi_sweep_analysis(
 
     # Detect whether all steps are hyperpolarizing (negative).  When true,
     # F-I analysis is skipped in favour of sag/rebound analysis.
-    is_hyperpolarizing = max_stimulus <= 0.0
+    is_hyperpolarizing = max_stimulus < 0.0
 
     # --- F-I / hyperpolarization data ---
     if len(sweeps) != len(current_steps):

@@ -30,9 +30,12 @@ from patch_sim.constants import (
     STN,
     THALAMIC_RELAY,
 )
+from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import (
     NEURON_PRESET_NAMES,
     NEURON_PRESETS,
+    NEURON_PROTOCOL_ADJUSTMENTS,
+    PROTOCOL_PRESETS,
 )
 
 _SAMPLING_FREQ = 40_000.0
@@ -49,11 +52,6 @@ def _run_hyperpolarization_sweeps(
     Returns:
         A :class:`HyperpolarizationAnalysisResult` from the final multi-sweep run.
     """
-    import numpy as np
-
-    from patch_sim.neuron_factory import make_neuron
-    from patch_sim.presets import NEURON_PROTOCOL_ADJUSTMENTS, PROTOCOL_PRESETS
-
     config = NEURON_PRESETS[preset_name]
     neuron = make_neuron(config)
 
@@ -170,11 +168,7 @@ def test_sag_in_cortical_pyramidal() -> None:
 
 
 def test_sag_in_thalamic_relay() -> None:
-    """Thalamic relay neuron shows Ih-driven voltage sag during hyperpolarization.
-
-    Args:
-        None
-    """
+    """Thalamic relay neuron shows Ih-driven voltage sag during hyperpolarization."""
     result = _run_hyperpolarization_sweeps(THALAMIC_RELAY)
     most_negative = result.points[0]
     assert most_negative.sag_amplitude > 1.0, (
@@ -183,11 +177,7 @@ def test_sag_in_thalamic_relay() -> None:
 
 
 def test_sag_in_ca1_pyramidal() -> None:
-    """Hippocampal CA1 pyramidal neuron shows Ih-driven sag.
-
-    Args:
-        None
-    """
+    """Hippocampal CA1 pyramidal neuron shows Ih-driven sag."""
     result = _run_hyperpolarization_sweeps(CA1_PYRAMIDAL)
     most_negative = result.points[0]
     assert most_negative.sag_amplitude > 1.0, (
@@ -196,11 +186,7 @@ def test_sag_in_ca1_pyramidal() -> None:
 
 
 def test_sag_in_stn() -> None:
-    """Subthalamic nucleus neuron shows Ih-driven sag during hyperpolarization.
-
-    Args:
-        None
-    """
+    """Subthalamic nucleus neuron shows Ih-driven sag during hyperpolarization."""
     result = _run_hyperpolarization_sweeps(STN)
     most_negative = result.points[0]
     assert most_negative.sag_amplitude > 2.0, (
@@ -209,11 +195,7 @@ def test_sag_in_stn() -> None:
 
 
 def test_sag_in_dopaminergic() -> None:
-    """Dopaminergic neuron shows Ih-driven sag during hyperpolarization.
-
-    Args:
-        None
-    """
+    """Dopaminergic neuron shows Ih-driven sag during hyperpolarization."""
     result = _run_hyperpolarization_sweeps(DOPAMINERGIC)
     most_negative = result.points[0]
     assert most_negative.sag_amplitude > 1.0, (
@@ -262,11 +244,7 @@ def test_rebound_burst_in_thalamic_relay() -> None:
 
 
 def test_rebound_burst_in_ca1_pyramidal() -> None:
-    """CA1 pyramidal neuron fires a rebound burst after deep hyperpolarization.
-
-    Args:
-        None
-    """
+    """CA1 pyramidal neuron fires a rebound burst after deep hyperpolarization."""
     result = _run_hyperpolarization_sweeps(CA1_PYRAMIDAL)
     most_negative = result.points[0]
     assert most_negative.rebound_spike_count >= 1, (

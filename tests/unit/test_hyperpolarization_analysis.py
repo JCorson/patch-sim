@@ -181,11 +181,7 @@ def test_compute_sag_point_rebound_spike_in_window() -> None:
 
 
 def test_compute_sag_point_spike_outside_rebound_window_not_counted() -> None:
-    """A spike beyond the 50 ms rebound window is not counted as a rebound spike.
-
-    Args:
-        None
-    """
+    """A spike beyond the 50 ms rebound window is not counted as a rebound spike."""
     stim_start, stim_end = 50.0, 250.0
     time = _make_time(500.0)
     voltage = _flat_step_voltage(time, -65.0, -85.0, stim_start, stim_end)
@@ -197,11 +193,7 @@ def test_compute_sag_point_spike_outside_rebound_window_not_counted() -> None:
 
 
 def test_compute_sag_point_spike_during_step_not_counted_as_rebound() -> None:
-    """A spike occurring during the step is not counted as a rebound spike.
-
-    Args:
-        None
-    """
+    """A spike occurring during the step is not counted as a rebound spike."""
     stim_start, stim_end = 50.0, 250.0
     time = _make_time(400.0)
     voltage = _flat_step_voltage(time, -65.0, -85.0, stim_start, stim_end)
@@ -213,11 +205,7 @@ def test_compute_sag_point_spike_during_step_not_counted_as_rebound() -> None:
 
 
 def test_compute_sag_point_multiple_rebound_spikes() -> None:
-    """Multiple spikes within the rebound window are all counted.
-
-    Args:
-        None
-    """
+    """Multiple spikes within the rebound window are all counted."""
     stim_start, stim_end = 50.0, 250.0
     time = _make_time(500.0)
     voltage = _flat_step_voltage(time, -65.0, -85.0, stim_start, stim_end)
@@ -234,9 +222,6 @@ def test_compute_sag_point_custom_rebound_window() -> None:
 
     With rebound_window_ms=5 only the spike at step_end+3 ms is inside the
     window; the spike at step_end+10 ms is excluded.
-
-    Args:
-        None
     """
     stim_start, stim_end = 50.0, 250.0
     time = _make_time(500.0)
@@ -256,9 +241,6 @@ def test_compute_sag_point_sag_amplitude_is_non_negative() -> None:
 
     For a true hyperpolarizing step the peak is the minimum, so
     steady_state ≥ peak and sag_amplitude ≥ 0.
-
-    Args:
-        None
     """
     time = _make_time(200.0)
     voltage = _flat_step_voltage(time, -65.0, -80.0, 50.0, 150.0)
@@ -278,9 +260,6 @@ def test_analyze_hyperpolarization_sorts_by_current() -> None:
 
     Regardless of the order the sweeps are passed, the result should be sorted
     by current_step from most negative to least negative.
-
-    Args:
-        None
     """
     time = _make_time(200.0)
     sweeps = [
@@ -298,11 +277,7 @@ def test_analyze_hyperpolarization_sorts_by_current() -> None:
 
 
 def test_analyze_hyperpolarization_properties_match_points() -> None:
-    """Convenience properties extract the correct fields from each point.
-
-    Args:
-        None
-    """
+    """Convenience properties extract the correct fields from each point."""
     time = _make_time(300.0)
     current_steps = [-3.0, -6.0]
     sweeps = [
@@ -320,11 +295,7 @@ def test_analyze_hyperpolarization_properties_match_points() -> None:
 
 
 def test_analyze_hyperpolarization_single_sweep() -> None:
-    """A single-sweep hyperpolarization run returns one SagPoint.
-
-    Args:
-        None
-    """
+    """A single-sweep hyperpolarization run returns one SagPoint."""
     time = _make_time(200.0)
     voltage = _flat_step_voltage(time, -65.0, -80.0, 50.0, 150.0)
 
