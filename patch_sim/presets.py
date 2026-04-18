@@ -398,6 +398,16 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         ACTION_POTENTIAL: {
             "stimulus_duration": 10.0,
         },
+        # Squid inherits the base preset range (−10 → −2 µA/cm²), which
+        # drives the membrane to roughly −98 mV.  At that depth the Na⁺
+        # inactivation gate h fully de-inactivates (h_inf ≈ 0.996, τ_h ≈
+        # 2.5 ms — reached within ~10 ms) and the K⁺ activation gate n
+        # deactivates (n_inf ≈ 0.002).  On step release, m activates rapidly
+        # while h is still elevated and g_K is negligible, triggering a
+        # post-hyperpolarization action potential — classic HH anode-break
+        # excitation (Hodgkin & Huxley, 1952).  No ICaT or Ih channels are
+        # involved; the spike is an intrinsic property of the HH52 Na/K model
+        # at these depths.
     },
     FAST_SPIKING_INTERNEURON: {
         # High total leak (g_NaL+g_KL=1.5 mS/cm²) raises the firing threshold; 20 µA/cm²
@@ -416,8 +426,12 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_duration": 180.0,
         },
         # Very low R_in (~0.67 kΩ·cm²) requires large currents for noticeable
-        # hyperpolarization.  −20 → −5 µA/cm² gives peaks of −74 to −67 mV and
-        # elicits a Kv3.1-driven rebound spike on step release at −20 µA/cm².
+        # hyperpolarization.  −20 → −5 µA/cm² gives peaks of −74 to −67 mV.
+        # At step release, Kv3.1 channels (which deactivate quickly during
+        # hyperpolarization) provide insufficient outward current to prevent the
+        # membrane from overshooting threshold, producing a rebound spike at
+        # −20 µA/cm².  Unlike ICaT-driven rebound, this is a Kv3.1-gated
+        # anode-break variant rather than a low-threshold Ca²⁺ burst.
         HYPERPOLARIZATION_STEPS: {
             "min_stimulus": -20.0,
             "max_stimulus": -5.0,
@@ -457,6 +471,12 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
         # High R_in means small currents produce large deflections.  −5 → −1 µA/cm²
         # gives peaks of −109 to −80 mV with Ih-driven sag of 10–25 mV per step.
+        # At the deepest steps the cell shows a post-hyperpolarization rebound
+        # spike driven by two overlapping mechanisms: HH anode-break excitation
+        # (h fully de-inactivates at −109 mV; n deactivates; m fires on release)
+        # and Ih-driven overshoot (Ih activated during the step continues
+        # conducting after release, transiently depolarising the membrane).  The
+        # cell has no ICaT, so the rebound is not a low-threshold Ca²⁺ burst.
         HYPERPOLARIZATION_STEPS: {
             "min_stimulus": -5.0,
             "max_stimulus": -1.0,
@@ -486,6 +506,9 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         # Very high passive R_in (50 kΩ·cm²) with many active channels; currents
         # beyond −2 µA/cm² push the simulation to the numerical floor (−150 mV).
         # −2 → −0.5 µA/cm² keeps peaks in −72 to −76 mV without instability.
+        # The modest ICaT conductance (g=0.5 mS/cm²) may produce a weak
+        # rebound spike at the deepest steps depending on the degree of
+        # de-inactivation at those depths.
         HYPERPOLARIZATION_STEPS: {
             "min_stimulus": -2.0,
             "max_stimulus": -0.5,
@@ -516,7 +539,10 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
         # R_in ≈ 3.5 kΩ·cm²; needs larger currents for visible hyperpolarization.
         # −20 → −5 µA/cm² gives peaks of −69 to −62 mV with clear Ih-driven sag
-        # (2–5 mV) and a rebound spike at step release for −15 µA/cm² and above.
+        # (2–5 mV).  At step release, Ih (g=2.0 mS/cm²) — still activated from
+        # the step — drives a transient depolarisation above threshold, producing
+        # a rebound spike for −15 µA/cm² and above.  This is an Ih-mediated
+        # rebound; the cell has no ICaT.
         HYPERPOLARIZATION_STEPS: {
             "min_stimulus": -20.0,
             "max_stimulus": -5.0,
@@ -551,6 +577,11 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_step": 1.0,
             "stimulus_duration": 100.0,
         },
+        # Inherits the base HYPERPOLARIZATION_STEPS range (−10 → −2 µA/cm²).
+        # Sustained hyperpolarisation de-inactivates ICaT (g=1.5 mS/cm²); on
+        # release a textbook post-inhibitory rebound burst fires via T-type Ca²⁺
+        # activation (Huguenard & McCormick, 1992).  Ih (g=1.0 mS/cm²) also
+        # contributes via sag and post-step overshoot.
     },
     CA1_PYRAMIDAL: {
         # 5 µA/cm² at 15 ms evokes a single AP; 30 ms default produces 2.
@@ -574,8 +605,11 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_duration": 150.0,
         },
         # High R_in (≈20 kΩ·cm²) with Ih; −6 → −2 µA/cm² gives peaks of
-        # −91 to −70 mV, Ih-driven sag of 2–5 mV, and rebound spikes for the
-        # two most negative steps (de-inactivation of low-threshold Ca²⁺ channels).
+        # −91 to −70 mV with Ih-driven sag of 2–5 mV.  Rebound spikes appear at
+        # the two most negative steps via overlapping mechanisms: ICaT
+        # de-inactivation (low-threshold Ca²⁺ burst), Ih overshoot (still
+        # activated on release), and mild HH anode-break at −91 mV (h approaches
+        # de-inactivation, n deactivates).
         HYPERPOLARIZATION_STEPS: {
             "min_stimulus": -6.0,
             "max_stimulus": -2.0,
@@ -608,6 +642,10 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_step": 0.5,
             "stimulus_duration": 200.0,
         },
+        # Inherits the base HYPERPOLARIZATION_STEPS range (−10 → −2 µA/cm²).
+        # Very high ICaT conductance (g=5.0 mS/cm²) produces a prominent
+        # post-inhibitory rebound burst on step release; Ih (g=0.5 mS/cm²)
+        # adds a depolarising overshoot that can trigger additional spikes.
     },
     TRN: {
         # R_in increased with lower total leak (g_KL=0.08); 0.1 µA/cm² subthreshold.

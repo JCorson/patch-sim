@@ -4,6 +4,30 @@ Provides functions to measure voltage sag (Ih-driven depolarising drift during a
 negative current step) and count rebound spikes at step offset from each sweep of
 a multi-sweep current-clamp experiment.
 
+Voltage sag is driven by Ih (HCN channels) and is present only in neurons that
+express those channels (cortical pyramidal, thalamic relay, CA1, STN, dopaminergic).
+
+Rebound spikes arise from several distinct biophysical mechanisms depending on the
+neuron model:
+
+- **ICaT de-inactivation** (thalamic relay, TRN, STN, CA1, Purkinje): sustained
+  hyperpolarisation removes T-type Ca²⁺ channel inactivation; on release the
+  low-threshold ICaT activates and drives a post-inhibitory burst.
+- **Ih-driven overshoot** (dopaminergic, cortical pyramidal): Ih activated during
+  the step continues to conduct after release, transiently depolarising the
+  membrane above threshold in high-excitability cells.
+- **HH anode-break excitation** (squid giant axon, cortical pyramidal): deep
+  hyperpolarisation fully de-inactivates the Na⁺ h-gate and deactivates the K⁺
+  n-gate; on release m activates before h re-inactivates, triggering an action
+  potential (Hodgkin & Huxley, 1952).
+- **Kv3.1 deactivation** (fast-spiking interneuron): Kv3.1 deactivates during
+  the step; insufficient outward current at release allows a brief voltage overshoot
+  past threshold.
+
+``rebound_spike_count`` is a mechanism-agnostic counter — it records spikes that
+fall within ``rebound_window_ms`` of step offset regardless of which of the above
+mechanisms produced them.
+
 Data classes:
     SagPoint: Per-step sag and rebound measurement record.
     HyperpolarizationAnalysisResult: Aggregated analysis output.
@@ -31,7 +55,9 @@ class SagPoint:
             (``steady_state_voltage − peak_voltage``; ≥ 0 when sag is
             present).
         rebound_spike_count: Number of action potentials detected in the
-            ``rebound_window_ms`` immediately following step offset.
+            ``rebound_window_ms`` immediately following step offset.  This is
+            mechanism-agnostic: spikes from ICaT de-inactivation, Ih overshoot,
+            HH anode-break excitation, or Kv3.1 deactivation are all counted.
     """
 
     current_step: float
@@ -141,7 +167,9 @@ def compute_sag_point(
     Peak voltage is the minimum of the voltage trace during the step.
     Steady-state voltage is the mean over the last ``steady_state_fraction`` of
     the step duration.  Rebound spikes are action potentials whose peak time
-    falls within ``[stim_end_ms, stim_end_ms + rebound_window_ms]``.
+    falls within ``[stim_end_ms, stim_end_ms + rebound_window_ms]``.  The count
+    is mechanism-agnostic: ICaT de-inactivation, Ih overshoot, HH anode-break
+    excitation, and Kv3.1 deactivation all contribute equally.
 
     Args:
         time: Time axis array in ms.
@@ -180,7 +208,9 @@ def analyze_hyperpolarization(
     """Compute sag and rebound metrics from a multi-sweep hyperpolarization run.
 
     Calls :func:`compute_sag_point` for each sweep and assembles the results,
-    sorted in ascending order of current step (most negative first).
+    sorted in ascending order of current step (most negative first).  Rebound
+    spike counts are mechanism-agnostic; see the module docstring for the
+    mechanisms that contribute in different neuron models.
 
     Args:
         time: Shared time axis in ms (same for all sweeps).
