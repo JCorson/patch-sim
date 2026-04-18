@@ -104,7 +104,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # reflecting the high input resistance (200–400 MΩ) of RS cortical
         # pyramidal cells.  With K_out=3.32, E_K ≈ −100 mV (Pospischil target),
         # so K leak is outward at v_rest = −70 mV and absorbs most of the total
-        # leak conductance.  g_NaL is very small (0.003 mS/cm²) because the Na
+        # leak conductance.  g_NaL is very small (0.0026 mS/cm²) because the Na
         # leak inward current at −70 mV would otherwise require a large outward
         # K component to compensate.
         #
@@ -118,8 +118,8 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # HH52 reference of 22 °C causes numerical instability in this model.
         v_rest=-70.0,
         K_out=3.32,
-        g_NaL=0.003,
-        g_KL=0.047,
+        g_NaL=0.0026,
+        g_KL=0.0474,
         T_ref=307.15,
         na_channel_factory=make_pospischil_na_channel,
         k_channel_factory=make_pospischil_k_channel,

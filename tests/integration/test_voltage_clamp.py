@@ -31,7 +31,8 @@ def test_simulate_voltage_clamp_returns_structured_array(hh_model):
         "Itotal",
         "INa",
         "IK",
-        "Ileak",
+        "INaL",
+        "IKL",
         "n",
         "m",
         "h",
@@ -269,7 +270,7 @@ def test_current_conservation(hh_model):
 
     result = simulate_voltage_clamp(hh_model, voltage_protocol=voltage)
 
-    reconstructed = result["INa"] + result["IK"] + result["Ileak"]
+    reconstructed = result["INa"] + result["IK"] + result["INaL"] + result["IKL"]
     assert np.allclose(result["Itotal"], reconstructed)
 
 

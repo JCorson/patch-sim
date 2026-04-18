@@ -183,9 +183,14 @@ def _vc_popover_content() -> rx.Component:
             VisibilityState.set_show_potassium_current,
         ),
         _trace_checkbox(
-            "I_L (leak)",
-            VisibilityState.show_leak_current,
-            VisibilityState.set_show_leak_current,
+            "I_NaL (Na⁺ leak)",
+            VisibilityState.show_na_leak_current,
+            VisibilityState.set_show_na_leak_current,
+        ),
+        _trace_checkbox(
+            "I_KL (K⁺ leak)",
+            VisibilityState.show_k_leak_current,
+            VisibilityState.set_show_k_leak_current,
         ),
         rx.separator(),
         _section_label("Gating Variables"),

@@ -55,7 +55,10 @@ def test_all_channels_with_additional() -> None:
 
 
 def test_all_gating_variables_no_additional(hh_model: Neuron) -> None:
-    """all_gating_variables has exactly 3 variables for the default HH model (NaL/KL have none)."""
+    """all_gating_variables has exactly 3 variables for the default HH model.
+
+    NaL and KL leak channels have no gating variables.
+    """
     gvs = hh_model.all_gating_variables
     names = [gv.name for gv in gvs]
     assert "m" in names

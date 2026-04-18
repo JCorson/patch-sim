@@ -29,7 +29,12 @@ from .constants import (
     DEFAULT_T_REF,
     DEFAULT_V_REST,
 )
-from .core_channels import make_k_channel, make_k_leak_channel, make_na_channel, make_na_leak_channel
+from .core_channels import (
+    make_k_channel,
+    make_k_leak_channel,
+    make_na_channel,
+    make_na_leak_channel,
+)
 
 logger = logging.getLogger(__name__)
 

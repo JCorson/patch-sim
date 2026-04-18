@@ -97,7 +97,11 @@ def run_membrane_test(neuron: Neuron) -> PassiveProperties | None:
         )
     )
     g_total = neuron.g_NaL + neuron.g_KL
-    e_l = (neuron.g_NaL * e_na + neuron.g_KL * e_k) / g_total if g_total > 0 else neuron.v_rest
+    e_l = (
+        (neuron.g_NaL * e_na + neuron.g_KL * e_k) / g_total
+        if g_total > 0
+        else neuron.v_rest
+    )
 
     # Passive-only neuron: g_Na = g_K = 0, no auxiliary channels.
     # Equivalent to pharmacological channel block in a real experiment.

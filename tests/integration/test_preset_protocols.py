@@ -33,8 +33,8 @@ from patch_sim.presets import (
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-_CURRENT_CLAMP_REQUIRED = {"time", "voltage", "INa", "IK", "Ileak", "Itotal"}
-_VOLTAGE_CLAMP_REQUIRED = {"time", "voltage", "Itotal", "INa", "IK", "Ileak"}
+_CURRENT_CLAMP_REQUIRED = {"time", "voltage", "INa", "IK", "INaL", "IKL", "Itotal"}
+_VOLTAGE_CLAMP_REQUIRED = {"time", "voltage", "Itotal", "INa", "IK", "INaL", "IKL"}
 
 
 def _count_action_potentials(voltage: np.ndarray, threshold: float = 0.0) -> int:

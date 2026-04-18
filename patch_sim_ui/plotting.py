@@ -67,7 +67,8 @@ class TraceVisibility:
         total_current: Show the summed ion current trace (Voltage Clamp).
         sodium_current: Show I_Na.
         potassium_current: Show I_K.
-        leak_current: Show I_L.
+        na_leak_current: Show I_NaL (Na⁺ leak).
+        k_leak_current: Show I_KL (K⁺ leak).
         potassium_activation: Show gating variable n.
         sodium_activation: Show gating variable m.
         sodium_inactivation: Show gating variable h.
@@ -81,7 +82,8 @@ class TraceVisibility:
     total_current: bool = True
     sodium_current: bool = True
     potassium_current: bool = True
-    leak_current: bool = True
+    na_leak_current: bool = True
+    k_leak_current: bool = True
     potassium_activation: bool = True
     sodium_activation: bool = True
     sodium_inactivation: bool = True
@@ -210,8 +212,10 @@ def _build_hover_tables(
             resp_cols.append(("I_Na", "classic", "sodium_current"))
         if visibility.potassium_current:
             resp_cols.append(("I_K", "classic", "potassium_current"))
-        if visibility.leak_current:
-            resp_cols.append(("I_L", "classic", "leak_current"))
+        if visibility.na_leak_current:
+            resp_cols.append(("I_NaL", "classic", "na_leak_current"))
+        if visibility.k_leak_current:
+            resp_cols.append(("I_KL", "classic", "k_leak_current"))
         for ch_name in add_current_keys:
             if visibility.additional_currents.get(ch_name, True):
                 resp_cols.append((f"I_{ch_name}", "additional", ch_name))
@@ -309,7 +313,8 @@ def compute_trace_visibility_map(
             _map("show_total_current")
             _map("show_sodium_current")
             _map("show_potassium_current")
-            _map("show_leak_current")
+            _map("show_na_leak_current")
+            _map("show_k_leak_current")
             for ch_name in sweep.additional_currents:
                 field = add_curr.get(ch_name)
                 if field:
@@ -516,7 +521,8 @@ def build_figure(
             ("total_current", "I_total", _TOTAL_CURRENT_LINE_WIDTH),
             ("sodium_current", "I_Na", None),
             ("potassium_current", "I_K", None),
-            ("leak_current", "I_L", None),
+            ("na_leak_current", "I_NaL", None),
+            ("k_leak_current", "I_KL", None),
         ]
         for attr, label, width in classic_defs:
             vis = getattr(visibility, attr) if visibility is not None else True

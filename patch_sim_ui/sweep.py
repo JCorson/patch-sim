@@ -13,7 +13,8 @@ _CLASSIC_COLUMNS = frozenset(
         "Itotal",
         "INa",
         "IK",
-        "Ileak",
+        "INaL",
+        "IKL",
         "n",
         "m",
         "h",
@@ -32,7 +33,8 @@ class Sweep(BaseModel):
         dvdt: Time derivative of membrane voltage in mV/ms.
         sodium_current: I_Na in µA/cm².
         potassium_current: I_K in µA/cm².
-        leak_current: I_L in µA/cm².
+        na_leak_current: I_NaL (Na⁺ leak) in µA/cm².
+        k_leak_current: I_KL (K⁺ leak) in µA/cm².
         total_current: Sum of ion currents in µA/cm².
         potassium_activation: Gating variable n (dimensionless, 0–1).
         sodium_activation: Gating variable m (dimensionless, 0–1).
@@ -50,7 +52,8 @@ class Sweep(BaseModel):
     dvdt: list[float]
     sodium_current: list[float]
     potassium_current: list[float]
-    leak_current: list[float]
+    na_leak_current: list[float]
+    k_leak_current: list[float]
     total_current: list[float]
     potassium_activation: list[float]
     sodium_activation: list[float]
@@ -117,7 +120,8 @@ class Sweep(BaseModel):
             dvdt=dvdt_arr.tolist(),
             sodium_current=_col("INa"),
             potassium_current=_col("IK"),
-            leak_current=_col("Ileak"),
+            na_leak_current=_col("INaL"),
+            k_leak_current=_col("IKL"),
             total_current=_col("Itotal"),
             potassium_activation=_col("n"),
             sodium_activation=_col("m"),

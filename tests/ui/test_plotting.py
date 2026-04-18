@@ -47,7 +47,8 @@ def _make_result(
         ("Itotal", np.float64),
         ("INa", np.float64),
         ("IK", np.float64),
-        ("Ileak", np.float64),
+        ("INaL", np.float64),
+        ("IKL", np.float64),
         ("n", np.float64),
         ("m", np.float64),
         ("h", np.float64),
@@ -61,7 +62,8 @@ def _make_result(
     result["Itotal"] = np.zeros(n)
     result["INa"] = np.zeros(n)
     result["IK"] = np.zeros(n)
-    result["Ileak"] = np.zeros(n)
+    result["INaL"] = np.zeros(n)
+    result["IKL"] = np.zeros(n)
     result["n"] = np.full(n, 0.3)
     result["m"] = np.full(n, 0.05)
     result["h"] = np.full(n, 0.6)
@@ -120,7 +122,8 @@ def test_from_result_classic_columns_are_populated() -> None:
     assert len(s.voltage) == _N
     assert len(s.sodium_current) == _N
     assert len(s.potassium_current) == _N
-    assert len(s.leak_current) == _N
+    assert len(s.na_leak_current) == _N
+    assert len(s.k_leak_current) == _N
     assert len(s.total_current) == _N
     assert len(s.potassium_activation) == _N
     assert len(s.sodium_activation) == _N
@@ -242,7 +245,8 @@ def _all_flags_true() -> TraceVisibility:
         total_current=True,
         sodium_current=True,
         potassium_current=True,
-        leak_current=True,
+        na_leak_current=True,
+        k_leak_current=True,
         potassium_activation=True,
         sodium_activation=True,
         sodium_inactivation=True,
@@ -298,13 +302,13 @@ def test_build_figure_cc_single_sweep_trace_count() -> None:
 
 
 def test_build_figure_vc_single_sweep_trace_count() -> None:
-    """Voltage Clamp single sweep: 4 current traces + 3 gating + stimulus = 8."""
+    """Voltage Clamp single sweep: 5 current traces + 3 gating + stimulus = 9."""
     sweep = _make_sweep(mode="Voltage Clamp")
     fig = build_figure(
         [sweep], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
     )
-    # total, Na, K, leak(4) + n, m, h(3) + stimulus(1) = 8
-    assert len(fig.data) == 8
+    # total, Na, K, NaL, KL(5) + n, m, h(3) + stimulus(1) = 9
+    assert len(fig.data) == 9
 
 
 # ---------------------------------------------------------------------------
@@ -612,7 +616,8 @@ def test_build_hover_tables_vc_all_current_flags_off_resp_returns_empty_strings(
         total_current=False,
         sodium_current=False,
         potassium_current=False,
-        leak_current=False,
+        na_leak_current=False,
+        k_leak_current=False,
     )
     args = {**_default_hover_args(sweeps, is_vc=True), "visibility": vis}
     resp, _, _ = _build_hover_tables(**args)
@@ -642,21 +647,23 @@ def test_compute_trace_visibility_map_cc_single_sweep_classic_fields() -> None:
     assert result["show_potassium_activation"] == [1]
     assert result["show_sodium_activation"] == [2]
     assert result["show_sodium_inactivation"] == [3]
-    assert "show_leak_current" not in result
+    assert "show_na_leak_current" not in result
+    assert "show_k_leak_current" not in result
 
 
 def test_compute_trace_visibility_map_vc_single_sweep_classic_fields() -> None:
     """VC single sweep maps classic show_* fields to the correct indices."""
     sweep = _make_sweep(mode="Voltage Clamp")
     result = compute_trace_visibility_map([sweep], "Voltage Clamp")
-    # trace order: total(0), Na(1), K(2), leak(3), n(4), m(5), h(6), stim(7)
+    # trace order: total(0), Na(1), K(2), NaL(3), KL(4), n(5), m(6), h(7), stim(8)
     assert result["show_total_current"] == [0]
     assert result["show_sodium_current"] == [1]
     assert result["show_potassium_current"] == [2]
-    assert result["show_leak_current"] == [3]
-    assert result["show_potassium_activation"] == [4]
-    assert result["show_sodium_activation"] == [5]
-    assert result["show_sodium_inactivation"] == [6]
+    assert result["show_na_leak_current"] == [3]
+    assert result["show_k_leak_current"] == [4]
+    assert result["show_potassium_activation"] == [5]
+    assert result["show_sodium_activation"] == [6]
+    assert result["show_sodium_inactivation"] == [7]
     assert "show_voltage" not in result
 
 
@@ -693,11 +700,11 @@ def test_compute_trace_visibility_map_vc_additional_current_mapped() -> None:
     result = compute_trace_visibility_map(
         [sweep], "Voltage Clamp", additional_current_field_map=curr_map
     )
-    # total(0), Na(1), K(2), leak(3), IFoo(4), n(5), m(6), h(7), stim(8)
-    assert result["show_foo_current"] == [4]
-    assert result["show_potassium_activation"] == [5]
-    assert result["show_sodium_activation"] == [6]
-    assert result["show_sodium_inactivation"] == [7]
+    # total(0), Na(1), K(2), NaL(3), KL(4), IFoo(5), n(6), m(7), h(8), stim(9)
+    assert result["show_foo_current"] == [5]
+    assert result["show_potassium_activation"] == [6]
+    assert result["show_sodium_activation"] == [7]
+    assert result["show_sodium_inactivation"] == [8]
 
 
 def test_compute_trace_visibility_map_multi_gating_keys_same_field() -> None:
@@ -717,10 +724,10 @@ def test_compute_trace_visibility_map_unknown_additional_key_advances_counter() 
     extra = {"IUnknown": [0.0] * _N}
     sweep = _make_sweep(mode="Voltage Clamp", extra_cols=extra)
     result = compute_trace_visibility_map([sweep], "Voltage Clamp")
-    # IUnknown (additional_current) advances the counter; classic gating at 5, 6, 7
-    assert result["show_potassium_activation"] == [5]
-    assert result["show_sodium_activation"] == [6]
-    assert result["show_sodium_inactivation"] == [7]
+    # IUnknown (additional_current) advances the counter; classic gating at 6, 7, 8
+    assert result["show_potassium_activation"] == [6]
+    assert result["show_sodium_activation"] == [7]
+    assert result["show_sodium_inactivation"] == [8]
 
 
 # ---------------------------------------------------------------------------
@@ -821,7 +828,8 @@ def test_build_figure_vc_single_sweep_currents_and_gating_in_legend() -> None:
     assert "I_total" in names
     assert "I_Na" in names
     assert "I_K" in names
-    assert "I_L" in names
+    assert "I_NaL" in names
+    assert "I_KL" in names
     assert "n" in names
     assert "m" in names
     assert "h" in names
@@ -847,7 +855,8 @@ def test_build_figure_multi_sweep_legend_names_have_no_voltage_prefix() -> None:
     assert "I_total" in legend_names
     assert "I_Na" in legend_names
     assert "I_K" in legend_names
-    assert "I_L" in legend_names
+    assert "I_NaL" in legend_names
+    assert "I_KL" in legend_names
     # Gating traces must use bare variable names, not "-60 mV n" etc.
     assert "n" in legend_names
     assert "m" in legend_names

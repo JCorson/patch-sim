@@ -316,7 +316,8 @@ def test_current_clamp_no_additional_channels_identical_columns(hh_model):
         "voltage",
         "INa",
         "IK",
-        "Ileak",
+        "INaL",
+        "IKL",
         "Itotal",
         "n",
         "m",
@@ -343,7 +344,8 @@ def test_voltage_clamp_no_additional_channels_identical_columns(hh_model):
         "Itotal",
         "INa",
         "IK",
-        "Ileak",
+        "INaL",
+        "IKL",
         "n",
         "m",
         "h",
@@ -431,7 +433,9 @@ def test_voltage_clamp_total_current_includes_ih():
         sampling_frequency=40000.0,
     )
     result = simulate_voltage_clamp(neuron, prot)
-    expected = result["INa"] + result["IK"] + result["Ileak"] + result["Ih"]
+    expected = (
+        result["INa"] + result["IK"] + result["INaL"] + result["IKL"] + result["Ih"]
+    )
     np.testing.assert_allclose(result["Itotal"], expected, rtol=1e-10)
 
 
