@@ -154,8 +154,9 @@ def test_q10_current_clamp_earlier_ap_onset() -> None:
     # Both neurons run at T=_T_REF so reversal potentials are identical.
     # Slow: T_ref == T → phi = 1.0 (no scaling).
     # Fast: T_ref = T - 10 → phi = Q10^1 = 3.0 (3× faster kinetics).
-    slow = Neuron(T=_T_REF, T_ref=_T_REF, Q10=3.0)
-    fast = Neuron(T=_T_REF, T_ref=_T_REF - 10.0, Q10=3.0)
+    # K_out=7.8 mM matches HH52 squid seawater; DEFAULT_K_OUT is 4.0 mM (mammalian).
+    slow = Neuron(T=_T_REF, T_ref=_T_REF, Q10=3.0, K_out=7.8)
+    fast = Neuron(T=_T_REF, T_ref=_T_REF - 10.0, Q10=3.0, K_out=7.8)
 
     # Near-threshold current so the subthreshold buildup is long enough for the
     # kinetic difference to shift AP onset by at least a few samples.

@@ -7,5 +7,10 @@ from patch_sim.neuron import Neuron
 
 @pytest.fixture
 def hh_model() -> Neuron:
-    """Default conductance-based neuron instance for all tests."""
-    return Neuron()
+    """HH52 squid giant axon neuron instance for all tests.
+
+    Uses K_out=7.8 mM (HH52 seawater value) explicitly so that tests written
+    against the classic squid axon remain correct even though DEFAULT_K_OUT
+    was lowered to 4.0 mM (physiological mammalian ACSF).
+    """
+    return Neuron(K_out=7.8)

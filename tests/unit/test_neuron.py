@@ -277,7 +277,7 @@ def test_ion_concentrations_reflects_custom_values() -> None:
     """ion_concentrations must return user-supplied concentration values."""
     model = Neuron(Na_out=200.0, K_in=100.0, Ca_out=5.0)
     assert model.ion_concentrations(IonSpecies.SODIUM) == pytest.approx((200.0, 15.0))
-    assert model.ion_concentrations(IonSpecies.POTASSIUM) == pytest.approx((7.8, 100.0))
+    assert model.ion_concentrations(IonSpecies.POTASSIUM) == pytest.approx((4.0, 100.0))
     assert model.ion_concentrations(IonSpecies.CALCIUM) == pytest.approx((5.0, 0.0001))
 
 
