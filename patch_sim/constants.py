@@ -1,19 +1,21 @@
 """Default neuron parameter values and domain constants for the Hodgkin-Huxley model."""
 
-# Default neuron parameters (classic Hodgkin-Huxley values)
+# Default neuron parameters (Hodgkin-Huxley squid giant axon values)
 #
-# Ion concentrations are set so that Nernst potentials match the reversal
-# potentials used in the original HH52 paper (E_Na ≈ +50, E_K ≈ −77 mV).
-# This ensures that the HH52 rate functions — which were empirically fit to
-# squid axon data at those reversal potentials — produce the correct resting
-# potential (−65 mV) and firing dynamics.
+# DEFAULT_K_OUT = 7.8 mM is the HH52 seawater value (E_K ≈ −77 mV at 37 °C).
+# Raw Neuron() instances and the SQUID_GIANT_AXON preset use this default.
+# Mammalian presets override K_out to 4.0 mM (typical ACSF, E_K ≈ −95 mV),
+# which provides the realistic K⁺ driving force needed to reach physiological
+# mammalian resting potentials.
 #
 # The passive leak is split into Na⁺ and K⁺ background conductances:
-#   DEFAULT_G_NAL = 0.054 mS/cm²  (Na⁺ leak, E_Na ≈ +50 mV)
-#   DEFAULT_G_KL  = 0.246 mS/cm²  (K⁺ leak, E_K ≈ −77 mV)
+#   DEFAULT_G_NAL = 0.054 mS/cm²  (Na⁺ leak, NALCN-type)
+#   DEFAULT_G_KL  = 0.246 mS/cm²  (K⁺ leak, TREK/TRAAK-type)
 # These values are chosen so that g_NaL + g_KL = 0.3 mS/cm² (preserving τ_m)
 # and I_NaL + I_KL at V = −65 mV equals the old chloride-leak current
 # (g_L_old × (−65 − E_L_old)), ensuring v_rest remains at −65 mV.
+# Mammalian presets each override g_NaL and g_KL explicitly and are retuned
+# for their own K_out=4.0 value.
 DEFAULT_G_NA: float = 120.0
 DEFAULT_G_K: float = 36.0
 DEFAULT_G_NAL: float = 0.054
@@ -22,7 +24,7 @@ DEFAULT_C_M: float = 1.0
 DEFAULT_V_REST: float = -65.0
 DEFAULT_NA_OUT: float = 97.4
 DEFAULT_NA_IN: float = 15.0
-DEFAULT_K_OUT: float = 7.8
+DEFAULT_K_OUT: float = 4.0
 DEFAULT_K_IN: float = 140.0
 DEFAULT_T: float = 310.15  # Kelvin (37°C)
 DEFAULT_Q10: float = 3.0  # Dimensionless Q10 temperature coefficient
