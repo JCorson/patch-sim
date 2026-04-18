@@ -60,10 +60,14 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # (E_Na ≈ +50, E_K ≈ −77, E_L ≈ −54 mV) so no overrides needed.
         # Ref: Hodgkin & Huxley (1952), J. Physiol. 117:500
         #
+        # K_out=7.8 mM overrides DEFAULT_K_OUT (4.0 mM, mammalian ACSF) to
+        # restore the HH52 seawater value (E_K ≈ −77 mV).
+        #
         # Q10=1.0: this preset IS the room-temperature squid axon model.
         # Applying a 5.2× thermal correction to bring it to mammalian
         # temperature is not meaningful — the kinetics are already those
         # of the intact preparation.
+        K_out=7.8,
         Q10=1.0,
     ),
     FAST_SPIKING_INTERNEURON: NeuronConfig(
@@ -76,8 +80,9 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # g_NaL + g_KL = 1.5 mS/cm² gives τ_m ≈ 0.67 ms — highly leaky membrane
         # that narrows the synaptic integration window, a hallmark of FS cells.
-        # Values chosen so that g_NaL*(v_rest-E_Na) + g_KL*(v_rest-E_K) matches
-        # the previous single-leak current at rest, preserving v_rest = −65 mV.
+        # Values tuned so that I_NaL + I_KL + I_channels = 0 at v_rest = −65 mV
+        # with K_out=4 mM (E_K ≈ −95 mV); g_total is unchanged from the
+        # previous tuning (preserving τ_m = 0.67 ms and v_rest = −65 mV).
         #
         # Q10=1.0: these channels are adapted from HH52 squid-axon kinetics
         # without a well-defined mammalian thermal reference.  Applying a 5.2×
@@ -86,8 +91,8 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # are already implicit in the conductance values fitted to FS cell data.
         g_Na=150.0,
         g_K=50.0,
-        g_NaL=0.182,
-        g_KL=1.318,
+        g_NaL=0.4065,
+        g_KL=1.0935,
         Q10=1.0,
         channels=(ChannelConfig(make_ikv31_channel, g_max=40.0),),
     ),
@@ -134,18 +139,26 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # IKCa couples Ca²⁺ influx to after-hyperpolarization.
         # Ref: De Schutter & Bower (1994), J. Neurophysiol. 71:375
         #
-        # v_rest = −68 mV matches the published Purkinje cell resting potential.
+        # v_rest = −70.5 mV is the zero-current equilibrium with K_out=4 mM
+        # (E_K ≈ −95 mV) and g_NaL = g_total = 0.02 mS/cm² (g_KL = 0).
+        # With E_K ≈ −95 mV the K⁺-leak driving force at −68 mV is too large
+        # for g_total = 0.02 to balance — a pure Na⁺ leak (g_KL = 0) lets the
+        # HH gated K⁺ current (g_K = 36) provide the outward balance, shifting
+        # v_rest to −70.5 mV.  Published Purkinje resting potentials range from
+        # −65 to −72 mV depending on preparation; −70.5 mV is within range.
         #
         # g_NaL + g_KL = 0.02 mS/cm² gives τ_m ≈ 50 ms and R_in ≈ 50 kΩ·cm²,
         # reflecting the low somatic leak conductance of Purkinje cells.
-        # g_NaL = 0.0095 and g_KL = 0.0105 preserve v_rest = −68 mV: Na⁺ leak
-        # is inward (v_rest = −68 mV < E_Na ≈ +50 mV); K⁺ leak is outward
-        # (v_rest = −68 mV > E_K ≈ −77 mV), partially offsetting the Na⁺ inward
-        # current.  This replaces the previous unphysiological Cl_in = 63.5 mM
-        # (#224) with the default physiological Cl_in ≈ 15.8 mM.
-        v_rest=-68.0,
-        g_NaL=0.0095,
-        g_KL=0.0105,
+        #
+        # WARNING: g_KL=0 means v_rest depends on the HH gated K⁺ current
+        # (g_K=36) for outward balance.  If g_K, g_Na, or the channel list
+        # changes, v_rest will shift silently.  A non-zero g_KL would be
+        # biophysically cleaner but requires a higher g_total to compensate
+        # the larger outward K⁺ driving force at E_K ≈ −95 mV, which would
+        # shorten τ_m below the 50 ms target.  Revisit if g_K is ever retuned.
+        v_rest=-70.5,
+        g_NaL=0.02,
+        g_KL=0.0,
         channels=(
             ChannelConfig(make_ical_channel, g_max=1.0),
             ChannelConfig(make_icat_channel, g_max=0.5),
@@ -160,13 +173,11 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # v_rest = −60 mV matches the published dopaminergic neuron resting
         # potential.  g_NaL + g_KL = 0.3 mS/cm² (τ_m ≈ 3.3 ms); values tuned
-        # so that g_NaL*(v_rest-E_Na) + g_KL*(v_rest-E_K) matches the previous
-        # leak current at rest, preserving v_rest = −60 mV.  This replaces the
-        # previous unphysiological Cl_in = 47.0 mM (#224) with the default
-        # physiological Cl_in ≈ 15.8 mM.
+        # so that I_NaL + I_KL + I_channels = 0 at v_rest = −60 mV with
+        # K_out=4 mM (E_K ≈ −95 mV); g_total is unchanged (τ_m preserved).
         v_rest=-60.0,
-        g_NaL=0.123,
-        g_KL=0.177,
+        g_NaL=0.2646,
+        g_KL=0.0354,
         channels=(
             ChannelConfig(make_ih_channel, g_max=2.0),
             ChannelConfig(make_im_channel, g_max=1.0),
@@ -180,9 +191,10 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # g_NaL + g_KL = 0.1 mS/cm² gives τ_m ≈ 10 ms and R_in ≈ 10 kΩ·cm²,
         # matching moderate resting conductances in thalamic relay cells.
         # Lower total leak (< 0.1) triggers spontaneous spiking via ICaT window
-        # current.  Values tuned to preserve v_rest = −65 mV.
-        g_NaL=0.006,
-        g_KL=0.094,
+        # current.  Values tuned for K_out=4 mM (E_K ≈ −95 mV) to preserve
+        # v_rest = −65 mV; g_total unchanged (τ_m preserved).
+        g_NaL=0.0644,
+        g_KL=0.0356,
         channels=(
             ChannelConfig(make_icat_channel, g_max=1.5),
             ChannelConfig(make_ih_channel, g_max=1.0),
@@ -197,7 +209,8 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # g_NaL + g_KL = 0.05 mS/cm² gives τ_m ≈ 20 ms and R_in ≈ 20 kΩ·cm²,
         # matching the high input resistance measured in CA1 pyramidal cells in
-        # slice recordings.  Values tuned to preserve v_rest = −65 mV.
+        # slice recordings.  Values tuned for K_out=4 mM (E_K ≈ −95 mV) to
+        # preserve v_rest = −65 mV; g_total unchanged (τ_m preserved).
         #
         # Q10=1.0: as with FSI, the HH52-derived Na⁺ kinetics lack a mammalian
         # thermal reference.  A 5.2× Q10 factor accelerates Na⁺ inactivation
@@ -205,8 +218,8 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # conductance values are already calibrated for CA1 behavior.
         g_Na=35.0,
         g_K=10.0,
-        g_NaL=0.015,
-        g_KL=0.035,
+        g_NaL=0.0411,
+        g_KL=0.0089,
         Q10=1.0,
         channels=(
             ChannelConfig(make_ika_channel, g_max=0.5),
@@ -254,26 +267,25 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         ),
     ),
     TRN: NeuronConfig(
-        # ICaT (g_T ≈ 3.5 mS/cm²) drives rhythmic burst firing and
+        # ICaT (g_T = 3.5 mS/cm²) drives rhythmic burst firing and
         # sleep-spindle oscillations characteristic of TRN cells.
         # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804;
         #       Destexhe et al. (1994)
         #
-        # g_KL = 0.08 mS/cm² gives τ_m ≈ 12.5 ms and R_in ≈ 12.5 kΩ·cm²,
-        # matching the moderate resting conductance of TRN neurons.  ICaT is
-        # sufficiently de-inactivated at v_rest ≈ −66 mV for post-inhibitory
-        # rebound bursting.
+        # With K_out=4 mM (E_K ≈ −95 mV), the physiological v_rest = −77 mV
+        # is now reachable: K⁺ leak has 18 mV of outward driving force at rest,
+        # and a small Na⁺ leak (g_NaL = 0.0104) provides the inward current to
+        # balance I_KL + I_CaT_window at −77 mV.  Previously, with E_K ≈ −77 mV
+        # (K_out=7.8), the K⁺ leak had zero driving force at the target rest,
+        # and the equilibrium was forced to −66 mV.
         #
-        # Note: TRN has v_rest ≈ E_K ≈ −77 mV in slice recordings, but the
-        # Na+K split leak model cannot reproduce this while also preserving τ_m.
-        # The K⁺ leak alone (E_KL = E_K ≈ −77 mV) has essentially zero driving
-        # force at the published resting potential, so the equilibrium settles
-        # at −66 mV where the ICaT window current is balanced by K⁺ leak outward
-        # current.  g_NaL = 0.0 is used so that the Na⁺ inward leak does not
-        # further depolarize the cell away from E_K.
-        v_rest=-66.0,
-        g_NaL=0.0,
-        g_KL=0.08,
+        # g_NaL + g_KL = 0.08 mS/cm² preserves τ_m ≈ 12.5 ms and
+        # R_in ≈ 12.5 kΩ·cm².  At v_rest = −77 mV, ICaT's inactivation gate
+        # is ft_inf ≈ 0.42 — well de-inactivated for post-inhibitory rebound
+        # bursting and burst character on depolarising steps.
+        v_rest=-77.0,
+        g_NaL=0.0104,
+        g_KL=0.0696,
         channels=(ChannelConfig(make_icat_channel, g_max=3.5),),
     ),
 }
@@ -431,11 +443,13 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "min_stimulus": 0.5,
             "max_stimulus": 0.5,
         },
-        # 5 µA/cm² at 15 ms evokes a single AP; 30 ms default produces 2.
+        # 10 µA/cm² at 5 ms evokes a single AP; longer durations produce 2+.
+        # Threshold rose from the old preset because v_rest shifted to −70.5 mV
+        # and K⁺ driving force is stronger with K_out=4.0 mM (E_K ≈ −95 mV).
         ACTION_POTENTIAL: {
-            "min_stimulus": 5.0,
-            "max_stimulus": 5.0,
-            "stimulus_duration": 15.0,
+            "min_stimulus": 10.0,
+            "max_stimulus": 10.0,
+            "stimulus_duration": 5.0,
         },
         # Moderate amplitude; complex Ca²⁺-driven spiking emerges within 200 ms.
         REPETITIVE_FIRING: {
@@ -445,19 +459,18 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     DOPAMINERGIC: {
-        # Q10 scaling (Q10=3 at 37°C vs 22°C ref) raises the firing threshold
-        # to ~6 µA/cm²; 7 µA/cm² is safely suprathreshold.  8 ms is long
-        # enough for the AP to fire but short enough to prevent a second spike.
+        # Firing threshold rose with K_out=4.0 mM (E_K ≈ −95 mV, stronger outward
+        # drive); 15 µA/cm² at 5 ms evokes a single AP, short enough to prevent
+        # a second spike from the large g_NaL inward current at rest.
         ACTION_POTENTIAL: {
-            "min_stimulus": 7.0,
-            "max_stimulus": 7.0,
-            "stimulus_duration": 8.0,
+            "min_stimulus": 15.0,
+            "max_stimulus": 15.0,
+            "stimulus_duration": 5.0,
         },
-        # Same amplitude bump for the long pacemaking window; HH channels scaled
-        # by Q10 fire at high frequency at 7 µA/cm², well above the ≥5 AP target.
+        # Long pacemaking window; 15 µA/cm² drives sustained high-frequency firing.
         REPETITIVE_FIRING: {
-            "min_stimulus": 7.0,
-            "max_stimulus": 7.0,
+            "min_stimulus": 15.0,
+            "max_stimulus": 15.0,
             "stimulus_duration": 480.0,
         },
         # Threshold ~1.75 µA/cm²; narrow range with finer steps to show
@@ -474,18 +487,19 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "min_stimulus": 0.2,
             "max_stimulus": 0.2,
         },
-        # 5 µA/cm² at 5 ms evokes a single AP; the shorter window prevents
-        # a second spike that Q10-scaled kinetics would otherwise allow.
+        # 20 µA/cm² at 2.5 ms evokes a single AP; threshold rose with K_out=4.0 mM
+        # (E_K ≈ −95 mV), and the brief pulse prevents the ICaT rebound from
+        # triggering additional oscillatory spikes.
         ACTION_POTENTIAL: {
-            "min_stimulus": 5.0,
-            "max_stimulus": 5.0,
-            "stimulus_duration": 5.0,
+            "min_stimulus": 20.0,
+            "max_stimulus": 20.0,
+            "stimulus_duration": 2.5,
         },
-        # Depolarizing step for sustained tonic firing via T-type Ca²⁺
-        # and Ih; 5 µA/cm² gives ~12 spikes at ~58 Hz over 200 ms.
+        # 8 µA/cm² drives sustained tonic firing via T-type Ca²⁺ and Ih
+        # over 200 ms (≥52 spikes).
         REPETITIVE_FIRING: {
-            "min_stimulus": 5.0,
-            "max_stimulus": 5.0,
+            "min_stimulus": 8.0,
+            "max_stimulus": 8.0,
             "stimulus_duration": 200.0,
         },
         # Threshold ~0.94 µA/cm²; narrow range with 1 µA/cm² steps to

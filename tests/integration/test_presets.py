@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 import patch_sim
+from patch_sim.additional_channels import make_icat_channel
 from patch_sim.analysis.membrane_test import run_membrane_test
 from patch_sim.constants import (
     ACTION_POTENTIAL,
@@ -264,3 +265,38 @@ def test_preset_passive_properties_in_physiological_range(
         f"Preset '{preset_name}': R_in = {props.input_resistance:.2f} kΩ·cm² "
         f"outside [{rin_lo}, {rin_hi}]"
     )
+
+
+# ---------------------------------------------------------------------------
+# TRN burst-enabling conditions
+# ---------------------------------------------------------------------------
+
+
+def test_trn_preset_vrest_is_physiological() -> None:
+    """TRN v_rest must be −77 mV — the physiological slice value.
+
+    This is the primary claim of the K_out=4.0 mM retuning: with E_K ≈ −95 mV
+    the K⁺ leak has 18 mV of outward driving force at rest, allowing a small
+    Na⁺ leak to balance ICaT window current at −77 mV.  If v_rest drifts, the
+    ICaT inactivation gate ft will shift and burst firing will be impaired.
+    """
+    config = NEURON_PRESETS[TRN]
+    assert config.v_rest == pytest.approx(-77.0)
+
+
+def test_trn_icat_ft_inf_at_vrest_enables_burst_firing() -> None:
+    """ICaT inactivation gate ft_inf at TRN v_rest must be ≈ 0.42.
+
+    ft_inf ≈ 0.42 at −77 mV means ICaT is substantially de-inactivated at
+    rest, enabling the post-inhibitory rebound burst and burst character on
+    depolarising steps that define TRN firing.  Previously (K_out=7.8 mM,
+    E_K ≈ −77 mV) v_rest settled at −66 mV where ft_inf ≈ 0.17 — too
+    inactivated for reliable burst firing.
+    """
+    channel = make_icat_channel()
+    ft_var = next(gv for gv in channel.gating_variables if gv.name == "ft")
+    v_rest = NEURON_PRESETS[TRN].v_rest
+    alpha = ft_var.alpha(v_rest, 0.0)
+    beta = ft_var.beta(v_rest, 0.0)
+    ft_inf = alpha / (alpha + beta)
+    assert ft_inf == pytest.approx(0.42, abs=0.02)

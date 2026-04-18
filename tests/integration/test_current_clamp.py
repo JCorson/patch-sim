@@ -51,8 +51,8 @@ def test_simulate_current_clamp_returns_structured_array(hh_model):
 
 def test_simulation_dynamics():
     """Test that the simulation shows expected dynamics."""
-    # Create model for testing
-    custom_model = Neuron()
+    # K_out=7.8 mM matches HH52 squid seawater; DEFAULT_K_OUT is 4.0 mM (mammalian).
+    custom_model = Neuron(K_out=7.8)
 
     # Create current array for a 50ms simulation
     duration = 50  # ms
@@ -117,8 +117,8 @@ def test_simulate_current_clamp_with_non_zero_currents(current_amplitude: float)
     """Test simulate_current_clamp with various non-zero external currents."""
     duration = 10  # ms
 
-    # Create a model for testing
-    custom_model = Neuron()
+    # K_out=7.8 mM matches HH52 squid seawater; DEFAULT_K_OUT is 4.0 mM (mammalian).
+    custom_model = Neuron(K_out=7.8)
     num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
 
     # Create constant current array for the given amplitude
