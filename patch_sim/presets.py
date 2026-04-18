@@ -60,9 +60,8 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # (E_Na ≈ +50, E_K ≈ −77, E_L ≈ −54 mV) so no overrides needed.
         # Ref: Hodgkin & Huxley (1952), J. Physiol. 117:500
         #
-        # K_out=7.8 mM preserves HH52 seawater E_K ≈ −77 mV; DEFAULT_K_OUT
-        # was changed to 4.0 mM (physiological mammalian ACSF) so this
-        # explicit override is required for squid-axon fidelity.
+        # K_out=7.8 mM overrides DEFAULT_K_OUT (4.0 mM, mammalian ACSF) to
+        # restore the HH52 seawater value (E_K ≈ −77 mV).
         #
         # Q10=1.0: this preset IS the room-temperature squid axon model.
         # Applying a 5.2× thermal correction to bring it to mammalian
@@ -150,6 +149,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # g_NaL + g_KL = 0.02 mS/cm² gives τ_m ≈ 50 ms and R_in ≈ 50 kΩ·cm²,
         # reflecting the low somatic leak conductance of Purkinje cells.
+        #
+        # WARNING: g_KL=0 means v_rest depends on the HH gated K⁺ current
+        # (g_K=36) for outward balance.  If g_K, g_Na, or the channel list
+        # changes, v_rest will shift silently.  A non-zero g_KL would be
+        # biophysically cleaner but requires a higher g_total to compensate
+        # the larger outward K⁺ driving force at E_K ≈ −95 mV, which would
+        # shorten τ_m below the 50 ms target.  Revisit if g_K is ever retuned.
         v_rest=-70.5,
         g_NaL=0.02,
         g_KL=0.0,

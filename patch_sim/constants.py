@@ -2,11 +2,9 @@
 
 # Default neuron parameters (Hodgkin-Huxley squid giant axon values)
 #
-# DEFAULT_K_OUT = 7.8 mM is the HH52 seawater value (E_K ≈ −77 mV at 37 °C).
-# Raw Neuron() instances and the SQUID_GIANT_AXON preset use this default.
-# Mammalian presets override K_out to 4.0 mM (typical ACSF, E_K ≈ −95 mV),
-# which provides the realistic K⁺ driving force needed to reach physiological
-# mammalian resting potentials.
+# DEFAULT_K_OUT = 4.0 mM is the physiological mammalian ACSF value
+# (E_K ≈ −95 mV at 37 °C).  All mammalian presets rely on this default.
+# SQUID_GIANT_AXON overrides it to 7.8 mM (HH52 seawater, E_K ≈ −77 mV).
 #
 # The passive leak is split into Na⁺ and K⁺ background conductances:
 #   DEFAULT_G_NAL = 0.054 mS/cm²  (Na⁺ leak, NALCN-type)

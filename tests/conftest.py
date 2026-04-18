@@ -11,6 +11,6 @@ def hh_model() -> Neuron:
 
     Uses K_out=7.8 mM (HH52 seawater value) explicitly so that tests written
     against the classic squid axon remain correct even though DEFAULT_K_OUT
-    was lowered to 4.0 mM (physiological mammalian ACSF).
+    is 4.0 mM (physiological mammalian ACSF).
     """
     return Neuron(K_out=7.8)
