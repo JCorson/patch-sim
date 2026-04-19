@@ -6,6 +6,7 @@ Modules:
     ap_metrics: Action potential detection and metric extraction.
     derivatives: General-purpose derivative utilities (e.g. dV/dt).
     fi_curve: F-I curve construction from current clamp multi-sweep results.
+    hyperpolarization: Sag and rebound analysis from hyperpolarization sweeps.
     iv_curve: I-V curve construction from voltage clamp multi-sweep results.
     membrane_test: Dedicated membrane test for passive property characterisation.
     passive_properties: Passive membrane property extraction (R_in, τₘ, Cₘ).
@@ -33,6 +34,12 @@ from .gv_curve import (
     boltzmann,
     compute_gv,
 )
+from .hyperpolarization import (
+    HyperpolarizationAnalysisResult,
+    SagPoint,
+    analyze_hyperpolarization,
+    compute_sag_point,
+)
 from .iv_curve import IVAnalysisResult, IVPoint, analyze_iv, compute_iv_point
 from .membrane_test import (
     MEMBRANE_TEST_CURRENT,
@@ -52,6 +59,7 @@ __all__ = [
     "analyze_aps",
     "analyze_aps_from_result",
     "analyze_fi",
+    "analyze_hyperpolarization",
     "analyze_iv",
     "analyze_passive_properties",
     "analyze_sfa",
@@ -60,6 +68,7 @@ __all__ = [
     "compute_fi_point",
     "compute_gv",
     "compute_iv_point",
+    "compute_sag_point",
     "compute_sfa",
     "estimate_rheobase",
     "is_subthreshold",
@@ -68,6 +77,8 @@ __all__ = [
     "BoltzmannFit",
     "FIAnalysisResult",
     "FIPoint",
+    "HyperpolarizationAnalysisResult",
+    "SagPoint",
     "GVAnalysisResult",
     "GVPoint",
     "IVAnalysisResult",
