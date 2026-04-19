@@ -27,6 +27,8 @@ from patch_sim.constants import (
 from patch_sim.core_channels import (
     make_pospischil_k_channel,
     make_pospischil_na_channel,
+    make_thalamic_relay_k_channel,
+    make_thalamic_relay_na_channel,
 )
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import (
@@ -232,6 +234,27 @@ def test_ca1_uses_pospischil_k_factory() -> None:
     """CA1 preset wires the Pospischil K⁺ channel factory (issue #231)."""
     config = NEURON_PRESETS[CA1_PYRAMIDAL]
     assert config.k_channel_factory is make_pospischil_k_channel
+
+
+def test_thalamic_relay_uses_mh92_na_factory() -> None:
+    """Thalamic Relay preset wires the McCormick-Huguenard Na⁺ factory (issue #241)."""
+    config = NEURON_PRESETS[THALAMIC_RELAY]
+    assert config.na_channel_factory is make_thalamic_relay_na_channel
+
+
+def test_thalamic_relay_uses_mh92_k_factory() -> None:
+    """Thalamic Relay preset wires the McCormick-Huguenard K⁺ factory (issue #241)."""
+    config = NEURON_PRESETS[THALAMIC_RELAY]
+    assert config.k_channel_factory is make_thalamic_relay_k_channel
+
+
+def test_thalamic_relay_t_ref_is_mccormick_huguenard_recording_temp() -> None:
+    """Thalamic Relay T_ref matches McCormick & Huguenard (1992) 36 °C recording temp.
+
+    Prevents regression to the HH52 default (295.15 K = 22 °C) which applied
+    a ~5.2× Q10 overcorrection and distorted Na⁺ inactivation kinetics.
+    """
+    assert NEURON_PRESETS[THALAMIC_RELAY].T_ref == pytest.approx(309.15)
 
 
 # ---------------------------------------------------------------------------
