@@ -397,6 +397,233 @@ def make_pospischil_k_channel(g_max: float) -> IonChannel:
 
 
 # ---------------------------------------------------------------------------
+# McCormick & Huguenard (1992) thalamic relay Na⁺/K⁺ rate functions
+#
+# Source: McCormick, D.A. & Huguenard, J.R. (1992) A model of the
+# electrophysiological properties of thalamocortical relay neurons.
+# J. Neurophysiol. 68:1384–1400.
+#
+# Parameterisation: Pospischil, M. et al. (2008) Minimal Hodgkin-Huxley type
+# models for different classes of cortical and thalamic neurons.
+# Biol. Cybern. 99:427–441, Table 2 (TC cell).
+#
+# Rate functions use the same Traub-Miles analytical form as the Pospischil
+# cortical RS factories above (pospischil_alpha_m / _beta_m / _alpha_h /
+# _beta_h / _alpha_n / _beta_n) — the only difference is the voltage
+# threshold VT = −52 mV here vs VT = −56.2 mV for cortical RS.  VT = −52 mV
+# matches the firing threshold of guinea-pig dorsal LGN relay neurons
+# recorded by McCormick & Huguenard (1992) at 36 °C.
+# ---------------------------------------------------------------------------
+
+#: Voltage threshold parameter (mV) for thalamic relay cells.
+#: Pospischil et al. (2008), Table 2 (TC model): VT = −52 mV.
+THALAMIC_RELAY_VT: float = -52.0
+
+
+def thalamic_relay_alpha_m(V: float, ca_i: float) -> float:
+    """Forward rate for thalamic relay Na⁺ activation gate m.
+
+    Traub-Miles form parameterised for thalamic relay cells (VT = −52 mV).
+    Has a removable singularity at V = VT + 13 = −39 mV; the L'Hôpital
+    limit (1.28) is returned when ``|V − VT − 13| < SINGULARITY_THRESHOLD``.
+
+    Reference: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384;
+    Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (TC model).
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    x = V - THALAMIC_RELAY_VT - 13
+    if abs(x) < SINGULARITY_THRESHOLD:
+        return 1.28
+    return -0.32 * x / (safe_exp(-x / 4) - 1)
+
+
+def thalamic_relay_beta_m(V: float, ca_i: float) -> float:
+    """Backward rate for thalamic relay Na⁺ activation gate m.
+
+    Traub-Miles form parameterised for thalamic relay cells (VT = −52 mV).
+    Has a removable singularity at V = VT + 40 = −12 mV; the L'Hôpital
+    limit (1.4) is returned when ``|V − VT − 40| < SINGULARITY_THRESHOLD``.
+
+    Reference: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384;
+    Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (TC model).
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    x = V - THALAMIC_RELAY_VT - 40
+    if abs(x) < SINGULARITY_THRESHOLD:
+        return 1.4
+    return 0.28 * x / (safe_exp(x / 5) - 1)
+
+
+def thalamic_relay_alpha_h(V: float, ca_i: float) -> float:
+    """Forward rate for thalamic relay Na⁺ inactivation gate h.
+
+    Traub-Miles form parameterised for thalamic relay cells (VT = −52 mV).
+
+    Reference: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384;
+    Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (TC model).
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    return 0.128 * safe_exp(-(V - THALAMIC_RELAY_VT - 17) / 18)
+
+
+def thalamic_relay_beta_h(V: float, ca_i: float) -> float:
+    """Backward rate for thalamic relay Na⁺ inactivation gate h.
+
+    Traub-Miles form parameterised for thalamic relay cells (VT = −52 mV).
+
+    Reference: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384;
+    Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (TC model).
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    return 4.0 / (1 + safe_exp(-(V - THALAMIC_RELAY_VT - 40) / 5))
+
+
+def thalamic_relay_alpha_n(V: float, ca_i: float) -> float:
+    """Forward rate for thalamic relay K⁺ delayed-rectifier activation gate n.
+
+    Traub-Miles form parameterised for thalamic relay cells (VT = −52 mV).
+    Has a removable singularity at V = VT + 15 = −37 mV; the L'Hôpital
+    limit (0.16) is returned when ``|V − VT − 15| < SINGULARITY_THRESHOLD``.
+
+    Reference: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384;
+    Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (TC model).
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    x = V - THALAMIC_RELAY_VT - 15
+    if abs(x) < SINGULARITY_THRESHOLD:
+        return 0.16
+    return -0.032 * x / (safe_exp(-x / 5) - 1)
+
+
+def thalamic_relay_beta_n(V: float, ca_i: float) -> float:
+    """Backward rate for thalamic relay K⁺ delayed-rectifier activation gate n.
+
+    Traub-Miles form parameterised for thalamic relay cells (VT = −52 mV).
+
+    Reference: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384;
+    Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (TC model).
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    return 0.5 * safe_exp(-(V - THALAMIC_RELAY_VT - 10) / 40)
+
+
+def make_thalamic_relay_na_channel(g_max: float) -> IonChannel:
+    """Create the thalamic relay fast sodium channel (Na⁺).
+
+    Uses Traub-Miles kinetics with VT = −52 mV, parameterised for the
+    thalamocortical relay (TC) cell model of Pospischil et al. (2008).
+    Rate-equation half-points match McCormick & Huguenard (1992) recordings
+    of guinea-pig dorsal LGN relay neurons at 36 °C.
+
+    Intended as the ``na_channel_factory`` of the Thalamic Relay preset.
+    Compared with the default HH52 Na⁺ channel (fitted to squid axon at
+    22 °C), the Traub-Miles form with VT = −52 mV shifts the activation
+    threshold ~13 mV depolarised and slows inactivation, preventing the
+    ~5.2× Q10 overcorrection that caused premature Na⁺ inactivation.
+
+    Reference: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384;
+    Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (TC model).
+
+    Args:
+        g_max: Maximum conductance in mS/cm².
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the thalamic
+        relay fast Na⁺ channel.
+    """
+    return IonChannel(
+        name="Na",
+        g_max=g_max,
+        gating_variables=(
+            GatingVariable(
+                name="m",
+                power=3,
+                alpha=thalamic_relay_alpha_m,
+                beta=thalamic_relay_beta_m,
+            ),
+            GatingVariable(
+                name="h",
+                power=1,
+                alpha=thalamic_relay_alpha_h,
+                beta=thalamic_relay_beta_h,
+            ),
+        ),
+        reversal_spec=NernstSpec(IonSpecies.SODIUM),
+    )
+
+
+def make_thalamic_relay_k_channel(g_max: float) -> IonChannel:
+    """Create the thalamic relay delayed-rectifier potassium channel (K⁺).
+
+    Uses Traub-Miles kinetics with VT = −52 mV, parameterised for the
+    thalamocortical relay (TC) cell model of Pospischil et al. (2008).
+    Rate-equation half-points match McCormick & Huguenard (1992) recordings
+    of guinea-pig dorsal LGN relay neurons at 36 °C.
+
+    Intended as the ``k_channel_factory`` of the Thalamic Relay preset.
+
+    Reference: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384;
+    Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (TC model).
+
+    Args:
+        g_max: Maximum conductance in mS/cm².
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the thalamic
+        relay delayed-rectifier K⁺ channel.
+    """
+    return IonChannel(
+        name="K",
+        g_max=g_max,
+        gating_variables=(
+            GatingVariable(
+                name="n",
+                power=4,
+                alpha=thalamic_relay_alpha_n,
+                beta=thalamic_relay_beta_n,
+            ),
+        ),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Otsuka et al. (2004) STN channel kinetics
 # ---------------------------------------------------------------------------
 # Reference: Otsuka, T. et al. (2004). Conductance-based model of the

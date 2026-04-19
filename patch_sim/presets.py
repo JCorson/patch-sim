@@ -47,6 +47,8 @@ from .core_channels import (
     make_pospischil_na_channel,
     make_stn_k_channel,
     make_stn_na_channel,
+    make_thalamic_relay_k_channel,
+    make_thalamic_relay_na_channel,
 )
 from .neuron_factory import ChannelConfig, NeuronConfig
 
@@ -192,15 +194,43 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
     THALAMIC_RELAY: NeuronConfig(
         # T-type Ca²⁺ produces low-threshold spike; Ih causes
         # post-inhibitory rebound burst after hyperpolarizing step.
-        # Ref: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384
+        # Refs: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384;
+        #       Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (TC)
         #
-        # g_NaL + g_KL = 0.1 mS/cm² gives τ_m ≈ 10 ms and R_in ≈ 10 kΩ·cm²,
-        # matching moderate resting conductances in thalamic relay cells.
-        # Lower total leak (< 0.1) triggers spontaneous spiking via ICaT window
-        # current.  Values tuned for K_out=4 mM (E_K ≈ −95 mV) to preserve
-        # v_rest = −65 mV; g_total unchanged (τ_m preserved).
-        g_NaL=0.0644,
-        g_KL=0.0356,
+        # McCormick-Huguenard (1992) / Pospischil (2008) Traub-Miles Na⁺/K⁺
+        # kinetics (VT = −52 mV) replace the default HH52 core channels.
+        # HH52 kinetics (fitted to room-temperature squid axon) over-accelerate
+        # Na⁺ inactivation under the default Q10=3.0 scaling (22→37 °C, factor
+        # ~5.2×), biologically wrong for a mammalian thalamic relay cell.
+        # MH92 channels were recorded at 36 °C, so T_ref=309.15 K limits the
+        # Q10 correction to ~1.12× (36→37 °C) — a negligible adjustment that
+        # preserves the published kinetics.
+        #
+        # v_rest = −68 mV is the zero-current equilibrium with MH92 kinetics and
+        # K_out=4 mM (E_K ≈ −95 mV); the McCormick-Huguenard TC cell rests in the
+        # −65 to −70 mV range depending on leak parameterisation.
+        #
+        # g_NaL = 0, g_KL = 0.15 mS/cm²: purely K⁺ background leak, τ_m ≈ 6.7 ms
+        # and R_in ≈ 6.7 kΩ·cm².  A nonzero g_NaL would shift v_rest upward but
+        # cannot satisfy the ≤1 mV stability criterion (test_all_presets_stable_at_rest)
+        # at any resting potential:
+        # the MH92 K⁺ kinetics produce negligible tonic window current at rest
+        # (n_inf ≈ 0.004 vs HH52 n_inf ≈ 0.32), removing the ~10.9 mA/cm² K⁺
+        # outward balance that the HH52 kinetics accidentally provided.  The large
+        # ICaT and Ih window inward currents at −65 mV (~4 mA/cm² combined)
+        # require g_total > 0.135 mS/cm² to balance, and at g_total = 0.15 only
+        # the pure-K⁺ split (g_NaL ≈ 0) achieves a stable rest at −68 mV.
+        #
+        # WARNING: v_rest depends on ICaT (g=1.5) and Ih (g=1.0) window currents
+        # at −68 mV, not purely on the leak ratio.  If g_CaT or g_Ih are ever
+        # retuned, re-run find_zero_current_voltage to recompute v_rest and
+        # g_KL (keeping g_NaL = 0 and g_KL = 0.15).
+        v_rest=-68.0,
+        g_NaL=0.0,
+        g_KL=0.15,
+        T_ref=309.15,
+        na_channel_factory=make_thalamic_relay_na_channel,
+        k_channel_factory=make_thalamic_relay_k_channel,
         channels=(
             ChannelConfig(make_icat_channel, g_max=1.5),
             ChannelConfig(make_ih_channel, g_max=1.0),
@@ -558,10 +588,10 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     THALAMIC_RELAY: {
-        # R_in increased with lower total leak (0.1 mS/cm²); 0.2 µA/cm² subthreshold.
+        # v_rest = −68 mV with MH92 kinetics; 0.1 µA/cm² is safely subthreshold.
         SUBTHRESHOLD_RESPONSE: {
-            "min_stimulus": 0.2,
-            "max_stimulus": 0.2,
+            "min_stimulus": 0.1,
+            "max_stimulus": 0.1,
         },
         # 20 µA/cm² at 2.5 ms evokes a single AP; threshold rose with K_out=4.0 mM
         # (E_K ≈ −95 mV), and the brief pulse prevents the ICaT rebound from

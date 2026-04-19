@@ -27,6 +27,8 @@ from patch_sim.constants import (
 from patch_sim.core_channels import (
     make_pospischil_k_channel,
     make_pospischil_na_channel,
+    make_thalamic_relay_k_channel,
+    make_thalamic_relay_na_channel,
 )
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import (
@@ -234,6 +236,27 @@ def test_ca1_uses_pospischil_k_factory() -> None:
     assert config.k_channel_factory is make_pospischil_k_channel
 
 
+def test_thalamic_relay_uses_mh92_na_factory() -> None:
+    """Thalamic Relay preset wires the McCormick-Huguenard Na⁺ factory (issue #241)."""
+    config = NEURON_PRESETS[THALAMIC_RELAY]
+    assert config.na_channel_factory is make_thalamic_relay_na_channel
+
+
+def test_thalamic_relay_uses_mh92_k_factory() -> None:
+    """Thalamic Relay preset wires the McCormick-Huguenard K⁺ factory (issue #241)."""
+    config = NEURON_PRESETS[THALAMIC_RELAY]
+    assert config.k_channel_factory is make_thalamic_relay_k_channel
+
+
+def test_thalamic_relay_t_ref_is_mccormick_huguenard_recording_temp() -> None:
+    """Thalamic Relay T_ref matches McCormick & Huguenard (1992) 36 °C recording temp.
+
+    Prevents regression to the HH52 default (295.15 K = 22 °C) which applied
+    a ~5.2× Q10 overcorrection and distorted Na⁺ inactivation kinetics.
+    """
+    assert NEURON_PRESETS[THALAMIC_RELAY].T_ref == pytest.approx(309.15)
+
+
 # ---------------------------------------------------------------------------
 # Passive membrane properties are physiologically differentiated
 # ---------------------------------------------------------------------------
@@ -250,7 +273,7 @@ def test_ca1_uses_pospischil_k_factory() -> None:
         (CORTICAL_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
         (PURKINJE, 45.0, 55.0, 45.0, 55.0),  # g_total=0.02 τ_m≈50 ms
         (DOPAMINERGIC, 2.5, 4.5, 2.5, 4.5),  # g_total=0.3  τ_m≈3.3 ms
-        (THALAMIC_RELAY, 8.0, 12.0, 8.0, 12.0),  # g_total=0.1  τ_m≈10 ms
+        (THALAMIC_RELAY, 5.0, 9.0, 5.0, 9.0),  # g_total=0.15  τ_m≈6.7 ms
         (CA1_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
         (STN, 2.5, 5.5, 2.5, 5.5),  # g_total=0.25 τ_m≈4 ms
         (TRN, 10.0, 15.0, 10.0, 15.0),  # g_total=0.08 τ_m≈12.5 ms
