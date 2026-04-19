@@ -10,7 +10,7 @@ express those channels (cortical pyramidal, thalamic relay, CA1, STN, dopaminerg
 Rebound spikes arise from several distinct biophysical mechanisms depending on the
 neuron model:
 
-- **ICaT de-inactivation** (thalamic relay, TRN, STN, CA1, Purkinje): sustained
+- **ICaT de-inactivation** (thalamic relay, TRN, STN, Purkinje): sustained
   hyperpolarisation removes T-type Ca²⁺ channel inactivation; on release the
   low-threshold ICaT activates and drives a post-inhibitory burst.
 - **Ih-driven overshoot** (dopaminergic, cortical pyramidal): Ih activated during
@@ -20,9 +20,6 @@ neuron model:
   hyperpolarisation fully de-inactivates the Na⁺ h-gate and deactivates the K⁺
   n-gate; on release m activates before h re-inactivates, triggering an action
   potential (Hodgkin & Huxley, 1952).
-- **Kv3.1 deactivation** (fast-spiking interneuron): Kv3.1 deactivates during
-  the step; insufficient outward current at release allows a brief voltage overshoot
-  past threshold.
 
 ``rebound_spike_count`` is a mechanism-agnostic counter — it records spikes that
 fall within ``rebound_window_ms`` of step offset regardless of which of the above
@@ -57,7 +54,7 @@ class SagPoint:
         rebound_spike_count: Number of action potentials detected in the
             ``rebound_window_ms`` immediately following step offset.  This is
             mechanism-agnostic: spikes from ICaT de-inactivation, Ih overshoot,
-            HH anode-break excitation, or Kv3.1 deactivation are all counted.
+            or HH anode-break excitation are all counted.
     """
 
     current_step: float
@@ -168,8 +165,8 @@ def compute_sag_point(
     Steady-state voltage is the mean over the last ``steady_state_fraction`` of
     the step duration.  Rebound spikes are action potentials whose peak time
     falls within ``[stim_end_ms, stim_end_ms + rebound_window_ms]``.  The count
-    is mechanism-agnostic: ICaT de-inactivation, Ih overshoot, HH anode-break
-    excitation, and Kv3.1 deactivation all contribute equally.
+    is mechanism-agnostic: ICaT de-inactivation, Ih overshoot, and HH anode-break
+    excitation all contribute equally.
 
     Args:
         time: Time axis array in ms.

@@ -438,12 +438,8 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
         # Very low R_in (~0.67 kΩ·cm²) requires large currents for noticeable
         # hyperpolarization.  −20 → −5 µA/cm² gives peaks of −74 to −67 mV.
-        # At step release, Kv3.1 channels (which deactivate quickly during
-        # hyperpolarization) provide insufficient outward current to prevent the
-        # membrane from overshooting threshold, producing a rebound spike at
-        # −20 µA/cm².  Unlike ICaT-driven rebound, this is a post-inhibitory
-        # rebound driven by de-inactivation of Na⁺ channels rather than a
-        # low-threshold Ca²⁺ burst.
+        # No post-inhibitory rebound: Pospischil Na⁺/K⁺ kinetics at 34 °C do
+        # not produce the Na⁺ de-inactivation overshoot seen in HH52 kinetics.
         HYPERPOLARIZATION_STEPS: {
             "min_stimulus": -20.0,
             "max_stimulus": -5.0,

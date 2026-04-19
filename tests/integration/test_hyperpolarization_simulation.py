@@ -6,12 +6,11 @@ the full simulation pipeline and verifies:
   - Ih-driven sag (steady-state depolarisation above the peak) for neurons
     known to express HCN channels.
   - Post-step rebound spikes for every model that produces them, covering all
-    four biophysical mechanisms present in this simulator:
+    three biophysical mechanisms present in this simulator:
 
-    * ICaT de-inactivation (thalamic relay, CA1 pyramidal, STN, TRN, Purkinje)
-    * Ih-driven post-step overshoot (dopaminergic)
+    * ICaT de-inactivation (thalamic relay, STN, TRN, Purkinje)
+    * Ih-driven post-step overshoot (dopaminergic, cortical pyramidal)
     * HH anode-break excitation (squid giant axon, cortical pyramidal)
-    * Kv3.1 deactivation-gated overshoot (fast-spiking interneuron)
 
   - Absence of true sag for neurons without HCN channels.
 
