@@ -79,22 +79,27 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Refs: Erisir et al. (1999), J. Neurophysiol. 82:2476;
         #       Wang & Buzsáki (1996), J. Neurosci. 16:6402
         #
+        # Pospischil et al. (2008) Traub-Miles Na⁺/K⁺ kinetics replace the
+        # default HH52 core channels.  HH52 kinetics (fitted to room-temperature
+        # squid axon) over-accelerate Na⁺ inactivation under the default
+        # Q10=3.0 scaling (22→37 °C, factor ~5.2×), causing depolarization
+        # block after the first AP — biologically wrong for a fast-spiking cell.
+        # Pospischil kinetics were characterized at mammalian temperature (34 °C),
+        # so T_ref=307.15 K limits the Q10 factor to ~1.4× and the cell sustains
+        # non-adapting high-frequency firing as expected.
+        #
         # g_NaL + g_KL = 1.5 mS/cm² gives τ_m ≈ 0.67 ms — highly leaky membrane
         # that narrows the synaptic integration window, a hallmark of FS cells.
         # Values tuned so that I_NaL + I_KL + I_channels = 0 at v_rest = −65 mV
-        # with K_out=4 mM (E_K ≈ −95 mV); g_total is unchanged from the
-        # previous tuning (preserving τ_m = 0.67 ms and v_rest = −65 mV).
-        #
-        # Q10=1.0: these channels are adapted from HH52 squid-axon kinetics
-        # without a well-defined mammalian thermal reference.  Applying a 5.2×
-        # Q10 factor (22→37 °C) drives Na⁺ inactivation so fast that the cell
-        # enters depolarization block after the first AP.  Temperature effects
-        # are already implicit in the conductance values fitted to FS cell data.
+        # with K_out=4 mM (E_K ≈ −95 mV) and Pospischil channel steady-state
+        # currents; g_total is unchanged (preserving τ_m = 0.67 ms).
         g_Na=150.0,
         g_K=50.0,
-        g_NaL=0.4065,
-        g_KL=1.0935,
-        Q10=1.0,
+        g_NaL=0.3115,
+        g_KL=1.1885,
+        T_ref=307.15,
+        na_channel_factory=make_pospischil_na_channel,
+        k_channel_factory=make_pospischil_k_channel,
         channels=(ChannelConfig(make_ikv31_channel, g_max=40.0),),
     ),
     CORTICAL_PYRAMIDAL: NeuronConfig(
@@ -208,20 +213,25 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # after-hyperpolarization (AHP) characteristic of CA1 cells.
         # Refs: Warman et al. (1994); Migliore et al. (1999), ModelDB #2796
         #
+        # Pospischil et al. (2008) Traub-Miles Na⁺/K⁺ kinetics replace the
+        # default HH52 core channels.  HH52 kinetics over-accelerate Na⁺
+        # inactivation under default Q10=3.0 scaling (factor ~5.2×), causing
+        # depolarization block after the first AP.  Pospischil kinetics were
+        # characterized at 34 °C, so T_ref=307.15 K reduces the Q10 factor
+        # to ~1.4× and the cell sustains repetitive firing as expected.
+        #
         # g_NaL + g_KL = 0.05 mS/cm² gives τ_m ≈ 20 ms and R_in ≈ 20 kΩ·cm²,
         # matching the high input resistance measured in CA1 pyramidal cells in
-        # slice recordings.  Values tuned for K_out=4 mM (E_K ≈ −95 mV) to
-        # preserve v_rest = −65 mV; g_total unchanged (τ_m preserved).
-        #
-        # Q10=1.0: as with FSI, the HH52-derived Na⁺ kinetics lack a mammalian
-        # thermal reference.  A 5.2× Q10 factor accelerates Na⁺ inactivation
-        # enough to cause depolarization block after the first AP; the
-        # conductance values are already calibrated for CA1 behavior.
+        # slice recordings.  Values tuned for K_out=4 mM (E_K ≈ −95 mV) with
+        # Pospischil channel steady-state currents to preserve v_rest = −65 mV;
+        # g_total unchanged (τ_m preserved).
         g_Na=35.0,
         g_K=10.0,
-        g_NaL=0.0411,
-        g_KL=0.0089,
-        Q10=1.0,
+        g_NaL=0.0232,
+        g_KL=0.0268,
+        T_ref=307.15,
+        na_channel_factory=make_pospischil_na_channel,
+        k_channel_factory=make_pospischil_k_channel,
         channels=(
             ChannelConfig(make_ika_channel, g_max=0.5),
             ChannelConfig(make_im_channel, g_max=0.5),
@@ -410,28 +420,26 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         # at these depths.
     },
     FAST_SPIKING_INTERNEURON: {
-        # High total leak (g_NaL+g_KL=1.5 mS/cm²) raises the firing threshold; 20 µA/cm²
-        # is safely suprathreshold.  10 ms avoids a second spike at this
-        # amplitude.
+        # High total leak (g_NaL+g_KL=1.5 mS/cm²) raises the firing threshold; 25 µA/cm²
+        # is safely suprathreshold with Pospischil kinetics.  5 ms is the minimum
+        # duration that reaches threshold at this amplitude; 5–10 ms gives exactly 1 AP.
         ACTION_POTENTIAL: {
-            "min_stimulus": 20.0,
-            "max_stimulus": 20.0,
-            "stimulus_duration": 10.0,
-        },
-        # Higher amplitude needed for non-adapting high-frequency firing with
-        # the elevated Kv3.1 conductance.
-        REPETITIVE_FIRING: {
             "min_stimulus": 25.0,
             "max_stimulus": 25.0,
+            "stimulus_duration": 5.0,
+        },
+        # 26 µA/cm² is just above the repetitive-firing threshold; lower amplitudes
+        # fire only 1 AP.  Pospischil kinetics sustain non-adapting high-frequency
+        # firing without depolarization block.
+        REPETITIVE_FIRING: {
+            "min_stimulus": 26.0,
+            "max_stimulus": 26.0,
             "stimulus_duration": 180.0,
         },
         # Very low R_in (~0.67 kΩ·cm²) requires large currents for noticeable
         # hyperpolarization.  −20 → −5 µA/cm² gives peaks of −74 to −67 mV.
-        # At step release, Kv3.1 channels (which deactivate quickly during
-        # hyperpolarization) provide insufficient outward current to prevent the
-        # membrane from overshooting threshold, producing a rebound spike at
-        # −20 µA/cm².  Unlike ICaT-driven rebound, this is a Kv3.1-gated
-        # anode-break variant rather than a low-threshold Ca²⁺ burst.
+        # No post-inhibitory rebound: Pospischil Na⁺/K⁺ kinetics at 34 °C do
+        # not produce the Na⁺ de-inactivation overshoot seen in HH52 kinetics.
         HYPERPOLARIZATION_STEPS: {
             "min_stimulus": -20.0,
             "max_stimulus": -5.0,
@@ -584,10 +592,11 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         # contributes via sag and post-step overshoot.
     },
     CA1_PYRAMIDAL: {
-        # 5 µA/cm² at 15 ms evokes a single AP; 30 ms default produces 2.
+        # 6 µA/cm² at 15 ms evokes a single AP with Pospischil kinetics;
+        # 5 µA/cm² falls below threshold with the retuned leak conductances.
         ACTION_POTENTIAL: {
-            "min_stimulus": 5.0,
-            "max_stimulus": 5.0,
+            "min_stimulus": 6.0,
+            "max_stimulus": 6.0,
             "stimulus_duration": 15.0,
         },
         # Long moderate-amplitude step reveals adaptation and pronounced AHP.
@@ -604,16 +613,15 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_step": 3.0,
             "stimulus_duration": 150.0,
         },
-        # High R_in (≈20 kΩ·cm²) with Ih; −6 → −2 µA/cm² gives peaks of
-        # −91 to −70 mV with Ih-driven sag of 2–5 mV.  Rebound spikes appear at
-        # the two most negative steps via overlapping mechanisms: ICaT
-        # de-inactivation (low-threshold Ca²⁺ burst), Ih overshoot (still
-        # activated on release), and mild HH anode-break at −91 mV (h approaches
-        # de-inactivation, n deactivates).
+        # High R_in (≈20 kΩ·cm²) with Ih; −3 → −1 µA/cm² gives peaks of
+        # −86 to −71 mV with Ih-driven sag of 2–10 mV.  Pospischil kinetics
+        # with the retuned leak produce larger voltage deflections per µA/cm²
+        # than the previous HH52 configuration; the range is reduced accordingly
+        # to stay in the biologically relevant window.
         HYPERPOLARIZATION_STEPS: {
-            "min_stimulus": -6.0,
-            "max_stimulus": -2.0,
-            "stimulus_step": 1.0,
+            "min_stimulus": -3.0,
+            "max_stimulus": -1.0,
+            "stimulus_step": 0.5,
         },
     },
     STN: {

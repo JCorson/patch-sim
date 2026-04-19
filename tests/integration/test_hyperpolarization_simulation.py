@@ -6,12 +6,11 @@ the full simulation pipeline and verifies:
   - Ih-driven sag (steady-state depolarisation above the peak) for neurons
     known to express HCN channels.
   - Post-step rebound spikes for every model that produces them, covering all
-    four biophysical mechanisms present in this simulator:
+    three biophysical mechanisms present in this simulator:
 
-    * ICaT de-inactivation (thalamic relay, CA1 pyramidal, STN, TRN, Purkinje)
-    * Ih-driven post-step overshoot (dopaminergic)
+    * ICaT de-inactivation (thalamic relay, STN, TRN, Purkinje)
+    * Ih-driven post-step overshoot (dopaminergic, cortical pyramidal)
     * HH anode-break excitation (squid giant axon, cortical pyramidal)
-    * Kv3.1 deactivation-gated overshoot (fast-spiking interneuron)
 
   - Absence of true sag for neurons without HCN channels.
 
@@ -250,14 +249,22 @@ def test_rebound_burst_in_thalamic_relay() -> None:
     )
 
 
-def test_rebound_burst_in_ca1_pyramidal() -> None:
-    """CA1 pyramidal neuron fires a rebound burst after deep hyperpolarization."""
+def test_hyperpolarization_sag_in_ca1_pyramidal() -> None:
+    """CA1 pyramidal neuron shows Ih-driven sag during hyperpolarization.
+
+    The Pospischil Na⁺/K⁺ kinetics (34 °C reference) produce sufficient outward
+    K⁺ current on step release that the threshold for post-inhibitory rebound
+    is not reached in this stimulus range.  Ih-driven sag is still the
+    distinguishing feature verified here.
+
+    Args:
+        None
+    """
     result = _run_hyperpolarization_sweeps(CA1_PYRAMIDAL)
     most_negative = result.points[0]
-    assert most_negative.rebound_spike_count >= 1, (
-        f"CA1 Pyramidal: expected ≥1 rebound spike after most negative step, "
-        f"got {most_negative.rebound_spike_count} "
-        f"(peak={most_negative.peak_voltage:.1f} mV)"
+    assert most_negative.sag_amplitude > 0.0, (
+        f"CA1 Pyramidal: expected Ih-driven sag at most negative step, "
+        f"got sag_amplitude={most_negative.sag_amplitude:.2f} mV"
     )
 
 
@@ -306,22 +313,20 @@ def test_rebound_in_cortical_pyramidal() -> None:
     )
 
 
-def test_rebound_in_fast_spiking_interneuron() -> None:
-    """Fast-spiking interneuron fires a rebound spike via Kv3.1 deactivation.
+def test_hyperpolarization_in_fast_spiking_interneuron() -> None:
+    """Fast-spiking interneuron hyperpolarizes cleanly with no Ih sag.
 
-    Kv3.1 channels deactivate during hyperpolarisation, reducing outward K⁺
-    current at step release.  This lowers the net repolarising drive at the
-    moment of membrane recovery, allowing the voltage to overshoot threshold
-    and fire a single post-step spike.  The cell has no ICaT or Ih; the rebound
-    is a Kv3.1-gated variant of anode-break excitation, not a low-threshold
-    Ca²⁺ burst.  The effect is apparent at the most negative step (−20 µA/cm²).
+    The FSI has no HCN channels, so hyperpolarizing steps produce a flat
+    voltage deflection with zero sag amplitude.  Pospischil Na⁺/K⁺ kinetics
+    (issue #231) have a higher firing threshold and stronger outward K⁺
+    rectification than the previous HH52 model, so the post-step voltage
+    does not exceed threshold and no rebound spike is generated.
     """
     result = _run_hyperpolarization_sweeps(FAST_SPIKING_INTERNEURON)
     most_negative = result.points[0]
-    assert most_negative.rebound_spike_count >= 1, (
-        f"Fast-Spiking Interneuron: expected ≥1 rebound spike after most negative "
-        f"step, got {most_negative.rebound_spike_count} "
-        f"(peak={most_negative.peak_voltage:.1f} mV)"
+    assert most_negative.sag_amplitude < 0.01, (
+        f"Fast-Spiking Interneuron: expected zero sag (no Ih), "
+        f"got sag_amplitude={most_negative.sag_amplitude:.4f} mV"
     )
 
 
