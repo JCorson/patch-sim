@@ -250,7 +250,7 @@ def test_ca1_uses_pospischil_k_factory() -> None:
         (CORTICAL_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
         (PURKINJE, 45.0, 55.0, 45.0, 55.0),  # g_total=0.02 τ_m≈50 ms
         (DOPAMINERGIC, 2.5, 4.5, 2.5, 4.5),  # g_total=0.3  τ_m≈3.3 ms
-        (THALAMIC_RELAY, 8.0, 12.0, 8.0, 12.0),  # g_total=0.1  τ_m≈10 ms
+        (THALAMIC_RELAY, 5.0, 9.0, 5.0, 9.0),  # g_total=0.15  τ_m≈6.7 ms
         (CA1_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
         (STN, 2.5, 5.5, 2.5, 5.5),  # g_total=0.25 τ_m≈4 ms
         (TRN, 10.0, 15.0, 10.0, 15.0),  # g_total=0.08 τ_m≈12.5 ms
