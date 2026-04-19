@@ -407,11 +407,12 @@ def make_pospischil_k_channel(g_max: float) -> IonChannel:
 # models for different classes of cortical and thalamic neurons.
 # Biol. Cybern. 99:427–441, Table 2 (TC cell).
 #
-# Rate functions use the Traub-Miles form (same as the Pospischil cortical
-# factories above) but with a thalamic-relay voltage threshold VT = −52 mV,
-# matching the firing threshold of guinea-pig dorsal LGN relay neurons
-# recorded by McCormick & Huguenard (1992) at 36 °C.  The cortical RS value
-# (VT = −56.2 mV) places activation too hyperpolarised for these cells.
+# Rate functions use the same Traub-Miles analytical form as the Pospischil
+# cortical RS factories above (pospischil_alpha_m / _beta_m / _alpha_h /
+# _beta_h / _alpha_n / _beta_n) — the only difference is the voltage
+# threshold VT = −52 mV here vs VT = −56.2 mV for cortical RS.  VT = −52 mV
+# matches the firing threshold of guinea-pig dorsal LGN relay neurons
+# recorded by McCormick & Huguenard (1992) at 36 °C.
 # ---------------------------------------------------------------------------
 
 #: Voltage threshold parameter (mV) for thalamic relay cells.

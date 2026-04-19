@@ -207,12 +207,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # preserves the published kinetics.
         #
         # v_rest = −68 mV is the zero-current equilibrium with MH92 kinetics and
-        # K_out=4 mM (E_K ≈ −95 mV); the MCormick-Huguenard TC cell rests in the
+        # K_out=4 mM (E_K ≈ −95 mV); the McCormick-Huguenard TC cell rests in the
         # −65 to −70 mV range depending on leak parameterisation.
         #
         # g_NaL = 0, g_KL = 0.15 mS/cm²: purely K⁺ background leak, τ_m ≈ 6.7 ms
         # and R_in ≈ 6.7 kΩ·cm².  A nonzero g_NaL would shift v_rest upward but
-        # cannot be achieved within 1 mV of equilibrium at any resting potential:
+        # cannot satisfy the ≤1 mV stability criterion (test_all_presets_stable_at_rest)
+        # at any resting potential:
         # the MH92 K⁺ kinetics produce negligible tonic window current at rest
         # (n_inf ≈ 0.004 vs HH52 n_inf ≈ 0.32), removing the ~10.9 mA/cm² K⁺
         # outward balance that the HH52 kinetics accidentally provided.  The large
