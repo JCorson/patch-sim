@@ -137,7 +137,7 @@ def _sag_point_from_ap_result(
     ss_mask = (time >= ss_start) & (time < stim_end_ms)
     steady_state_voltage = float(voltage[ss_mask].mean())
 
-    sag_amplitude = steady_state_voltage - peak_voltage
+    sag_amplitude = max(0.0, steady_state_voltage - peak_voltage)
 
     rebound_end_ms = stim_end_ms + rebound_window_ms
     rebound_spikes = [

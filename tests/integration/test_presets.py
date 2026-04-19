@@ -194,7 +194,7 @@ def test_build_protocol_from_preset_exported_from_patch_sim() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Cortical Pyramidal preset uses Pospischil factories
+# Presets that use Pospischil factories (mammalian kinetics at 34 °C)
 # ---------------------------------------------------------------------------
 
 
@@ -207,6 +207,30 @@ def test_cortical_pyramidal_uses_pospischil_na_factory() -> None:
 def test_cortical_pyramidal_uses_pospischil_k_factory() -> None:
     """Cortical Pyramidal preset wires the Pospischil K⁺ channel factory."""
     config = NEURON_PRESETS[CORTICAL_PYRAMIDAL]
+    assert config.k_channel_factory is make_pospischil_k_channel
+
+
+def test_fsi_uses_pospischil_na_factory() -> None:
+    """FSI preset wires the Pospischil Na⁺ channel factory (issue #231)."""
+    config = NEURON_PRESETS[FAST_SPIKING_INTERNEURON]
+    assert config.na_channel_factory is make_pospischil_na_channel
+
+
+def test_fsi_uses_pospischil_k_factory() -> None:
+    """FSI preset wires the Pospischil K⁺ channel factory (issue #231)."""
+    config = NEURON_PRESETS[FAST_SPIKING_INTERNEURON]
+    assert config.k_channel_factory is make_pospischil_k_channel
+
+
+def test_ca1_uses_pospischil_na_factory() -> None:
+    """CA1 preset wires the Pospischil Na⁺ channel factory (issue #231)."""
+    config = NEURON_PRESETS[CA1_PYRAMIDAL]
+    assert config.na_channel_factory is make_pospischil_na_channel
+
+
+def test_ca1_uses_pospischil_k_factory() -> None:
+    """CA1 preset wires the Pospischil K⁺ channel factory (issue #231)."""
+    config = NEURON_PRESETS[CA1_PYRAMIDAL]
     assert config.k_channel_factory is make_pospischil_k_channel
 
 

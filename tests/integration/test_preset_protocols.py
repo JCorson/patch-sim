@@ -19,7 +19,6 @@ from patch_sim.clamp_simulations import (
 )
 from patch_sim.constants import (
     ACTION_POTENTIAL,
-    FAST_SPIKING_INTERNEURON,
     REPETITIVE_FIRING,
 )
 from patch_sim.neuron_factory import make_neuron
@@ -175,13 +174,6 @@ def test_subthreshold_response_preset(preset_name: str) -> None:
 # Current clamp: Repetitive Firing protocol
 # ---------------------------------------------------------------------------
 
-# Minimum AP counts per neuron preset for the Repetitive Firing protocol.
-# FSI uses HH52 Na⁺ kinetics which lead to depolarization block after the
-# first AP under sustained current — a pre-existing kinetics limitation
-# unrelated to Q10 temperature scaling.
-_MIN_REPETITIVE_APS: dict[str, int] = {
-    FAST_SPIKING_INTERNEURON: 1,
-}
 _DEFAULT_MIN_REPETITIVE_APS = 5
 
 
@@ -190,8 +182,8 @@ def test_repetitive_firing_preset(preset_name: str) -> None:
     """Repetitive Firing protocol elicits multiple action potentials.
 
     The long suprathreshold step is designed to produce sustained repetitive
-    discharge.  Most presets produce at least ``_DEFAULT_MIN_REPETITIVE_APS``
-    (5) APs; exceptions are listed in ``_MIN_REPETITIVE_APS``.
+    discharge.  All presets must produce at least ``_DEFAULT_MIN_REPETITIVE_APS``
+    (5) APs.
 
     Args:
         preset_name: Name of the neuron preset under test.
@@ -202,11 +194,10 @@ def test_repetitive_firing_preset(preset_name: str) -> None:
 
     _assert_current_clamp_valid(result)
 
-    min_aps = _MIN_REPETITIVE_APS.get(preset_name, _DEFAULT_MIN_REPETITIVE_APS)
     n_aps = _count_action_potentials(result["voltage"])
-    assert n_aps >= min_aps, (
-        f"{preset_name}: expected ≥{min_aps} APs under Repetitive Firing protocol, "
-        f"got {n_aps}"
+    assert n_aps >= _DEFAULT_MIN_REPETITIVE_APS, (
+        f"{preset_name}: expected ≥{_DEFAULT_MIN_REPETITIVE_APS} APs under Repetitive "
+        f"Firing protocol, got {n_aps}"
     )
 
 
