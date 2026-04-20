@@ -55,14 +55,13 @@ def test_find_zero_current_voltage_no_bracket() -> None:
 # crossing in the default search range.  See test_all_presets_stable_at_rest
 # in test_current_clamp.py for the 50 ms stability verification.
 #
-# PURKINJE is excluded: De Schutter & Bower (1994) Traub-Miles kinetics
-# (VT=−58 mV) produce a complex I_total(V) profile with multiple sign changes
-# in the default range (−100 to −20 mV).  The stable rest at −82.3 mV is a
-# genuine sign change (inward at −85 mV → outward at −80 mV), but Brent's
-# method in the default range finds a spurious root near −30 mV (Na/K plateau
-# region).  Use v_min=−90, v_max=−75 to locate the physiological equilibrium.
-# See test_all_presets_stable_at_rest in test_current_clamp.py for the
-# 50 ms stability verification.
+# PURKINJE is excluded: De Schutter & Bower (1994) Traub-Miles kinetics plus
+# INaP/INaR produce a complex I_total(V) profile with multiple sign changes in
+# the default range (−100 to −20 mV).  The pacemaker threshold at −65 mV is a
+# genuine sign change, but Brent's method in the default range finds a spurious
+# root near −30 mV (Na/K plateau region).  Use v_min=−75, v_max=−55 to isolate
+# the physiological pacemaker threshold.
+# See test_find_zero_current_voltage_purkinje_pacemaking_range below.
 _EQUILIBRIUM_PRESET_NAMES = [p for p in NEURON_PRESET_NAMES if p not in (TRN, PURKINJE)]
 
 
@@ -82,18 +81,19 @@ def test_find_zero_current_voltage_all_presets(preset_name: str) -> None:
     )
 
 
-def test_find_zero_current_voltage_purkinje_narrow_range() -> None:
-    """Purkinje equilibrium is found in [−90, −75] mV and matches v_rest.
+def test_find_zero_current_voltage_purkinje_pacemaking_range() -> None:
+    """Purkinje zero-current equilibrium is in [−75, −55] mV and matches v_rest.
 
-    The default [−100, −20] range finds a spurious root near −30 mV (see
-    _EQUILIBRIUM_PRESET_NAMES exclusion comment above).  The narrow range
-    isolates the physiological fixed point at −82.3 mV, pinning g_NaL, g_KL,
-    and g_CaT against silent regressions.
+    With INaP/INaR added, the equilibrium shifts from −82.3 mV to the
+    physiological pacemaking range (Häusser & Clark 1997: −55 to −65 mV).
+    The default [−100, −20] range finds a spurious root near −30 mV (Na/K
+    plateau); the narrow [−75, −55] range isolates the pacemaker threshold,
+    pinning g_KL, g_NaP, g_NaR, and g_CaT against silent regressions.
     """
     config = NEURON_PRESETS[PURKINJE]
     neuron = make_neuron(config)
-    v_eq = find_zero_current_voltage(neuron, v_min=-90.0, v_max=-75.0)
+    v_eq = find_zero_current_voltage(neuron, v_min=-75.0, v_max=-55.0)
     assert abs(v_eq - neuron.v_rest) < 0.5, (
-        f"Purkinje narrow-range equilibrium {v_eq:.2f} mV differs from "
+        f"Purkinje pacemaking-range equilibrium {v_eq:.2f} mV differs from "
         f"v_rest={neuron.v_rest:.1f} mV by {abs(v_eq - neuron.v_rest):.2f} mV"
     )

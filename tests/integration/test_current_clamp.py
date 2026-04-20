@@ -4,9 +4,16 @@ import numpy as np
 import pytest
 
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+from patch_sim.constants import PURKINJE
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
+
+# Purkinje is a pacemaker with an UNSTABLE zero-current equilibrium at v_rest.
+# Starting from v_rest = −65 mV it drifts below threshold — the stability
+# criterion does not apply.  See test_purkinje_fires_spontaneously in
+# tests/integration/test_purkinje.py for the pacemaking behaviour check.
+_STABLE_PRESET_NAMES = [p for p in NEURON_PRESET_NAMES if p != PURKINJE]
 
 
 def test_simulate_current_clamp_returns_structured_array(hh_model):
@@ -376,13 +383,16 @@ def test_large_hyperpolarizing_current_voltage_stays_bounded(hh_model):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("preset_name", NEURON_PRESET_NAMES)
+@pytest.mark.parametrize("preset_name", _STABLE_PRESET_NAMES)
 def test_all_presets_stable_at_rest(preset_name: str) -> None:
-    """Every neuron preset stays within 1 mV of v_rest with zero stimulus.
+    """Every non-pacemaker preset stays within 1 mV of v_rest with zero stimulus.
 
     Regression test for issue #197: v_rest must equal the zero-current
     equilibrium so that neurons do not drift when unstimulated.  Also
     serves as a standard acceptance criterion for new neuron types.
+
+    Purkinje is excluded because its v_rest is an unstable zero-current
+    equilibrium (pacemaker threshold); see test_purkinje.py for pacemaking tests.
     """
     config = NEURON_PRESETS[preset_name]
     neuron = make_neuron(config)

@@ -9,7 +9,11 @@ import numpy as np
 import pytest
 
 import patch_sim
-from patch_sim.additional_channels import make_icat_channel
+from patch_sim.additional_channels import (
+    make_icat_channel,
+    make_inap_channel,
+    make_inar_channel,
+)
 from patch_sim.analysis.membrane_test import run_membrane_test
 from patch_sim.constants import (
     ACTION_POTENTIAL,
@@ -275,7 +279,7 @@ def test_thalamic_relay_t_ref_is_mccormick_huguenard_recording_temp() -> None:
         (SQUID_GIANT_AXON, 2.5, 4.5, 2.5, 4.5),  # g_total=0.3  τ_m≈3.3 ms
         (FAST_SPIKING_INTERNEURON, 0.4, 1.0, 0.4, 1.0),  # g_total=1.5  τ_m≈0.67 ms
         (CORTICAL_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
-        (PURKINJE, 45.0, 55.0, 45.0, 55.0),  # g_total=0.02 τ_m≈50 ms
+        (PURKINJE, 18.0, 28.0, 18.0, 28.0),  # g_total=0.044 τ_m≈22.7 ms
         (DOPAMINERGIC, 2.5, 4.5, 2.5, 4.5),  # g_total=0.3  τ_m≈3.3 ms
         (THALAMIC_RELAY, 5.0, 9.0, 5.0, 9.0),  # g_total=0.15  τ_m≈6.7 ms
         (CA1_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
@@ -424,3 +428,51 @@ def test_purkinje_t_ref_is_dschutter_bower_recording_temp() -> None:
     """
     config = NEURON_PRESETS[PURKINJE]
     assert config.T_ref == pytest.approx(305.15)
+
+
+def test_purkinje_has_nap_channel() -> None:
+    """Purkinje preset includes an INaP (persistent Na⁺) channel.
+
+    INaP shifts the zero-current equilibrium from −82.3 mV to the physiological
+    pacemaking range and amplifies subthreshold depolarizations.
+    Ref: Raman & Bean (1999), J. Neurosci. 19:4663.
+    """
+    config = NEURON_PRESETS[PURKINJE]
+    factories = [cc.factory for cc in config.channels]
+    assert make_inap_channel in factories
+
+
+def test_purkinje_has_nar_channel() -> None:
+    """Purkinje preset includes an INaR (resurgent Na⁺) channel.
+
+    INaR enables the fast repriming and high-frequency burst firing that
+    characterises complex spikes in cerebellar Purkinje cells.
+    Ref: Raman & Bean (1997), Neuron 19:1of.
+    """
+    config = NEURON_PRESETS[PURKINJE]
+    factories = [cc.factory for cc in config.channels]
+    assert make_inar_channel in factories
+
+
+def test_purkinje_nap_conductance_physiological() -> None:
+    """INaP conductance in Purkinje preset is in the physiological range.
+
+    Expected range: [0.01, 0.5] mS/cm².  Values below 0.01 have negligible
+    effect on resting potential; values above 0.5 produce pathologically large
+    persistent inward currents.
+    """
+    config = NEURON_PRESETS[PURKINJE]
+    nap_configs = [cc for cc in config.channels if cc.factory is make_inap_channel]
+    assert len(nap_configs) == 1
+    assert 0.01 <= nap_configs[0].g_max <= 0.5
+
+
+def test_purkinje_vrest_in_pacemaking_range() -> None:
+    """Purkinje v_rest is in the in-vivo pacemaking range [−65, −55] mV.
+
+    Häusser & Clark (1997, J. Neurosci. 17:2358) report spontaneous pacemaking
+    near −55 to −65 mV in vivo.  Raman & Bean (1999) attribute this to INaP/INaR
+    subthreshold window currents.
+    """
+    config = NEURON_PRESETS[PURKINJE]
+    assert -65.0 <= config.v_rest <= -55.0
