@@ -46,6 +46,8 @@ from patch_sim.core_channels import (
 )
 from patch_sim.neuron import Neuron
 
+RateFn = Callable[[float, float], float]
+
 # ---------------------------------------------------------------------------
 # Rate function positivity
 # ---------------------------------------------------------------------------
@@ -133,9 +135,7 @@ def test_alpha_m_near_singularity_continuous_below() -> None:
 
 @pytest.mark.parametrize("V", [-65.0, 0.0])
 @pytest.mark.parametrize("fn", [alpha_n, beta_n, alpha_m, beta_m, alpha_h, beta_h])
-def test_rate_functions_ignore_ca_i(
-    V: float, fn: Callable[[float, float], float]
-) -> None:
+def test_rate_functions_ignore_ca_i(V: float, fn: RateFn) -> None:
     """All rate functions return the same value regardless of ca_i."""
     assert fn(V, 0.0) == pytest.approx(fn(V, 1.0))
 
@@ -408,9 +408,7 @@ def test_pospischil_alpha_n_near_singularity_continuous_below() -> None:
         pospischil_beta_n,
     ],
 )
-def test_pospischil_rate_functions_ignore_ca_i(
-    V: float, fn: Callable[[float, float], float]
-) -> None:
+def test_pospischil_rate_functions_ignore_ca_i(V: float, fn: RateFn) -> None:
     """All Pospischil rate functions return the same value regardless of ca_i."""
     assert fn(V, 0.0) == pytest.approx(fn(V, 1.0))
 
@@ -752,9 +750,7 @@ def test_purkinje_alpha_n_near_singularity_continuous_below() -> None:
         purkinje_beta_n,
     ],
 )
-def test_purkinje_rate_functions_ignore_ca_i(
-    V: float, fn: Callable[[float, float], float]
-) -> None:
+def test_purkinje_rate_functions_ignore_ca_i(V: float, fn: RateFn) -> None:
     """All Purkinje rate functions return the same value regardless of ca_i."""
     assert fn(V, 0.0) == pytest.approx(fn(V, 1.0))
 
