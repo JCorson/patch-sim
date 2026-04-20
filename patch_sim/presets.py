@@ -20,6 +20,7 @@ from .additional_channels import (
     make_ikv31_channel,
     make_im_channel,
     make_inap_channel,
+    make_inar_channel,
 )
 from .constants import (
     ACTION_POTENTIAL,
@@ -149,7 +150,12 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
     PURKINJE: NeuronConfig(
         # L-type and T-type Ca²⁺ channels drive complex spiking;
         # IKCa couples Ca²⁺ influx to after-hyperpolarization.
-        # Ref: De Schutter & Bower (1994), J. Neurophysiol. 71:375
+        # INaP (persistent Na⁺) and INaR (resurgent Na⁺) shift the
+        # zero-current equilibrium into the physiological pacemaking range.
+        # Refs: De Schutter & Bower (1994), J. Neurophysiol. 71:375;
+        #       Raman & Bean (1997), Neuron 19:1of (NaR);
+        #       Raman & Bean (1999), J. Neurosci. 19:4663 (NaP/NaR pacemaking);
+        #       Häusser & Clark (1997), J. Neurosci. 17:2358 (−55 to −65 mV range)
         #
         # De Schutter & Bower (1994) Traub-Miles Na⁺/K⁺ kinetics (VT = −58 mV)
         # replace the default HH52 core channels.  HH52 kinetics (fitted to
@@ -159,27 +165,30 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # recorded at 32 °C, so T_ref=305.15 K limits the Q10 correction to
         # ~1.73× (32→37 °C), preserving the published kinetics.
         #
-        # v_rest = −82.3 mV is the zero-current equilibrium with DSB94 kinetics
-        # and K_out=4 mM (E_K ≈ −95 mV).  With Traub-Miles VT=−58 mV, n_inf at
-        # −70.5 mV is ≈ 0.004 (vs HH52 n_inf ≈ 0.24), so the gated K⁺ window
-        # current that the old preset relied on for outward balance is negligible.
-        # The new equilibrium is set by the ICaT window current (~−0.2 µA/cm²
-        # at −70.5 mV) balanced by the K⁺ leak; the resulting stable fixed point
-        # is −82.3 mV.  Published Purkinje resting potentials range from −60 to
-        # −82 mV depending on preparation; −82 mV is within the physiological
-        # range and near the lower end reported for quiescent cells in slice.
+        # v_rest = −65.0 mV is the zero-current equilibrium with NaP/NaR added.
+        # INaP (Magistretti & Alonso 1999 kinetics, half = −52.6 mV) provides a
+        # persistent inward Na⁺ window current at subthreshold potentials that
+        # shifts the balance point from −82.3 mV (without INaP) to −65.0 mV.
+        # This equilibrium is UNSTABLE (pacemaker threshold): the inward NaP
+        # window current exceeds the K⁺ leak just above −65 mV, so the cell
+        # fires a spontaneous AP on any depolarizing perturbation.  Full
+        # rhythmic pacemaking at 10–100 Hz (Häusser & Clark 1997) requires an
+        # additional hyperpolarization-activated conductance (e.g. Ih) to drive
+        # recovery from the post-AP deep AHP near E_K.
         #
-        # g_NaL + g_KL = 0.02 mS/cm² gives τ_m ≈ 50 ms and R_in ≈ 50 kΩ·cm²,
-        # reflecting the low somatic leak conductance of Purkinje cells.
-        # g_NaL = 0.0017 / g_KL = 0.0183 solved analytically from the
-        # zero-current condition at −82.3 mV with all window currents included.
+        # g_NaL = 0 / g_KL = 0.044 mS/cm²: pure K⁺ background leak.
+        # τ_m = C_m / g_KL ≈ 22.7 ms and R_in ≈ 22.7 kΩ·cm², consistent with
+        # somatic recordings in cerebellar slice (Roth & Häusser 2001).
+        # The g_NaL / g_KL split and g_NaP / g_NaR were solved numerically so
+        # that find_zero_current_voltage([−75, −55]) returns exactly −65.0 mV.
         #
-        # WARNING: v_rest depends on ICaT (g=0.5) window current at −82.3 mV.
-        # If g_CaT is ever retuned, re-run find_zero_current_voltage (range
-        # −90 to −75 mV) and update v_rest, g_NaL, and g_KL accordingly.
-        v_rest=-82.3,
-        g_NaL=0.0017,
-        g_KL=0.0183,
+        # WARNING: v_rest depends on INaP (g=0.1), INaR (g=0.1), and ICaT
+        # (g=0.5) window currents at −65.0 mV.  If any of these conductances
+        # are retuned, re-run find_zero_current_voltage (range −75 to −55 mV)
+        # and update v_rest, g_NaL, and g_KL accordingly.
+        v_rest=-65.0,
+        g_NaL=0.0,
+        g_KL=0.044,
         T_ref=305.15,
         na_channel_factory=make_purkinje_na_channel,
         k_channel_factory=make_purkinje_k_channel,
@@ -187,6 +196,8 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ical_channel, g_max=1.0),
             ChannelConfig(make_icat_channel, g_max=0.5),
             ChannelConfig(make_ikca_channel, g_max=2.0),
+            ChannelConfig(make_inap_channel, g_max=0.1),
+            ChannelConfig(make_inar_channel, g_max=0.1),
         ),
     ),
     DOPAMINERGIC: NeuronConfig(
@@ -558,30 +569,29 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     PURKINJE: {
-        # v_rest = −82.3 mV with DSB94 kinetics; 0.1 µA/cm² is subthreshold.
+        # v_rest = −65.0 mV (pacemaker threshold); 0.1 µA/cm² is subthreshold.
         SUBTHRESHOLD_RESPONSE: {
             "min_stimulus": 0.1,
             "max_stimulus": 0.1,
         },
-        # 5 µA/cm² at 5 ms evokes a single AP with DSB94 kinetics;
-        # 3 µA/cm² produces a subthreshold depolarisation (v_peak ≈ −60 mV).
-        # 50 ms pre-stimulus lets gating variables settle at −82.3 mV before
-        # the pulse (10 ms default is insufficient for full equilibration).
+        # 5 µA/cm² at 5 ms evokes a single AP.  10 ms pre-stimulus (base
+        # default) allows only a small drift from v_rest = −65 mV to ≈ −66.5 mV
+        # before the pulse; a longer pre-stimulus drives the cell toward E_K
+        # (≈ −95 mV) because v_rest is an unstable equilibrium, making the pulse
+        # insufficient to reach AP threshold.
         ACTION_POTENTIAL: {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
             "stimulus_duration": 5.0,
-            "pre_stimulus_duration": 50.0,
         },
-        # Moderate amplitude; complex Ca²⁺-driven spiking emerges within 200 ms.
+        # 10 µA/cm² for 180 ms drives complex Ca²⁺-driven spiking.
         REPETITIVE_FIRING: {
             "min_stimulus": 10.0,
             "max_stimulus": 10.0,
             "stimulus_duration": 180.0,
         },
-        # Very high passive R_in (50 kΩ·cm²); even −0.3 µA/cm² deflects by
-        # 15 mV (to −97 mV).  −0.3 → −0.1 µA/cm² keeps peaks in −87 to −97 mV
-        # without hitting the numerical floor (−150 mV).
+        # R_in ≈ 22.7 kΩ·cm²; −0.1 µA/cm² deflects by ≈ 21 mV (to −86 mV).
+        # −0.3 → −0.1 µA/cm² keeps peaks in −86 to −89 mV.
         HYPERPOLARIZATION_STEPS: {
             "min_stimulus": -0.3,
             "max_stimulus": -0.1,
