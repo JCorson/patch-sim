@@ -20,6 +20,65 @@ intracellular [Cl⁻] that arose when using a single chloride-Nernst leak.
 from .channels import GatingVariable, IonChannel, IonSpecies, NernstSpec
 from .utils import safe_exp
 
+__all__ = [
+    # Module constant
+    "SINGULARITY_THRESHOLD",
+    # Classic Hodgkin-Huxley rate functions and factories
+    "alpha_n",
+    "beta_n",
+    "alpha_m",
+    "beta_m",
+    "alpha_h",
+    "beta_h",
+    "make_na_channel",
+    "make_k_channel",
+    "make_na_leak_channel",
+    "make_k_leak_channel",
+    # Pospischil et al. (2008) cortical RS
+    "POSPISCHIL_VT",
+    "pospischil_alpha_m",
+    "pospischil_beta_m",
+    "pospischil_alpha_h",
+    "pospischil_beta_h",
+    "pospischil_alpha_n",
+    "pospischil_beta_n",
+    "make_pospischil_na_channel",
+    "make_pospischil_k_channel",
+    # McCormick & Huguenard (1992) thalamic relay
+    "THALAMIC_RELAY_VT",
+    "thalamic_relay_alpha_m",
+    "thalamic_relay_beta_m",
+    "thalamic_relay_alpha_h",
+    "thalamic_relay_beta_h",
+    "thalamic_relay_alpha_n",
+    "thalamic_relay_beta_n",
+    "make_thalamic_relay_na_channel",
+    "make_thalamic_relay_k_channel",
+    # Huguenard & Prince (1992) / Destexhe et al. (1994) TRN
+    "TRN_VT",
+    "trn_alpha_m",
+    "trn_beta_m",
+    "trn_alpha_h",
+    "trn_beta_h",
+    "trn_alpha_n",
+    "trn_beta_n",
+    "make_trn_na_channel",
+    "make_trn_k_channel",
+    # De Schutter & Bower (1994) Purkinje
+    "PURKINJE_VT",
+    "purkinje_alpha_m",
+    "purkinje_beta_m",
+    "purkinje_alpha_h",
+    "purkinje_beta_h",
+    "purkinje_alpha_n",
+    "purkinje_beta_n",
+    "make_purkinje_na_channel",
+    "make_purkinje_k_channel",
+    # Otsuka et al. (2004) STN
+    "make_stn_na_channel",
+    "make_stn_k_channel",
+]
+
 # Threshold for detecting near-singularity in GHK-style rate equations.
 # When the denominator voltage term is within this tolerance of zero, the
 # L'Hôpital limit is used instead to avoid division by zero.
