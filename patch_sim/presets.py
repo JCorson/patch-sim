@@ -45,6 +45,8 @@ from .constants import (
 from .core_channels import (
     make_pospischil_k_channel,
     make_pospischil_na_channel,
+    make_purkinje_k_channel,
+    make_purkinje_na_channel,
     make_stn_k_channel,
     make_stn_na_channel,
     make_thalamic_relay_k_channel,
@@ -149,26 +151,38 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # IKCa couples Ca²⁺ influx to after-hyperpolarization.
         # Ref: De Schutter & Bower (1994), J. Neurophysiol. 71:375
         #
-        # v_rest = −70.5 mV is the zero-current equilibrium with K_out=4 mM
-        # (E_K ≈ −95 mV) and g_NaL = g_total = 0.02 mS/cm² (g_KL = 0).
-        # With E_K ≈ −95 mV the K⁺-leak driving force at −68 mV is too large
-        # for g_total = 0.02 to balance — a pure Na⁺ leak (g_KL = 0) lets the
-        # HH gated K⁺ current (g_K = 36) provide the outward balance, shifting
-        # v_rest to −70.5 mV.  Published Purkinje resting potentials range from
-        # −65 to −72 mV depending on preparation; −70.5 mV is within range.
+        # De Schutter & Bower (1994) Traub-Miles Na⁺/K⁺ kinetics (VT = −58 mV)
+        # replace the default HH52 core channels.  HH52 kinetics (fitted to
+        # room-temperature squid axon) over-accelerate Na⁺ inactivation under
+        # the default Q10=3.0 scaling (22→37 °C, factor ~5.2×), biologically
+        # wrong for a mammalian cerebellar Purkinje cell.  DSB94 channels were
+        # recorded at 32 °C, so T_ref=305.15 K limits the Q10 correction to
+        # ~1.73× (32→37 °C), preserving the published kinetics.
+        #
+        # v_rest = −82.3 mV is the zero-current equilibrium with DSB94 kinetics
+        # and K_out=4 mM (E_K ≈ −95 mV).  With Traub-Miles VT=−58 mV, n_inf at
+        # −70.5 mV is ≈ 0.004 (vs HH52 n_inf ≈ 0.24), so the gated K⁺ window
+        # current that the old preset relied on for outward balance is negligible.
+        # The new equilibrium is set by the ICaT window current (~−0.2 µA/cm²
+        # at −70.5 mV) balanced by the K⁺ leak; the resulting stable fixed point
+        # is −82.3 mV.  Published Purkinje resting potentials range from −60 to
+        # −82 mV depending on preparation; −82 mV is within the physiological
+        # range and near the lower end reported for quiescent cells in slice.
         #
         # g_NaL + g_KL = 0.02 mS/cm² gives τ_m ≈ 50 ms and R_in ≈ 50 kΩ·cm²,
         # reflecting the low somatic leak conductance of Purkinje cells.
+        # g_NaL = 0.0017 / g_KL = 0.0183 solved analytically from the
+        # zero-current condition at −82.3 mV with all window currents included.
         #
-        # WARNING: g_KL=0 means v_rest depends on the HH gated K⁺ current
-        # (g_K=36) for outward balance.  If g_K, g_Na, or the channel list
-        # changes, v_rest will shift silently.  A non-zero g_KL would be
-        # biophysically cleaner but requires a higher g_total to compensate
-        # the larger outward K⁺ driving force at E_K ≈ −95 mV, which would
-        # shorten τ_m below the 50 ms target.  Revisit if g_K is ever retuned.
-        v_rest=-70.5,
-        g_NaL=0.02,
-        g_KL=0.0,
+        # WARNING: v_rest depends on ICaT (g=0.5) window current at −82.3 mV.
+        # If g_CaT is ever retuned, re-run find_zero_current_voltage (range
+        # −90 to −75 mV) and update v_rest, g_NaL, and g_KL accordingly.
+        v_rest=-82.3,
+        g_NaL=0.0017,
+        g_KL=0.0183,
+        T_ref=305.15,
+        na_channel_factory=make_purkinje_na_channel,
+        k_channel_factory=make_purkinje_k_channel,
         channels=(
             ChannelConfig(make_ical_channel, g_max=1.0),
             ChannelConfig(make_icat_channel, g_max=0.5),
@@ -544,35 +558,34 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     PURKINJE: {
-        # Low R_in at rest (active channels); 0.5 µA/cm² is subthreshold.
+        # v_rest = −82.3 mV with DSB94 kinetics; 0.1 µA/cm² is subthreshold.
         SUBTHRESHOLD_RESPONSE: {
-            "min_stimulus": 0.5,
-            "max_stimulus": 0.5,
+            "min_stimulus": 0.1,
+            "max_stimulus": 0.1,
         },
-        # 10 µA/cm² at 5 ms evokes a single AP; longer durations produce 2+.
-        # Threshold rose from the old preset because v_rest shifted to −70.5 mV
-        # and K⁺ driving force is stronger with K_out=4.0 mM (E_K ≈ −95 mV).
+        # 5 µA/cm² at 5 ms evokes a single AP with DSB94 kinetics;
+        # 3 µA/cm² produces a subthreshold depolarisation (v_peak ≈ −60 mV).
+        # 50 ms pre-stimulus lets gating variables settle at −82.3 mV before
+        # the pulse (10 ms default is insufficient for full equilibration).
         ACTION_POTENTIAL: {
-            "min_stimulus": 10.0,
-            "max_stimulus": 10.0,
+            "min_stimulus": 5.0,
+            "max_stimulus": 5.0,
             "stimulus_duration": 5.0,
+            "pre_stimulus_duration": 50.0,
         },
         # Moderate amplitude; complex Ca²⁺-driven spiking emerges within 200 ms.
         REPETITIVE_FIRING: {
-            "min_stimulus": 12.0,
-            "max_stimulus": 12.0,
+            "min_stimulus": 10.0,
+            "max_stimulus": 10.0,
             "stimulus_duration": 180.0,
         },
-        # Very high passive R_in (50 kΩ·cm²) with many active channels; currents
-        # beyond −2 µA/cm² push the simulation to the numerical floor (−150 mV).
-        # −2 → −0.5 µA/cm² keeps peaks in −72 to −76 mV without instability.
-        # The modest ICaT conductance (g=0.5 mS/cm²) may produce a weak
-        # rebound spike at the deepest steps depending on the degree of
-        # de-inactivation at those depths.
+        # Very high passive R_in (50 kΩ·cm²); even −0.3 µA/cm² deflects by
+        # 15 mV (to −97 mV).  −0.3 → −0.1 µA/cm² keeps peaks in −87 to −97 mV
+        # without hitting the numerical floor (−150 mV).
         HYPERPOLARIZATION_STEPS: {
-            "min_stimulus": -2.0,
-            "max_stimulus": -0.5,
-            "stimulus_step": 0.5,
+            "min_stimulus": -0.3,
+            "max_stimulus": -0.1,
+            "stimulus_step": 0.1,
         },
     },
     DOPAMINERGIC: {
