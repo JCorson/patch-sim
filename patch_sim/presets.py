@@ -148,10 +148,8 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         ),
     ),
     PURKINJE: NeuronConfig(
-        # L-type and T-type Ca²⁺ channels drive complex spiking;
-        # IKCa couples Ca²⁺ influx to after-hyperpolarization.
-        # INaP (persistent Na⁺) and INaR (resurgent Na⁺) shift the
-        # zero-current equilibrium into the physiological pacemaking range.
+        # Spontaneous pacemaker: INaP window current destabilises the rest,
+        # Ih drives recovery from AHP back to threshold → autonomous oscillation.
         # Refs: De Schutter & Bower (1994), J. Neurophysiol. 71:375;
         #       Raman & Bean (1997), Neuron 19:881 (NaR);
         #       Raman & Bean (1999), J. Neurosci. 19:4663 (NaP/NaR pacemaking);
@@ -165,27 +163,24 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # recorded at 32 °C, so T_ref=305.15 K limits the Q10 correction to
         # ~1.73× (32→37 °C), preserving the published kinetics.
         #
-        # v_rest = −65.0 mV is the zero-current equilibrium with NaP/NaR added.
-        # INaP (Magistretti & Alonso 1999 kinetics, half = −52.6 mV) provides a
-        # persistent inward Na⁺ window current at subthreshold potentials that
-        # shifts the balance point from −82.3 mV (without INaP) to −65.0 mV.
-        # This equilibrium is UNSTABLE (pacemaker threshold): the inward NaP
-        # window current exceeds the K⁺ leak just above −65 mV, so the cell
-        # fires a spontaneous AP on any depolarizing perturbation.  Full
-        # rhythmic pacemaking at 10–100 Hz (Häusser & Clark 1997) requires an
-        # additional hyperpolarization-activated conductance (e.g. Ih) to drive
-        # recovery from the post-AP deep AHP near E_K.
+        # Pacemaking mechanism:
+        #   1. INaP (Magistretti & Alonso 1999, half = −52.6 mV) provides a
+        #      persistent inward Na⁺ window current that destabilises any rest
+        #      near −65 mV — the cell fires spontaneously without external input.
+        #   2. After each AP the cell undergoes a deep AHP near E_K (≈ −95 mV).
+        #   3. Ih (Destexhe et al. 1993, half ≈ −82 mV, g = 1.0 mS/cm²) activates
+        #      during the AHP and drives a slow depolarisation back to threshold,
+        #      producing rhythmic spontaneous firing at ~10–20 Hz in this
+        #      single-compartment model (in vivo rate is 50–100 Hz with dendritic
+        #      inputs and network drive).
+        #
+        # v_rest = −65.0 mV is the simulation starting point (near the INaP
+        # activation threshold); this cell has NO stable zero-current resting
+        # potential — it is an autonomous oscillator.
         #
         # g_NaL = 0 / g_KL = 0.044 mS/cm²: pure K⁺ background leak.
         # τ_m = C_m / g_KL ≈ 22.7 ms and R_in ≈ 22.7 kΩ·cm², consistent with
         # somatic recordings in cerebellar slice (Roth & Häusser 2001).
-        # The g_NaL / g_KL split and g_NaP / g_NaR were solved numerically so
-        # that find_zero_current_voltage([−75, −55]) returns exactly −65.0 mV.
-        #
-        # WARNING: v_rest depends on INaP (g=0.1), INaR (g=0.1), and ICaT
-        # (g=0.5) window currents at −65.0 mV.  If any of these conductances
-        # are retuned, re-run find_zero_current_voltage (range −75 to −55 mV)
-        # and update v_rest and g_KL accordingly (g_NaL is fixed at 0).
         v_rest=-65.0,
         g_NaL=0.0,
         g_KL=0.044,
@@ -198,6 +193,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ikca_channel, g_max=2.0),
             ChannelConfig(make_inap_channel, g_max=0.1),
             ChannelConfig(make_inar_channel, g_max=0.1),
+            ChannelConfig(make_ih_channel, g_max=1.0),
         ),
     ),
     DOPAMINERGIC: NeuronConfig(
@@ -569,16 +565,16 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     PURKINJE: {
-        # v_rest = −65.0 mV (pacemaker threshold); 0.1 µA/cm² is subthreshold.
+        # Purkinje is a spontaneous pacemaker (fires without external current).
+        # The Subthreshold Response and Action Potential protocols are kept for
+        # UI display purposes; the cell will fire spontaneously during both.
+        # Subthreshold Response: small positive current to demonstrate INaP
+        # amplification of subthreshold depolarization just below threshold.
         SUBTHRESHOLD_RESPONSE: {
             "min_stimulus": 0.1,
             "max_stimulus": 0.1,
         },
-        # 5 µA/cm² at 5 ms evokes a single AP.  10 ms pre-stimulus (base
-        # default) allows only a small drift from v_rest = −65 mV to ≈ −66.5 mV
-        # before the pulse; a longer pre-stimulus drives the cell toward E_K
-        # (≈ −95 mV) because v_rest is an unstable equilibrium, making the pulse
-        # insufficient to reach AP threshold.
+        # 5 µA/cm² at 5 ms superimposed on spontaneous pacemaking.
         ACTION_POTENTIAL: {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
@@ -590,12 +586,13 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 10.0,
             "stimulus_duration": 180.0,
         },
-        # R_in ≈ 22.7 kΩ·cm²; −0.1 µA/cm² deflects by ≈ 21 mV (to −86 mV).
-        # −0.3 → −0.1 µA/cm² keeps peaks in −86 to −89 mV.
+        # R_in ≈ 22.7 kΩ·cm²; −0.5 µA/cm² hyperpolarizes by ≈ 11 mV (to −76 mV)
+        # and temporarily suppresses pacemaking, revealing Ih-driven sag and
+        # rebound firing on step release.  −1.5 → −0.5 µA/cm² in 0.5 µA steps.
         HYPERPOLARIZATION_STEPS: {
-            "min_stimulus": -0.3,
-            "max_stimulus": -0.1,
-            "stimulus_step": 0.1,
+            "min_stimulus": -1.5,
+            "max_stimulus": -0.5,
+            "stimulus_step": 0.5,
         },
     },
     DOPAMINERGIC: {

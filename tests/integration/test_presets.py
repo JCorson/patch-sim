@@ -11,6 +11,7 @@ import pytest
 import patch_sim
 from patch_sim.additional_channels import (
     make_icat_channel,
+    make_ih_channel,
     make_inap_channel,
     make_inar_channel,
 )
@@ -490,3 +491,28 @@ def test_purkinje_nar_conductance_physiological() -> None:
     nar_configs = [cc for cc in config.channels if cc.factory is make_inar_channel]
     assert len(nar_configs) == 1
     assert 0.01 <= nar_configs[0].g_max <= 0.5
+
+
+def test_purkinje_has_ih_channel() -> None:
+    """Purkinje preset includes an Ih (hyperpolarization-activated) channel.
+
+    Ih activates during the post-AP AHP and drives recovery to threshold,
+    enabling spontaneous autonomous pacemaking without external current.
+    Ref: Destexhe et al. (1993), J. Neurophysiol. 70:1385.
+    """
+    config = NEURON_PRESETS[PURKINJE]
+    factories = [cc.factory for cc in config.channels]
+    assert make_ih_channel in factories
+
+
+def test_purkinje_ih_conductance_physiological() -> None:
+    """Ih conductance in Purkinje preset is in the physiological range.
+
+    Expected range: [0.1, 5.0] mS/cm².  Values below 0.1 are insufficient
+    to drive recovery from the post-AP AHP; values above 5.0 dominate
+    membrane current and produce unrealistically fast pacemaking.
+    """
+    config = NEURON_PRESETS[PURKINJE]
+    ih_configs = [cc for cc in config.channels if cc.factory is make_ih_channel]
+    assert len(ih_configs) == 1
+    assert 0.1 <= ih_configs[0].g_max <= 5.0

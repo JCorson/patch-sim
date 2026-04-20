@@ -1,9 +1,9 @@
 """Behavioral tests for the Purkinje neuron preset.
 
-Verifies that NaP/NaR-driven pacemaking behaviour is present: INaP provides
-inward subthreshold current near the pacemaker threshold, INaR is represented
-in the simulation output, and the cell fires readily from the unstable
-zero-current equilibrium (v_rest = −65 mV).
+Verifies spontaneous pacemaking driven by Ih (hyperpolarization-activated
+current) and the NaP/NaR window-current complex: the cell fires autonomously
+without external current, INaP provides persistent inward current near
+threshold, and INaR is tracked in the simulation output.
 """
 
 import numpy as np
@@ -61,40 +61,26 @@ def _ms_to_samples(ms: float) -> int:
 
 
 # ---------------------------------------------------------------------------
-# INaP: subthreshold inward current
+# Spontaneous pacemaking
 # ---------------------------------------------------------------------------
 
 
-def test_inap_inward_at_subthreshold(pk_neuron: Neuron) -> None:
-    """INaP carries inward (negative) current during subthreshold depolarization.
+def test_fires_spontaneously(pk_neuron: Neuron) -> None:
+    """Purkinje cell fires spontaneously with zero external current.
 
-    The persistent sodium current activates near v_rest = −65 mV and amplifies
-    subthreshold depolarizations.  With a 0.05 µA/cm² step (below AP threshold,
-    verified to be subthreshold in a 50 ms window), the INaP column must be
-    negative throughout the step, confirming the channel is active and
-    contributing inward current.
-    Ref: Raman & Bean (1999), J. Neurosci. 19:4663.
+    With Ih (g=1.0 mS/cm²) recovering the cell from the post-AP AHP and INaP
+    destabilising the rest near −65 mV, the cell should sustain autonomous
+    pacemaking.  At least 5 APs must occur in 500 ms of zero current,
+    confirming a mean inter-spike interval ≤ 100 ms (≥ 10 Hz).
+    Ref: Häusser & Clark (1997), J. Neurosci. 17:2358.
     """
-    protocol = step_current(
-        duration=100.0,
-        current_amplitude=0.05,
-        step_start=0.0,
-        step_duration=50.0,
-        sampling_frequency=SIM_SAMPLING_FREQ,
-    )
-    result = simulate_current_clamp(pk_neuron, current_external=protocol)
-
-    step_end = _ms_to_samples(50)
-    peak_voltage = float(result["voltage"][:step_end].max())
-    assert peak_voltage < 0.0, (
-        f"Step should be subthreshold (< 0 mV), "
-        f"but voltage reached {peak_voltage:.1f} mV"
-    )
-
-    inap_during_step = result["INaP"][:step_end]
-    assert float(inap_during_step.max()) < 0.0, (
-        f"Expected INaP to be inward (negative) during depolarization, "
-        f"but max was {inap_during_step.max():.4f} µA/cm²"
+    zero_current = np.zeros(_ms_to_samples(500) + 1)
+    result = simulate_current_clamp(pk_neuron, current_external=zero_current)
+    n_aps = _count_action_potentials(result["voltage"])
+    assert n_aps >= 5, (
+        f"Expected ≥5 spontaneous APs in 500 ms (≥10 Hz pacemaking), "
+        f"but detected {n_aps}.  Ih may not be wired into the preset or "
+        "g_Ih may be too small to drive recovery from the post-AP AHP."
     )
 
 
@@ -123,30 +109,22 @@ def test_inar_column_present_in_simulation(pk_neuron: Neuron) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Near-threshold firing
+# Ih: hyperpolarization-activated current presence
 # ---------------------------------------------------------------------------
 
 
-def test_fires_from_small_depolarization(pk_neuron: Neuron) -> None:
-    """Cell fires at least one AP with a small depolarizing current from v_rest.
+def test_ih_column_present_in_simulation(pk_neuron: Neuron) -> None:
+    """Ih current column appears in the simulation result dtype.
 
-    v_rest = −65 mV is the zero-current pacemaker threshold (unstable
-    equilibrium).  A 0.2 µA/cm² step — just above the subthreshold range —
-    must cross the Na⁺ activation threshold and fire an action potential,
-    demonstrating that the cell is at the edge of the pacemaking zone.
+    Confirms that the Ih channel is wired into the preset and that the
+    hyperpolarization-activated cation current is tracked in the output.
+    Ref: Destexhe et al. (1993), J. Neurophysiol. 70:1385.
     """
-    protocol = step_current(
-        duration=200.0,
-        current_amplitude=0.2,
-        step_start=0.0,
-        step_duration=100.0,
-        sampling_frequency=SIM_SAMPLING_FREQ,
-    )
-    result = simulate_current_clamp(pk_neuron, current_external=protocol)
-    n_aps = _count_action_potentials(result["voltage"])
-    assert n_aps >= 1, (
-        f"Expected at least 1 AP with 0.2 µA/cm² from v_rest=−65 mV, "
-        f"but detected {n_aps}.  v_rest may no longer be the pacemaker threshold."
+    zero_current = np.zeros(_ms_to_samples(100) + 1)
+    result = simulate_current_clamp(pk_neuron, current_external=zero_current)
+    assert "Ih" in result.dtype.names, (
+        "Expected 'Ih' column in simulation output — make_ih_channel may "
+        "not be included in the Purkinje preset channels tuple"
     )
 
 
@@ -158,7 +136,7 @@ def test_fires_from_small_depolarization(pk_neuron: Neuron) -> None:
 def test_suprathreshold_fires_action_potential(pk_neuron: Neuron) -> None:
     """Suprathreshold pulse produces a full-amplitude action potential.
 
-    Confirms that DSB94 Na⁺/K⁺ kinetics and the NaP/NaR additions still
+    Confirms that DSB94 Na⁺/K⁺ kinetics and the NaP/NaR/Ih additions still
     support normal AP generation.  Peak must exceed +20 mV and the cell
     must repolarize below −50 mV after the peak.
     """

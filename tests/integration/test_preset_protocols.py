@@ -19,6 +19,7 @@ from patch_sim.clamp_simulations import (
 )
 from patch_sim.constants import (
     ACTION_POTENTIAL,
+    PURKINJE,
     REPETITIVE_FIRING,
 )
 from patch_sim.neuron_factory import make_neuron
@@ -27,6 +28,14 @@ from patch_sim.presets import (
     NEURON_PRESETS,
     build_protocol_from_preset,
 )
+
+# Purkinje is a spontaneous pacemaker — it fires without external current.
+# The "zero-current rest" assumption underlying these three tests does not hold:
+# - test_action_potential_preset: cell fires spontaneously before the stimulus
+# - test_subthreshold_response_preset: no stimulus is subthreshold for a pacemaker
+# - test_fi_curve_preset: the zero-current (first) sweep produces spontaneous APs
+# Dedicated Purkinje tests live in tests/integration/test_purkinje.py.
+_QUIESCENT_PRESET_NAMES = [p for p in NEURON_PRESET_NAMES if p != PURKINJE]
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -108,13 +117,14 @@ def _assert_voltage_clamp_valid(result: np.ndarray) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("preset_name", NEURON_PRESET_NAMES)
+@pytest.mark.parametrize("preset_name", _QUIESCENT_PRESET_NAMES)
 def test_action_potential_preset(preset_name: str) -> None:
     """Action Potential protocol elicits exactly one action potential.
 
     The adjusted single-step stimulus is tuned per neuron to produce a
     single suprathreshold spike.  The test asserts exactly 1 AP so that
     miscalibrated stimuli (producing 0 or ≥2 spikes) are caught as failures.
+    Purkinje is excluded because it fires spontaneously (see test_purkinje.py).
 
     Args:
         preset_name: Name of the neuron preset under test.
@@ -140,13 +150,14 @@ def test_action_potential_preset(preset_name: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("preset_name", NEURON_PRESET_NAMES)
+@pytest.mark.parametrize("preset_name", _QUIESCENT_PRESET_NAMES)
 def test_subthreshold_response_preset(preset_name: str) -> None:
     """Subthreshold Response protocol produces no action potentials.
 
     The weak stimulus is calibrated per neuron to stay below AP threshold.
     The test asserts no threshold crossings and that peak voltage remains
-    below 0 mV.
+    below 0 mV.  Purkinje is excluded because it fires spontaneously and has
+    no subthreshold regime (see test_purkinje.py).
 
     Args:
         preset_name: Name of the neuron preset under test.
@@ -206,7 +217,7 @@ def test_repetitive_firing_preset(preset_name: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("preset_name", NEURON_PRESET_NAMES)
+@pytest.mark.parametrize("preset_name", _QUIESCENT_PRESET_NAMES)
 def test_fi_curve_preset(preset_name: str) -> None:
     """F-I Curve protocol shows increasing AP count with increasing current.
 
@@ -216,6 +227,9 @@ def test_fi_curve_preset(preset_name: str) -> None:
     - The maximum-current (last) sweep produces at least as many APs as the
       first sweep (monotonicity).
     - Each sweep result is structurally valid with all values finite.
+
+    Purkinje is excluded because its zero-current sweep produces spontaneous
+    APs (see test_purkinje.py).
 
     Args:
         preset_name: Name of the neuron preset under test.
