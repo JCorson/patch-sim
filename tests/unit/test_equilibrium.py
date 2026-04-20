@@ -80,3 +80,20 @@ def test_find_zero_current_voltage_all_presets(preset_name: str) -> None:
         f"{preset_name}: computed equilibrium {v_eq:.2f} mV differs from "
         f"v_rest={neuron.v_rest:.1f} mV by {abs(v_eq - neuron.v_rest):.2f} mV"
     )
+
+
+def test_find_zero_current_voltage_purkinje_narrow_range() -> None:
+    """Purkinje equilibrium is found in [−90, −75] mV and matches v_rest.
+
+    The default [−100, −20] range finds a spurious root near −30 mV (see
+    _EQUILIBRIUM_PRESET_NAMES exclusion comment above).  The narrow range
+    isolates the physiological fixed point at −82.3 mV, pinning g_NaL, g_KL,
+    and g_CaT against silent regressions.
+    """
+    config = NEURON_PRESETS[PURKINJE]
+    neuron = make_neuron(config)
+    v_eq = find_zero_current_voltage(neuron, v_min=-90.0, v_max=-75.0)
+    assert abs(v_eq - neuron.v_rest) < 0.5, (
+        f"Purkinje narrow-range equilibrium {v_eq:.2f} mV differs from "
+        f"v_rest={neuron.v_rest:.1f} mV by {abs(v_eq - neuron.v_rest):.2f} mV"
+    )

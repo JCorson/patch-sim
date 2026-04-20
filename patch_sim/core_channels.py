@@ -999,9 +999,9 @@ def make_purkinje_na_channel(g_max: float) -> IonChannel:
 
     Intended as the ``na_channel_factory`` of the Purkinje preset.  Compared
     with the default HH52 Na⁺ channel (fitted to squid axon at 22 °C), the
-    Traub-Miles form with VT = −58 mV places the activation half-point near
-    −45 mV and prevents the ~5.2× Q10 overcorrection that caused premature
-    Na⁺ inactivation.
+    Traub-Miles form with VT = −58 mV places the α_m singularity (and
+    approximate activation inflection) near −45 mV and prevents the ~5.2×
+    Q10 overcorrection that caused premature Na⁺ inactivation.
 
     Reference: De Schutter & Bower (1994), J. Neurophysiol. 71:375.
     Kinetics recorded at 32 °C — use T_ref = 305.15 K with this factory.
