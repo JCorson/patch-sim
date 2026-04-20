@@ -27,6 +27,8 @@ from patch_sim.constants import (
 from patch_sim.core_channels import (
     make_pospischil_k_channel,
     make_pospischil_na_channel,
+    make_purkinje_k_channel,
+    make_purkinje_na_channel,
     make_thalamic_relay_k_channel,
     make_thalamic_relay_na_channel,
     make_trn_k_channel,
@@ -385,3 +387,40 @@ def test_trn_t_ref_is_huguenard_recording_temp() -> None:
     """
     config = NEURON_PRESETS[TRN]
     assert config.T_ref == pytest.approx(309.15)
+
+
+# ---------------------------------------------------------------------------
+# Purkinje preset uses De Schutter & Bower (1994) factories (issue #243)
+# ---------------------------------------------------------------------------
+
+
+def test_purkinje_uses_dschutter_bower_na_factory() -> None:
+    """Purkinje preset wires the De Schutter & Bower (1994) Na⁺ channel factory.
+
+    Verifies that Traub-Miles kinetics (VT = −58 mV, recorded at 32 °C) are
+    used instead of the default HH52 squid axon kinetics, which applied a
+    ~5.2× Q10 overcorrection inappropriate for a mammalian Purkinje cell.
+    """
+    config = NEURON_PRESETS[PURKINJE]
+    assert config.na_channel_factory is make_purkinje_na_channel
+
+
+def test_purkinje_uses_dschutter_bower_k_factory() -> None:
+    """Purkinje preset wires the De Schutter & Bower (1994) K⁺ channel factory.
+
+    Verifies that Traub-Miles kinetics (VT = −58 mV, recorded at 32 °C) are
+    used instead of the default HH52 squid axon kinetics.
+    """
+    config = NEURON_PRESETS[PURKINJE]
+    assert config.k_channel_factory is make_purkinje_k_channel
+
+
+def test_purkinje_t_ref_is_dschutter_bower_recording_temp() -> None:
+    """Purkinje preset T_ref must be 305.15 K (32 °C), the DSB94 recording temperature.
+
+    Setting T_ref = 305.15 K limits the Q10 correction from ~5.2× (22→37 °C)
+    to ~1.73× (32→37 °C), preserving the published De Schutter & Bower kinetics
+    and preventing distorted Na⁺ inactivation at physiological temperature.
+    """
+    config = NEURON_PRESETS[PURKINJE]
+    assert config.T_ref == pytest.approx(305.15)

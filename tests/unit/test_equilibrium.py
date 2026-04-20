@@ -3,7 +3,7 @@
 import pytest
 
 from patch_sim import find_zero_current_voltage
-from patch_sim.constants import TRN
+from patch_sim.constants import PURKINJE, TRN
 from patch_sim.equilibrium import _total_ionic_current
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
@@ -54,7 +54,16 @@ def test_find_zero_current_voltage_no_bracket() -> None:
 # by mixed Na⁺/K⁺ leak), but does not manifest as a Brent-findable zero
 # crossing in the default search range.  See test_all_presets_stable_at_rest
 # in test_current_clamp.py for the 50 ms stability verification.
-_EQUILIBRIUM_PRESET_NAMES = [p for p in NEURON_PRESET_NAMES if p != TRN]
+#
+# PURKINJE is excluded: De Schutter & Bower (1994) Traub-Miles kinetics
+# (VT=−58 mV) produce a complex I_total(V) profile with multiple sign changes
+# in the default range (−100 to −20 mV).  The stable rest at −82.3 mV is a
+# genuine sign change (inward at −85 mV → outward at −80 mV), but Brent's
+# method in the default range finds a spurious root near −30 mV (Na/K plateau
+# region).  Use v_min=−90, v_max=−75 to locate the physiological equilibrium.
+# See test_all_presets_stable_at_rest in test_current_clamp.py for the
+# 50 ms stability verification.
+_EQUILIBRIUM_PRESET_NAMES = [p for p in NEURON_PRESET_NAMES if p not in (TRN, PURKINJE)]
 
 
 @pytest.mark.parametrize("preset_name", _EQUILIBRIUM_PRESET_NAMES)
@@ -69,5 +78,22 @@ def test_find_zero_current_voltage_all_presets(preset_name: str) -> None:
     v_eq = find_zero_current_voltage(neuron)
     assert abs(v_eq - neuron.v_rest) < 0.5, (
         f"{preset_name}: computed equilibrium {v_eq:.2f} mV differs from "
+        f"v_rest={neuron.v_rest:.1f} mV by {abs(v_eq - neuron.v_rest):.2f} mV"
+    )
+
+
+def test_find_zero_current_voltage_purkinje_narrow_range() -> None:
+    """Purkinje equilibrium is found in [−90, −75] mV and matches v_rest.
+
+    The default [−100, −20] range finds a spurious root near −30 mV (see
+    _EQUILIBRIUM_PRESET_NAMES exclusion comment above).  The narrow range
+    isolates the physiological fixed point at −82.3 mV, pinning g_NaL, g_KL,
+    and g_CaT against silent regressions.
+    """
+    config = NEURON_PRESETS[PURKINJE]
+    neuron = make_neuron(config)
+    v_eq = find_zero_current_voltage(neuron, v_min=-90.0, v_max=-75.0)
+    assert abs(v_eq - neuron.v_rest) < 0.5, (
+        f"Purkinje narrow-range equilibrium {v_eq:.2f} mV differs from "
         f"v_rest={neuron.v_rest:.1f} mV by {abs(v_eq - neuron.v_rest):.2f} mV"
     )
