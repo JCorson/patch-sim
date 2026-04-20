@@ -7,6 +7,7 @@ import pytest
 from patch_sim.channels import IonChannel, IonSpecies, NernstSpec
 from patch_sim.core_channels import (
     POSPISCHIL_VT,
+    PURKINJE_VT,
     _stn_alpha_h,
     _stn_alpha_m,
     _stn_alpha_n,
@@ -25,6 +26,8 @@ from patch_sim.core_channels import (
     make_na_leak_channel,
     make_pospischil_k_channel,
     make_pospischil_na_channel,
+    make_purkinje_k_channel,
+    make_purkinje_na_channel,
     make_stn_k_channel,
     make_stn_na_channel,
     pospischil_alpha_h,
@@ -33,6 +36,12 @@ from patch_sim.core_channels import (
     pospischil_beta_h,
     pospischil_beta_m,
     pospischil_beta_n,
+    purkinje_alpha_h,
+    purkinje_alpha_m,
+    purkinje_alpha_n,
+    purkinje_beta_h,
+    purkinje_beta_m,
+    purkinje_beta_n,
 )
 from patch_sim.neuron import Neuron
 
@@ -625,3 +634,149 @@ def test_stn_preset_uses_otsuka_factories() -> None:
     config = NEURON_PRESETS[STN]
     assert config.na_channel_factory is make_stn_na_channel
     assert config.k_channel_factory is make_stn_k_channel
+
+
+# ---------------------------------------------------------------------------
+# Purkinje (De Schutter & Bower 1994) rate functions
+# ---------------------------------------------------------------------------
+
+_PURKINJE_ALPHA_M_SINGULARITY = PURKINJE_VT + 13  # -45 mV
+_PURKINJE_BETA_M_SINGULARITY = PURKINJE_VT + 40  # -18 mV
+_PURKINJE_ALPHA_N_SINGULARITY = PURKINJE_VT + 15  # -43 mV
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, 0.0, 40.0])
+def test_purkinje_na_rate_functions_positive(V: float) -> None:
+    """All Purkinje Na⁺ rate functions are positive at physiological voltages."""
+    assert purkinje_alpha_m(V, 0.0) > 0
+    assert purkinje_beta_m(V, 0.0) > 0
+    assert purkinje_alpha_h(V, 0.0) > 0
+    assert purkinje_beta_h(V, 0.0) > 0
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, 0.0, 40.0])
+def test_purkinje_k_rate_functions_positive(V: float) -> None:
+    """All Purkinje K⁺ rate functions are positive at physiological voltages."""
+    assert purkinje_alpha_n(V, 0.0) > 0
+    assert purkinje_beta_n(V, 0.0) > 0
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, 0.0, 40.0])
+def test_purkinje_steady_state_gating_bounds(V: float) -> None:
+    """Purkinje steady-state gating variables are in [0, 1]."""
+    m_inf = purkinje_alpha_m(V, 0.0) / (
+        purkinje_alpha_m(V, 0.0) + purkinje_beta_m(V, 0.0)
+    )
+    h_inf = purkinje_alpha_h(V, 0.0) / (
+        purkinje_alpha_h(V, 0.0) + purkinje_beta_h(V, 0.0)
+    )
+    n_inf = purkinje_alpha_n(V, 0.0) / (
+        purkinje_alpha_n(V, 0.0) + purkinje_beta_n(V, 0.0)
+    )
+    assert 0.0 <= m_inf <= 1.0
+    assert 0.0 <= h_inf <= 1.0
+    assert 0.0 <= n_inf <= 1.0
+
+
+def test_purkinje_alpha_m_singularity_guard() -> None:
+    """purkinje_alpha_m returns L'Hôpital limit 1.28 at V = VT + 13."""
+    assert purkinje_alpha_m(_PURKINJE_ALPHA_M_SINGULARITY, 0.0) == pytest.approx(1.28)
+
+
+def test_purkinje_alpha_m_near_singularity_continuous_above() -> None:
+    """purkinje_alpha_m is continuous approaching the singularity from above."""
+    assert purkinje_alpha_m(_PURKINJE_ALPHA_M_SINGULARITY + 1e-5, 0.0) == pytest.approx(
+        1.28, rel=1e-3
+    )
+
+
+def test_purkinje_alpha_m_near_singularity_continuous_below() -> None:
+    """purkinje_alpha_m is continuous approaching the singularity from below."""
+    assert purkinje_alpha_m(_PURKINJE_ALPHA_M_SINGULARITY - 1e-5, 0.0) == pytest.approx(
+        1.28, rel=1e-3
+    )
+
+
+def test_purkinje_beta_m_singularity_guard() -> None:
+    """purkinje_beta_m returns L'Hôpital limit 1.4 at V = VT + 40."""
+    assert purkinje_beta_m(_PURKINJE_BETA_M_SINGULARITY, 0.0) == pytest.approx(1.4)
+
+
+def test_purkinje_beta_m_near_singularity_continuous_above() -> None:
+    """purkinje_beta_m is continuous approaching the singularity from above."""
+    assert purkinje_beta_m(_PURKINJE_BETA_M_SINGULARITY + 1e-5, 0.0) == pytest.approx(
+        1.4, rel=1e-3
+    )
+
+
+def test_purkinje_beta_m_near_singularity_continuous_below() -> None:
+    """purkinje_beta_m is continuous approaching the singularity from below."""
+    assert purkinje_beta_m(_PURKINJE_BETA_M_SINGULARITY - 1e-5, 0.0) == pytest.approx(
+        1.4, rel=1e-3
+    )
+
+
+def test_purkinje_alpha_n_singularity_guard() -> None:
+    """purkinje_alpha_n returns L'Hôpital limit 0.16 at V = VT + 15."""
+    assert purkinje_alpha_n(_PURKINJE_ALPHA_N_SINGULARITY, 0.0) == pytest.approx(0.16)
+
+
+def test_purkinje_alpha_n_near_singularity_continuous_above() -> None:
+    """purkinje_alpha_n is continuous approaching the singularity from above."""
+    assert purkinje_alpha_n(_PURKINJE_ALPHA_N_SINGULARITY + 1e-5, 0.0) == pytest.approx(
+        0.16, rel=1e-3
+    )
+
+
+def test_purkinje_alpha_n_near_singularity_continuous_below() -> None:
+    """purkinje_alpha_n is continuous approaching the singularity from below."""
+    assert purkinje_alpha_n(_PURKINJE_ALPHA_N_SINGULARITY - 1e-5, 0.0) == pytest.approx(
+        0.16, rel=1e-3
+    )
+
+
+@pytest.mark.parametrize("V", [-65.0, 0.0])
+@pytest.mark.parametrize(
+    "fn",
+    [
+        purkinje_alpha_m,
+        purkinje_beta_m,
+        purkinje_alpha_h,
+        purkinje_beta_h,
+        purkinje_alpha_n,
+        purkinje_beta_n,
+    ],
+)
+def test_purkinje_rate_functions_ignore_ca_i(V: float, fn) -> None:
+    """All Purkinje rate functions return the same value regardless of ca_i."""
+    assert fn(V, 0.0) == pytest.approx(fn(V, 1.0))
+
+
+def test_make_purkinje_na_channel_structure() -> None:
+    """make_purkinje_na_channel returns a channel with m³h gating and Na⁺ reversal."""
+    ch = make_purkinje_na_channel(g_max=120.0)
+    assert isinstance(ch, IonChannel)
+    assert ch.name == "Na"
+    assert ch.g_max == pytest.approx(120.0)
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "m"
+    assert ch.gating_variables[0].power == 3
+    assert ch.gating_variables[1].name == "h"
+    assert ch.gating_variables[1].power == 1
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.SODIUM
+    assert not ch.carries_calcium
+
+
+def test_make_purkinje_k_channel_structure() -> None:
+    """make_purkinje_k_channel returns a channel with n⁴ gating and K⁺ reversal."""
+    ch = make_purkinje_k_channel(g_max=36.0)
+    assert isinstance(ch, IonChannel)
+    assert ch.name == "K"
+    assert ch.g_max == pytest.approx(36.0)
+    assert len(ch.gating_variables) == 1
+    assert ch.gating_variables[0].name == "n"
+    assert ch.gating_variables[0].power == 4
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
+    assert not ch.carries_calcium
