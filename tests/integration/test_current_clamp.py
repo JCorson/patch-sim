@@ -11,7 +11,7 @@ from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
 
 # Purkinje is a pacemaker with an UNSTABLE zero-current equilibrium at v_rest.
 # Starting from v_rest = −65 mV it drifts below threshold — the stability
-# criterion does not apply.  See test_purkinje_fires_spontaneously in
+# criterion does not apply.  See test_fires_from_small_depolarization in
 # tests/integration/test_purkinje.py for the pacemaking behaviour check.
 _STABLE_PRESET_NAMES = [p for p in NEURON_PRESET_NAMES if p != PURKINJE]
 

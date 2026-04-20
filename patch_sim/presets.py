@@ -153,7 +153,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # INaP (persistent Na⁺) and INaR (resurgent Na⁺) shift the
         # zero-current equilibrium into the physiological pacemaking range.
         # Refs: De Schutter & Bower (1994), J. Neurophysiol. 71:375;
-        #       Raman & Bean (1997), Neuron 19:1of (NaR);
+        #       Raman & Bean (1997), Neuron 19:881 (NaR);
         #       Raman & Bean (1999), J. Neurosci. 19:4663 (NaP/NaR pacemaking);
         #       Häusser & Clark (1997), J. Neurosci. 17:2358 (−55 to −65 mV range)
         #
@@ -185,7 +185,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # WARNING: v_rest depends on INaP (g=0.1), INaR (g=0.1), and ICaT
         # (g=0.5) window currents at −65.0 mV.  If any of these conductances
         # are retuned, re-run find_zero_current_voltage (range −75 to −55 mV)
-        # and update v_rest, g_NaL, and g_KL accordingly.
+        # and update v_rest and g_KL accordingly (g_NaL is fixed at 0).
         v_rest=-65.0,
         g_NaL=0.0,
         g_KL=0.044,

@@ -447,7 +447,7 @@ def test_purkinje_has_nar_channel() -> None:
 
     INaR enables the fast repriming and high-frequency burst firing that
     characterises complex spikes in cerebellar Purkinje cells.
-    Ref: Raman & Bean (1997), Neuron 19:1of.
+    Ref: Raman & Bean (1997), Neuron 19:881.
     """
     config = NEURON_PRESETS[PURKINJE]
     factories = [cc.factory for cc in config.channels]
@@ -468,11 +468,25 @@ def test_purkinje_nap_conductance_physiological() -> None:
 
 
 def test_purkinje_vrest_in_pacemaking_range() -> None:
-    """Purkinje v_rest is in the in-vivo pacemaking range [−65, −55] mV.
+    """Purkinje v_rest is in the in-vivo pacemaking range [−65.5, −55] mV.
 
     Häusser & Clark (1997, J. Neurosci. 17:2358) report spontaneous pacemaking
     near −55 to −65 mV in vivo.  Raman & Bean (1999) attribute this to INaP/INaR
-    subthreshold window currents.
+    subthreshold window currents.  The lower bound is widened to −65.5 mV to
+    accommodate the 0.5 mV equilibrium-finding tolerance.
     """
     config = NEURON_PRESETS[PURKINJE]
-    assert -65.0 <= config.v_rest <= -55.0
+    assert -65.5 <= config.v_rest <= -55.0
+
+
+def test_purkinje_nar_conductance_physiological() -> None:
+    """INaR conductance in Purkinje preset is in the physiological range.
+
+    Expected range: [0.01, 0.5] mS/cm².  Consistent bound as for INaP;
+    guards against silent regressions to non-physiological values.
+    Ref: Raman & Bean (1997), Neuron 19:881.
+    """
+    config = NEURON_PRESETS[PURKINJE]
+    nar_configs = [cc for cc in config.channels if cc.factory is make_inar_channel]
+    assert len(nar_configs) == 1
+    assert 0.01 <= nar_configs[0].g_max <= 0.5

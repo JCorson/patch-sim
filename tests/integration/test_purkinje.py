@@ -43,7 +43,7 @@ def _count_action_potentials(voltage: np.ndarray, threshold: float = 0.0) -> int
         if v > threshold and not above:
             count += 1
             above = True
-        elif v < threshold:
+        elif v <= threshold:
             above = False
     return count
 
@@ -80,6 +80,7 @@ def test_inap_inward_at_subthreshold(pk_neuron: Neuron) -> None:
         current_amplitude=0.05,
         step_start=0.0,
         step_duration=50.0,
+        sampling_frequency=SIM_SAMPLING_FREQ,
     )
     result = simulate_current_clamp(pk_neuron, current_external=protocol)
 
@@ -107,9 +108,13 @@ def test_inar_column_present_in_simulation(pk_neuron: Neuron) -> None:
 
     Confirms that the INaR channel is wired into the preset and that the
     resurgent sodium current is tracked in the output structured array.
-    Ref: Raman & Bean (1997), Neuron 19:1of.
+    Ref: Raman & Bean (1997), Neuron 19:881.
     """
-    protocol = step_current(duration=50.0, current_amplitude=5.0)
+    protocol = step_current(
+        duration=50.0,
+        current_amplitude=5.0,
+        sampling_frequency=SIM_SAMPLING_FREQ,
+    )
     result = simulate_current_clamp(pk_neuron, current_external=protocol)
     assert "INaR" in result.dtype.names, (
         "Expected 'INaR' column in simulation output — make_inar_channel may "
@@ -135,6 +140,7 @@ def test_fires_from_small_depolarization(pk_neuron: Neuron) -> None:
         current_amplitude=0.2,
         step_start=0.0,
         step_duration=100.0,
+        sampling_frequency=SIM_SAMPLING_FREQ,
     )
     result = simulate_current_clamp(pk_neuron, current_external=protocol)
     n_aps = _count_action_potentials(result["voltage"])
@@ -157,10 +163,11 @@ def test_suprathreshold_fires_action_potential(pk_neuron: Neuron) -> None:
     must repolarize below −50 mV after the peak.
     """
     protocol = step_current(
-        duration=100.0,
+        duration=50.0,
         current_amplitude=5.0,
-        step_start=50.0,
+        step_start=10.0,
         step_duration=5.0,
+        sampling_frequency=SIM_SAMPLING_FREQ,
     )
     result = simulate_current_clamp(pk_neuron, current_external=protocol)
     voltage = result["voltage"]
@@ -176,10 +183,10 @@ def test_suprathreshold_fires_action_potential(pk_neuron: Neuron) -> None:
 
 
 def test_complex_spiking_with_strong_stimulus(pk_neuron: Neuron) -> None:
-    """Strong sustained current evokes complex Ca²⁺-driven spiking.
+    """Strong sustained current evokes multiple action potentials.
 
     10 µA/cm² for 180 ms should drive at least 3 action potentials through
-    the ICaL/ICaT/IKCa interaction characteristic of Purkinje complex spikes.
+    the Ca²⁺/IKCa interaction characteristic of Purkinje sustained firing.
     Ref: De Schutter & Bower (1994), J. Neurophysiol. 71:375.
     """
     protocol = step_current(
@@ -187,6 +194,7 @@ def test_complex_spiking_with_strong_stimulus(pk_neuron: Neuron) -> None:
         current_amplitude=10.0,
         step_start=0.0,
         step_duration=180.0,
+        sampling_frequency=SIM_SAMPLING_FREQ,
     )
     result = simulate_current_clamp(pk_neuron, current_external=protocol)
     n_aps = _count_action_potentials(result["voltage"])
