@@ -856,6 +856,210 @@ def make_trn_k_channel(g_max: float) -> IonChannel:
 
 
 # ---------------------------------------------------------------------------
+# De Schutter & Bower (1994) Purkinje cell Na⁺/K⁺ rate functions
+#
+# Source: De Schutter, E. & Bower, J.M. (1994) An active membrane model of
+# the cerebellar Purkinje cell I. Simulation of current clamps in slice.
+# J. Neurophysiol. 71:375–400.
+#
+# Rate functions use the same Traub-Miles analytical form as the other
+# cell-type-specific factories.  VT = −58 mV matches the somatic Na⁺
+# activation threshold of guinea-pig cerebellar Purkinje neurons at 32 °C
+# (the recording temperature of De Schutter & Bower 1994).
+# ---------------------------------------------------------------------------
+
+#: Voltage threshold parameter (mV) for cerebellar Purkinje cells.
+#: Matches the somatic NaF activation threshold from De Schutter & Bower (1994).
+PURKINJE_VT: float = -58.0
+
+
+def purkinje_alpha_m(V: float, ca_i: float) -> float:
+    """Forward rate for Purkinje Na⁺ activation gate m.
+
+    Traub-Miles form parameterised for cerebellar Purkinje cells (VT = −58 mV).
+    Has a removable singularity at V = VT + 13 = −45 mV; the L'Hôpital
+    limit (1.28) is returned when ``|V − VT − 13| < SINGULARITY_THRESHOLD``.
+
+    Reference: De Schutter & Bower (1994), J. Neurophysiol. 71:375.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    x = V - PURKINJE_VT - 13
+    if abs(x) < SINGULARITY_THRESHOLD:
+        return 1.28
+    return -0.32 * x / (safe_exp(-x / 4) - 1)
+
+
+def purkinje_beta_m(V: float, ca_i: float) -> float:
+    """Backward rate for Purkinje Na⁺ activation gate m.
+
+    Traub-Miles form parameterised for cerebellar Purkinje cells (VT = −58 mV).
+    Has a removable singularity at V = VT + 40 = −18 mV; the L'Hôpital
+    limit (1.4) is returned when ``|V − VT − 40| < SINGULARITY_THRESHOLD``.
+
+    Reference: De Schutter & Bower (1994), J. Neurophysiol. 71:375.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    x = V - PURKINJE_VT - 40
+    if abs(x) < SINGULARITY_THRESHOLD:
+        return 1.4
+    return 0.28 * x / (safe_exp(x / 5) - 1)
+
+
+def purkinje_alpha_h(V: float, ca_i: float) -> float:
+    """Forward rate for Purkinje Na⁺ inactivation gate h.
+
+    Traub-Miles form parameterised for cerebellar Purkinje cells (VT = −58 mV).
+
+    Reference: De Schutter & Bower (1994), J. Neurophysiol. 71:375.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    return 0.128 * safe_exp(-(V - PURKINJE_VT - 17) / 18)
+
+
+def purkinje_beta_h(V: float, ca_i: float) -> float:
+    """Backward rate for Purkinje Na⁺ inactivation gate h.
+
+    Traub-Miles form parameterised for cerebellar Purkinje cells (VT = −58 mV).
+
+    Reference: De Schutter & Bower (1994), J. Neurophysiol. 71:375.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    return 4.0 / (1 + safe_exp(-(V - PURKINJE_VT - 40) / 5))
+
+
+def purkinje_alpha_n(V: float, ca_i: float) -> float:
+    """Forward rate for Purkinje K⁺ delayed-rectifier activation gate n.
+
+    Traub-Miles form parameterised for cerebellar Purkinje cells (VT = −58 mV).
+    Has a removable singularity at V = VT + 15 = −43 mV; the L'Hôpital
+    limit (0.16) is returned when ``|V − VT − 15| < SINGULARITY_THRESHOLD``.
+
+    Reference: De Schutter & Bower (1994), J. Neurophysiol. 71:375.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    x = V - PURKINJE_VT - 15
+    if abs(x) < SINGULARITY_THRESHOLD:
+        return 0.16
+    return -0.032 * x / (safe_exp(-x / 5) - 1)
+
+
+def purkinje_beta_n(V: float, ca_i: float) -> float:
+    """Backward rate for Purkinje K⁺ delayed-rectifier activation gate n.
+
+    Traub-Miles form parameterised for cerebellar Purkinje cells (VT = −58 mV).
+
+    Reference: De Schutter & Bower (1994), J. Neurophysiol. 71:375.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    return 0.5 * safe_exp(-(V - PURKINJE_VT - 10) / 40)
+
+
+def make_purkinje_na_channel(g_max: float) -> IonChannel:
+    """Create the cerebellar Purkinje fast sodium channel (Na⁺).
+
+    Uses Traub-Miles kinetics with VT = −58 mV to match the somatic NaF
+    activation threshold of mammalian cerebellar Purkinje neurons recorded
+    by De Schutter & Bower (1994) at 32 °C.
+
+    Intended as the ``na_channel_factory`` of the Purkinje preset.  Compared
+    with the default HH52 Na⁺ channel (fitted to squid axon at 22 °C), the
+    Traub-Miles form with VT = −58 mV places the activation half-point near
+    −45 mV and prevents the ~5.2× Q10 overcorrection that caused premature
+    Na⁺ inactivation.
+
+    Reference: De Schutter & Bower (1994), J. Neurophysiol. 71:375.
+    Kinetics recorded at 32 °C — use T_ref = 305.15 K with this factory.
+
+    Args:
+        g_max: Maximum conductance in mS/cm².
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the Purkinje
+        fast Na⁺ channel.
+    """
+    return IonChannel(
+        name="Na",
+        g_max=g_max,
+        gating_variables=(
+            GatingVariable(
+                name="m", power=3, alpha=purkinje_alpha_m, beta=purkinje_beta_m
+            ),
+            GatingVariable(
+                name="h", power=1, alpha=purkinje_alpha_h, beta=purkinje_beta_h
+            ),
+        ),
+        reversal_spec=NernstSpec(IonSpecies.SODIUM),
+    )
+
+
+def make_purkinje_k_channel(g_max: float) -> IonChannel:
+    """Create the cerebellar Purkinje delayed-rectifier potassium channel (K⁺).
+
+    Uses Traub-Miles kinetics with VT = −58 mV to match the somatic KDR
+    activation threshold of mammalian cerebellar Purkinje neurons recorded
+    by De Schutter & Bower (1994) at 32 °C.
+
+    Intended as the ``k_channel_factory`` of the Purkinje preset.
+
+    Reference: De Schutter & Bower (1994), J. Neurophysiol. 71:375.
+    Kinetics recorded at 32 °C — use T_ref = 305.15 K with this factory.
+
+    Args:
+        g_max: Maximum conductance in mS/cm².
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the Purkinje
+        delayed-rectifier K⁺ channel.
+    """
+    return IonChannel(
+        name="K",
+        g_max=g_max,
+        gating_variables=(
+            GatingVariable(
+                name="n", power=4, alpha=purkinje_alpha_n, beta=purkinje_beta_n
+            ),
+        ),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Otsuka et al. (2004) STN channel kinetics
 # ---------------------------------------------------------------------------
 # Reference: Otsuka, T. et al. (2004). Conductance-based model of the
