@@ -29,6 +29,8 @@ from patch_sim.core_channels import (
     make_pospischil_na_channel,
     make_thalamic_relay_k_channel,
     make_thalamic_relay_na_channel,
+    make_trn_k_channel,
+    make_trn_na_channel,
 )
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import (
@@ -276,7 +278,7 @@ def test_thalamic_relay_t_ref_is_mccormick_huguenard_recording_temp() -> None:
         (THALAMIC_RELAY, 5.0, 9.0, 5.0, 9.0),  # g_total=0.15  τ_m≈6.7 ms
         (CA1_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
         (STN, 2.5, 5.5, 2.5, 5.5),  # g_total=0.25 τ_m≈4 ms
-        (TRN, 10.0, 15.0, 10.0, 15.0),  # g_total=0.08 τ_m≈12.5 ms
+        (TRN, 10.0, 15.0, 10.0, 15.0),  # g_total=0.07 τ_m≈14.3 ms
     ],
 )
 def test_preset_passive_properties_in_physiological_range(
@@ -320,25 +322,28 @@ def test_preset_passive_properties_in_physiological_range(
 
 
 def test_trn_preset_vrest_is_physiological() -> None:
-    """TRN v_rest must be −77 mV — the physiological slice value.
+    """TRN v_rest must be −80 mV — a stable, physiologically valid resting potential.
 
-    This is the primary claim of the K_out=4.0 mM retuning: with E_K ≈ −95 mV
-    the K⁺ leak has 18 mV of outward driving force at rest, allowing a small
-    Na⁺ leak to balance ICaT window current at −77 mV.  If v_rest drifts, the
-    ICaT inactivation gate ft will shift and burst firing will be impaired.
+    −80 mV is chosen over −77 mV because the ICaT window current at −77 mV
+    (ft_inf ≈ 0.42) creates ~3.1 mS/cm² of negative conductance — far exceeding
+    g_total = 0.07 mS/cm² and making −77 mV an unstable equilibrium in the
+    steady-state conductance picture.  At −80 mV, the ft gate is at its
+    half-inactivation point (ft_inf = 0.50) and the ICaT negative conductance
+    falls to ~0.038 mS/cm², which g_total safely overcomes.  −80 mV is within
+    the physiological range reported by Huguenard & Prince (1992) for TRN cells.
     """
     config = NEURON_PRESETS[TRN]
-    assert config.v_rest == pytest.approx(-77.0)
+    assert config.v_rest == pytest.approx(-80.0)
 
 
 def test_trn_icat_ft_inf_at_vrest_enables_burst_firing() -> None:
-    """ICaT inactivation gate ft_inf at TRN v_rest must be ≈ 0.42.
+    """ICaT inactivation gate ft_inf at TRN v_rest must be ≈ 0.50.
 
-    ft_inf ≈ 0.42 at −77 mV means ICaT is substantially de-inactivated at
-    rest, enabling the post-inhibitory rebound burst and burst character on
-    depolarising steps that define TRN firing.  Previously (K_out=7.8 mM,
-    E_K ≈ −77 mV) v_rest settled at −66 mV where ft_inf ≈ 0.17 — too
-    inactivated for reliable burst firing.
+    ft_inf = 0.50 at −80 mV (the ICaT half-inactivation voltage) means ICaT
+    is half de-inactivated at rest, enabling the post-inhibitory rebound burst
+    and burst character on depolarising steps that define TRN firing.
+    Previously (K_out=7.8 mM, E_K ≈ −77 mV) v_rest settled at −66 mV where
+    ft_inf ≈ 0.17 — too inactivated for reliable burst firing.
     """
     channel = make_icat_channel()
     ft_var = next(gv for gv in channel.gating_variables if gv.name == "ft")
@@ -346,4 +351,37 @@ def test_trn_icat_ft_inf_at_vrest_enables_burst_firing() -> None:
     alpha = ft_var.alpha(v_rest, 0.0)
     beta = ft_var.beta(v_rest, 0.0)
     ft_inf = alpha / (alpha + beta)
-    assert ft_inf == pytest.approx(0.42, abs=0.02)
+    assert ft_inf == pytest.approx(0.50, abs=0.02)
+
+
+def test_trn_uses_huguenard_na_factory() -> None:
+    """TRN preset must wire make_trn_na_channel as its Na⁺ channel factory.
+
+    Verifies that the Huguenard & Prince (1992) / Pospischil (2008) RE-cell
+    Na⁺ kinetics (VT = −67 mV, recorded at 36 °C) are used instead of the
+    default HH52 squid axon kinetics.
+    """
+    config = NEURON_PRESETS[TRN]
+    assert config.na_channel_factory is make_trn_na_channel
+
+
+def test_trn_uses_huguenard_k_factory() -> None:
+    """TRN preset must wire make_trn_k_channel as its K⁺ channel factory.
+
+    Verifies that the Huguenard & Prince (1992) / Pospischil (2008) RE-cell
+    K⁺ kinetics (VT = −67 mV, recorded at 36 °C) are used instead of the
+    default HH52 squid axon kinetics.
+    """
+    config = NEURON_PRESETS[TRN]
+    assert config.k_channel_factory is make_trn_k_channel
+
+
+def test_trn_t_ref_is_huguenard_recording_temp() -> None:
+    """TRN preset T_ref must be 309.15 K (36 °C), the HP92 recording temperature.
+
+    Setting T_ref = 309.15 K limits the Q10 correction from ~5.2× (22→37 °C)
+    to ~1.12× (36→37 °C), preserving the published Huguenard & Prince kinetics
+    and preventing premature Na⁺ inactivation at physiological temperature.
+    """
+    config = NEURON_PRESETS[TRN]
+    assert config.T_ref == pytest.approx(309.15)
