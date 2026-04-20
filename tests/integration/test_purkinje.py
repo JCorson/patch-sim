@@ -176,4 +176,4 @@ def test_complex_spiking_with_strong_stimulus(pk_neuron: Neuron) -> None:
     )
     result = simulate_current_clamp(pk_neuron, current_external=protocol)
     n_aps = _count_action_potentials(result["voltage"])
-    assert n_aps >= 3, f"Expected at least 3 complex spikes with 10 µA/cm², got {n_aps}"
+    assert n_aps >= 6, f"Expected at least 6 complex spikes with 10 µA/cm², got {n_aps}"
