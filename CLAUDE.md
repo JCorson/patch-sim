@@ -26,6 +26,10 @@ Only fall back to Grep/Glob when the LSP cannot answer the question (e.g. search
 
 Patch clamp experiment simulator with a core library (`patch_sim/`) and a Reflex web UI (`patch_sim_ui/`). The core library models ion channels, gating variables, voltage/current clamp protocols, and the HH differential equations. The UI provides interactive controls and live trace plots.
 
+## Biological accuracy
+
+**Prioritise biological accuracy** when designing or modifying neuron presets. If a preset produces behaviour that doesn't match known physiology (wrong resting potential, wrong firing pattern, missing channels), fix the underlying biology rather than working around it. When a full biological fix is out of scope (e.g. a channel type not yet implemented), document the known limitation explicitly in the preset comment and in an issue — do not silently accept a biologically wrong default.
+
 ## Architecture
 
 - `patch_sim/` — pure Python library, **no Reflex dependency**. All simulation logic lives here.
