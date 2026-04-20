@@ -20,6 +20,65 @@ intracellular [Cl⁻] that arose when using a single chloride-Nernst leak.
 from .channels import GatingVariable, IonChannel, IonSpecies, NernstSpec
 from .utils import safe_exp
 
+__all__ = [
+    # Module constant
+    "SINGULARITY_THRESHOLD",
+    # Classic Hodgkin-Huxley rate functions and factories
+    "alpha_n",
+    "beta_n",
+    "alpha_m",
+    "beta_m",
+    "alpha_h",
+    "beta_h",
+    "make_na_channel",
+    "make_k_channel",
+    "make_na_leak_channel",
+    "make_k_leak_channel",
+    # Pospischil et al. (2008) cortical RS
+    "POSPISCHIL_VT",
+    "pospischil_alpha_m",
+    "pospischil_beta_m",
+    "pospischil_alpha_h",
+    "pospischil_beta_h",
+    "pospischil_alpha_n",
+    "pospischil_beta_n",
+    "make_pospischil_na_channel",
+    "make_pospischil_k_channel",
+    # McCormick & Huguenard (1992) thalamic relay
+    "THALAMIC_RELAY_VT",
+    "thalamic_relay_alpha_m",
+    "thalamic_relay_beta_m",
+    "thalamic_relay_alpha_h",
+    "thalamic_relay_beta_h",
+    "thalamic_relay_alpha_n",
+    "thalamic_relay_beta_n",
+    "make_thalamic_relay_na_channel",
+    "make_thalamic_relay_k_channel",
+    # Huguenard & Prince (1992) / Destexhe et al. (1994) TRN
+    "TRN_VT",
+    "trn_alpha_m",
+    "trn_beta_m",
+    "trn_alpha_h",
+    "trn_beta_h",
+    "trn_alpha_n",
+    "trn_beta_n",
+    "make_trn_na_channel",
+    "make_trn_k_channel",
+    # De Schutter & Bower (1994) Purkinje
+    "PURKINJE_VT",
+    "purkinje_alpha_m",
+    "purkinje_beta_m",
+    "purkinje_alpha_h",
+    "purkinje_beta_h",
+    "purkinje_alpha_n",
+    "purkinje_beta_n",
+    "make_purkinje_na_channel",
+    "make_purkinje_k_channel",
+    # Otsuka et al. (2004) STN
+    "make_stn_na_channel",
+    "make_stn_k_channel",
+]
+
 # Threshold for detecting near-singularity in GHK-style rate equations.
 # When the denominator voltage term is within this tolerance of zero, the
 # L'Hôpital limit is used instead to avoid division by zero.
@@ -215,6 +274,113 @@ def make_k_leak_channel(g_max: float) -> IonChannel:
 
 
 # ---------------------------------------------------------------------------
+# Shared Traub-Miles (1991) analytical rate-function helpers
+#
+# All four cell-type-specific families below (Pospischil, Thalamic Relay, TRN,
+# Purkinje) use the same six Traub-Miles analytical forms — they differ only in
+# the voltage threshold parameter ``vt``.  These private helpers encode each
+# form once; the public wrappers delegate to them with the appropriate VT
+# constant.
+# ---------------------------------------------------------------------------
+
+
+def _traub_miles_alpha_m(V: float, vt: float) -> float:
+    """Traub-Miles forward rate for Na⁺ activation gate m.
+
+    Has a removable singularity at V = vt + 13; the L'Hôpital limit (1.28)
+    is returned when ``|V − vt − 13| < SINGULARITY_THRESHOLD``.
+
+    Args:
+        V: Membrane voltage in mV.
+        vt: Cell-type voltage threshold in mV.
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    x = V - vt - 13
+    if abs(x) < SINGULARITY_THRESHOLD:
+        return 1.28
+    return -0.32 * x / (safe_exp(-x / 4) - 1)
+
+
+def _traub_miles_beta_m(V: float, vt: float) -> float:
+    """Traub-Miles backward rate for Na⁺ activation gate m.
+
+    Has a removable singularity at V = vt + 40; the L'Hôpital limit (1.4)
+    is returned when ``|V − vt − 40| < SINGULARITY_THRESHOLD``.
+
+    Args:
+        V: Membrane voltage in mV.
+        vt: Cell-type voltage threshold in mV.
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    x = V - vt - 40
+    if abs(x) < SINGULARITY_THRESHOLD:
+        return 1.4
+    return 0.28 * x / (safe_exp(x / 5) - 1)
+
+
+def _traub_miles_alpha_h(V: float, vt: float) -> float:
+    """Traub-Miles forward rate for Na⁺ inactivation gate h.
+
+    Args:
+        V: Membrane voltage in mV.
+        vt: Cell-type voltage threshold in mV.
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    return 0.128 * safe_exp(-(V - vt - 17) / 18)
+
+
+def _traub_miles_beta_h(V: float, vt: float) -> float:
+    """Traub-Miles backward rate for Na⁺ inactivation gate h.
+
+    Args:
+        V: Membrane voltage in mV.
+        vt: Cell-type voltage threshold in mV.
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    return 4.0 / (1 + safe_exp(-(V - vt - 40) / 5))
+
+
+def _traub_miles_alpha_n(V: float, vt: float) -> float:
+    """Traub-Miles forward rate for K⁺ delayed-rectifier activation gate n.
+
+    Has a removable singularity at V = vt + 15; the L'Hôpital limit (0.16)
+    is returned when ``|V − vt − 15| < SINGULARITY_THRESHOLD``.
+
+    Args:
+        V: Membrane voltage in mV.
+        vt: Cell-type voltage threshold in mV.
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    x = V - vt - 15
+    if abs(x) < SINGULARITY_THRESHOLD:
+        return 0.16
+    return -0.032 * x / (safe_exp(-x / 5) - 1)
+
+
+def _traub_miles_beta_n(V: float, vt: float) -> float:
+    """Traub-Miles backward rate for K⁺ delayed-rectifier activation gate n.
+
+    Args:
+        V: Membrane voltage in mV.
+        vt: Cell-type voltage threshold in mV.
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    return 0.5 * safe_exp(-(V - vt - 10) / 40)
+
+
+# ---------------------------------------------------------------------------
 # Pospischil et al. (2008) cortical pyramidal (RS) Na⁺/K⁺ rate functions
 #
 # Source: Pospischil M. et al. (2008) Minimal Hodgkin-Huxley type models for
@@ -243,10 +409,7 @@ def pospischil_alpha_m(V: float, ca_i: float) -> float:
     Returns:
         Forward rate in 1/ms.
     """
-    x = V - POSPISCHIL_VT - 13
-    if abs(x) < SINGULARITY_THRESHOLD:
-        return 1.28
-    return -0.32 * x / (safe_exp(-x / 4) - 1)
+    return _traub_miles_alpha_m(V, POSPISCHIL_VT)
 
 
 def pospischil_beta_m(V: float, ca_i: float) -> float:
@@ -263,10 +426,7 @@ def pospischil_beta_m(V: float, ca_i: float) -> float:
     Returns:
         Backward rate in 1/ms.
     """
-    x = V - POSPISCHIL_VT - 40
-    if abs(x) < SINGULARITY_THRESHOLD:
-        return 1.4
-    return 0.28 * x / (safe_exp(x / 5) - 1)
+    return _traub_miles_beta_m(V, POSPISCHIL_VT)
 
 
 def pospischil_alpha_h(V: float, ca_i: float) -> float:
@@ -281,7 +441,7 @@ def pospischil_alpha_h(V: float, ca_i: float) -> float:
     Returns:
         Forward rate in 1/ms.
     """
-    return 0.128 * safe_exp(-(V - POSPISCHIL_VT - 17) / 18)
+    return _traub_miles_alpha_h(V, POSPISCHIL_VT)
 
 
 def pospischil_beta_h(V: float, ca_i: float) -> float:
@@ -296,7 +456,7 @@ def pospischil_beta_h(V: float, ca_i: float) -> float:
     Returns:
         Backward rate in 1/ms.
     """
-    return 4.0 / (1 + safe_exp(-(V - POSPISCHIL_VT - 40) / 5))
+    return _traub_miles_beta_h(V, POSPISCHIL_VT)
 
 
 def pospischil_alpha_n(V: float, ca_i: float) -> float:
@@ -313,10 +473,7 @@ def pospischil_alpha_n(V: float, ca_i: float) -> float:
     Returns:
         Forward rate in 1/ms.
     """
-    x = V - POSPISCHIL_VT - 15
-    if abs(x) < SINGULARITY_THRESHOLD:
-        return 0.16
-    return -0.032 * x / (safe_exp(-x / 5) - 1)
+    return _traub_miles_alpha_n(V, POSPISCHIL_VT)
 
 
 def pospischil_beta_n(V: float, ca_i: float) -> float:
@@ -331,7 +488,7 @@ def pospischil_beta_n(V: float, ca_i: float) -> float:
     Returns:
         Backward rate in 1/ms.
     """
-    return 0.5 * safe_exp(-(V - POSPISCHIL_VT - 10) / 40)
+    return _traub_miles_beta_n(V, POSPISCHIL_VT)
 
 
 def make_pospischil_na_channel(g_max: float) -> IonChannel:
@@ -437,10 +594,7 @@ def thalamic_relay_alpha_m(V: float, ca_i: float) -> float:
     Returns:
         Forward rate in 1/ms.
     """
-    x = V - THALAMIC_RELAY_VT - 13
-    if abs(x) < SINGULARITY_THRESHOLD:
-        return 1.28
-    return -0.32 * x / (safe_exp(-x / 4) - 1)
+    return _traub_miles_alpha_m(V, THALAMIC_RELAY_VT)
 
 
 def thalamic_relay_beta_m(V: float, ca_i: float) -> float:
@@ -460,10 +614,7 @@ def thalamic_relay_beta_m(V: float, ca_i: float) -> float:
     Returns:
         Backward rate in 1/ms.
     """
-    x = V - THALAMIC_RELAY_VT - 40
-    if abs(x) < SINGULARITY_THRESHOLD:
-        return 1.4
-    return 0.28 * x / (safe_exp(x / 5) - 1)
+    return _traub_miles_beta_m(V, THALAMIC_RELAY_VT)
 
 
 def thalamic_relay_alpha_h(V: float, ca_i: float) -> float:
@@ -481,7 +632,7 @@ def thalamic_relay_alpha_h(V: float, ca_i: float) -> float:
     Returns:
         Forward rate in 1/ms.
     """
-    return 0.128 * safe_exp(-(V - THALAMIC_RELAY_VT - 17) / 18)
+    return _traub_miles_alpha_h(V, THALAMIC_RELAY_VT)
 
 
 def thalamic_relay_beta_h(V: float, ca_i: float) -> float:
@@ -499,7 +650,7 @@ def thalamic_relay_beta_h(V: float, ca_i: float) -> float:
     Returns:
         Backward rate in 1/ms.
     """
-    return 4.0 / (1 + safe_exp(-(V - THALAMIC_RELAY_VT - 40) / 5))
+    return _traub_miles_beta_h(V, THALAMIC_RELAY_VT)
 
 
 def thalamic_relay_alpha_n(V: float, ca_i: float) -> float:
@@ -519,10 +670,7 @@ def thalamic_relay_alpha_n(V: float, ca_i: float) -> float:
     Returns:
         Forward rate in 1/ms.
     """
-    x = V - THALAMIC_RELAY_VT - 15
-    if abs(x) < SINGULARITY_THRESHOLD:
-        return 0.16
-    return -0.032 * x / (safe_exp(-x / 5) - 1)
+    return _traub_miles_alpha_n(V, THALAMIC_RELAY_VT)
 
 
 def thalamic_relay_beta_n(V: float, ca_i: float) -> float:
@@ -540,7 +688,7 @@ def thalamic_relay_beta_n(V: float, ca_i: float) -> float:
     Returns:
         Backward rate in 1/ms.
     """
-    return 0.5 * safe_exp(-(V - THALAMIC_RELAY_VT - 10) / 40)
+    return _traub_miles_beta_n(V, THALAMIC_RELAY_VT)
 
 
 def make_thalamic_relay_na_channel(g_max: float) -> IonChannel:
@@ -670,10 +818,7 @@ def trn_alpha_m(V: float, ca_i: float) -> float:
     Returns:
         Forward rate in 1/ms.
     """
-    x = V - TRN_VT - 13
-    if abs(x) < SINGULARITY_THRESHOLD:
-        return 1.28
-    return -0.32 * x / (safe_exp(-x / 4) - 1)
+    return _traub_miles_alpha_m(V, TRN_VT)
 
 
 def trn_beta_m(V: float, ca_i: float) -> float:
@@ -695,10 +840,7 @@ def trn_beta_m(V: float, ca_i: float) -> float:
     Returns:
         Backward rate in 1/ms.
     """
-    x = V - TRN_VT - 40
-    if abs(x) < SINGULARITY_THRESHOLD:
-        return 1.4
-    return 0.28 * x / (safe_exp(x / 5) - 1)
+    return _traub_miles_beta_m(V, TRN_VT)
 
 
 def trn_alpha_h(V: float, ca_i: float) -> float:
@@ -718,7 +860,7 @@ def trn_alpha_h(V: float, ca_i: float) -> float:
     Returns:
         Forward rate in 1/ms.
     """
-    return 0.128 * safe_exp(-(V - TRN_VT - 17) / 18)
+    return _traub_miles_alpha_h(V, TRN_VT)
 
 
 def trn_beta_h(V: float, ca_i: float) -> float:
@@ -738,7 +880,7 @@ def trn_beta_h(V: float, ca_i: float) -> float:
     Returns:
         Backward rate in 1/ms.
     """
-    return 4.0 / (1 + safe_exp(-(V - TRN_VT - 40) / 5))
+    return _traub_miles_beta_h(V, TRN_VT)
 
 
 def trn_alpha_n(V: float, ca_i: float) -> float:
@@ -760,10 +902,7 @@ def trn_alpha_n(V: float, ca_i: float) -> float:
     Returns:
         Forward rate in 1/ms.
     """
-    x = V - TRN_VT - 15
-    if abs(x) < SINGULARITY_THRESHOLD:
-        return 0.16
-    return -0.032 * x / (safe_exp(-x / 5) - 1)
+    return _traub_miles_alpha_n(V, TRN_VT)
 
 
 def trn_beta_n(V: float, ca_i: float) -> float:
@@ -783,7 +922,7 @@ def trn_beta_n(V: float, ca_i: float) -> float:
     Returns:
         Backward rate in 1/ms.
     """
-    return 0.5 * safe_exp(-(V - TRN_VT - 10) / 40)
+    return _traub_miles_beta_n(V, TRN_VT)
 
 
 def make_trn_na_channel(g_max: float) -> IonChannel:
@@ -889,10 +1028,7 @@ def purkinje_alpha_m(V: float, ca_i: float) -> float:
     Returns:
         Forward rate in 1/ms.
     """
-    x = V - PURKINJE_VT - 13
-    if abs(x) < SINGULARITY_THRESHOLD:
-        return 1.28
-    return -0.32 * x / (safe_exp(-x / 4) - 1)
+    return _traub_miles_alpha_m(V, PURKINJE_VT)
 
 
 def purkinje_beta_m(V: float, ca_i: float) -> float:
@@ -911,10 +1047,7 @@ def purkinje_beta_m(V: float, ca_i: float) -> float:
     Returns:
         Backward rate in 1/ms.
     """
-    x = V - PURKINJE_VT - 40
-    if abs(x) < SINGULARITY_THRESHOLD:
-        return 1.4
-    return 0.28 * x / (safe_exp(x / 5) - 1)
+    return _traub_miles_beta_m(V, PURKINJE_VT)
 
 
 def purkinje_alpha_h(V: float, ca_i: float) -> float:
@@ -931,7 +1064,7 @@ def purkinje_alpha_h(V: float, ca_i: float) -> float:
     Returns:
         Forward rate in 1/ms.
     """
-    return 0.128 * safe_exp(-(V - PURKINJE_VT - 17) / 18)
+    return _traub_miles_alpha_h(V, PURKINJE_VT)
 
 
 def purkinje_beta_h(V: float, ca_i: float) -> float:
@@ -948,7 +1081,7 @@ def purkinje_beta_h(V: float, ca_i: float) -> float:
     Returns:
         Backward rate in 1/ms.
     """
-    return 4.0 / (1 + safe_exp(-(V - PURKINJE_VT - 40) / 5))
+    return _traub_miles_beta_h(V, PURKINJE_VT)
 
 
 def purkinje_alpha_n(V: float, ca_i: float) -> float:
@@ -967,10 +1100,7 @@ def purkinje_alpha_n(V: float, ca_i: float) -> float:
     Returns:
         Forward rate in 1/ms.
     """
-    x = V - PURKINJE_VT - 15
-    if abs(x) < SINGULARITY_THRESHOLD:
-        return 0.16
-    return -0.032 * x / (safe_exp(-x / 5) - 1)
+    return _traub_miles_alpha_n(V, PURKINJE_VT)
 
 
 def purkinje_beta_n(V: float, ca_i: float) -> float:
@@ -987,7 +1117,7 @@ def purkinje_beta_n(V: float, ca_i: float) -> float:
     Returns:
         Backward rate in 1/ms.
     """
-    return 0.5 * safe_exp(-(V - PURKINJE_VT - 10) / 40)
+    return _traub_miles_beta_n(V, PURKINJE_VT)
 
 
 def make_purkinje_na_channel(g_max: float) -> IonChannel:
