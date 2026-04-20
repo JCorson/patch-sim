@@ -49,6 +49,8 @@ from .core_channels import (
     make_stn_na_channel,
     make_thalamic_relay_k_channel,
     make_thalamic_relay_na_channel,
+    make_trn_k_channel,
+    make_trn_na_channel,
 )
 from .neuron_factory import ChannelConfig, NeuronConfig
 
@@ -311,22 +313,42 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # ICaT (g_T = 3.5 mS/cm²) drives rhythmic burst firing and
         # sleep-spindle oscillations characteristic of TRN cells.
         # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804;
-        #       Destexhe et al. (1994)
+        #       Destexhe et al. (1994);
+        #       Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (RE)
         #
-        # With K_out=4 mM (E_K ≈ −95 mV), the physiological v_rest = −77 mV
-        # is now reachable: K⁺ leak has 18 mV of outward driving force at rest,
-        # and a small Na⁺ leak (g_NaL = 0.0104) provides the inward current to
-        # balance I_KL + I_CaT_window at −77 mV.  Previously, with E_K ≈ −77 mV
-        # (K_out=7.8), the K⁺ leak had zero driving force at the target rest,
-        # and the equilibrium was forced to −66 mV.
+        # Huguenard & Prince (1992) / Pospischil (2008) Traub-Miles Na⁺/K⁺
+        # kinetics (VT = −67 mV) replace the default HH52 core channels.
+        # HH52 kinetics (fitted to room-temperature squid axon) over-accelerate
+        # Na⁺ inactivation under the default Q10=3.0 scaling (22→37 °C, factor
+        # ~5.2×), biologically wrong for a mammalian TRN cell.
+        # HP92 channels were recorded at 36 °C, so T_ref=309.15 K limits the
+        # Q10 correction to ~1.12× (36→37 °C) — a negligible adjustment that
+        # preserves the published kinetics.
         #
-        # g_NaL + g_KL = 0.08 mS/cm² preserves τ_m ≈ 12.5 ms and
-        # R_in ≈ 12.5 kΩ·cm².  At v_rest = −77 mV, ICaT's inactivation gate
-        # is ft_inf ≈ 0.42 — well de-inactivated for post-inhibitory rebound
-        # bursting and burst character on depolarising steps.
-        v_rest=-77.0,
-        g_NaL=0.0104,
-        g_KL=0.0696,
+        # v_rest = −80 mV (not −77 mV).  The ICaT window current at −77 mV
+        # (ft_inf ≈ 0.42) creates ~3.1 mS/cm² of negative conductance —
+        # far exceeding any physiologically plausible total leak (0.07–0.10
+        # mS/cm²) and making −77 mV an unstable equilibrium in the steady-state
+        # conductance picture.  The original HP92/Pospischil RE models avoid
+        # this by using a single leak with E_L = v_rest, which enforces
+        # stability by construction; our split Na⁺/K⁺ leak cannot replicate
+        # that property at −77 mV.  At −80 mV the ft gate is at its
+        # half-inactivation point (ft_inf = 0.50) and the ICaT negative
+        # conductance falls to ~0.038 mS/cm² — well below g_total = 0.07
+        # mS/cm², giving a truly stable rest.  −80 mV is within the
+        # physiological range reported by Huguenard & Prince (1992) for
+        # TRN cells in slice recordings.
+        #
+        # g_NaL + g_KL = 0.07 mS/cm² gives τ_m ≈ 14.3 ms and
+        # R_in ≈ 14.3 kΩ·cm² (physiological range 10–15 ms/kΩ·cm²).
+        # At v_rest = −80 mV, ICaT's inactivation gate ft_inf = 0.50 —
+        # well de-inactivated for post-inhibitory rebound bursting.
+        v_rest=-80.0,
+        g_NaL=0.0062,
+        g_KL=0.0638,
+        T_ref=309.15,
+        na_channel_factory=make_trn_na_channel,
+        k_channel_factory=make_trn_k_channel,
         channels=(ChannelConfig(make_icat_channel, g_max=3.5),),
     ),
 }
@@ -686,36 +708,32 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         # adds a depolarising overshoot that can trigger additional spikes.
     },
     TRN: {
-        # R_in increased with lower total leak (g_KL=0.08); 0.1 µA/cm² subthreshold.
+        # Very low threshold with HP92 kinetics; 0.01 µA/cm² is safely subthreshold.
         SUBTHRESHOLD_RESPONSE: {
-            "min_stimulus": 0.1,
-            "max_stimulus": 0.1,
+            "min_stimulus": 0.01,
+            "max_stimulus": 0.01,
         },
-        # 5 µA/cm² at 5 ms evokes a single AP; the shorter window prevents
-        # a second spike that Q10-scaled kinetics would otherwise allow.
+        # 5 µA/cm² at 2 ms evokes a single AP with HP92 kinetics.
         ACTION_POTENTIAL: {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
-            "stimulus_duration": 5.0,
+            "stimulus_duration": 2.0,
         },
         # Depolarizing step for sustained repetitive firing via ICaT;
-        # 5 µA/cm² gives ~11 spikes at ~54 Hz over 200 ms.
+        # 3 µA/cm² gives ≥5 spikes over 200 ms with HP92 kinetics.
         REPETITIVE_FIRING: {
-            "min_stimulus": 5.0,
-            "max_stimulus": 5.0,
+            "min_stimulus": 3.0,
+            "max_stimulus": 3.0,
             "stimulus_duration": 200.0,
         },
-        # Threshold ~1.03 µA/cm²; narrow range with 1 µA/cm² steps to
-        # show the subthreshold-to-firing transition cleanly.
+        # Low threshold with HP92 kinetics; 0–5 µA/cm² in 0.5 µA steps.
         FI_CURVE: {
-            "max_stimulus": 10.0,
-            "stimulus_step": 1.0,
+            "max_stimulus": 5.0,
+            "stimulus_step": 0.5,
             "stimulus_duration": 100.0,
         },
-        # High passive R_in (≈12.5 kΩ·cm²) with Ih; −2 µA/cm² already pushes
-        # v_rest (−77 mV) to the numerical floor.  −1 → −0.25 µA/cm² in 0.25
-        # steps gives peaks of −79 to −89 mV — enough to de-inactivate ICaT —
-        # while staying far from the −150 mV boundary.
+        # High R_in (≈14.3 kΩ·cm²); −1 → −0.25 µA/cm² in 0.25 steps gives
+        # −79 to −95 mV — enough to de-inactivate ICaT (ft_inf → 0.84).
         HYPERPOLARIZATION_STEPS: {
             "min_stimulus": -1.0,
             "max_stimulus": -0.25,
