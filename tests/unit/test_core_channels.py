@@ -1,11 +1,10 @@
 """Tests for the core HH channel factory functions in core_channels.py."""
 
 import math
-from collections.abc import Callable
 
 import pytest
 
-from patch_sim.channels import IonChannel, IonSpecies, NernstSpec
+from patch_sim.channels import IonChannel, IonSpecies, NernstSpec, RateFn
 from patch_sim.core_channels import (
     POSPISCHIL_VT,
     PURKINJE_VT,
@@ -45,8 +44,6 @@ from patch_sim.core_channels import (
     purkinje_beta_n,
 )
 from patch_sim.neuron import Neuron
-
-RateFn = Callable[[float, float], float]
 
 # ---------------------------------------------------------------------------
 # Rate function positivity

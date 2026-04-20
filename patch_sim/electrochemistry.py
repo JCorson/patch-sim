@@ -12,11 +12,12 @@ This module provides:
   callable pairs from Boltzmann/cosh kinetic parameters.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
 
+from .channels import RateFn
 from .utils import safe_cosh, safe_exp
 
 # Constants
@@ -189,7 +190,7 @@ def boltzmann_cosh_rates(
     inverted: bool = False,
     tau_cosh_scale: float | None = None,
     tau_rate: float = 1.0,
-) -> tuple[Callable[[float, float], float], Callable[[float, float], float]]:
+) -> tuple[RateFn, RateFn]:
     """Return (alpha, beta) callables from Boltzmann/cosh kinetic parameters.
 
     Constructs a pair of rate functions for a gating variable whose steady
