@@ -46,12 +46,13 @@ def test_find_zero_current_voltage_no_bracket() -> None:
 
 
 # TRN is excluded: Huguenard & Prince kinetics (VT=−67 mV) + ICaT window
-# current create an I_total(V) profile that is negative throughout the
-# physiological range (−100 to −40 mV).  The only sign change in [−100, −20]
-# is the Na/K balance at −37 mV, not the physiological rest at −77 mV.
+# current create an I_total(V) profile that approaches zero near −80 mV but
+# without a sign change detectable by Brent's method in the default search
+# range (−100 to −20 mV).  The only clear sign change in [−100, −20] is the
+# Na/K balance at −37 mV, not the physiological rest at −80 mV.
 # The resting potential is maintained dynamically (ICaT window current balanced
 # by mixed Na⁺/K⁺ leak), but does not manifest as a Brent-findable zero
-# crossing in the default search range.  See test_trn_resting_potential_is_stable
+# crossing in the default search range.  See test_all_presets_stable_at_rest
 # in test_current_clamp.py for the 50 ms stability verification.
 _EQUILIBRIUM_PRESET_NAMES = [p for p in NEURON_PRESET_NAMES if p != TRN]
 
