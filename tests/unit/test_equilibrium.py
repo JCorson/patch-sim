@@ -63,11 +63,12 @@ def test_find_zero_current_voltage_no_bracket() -> None:
 # See test_fires_spontaneously in tests/integration/test_purkinje.py.
 #
 # DOPAMINERGIC is excluded: Canavier/Komendantov kinetics (VT=−67 mV) combined
-# with large Ih (g_max=2.0) produce a dynamically stable rest near −62.5 mV
-# that is NOT a zero-crossing of the instantaneous I-V curve.  The steady-state
-# Ih activation at the resting potential differs substantially from its
-# instantaneous activation, so _total_ionic_current does not change sign in any
-# subthreshold range.  Stability is verified instead by the simulation-based
+# with large Ih (g_max=2.0) create multiple sign changes in the default search
+# range [−100, −20] mV — one near the physiological rest (~−62.5 mV) and at
+# least one more near the Na⁺ activation threshold (~−37 mV).  Brent's method
+# finds whichever root the endpoint signs bracket; with the default endpoints it
+# converges on the non-physiological root near −37 mV rather than the resting
+# equilibrium.  Stability at v_rest is verified instead by the simulation-based
 # test_all_presets_stable_at_rest in tests/integration/test_current_clamp.py.
 _EQUILIBRIUM_PRESET_NAMES = [
     p for p in NEURON_PRESET_NAMES if p not in (TRN, PURKINJE, DOPAMINERGIC)

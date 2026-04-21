@@ -128,13 +128,13 @@ def _protocol_total_samples(preset_name: str, neuron_name: str | None) -> int:
 def test_neuron_protocol_adjustments_change_stimulus_duration() -> None:
     """Neuron adjustments that change stimulus_duration produce a different length.
 
-    The Dopaminergic Neuron adjusts Repetitive Firing from 180 ms to 480 ms —
+    The SNc Dopaminergic Neuron adjusts Repetitive Firing from 180 ms to 480 ms —
     the longer duration must result in a longer stimulus array.
     """
     base_samples = _protocol_total_samples(REPETITIVE_FIRING, None)
     adjusted_samples = _protocol_total_samples(REPETITIVE_FIRING, DOPAMINERGIC)
     assert adjusted_samples > base_samples, (
-        "Dopaminergic Neuron adjustment should produce a longer array"
+        "SNc Dopaminergic Neuron adjustment should produce a longer array"
     )
 
 

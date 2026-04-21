@@ -800,15 +800,15 @@ def test_make_purkinje_k_channel_structure() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("V", [-100.0, -65.0, 0.0, 40.0])
+@pytest.mark.parametrize("V", [-100.0, -65.0, -54.0, 0.0, 40.0])
 def test_dopaminergic_alpha_m_positive(V: float) -> None:
-    """dopaminergic_alpha_m is positive at physiological voltages."""
+    """dopaminergic_alpha_m is positive at physiological voltages and singularity."""
     assert dopaminergic_alpha_m(V, 0.0) > 0
 
 
-@pytest.mark.parametrize("V", [-100.0, -65.0, 0.0, 40.0])
+@pytest.mark.parametrize("V", [-100.0, -65.0, -27.0, 0.0, 40.0])
 def test_dopaminergic_beta_m_positive(V: float) -> None:
-    """dopaminergic_beta_m is positive at physiological voltages."""
+    """dopaminergic_beta_m is positive at physiological voltages and singularity."""
     assert dopaminergic_beta_m(V, 0.0) > 0
 
 
@@ -824,9 +824,9 @@ def test_dopaminergic_beta_h_positive(V: float) -> None:
     assert dopaminergic_beta_h(V, 0.0) > 0
 
 
-@pytest.mark.parametrize("V", [-100.0, -65.0, 0.0, 40.0])
+@pytest.mark.parametrize("V", [-100.0, -65.0, -52.0, 0.0, 40.0])
 def test_dopaminergic_alpha_n_positive(V: float) -> None:
-    """dopaminergic_alpha_n is positive at physiological voltages."""
+    """dopaminergic_alpha_n is positive at physiological voltages and singularity."""
     assert dopaminergic_alpha_n(V, 0.0) > 0
 
 
