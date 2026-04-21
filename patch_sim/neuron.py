@@ -233,7 +233,12 @@ class Neuron:
             result.extend(ch.gating_variables)
         return tuple(result)
 
-    def calcium_current(self, V: float, gating_state: dict[str, float]) -> float:
+    def calcium_current(
+        self,
+        V: float,
+        gating_state: dict[str, float],
+        e_rev_by_name: dict[str, float] | None = None,
+    ) -> float:
         """Return the total current from all calcium-carrying channels.
 
         Sums the current from every channel (core or additional) that has
@@ -244,12 +249,20 @@ class Neuron:
             V: Membrane voltage in mV.
             gating_state: Full gating state mapping variable name → value,
                 covering both core and additional channels.
+            e_rev_by_name: Optional pre-computed reversal potentials keyed by
+                channel name.  When supplied, bypasses the per-call Nernst/
+                Goldman computation for each Ca²⁺-carrying channel.
 
         Returns:
             Total calcium current in µA/cm² (positive = outward).
         """
         return sum(
-            ch.compute_current(V, gating_state, self)
+            ch.compute_current(
+                V,
+                gating_state,
+                self,
+                e_rev_by_name.get(ch.name) if e_rev_by_name is not None else None,
+            )
             for ch in self.all_channels
             if ch.carries_calcium
         )
