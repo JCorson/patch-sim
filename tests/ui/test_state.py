@@ -1073,8 +1073,9 @@ async def test_load_neuron_preset_reapplies_active_protocol_overrides() -> None:
     """Switching neuron type re-applies the active protocol preset with new overrides.
 
     Load 'Repetitive Firing' (Squid defaults: duration=180 ms), then switch to
-    Dopaminergic Neuron which has a longer 480 ms duration override.  The
-    protocol params should update automatically.
+    SNc Dopaminergic which has a longer 480 ms duration override and lower
+    2.0 µA/cm² stimulus (Canavier/Komendantov threshold is ~1 µA/cm²).
+    The protocol params should update automatically.
     """
     ns = _make_neuron_state()
     ps = _make_protocol_state()
@@ -1088,7 +1089,7 @@ async def test_load_neuron_preset_reapplies_active_protocol_overrides() -> None:
     ):
         [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
     assert ps.stimulus_duration == pytest.approx(480.0)
-    assert ps.min_stimulus == pytest.approx(15.0)
+    assert ps.min_stimulus == pytest.approx(2.0)
 
 
 async def test_load_neuron_preset_no_active_protocol_skips_override() -> None:

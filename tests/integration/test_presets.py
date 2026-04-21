@@ -30,6 +30,8 @@ from patch_sim.constants import (
     TRN,
 )
 from patch_sim.core_channels import (
+    make_dopaminergic_k_channel,
+    make_dopaminergic_na_channel,
     make_pospischil_k_channel,
     make_pospischil_na_channel,
     make_purkinje_k_channel,
@@ -516,3 +518,39 @@ def test_purkinje_ih_conductance_physiological() -> None:
     ih_configs = [cc for cc in config.channels if cc.factory is make_ih_channel]
     assert len(ih_configs) == 1
     assert 0.1 <= ih_configs[0].g_max <= 5.0
+
+
+# ---------------------------------------------------------------------------
+# SNc Dopaminergic preset uses Canavier/Komendantov (1999/2004) factories (#244)
+# ---------------------------------------------------------------------------
+
+
+def test_dopaminergic_uses_komendantov_na_factory() -> None:
+    """SNc Dopaminergic preset wires the Canavier/Komendantov Na⁺ channel factory.
+
+    Verifies that Komendantov (2004) kinetics (VT=-67 mV, T_ref=308.15 K) are
+    used instead of the HH52 squid axon kinetics, which applied a ~5.2×
+    Q10 overcorrection inappropriate for an SNc dopaminergic neuron.
+    """
+    config = NEURON_PRESETS[DOPAMINERGIC]
+    assert config.na_channel_factory is make_dopaminergic_na_channel
+
+
+def test_dopaminergic_uses_komendantov_k_factory() -> None:
+    """SNc Dopaminergic preset wires the Canavier/Komendantov K⁺ channel factory.
+
+    Verifies that Komendantov (2004) kinetics (VT=-67 mV, T_ref=308.15 K) are
+    used instead of the HH52 squid axon kinetics.
+    """
+    config = NEURON_PRESETS[DOPAMINERGIC]
+    assert config.k_channel_factory is make_dopaminergic_k_channel
+
+
+def test_dopaminergic_t_ref_is_komendantov_recording_temp() -> None:
+    """SNc Dopaminergic T_ref matches Komendantov (2004) 35 °C recording temperature.
+
+    Prevents regression to the HH52 default (295.15 K = 22 °C) which applied
+    a ~5.2× Q10 overcorrection and produced excessively fast Na⁺ gating.
+    Komendantov (2004) recorded at 35 °C = 308.15 K.
+    """
+    assert NEURON_PRESETS[DOPAMINERGIC].T_ref == pytest.approx(308.15)
