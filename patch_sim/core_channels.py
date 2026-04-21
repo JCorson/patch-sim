@@ -77,6 +77,16 @@ __all__ = [
     # Otsuka et al. (2004) STN
     "make_stn_na_channel",
     "make_stn_k_channel",
+    # Komendantov et al. (2004) midbrain dopaminergic (SNc/VTA)
+    "DOPAMINERGIC_VT",
+    "dopaminergic_alpha_m",
+    "dopaminergic_beta_m",
+    "dopaminergic_alpha_h",
+    "dopaminergic_beta_h",
+    "dopaminergic_alpha_n",
+    "dopaminergic_beta_n",
+    "make_dopaminergic_na_channel",
+    "make_dopaminergic_k_channel",
 ]
 
 # Threshold for detecting near-singularity in GHK-style rate equations.
@@ -1372,6 +1382,252 @@ def make_stn_k_channel(g_max: float) -> IonChannel:
         g_max=g_max,
         gating_variables=(
             GatingVariable(name="n", power=4, alpha=_stn_alpha_n, beta=_stn_beta_n),
+        ),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Komendantov et al. (2004) midbrain dopaminergic (SNc/VTA) Na⁺/K⁺ rate functions
+#
+# Primary source:
+#   Komendantov, A.O., Komendantova, O.G., Johnson, S.W. & Canavier, C.C.
+#   (2004) A modeling study suggests complementary roles for GABAA and NMDA
+#   receptors and the SK channel in regulating the firing pattern in midbrain
+#   dopamine neurons. J. Neurophysiol. 91:346–357.
+#
+# Kinetic basis:
+#   Canavier, C.C. (1999) Sodium dynamics underlying burst firing and putative
+#   mechanisms for the regulation of the firing pattern in midbrain dopamine
+#   neurons: a computational approach. J. Comput. Neurosci. 6:49–69.
+#
+# Kinetics reported for somatic SNc DA neurons; recording temperature ~35 °C.
+#
+# The Canavier (1999) / Komendantov (2004) Na⁺ rate functions are:
+#   α_m = 0.32*(V+54)/(1−exp(−(V+54)/4))
+#   β_m = 0.28*(V+27)/(exp((V+27)/5)−1)
+#   α_n = 0.032*(V+52)/(1−exp(−(V+52)/5))
+# These are algebraically identical to the Traub-Miles form with VT = −67 mV:
+#   α_m(V, VT) = −0.32*(V−VT−13)/(exp(−(V−VT−13)/4)−1)
+# because VT+13 = −54 → VT = −67.  The same VT applies to all six rate
+# functions.  VT = −67 mV produces m_inf ≈ 5.6% at −60 mV, which is the
+# window Na⁺ current that allows Ih-driven post-hyperpolarization rebound
+# spiking observed in SNc DA neurons.
+# ---------------------------------------------------------------------------
+
+#: Voltage threshold parameter (mV) for midbrain dopaminergic (SNc/VTA) cells.
+#: Derived from the Canavier (1999) / Komendantov (2004) rate functions which
+#: use α_m = 0.32*(V+54)/..., equivalent to Traub-Miles with VT+13 = −54 mV,
+#: i.e. VT = −67 mV.  This VT gives m_inf ≈ 5.6% at the −60 mV resting
+#: potential — the window Na⁺ current that supports Ih-driven rebound spiking
+#: observed in SNc DA neurons in slice (Wilson & Callaway 2000).
+DOPAMINERGIC_VT: float = -67.0
+
+
+def dopaminergic_alpha_m(V: float, ca_i: float) -> float:
+    """Forward rate for dopaminergic Na⁺ activation gate m.
+
+    Traub-Miles form parameterised for midbrain dopaminergic (SNc/VTA) cells
+    (VT = −67 mV).  Has a removable singularity at V = VT + 13 = −54 mV; the
+    L'Hôpital limit (1.28) is returned when
+    ``|V − VT − 13| < SINGULARITY_THRESHOLD``.
+
+    Algebraically equivalent to α_m = 0.32*(V+54)/(1−exp(−(V+54)/4)) from
+    Canavier (1999) / Komendantov et al. (2004).
+
+    Reference: Canavier (1999), J. Comput. Neurosci. 6:49;
+    Komendantov et al. (2004), J. Neurophysiol. 91:346.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    return _traub_miles_alpha_m(V, DOPAMINERGIC_VT)
+
+
+def dopaminergic_beta_m(V: float, ca_i: float) -> float:
+    """Backward rate for dopaminergic Na⁺ activation gate m.
+
+    Traub-Miles form parameterised for midbrain dopaminergic (SNc/VTA) cells
+    (VT = −67 mV).  Has a removable singularity at V = VT + 40 = −27 mV; the
+    L'Hôpital limit (1.4) is returned when
+    ``|V − VT − 40| < SINGULARITY_THRESHOLD``.
+
+    Algebraically equivalent to β_m = 0.28*(V+27)/(exp((V+27)/5)−1) from
+    Canavier (1999) / Komendantov et al. (2004).
+
+    Reference: Canavier (1999), J. Comput. Neurosci. 6:49;
+    Komendantov et al. (2004), J. Neurophysiol. 91:346.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    return _traub_miles_beta_m(V, DOPAMINERGIC_VT)
+
+
+def dopaminergic_alpha_h(V: float, ca_i: float) -> float:
+    """Forward rate for dopaminergic Na⁺ inactivation gate h.
+
+    Traub-Miles form parameterised for midbrain dopaminergic (SNc/VTA) cells
+    (VT = −67 mV).
+
+    Reference: Canavier (1999), J. Comput. Neurosci. 6:49;
+    Komendantov et al. (2004), J. Neurophysiol. 91:346.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    return _traub_miles_alpha_h(V, DOPAMINERGIC_VT)
+
+
+def dopaminergic_beta_h(V: float, ca_i: float) -> float:
+    """Backward rate for dopaminergic Na⁺ inactivation gate h.
+
+    Traub-Miles form parameterised for midbrain dopaminergic (SNc/VTA) cells
+    (VT = −67 mV).
+
+    Reference: Canavier (1999), J. Comput. Neurosci. 6:49;
+    Komendantov et al. (2004), J. Neurophysiol. 91:346.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    return _traub_miles_beta_h(V, DOPAMINERGIC_VT)
+
+
+def dopaminergic_alpha_n(V: float, ca_i: float) -> float:
+    """Forward rate for dopaminergic K⁺ delayed-rectifier activation gate n.
+
+    Traub-Miles form parameterised for midbrain dopaminergic (SNc/VTA) cells
+    (VT = −67 mV).  Has a removable singularity at V = VT + 15 = −52 mV; the
+    L'Hôpital limit (0.16) is returned when
+    ``|V − VT − 15| < SINGULARITY_THRESHOLD``.
+
+    Algebraically equivalent to α_n = 0.032*(V+52)/(1−exp(−(V+52)/5)) from
+    Canavier (1999) / Komendantov et al. (2004).
+
+    Reference: Canavier (1999), J. Comput. Neurosci. 6:49;
+    Komendantov et al. (2004), J. Neurophysiol. 91:346.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    return _traub_miles_alpha_n(V, DOPAMINERGIC_VT)
+
+
+def dopaminergic_beta_n(V: float, ca_i: float) -> float:
+    """Backward rate for dopaminergic K⁺ delayed-rectifier activation gate n.
+
+    Traub-Miles form parameterised for midbrain dopaminergic (SNc/VTA) cells
+    (VT = −67 mV).
+
+    Reference: Canavier (1999), J. Comput. Neurosci. 6:49;
+    Komendantov et al. (2004), J. Neurophysiol. 91:346.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    return _traub_miles_beta_n(V, DOPAMINERGIC_VT)
+
+
+def make_dopaminergic_na_channel(g_max: float) -> IonChannel:
+    """Create the midbrain dopaminergic fast sodium channel (Na⁺).
+
+    Uses Traub-Miles kinetics with VT = −67 mV, directly equivalent to the
+    Canavier (1999) / Komendantov et al. (2004) rate functions (α_m =
+    0.32*(V+54)/..., α_n = 0.032*(V+52)/...) for SNc DA neurons at ~35 °C.
+
+    Intended as the ``na_channel_factory`` of the SNc Dopaminergic preset.
+    Compared with the default HH52 Na⁺ channel (fitted to squid axon at
+    22 °C), these kinetics give m_inf ≈ 5.6% at the −60 mV resting potential
+    and prevent the ~5.2× Q10 overcorrection that distorts Na⁺ inactivation
+    under the default reference temperature.
+
+    Reference: Canavier (1999), J. Comput. Neurosci. 6:49;
+    Komendantov et al. (2004), J. Neurophysiol. 91:346.
+    Kinetics at ~35 °C — use T_ref = 308.15 K with this factory.
+
+    Args:
+        g_max: Maximum conductance in mS/cm².
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the
+        dopaminergic fast Na⁺ channel.
+    """
+    return IonChannel(
+        name="Na",
+        g_max=g_max,
+        gating_variables=(
+            GatingVariable(
+                name="m",
+                power=3,
+                alpha=dopaminergic_alpha_m,
+                beta=dopaminergic_beta_m,
+            ),
+            GatingVariable(
+                name="h",
+                power=1,
+                alpha=dopaminergic_alpha_h,
+                beta=dopaminergic_beta_h,
+            ),
+        ),
+        reversal_spec=NernstSpec(IonSpecies.SODIUM),
+    )
+
+
+def make_dopaminergic_k_channel(g_max: float) -> IonChannel:
+    """Create the midbrain dopaminergic delayed-rectifier potassium channel (K⁺).
+
+    Uses Traub-Miles kinetics with VT = −67 mV, directly equivalent to the
+    Canavier (1999) / Komendantov et al. (2004) α_n = 0.032*(V+52)/...
+    rate function for SNc DA neurons at ~35 °C.
+
+    Intended as the ``k_channel_factory`` of the SNc Dopaminergic preset.
+
+    Reference: Canavier (1999), J. Comput. Neurosci. 6:49;
+    Komendantov et al. (2004), J. Neurophysiol. 91:346.
+    Kinetics at ~35 °C — use T_ref = 308.15 K with this factory.
+
+    Args:
+        g_max: Maximum conductance in mS/cm².
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the
+        dopaminergic delayed-rectifier K⁺ channel.
+    """
+    return IonChannel(
+        name="K",
+        g_max=g_max,
+        gating_variables=(
+            GatingVariable(
+                name="n",
+                power=4,
+                alpha=dopaminergic_alpha_n,
+                beta=dopaminergic_beta_n,
+            ),
         ),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )

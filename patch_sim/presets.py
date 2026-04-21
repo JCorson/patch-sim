@@ -44,6 +44,8 @@ from .constants import (
     VOLTAGE_CLAMP,
 )
 from .core_channels import (
+    make_dopaminergic_k_channel,
+    make_dopaminergic_na_channel,
     make_pospischil_k_channel,
     make_pospischil_na_channel,
     make_purkinje_k_channel,
@@ -200,15 +202,35 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Ih drives pacemaker sag and rebound; IM provides slow
         # oscillatory hyperpolarization.
         # Refs: Wilson & Callaway (2000), J. Neurophysiol. 83:3084;
-        #       Komendantov et al. (2004)
+        #       Canavier (1999), J. Comput. Neurosci. 6:49;
+        #       Komendantov et al. (2004), J. Neurophysiol. 91:346
         #
-        # v_rest = −60 mV matches the published dopaminergic neuron resting
-        # potential.  g_NaL + g_KL = 0.3 mS/cm² (τ_m ≈ 3.3 ms); values tuned
-        # so that I_NaL + I_KL + I_channels = 0 at v_rest = −60 mV with
-        # K_out=4 mM (E_K ≈ −95 mV); g_total is unchanged (τ_m preserved).
-        v_rest=-60.0,
-        g_NaL=0.2646,
-        g_KL=0.0354,
+        # Canavier (1999) / Komendantov (2004) Traub-Miles Na⁺/K⁺ kinetics
+        # (VT = −67 mV) replace the default HH52 core channels.  HH52 kinetics
+        # (fitted to room-temperature squid axon) over-accelerate Na⁺ inactivation
+        # under the default Q10=3.0 scaling (22→37 °C, factor ~5.2×), biologically
+        # wrong for a mammalian midbrain DA cell.  The Canavier/Komendantov kinetics
+        # at ~35 °C give VT = −67 mV (equivalent to α_m = 0.32*(V+54)/...), which
+        # produces m_inf ≈ 5.6% at rest — the Na⁺ window current that supports
+        # Ih-driven post-hyperpolarization rebound spiking in SNc neurons (Wilson &
+        # Callaway 2000).  T_ref = 308.15 K (35 °C) limits the Q10 correction to
+        # ~1.26× (35→37 °C), preserving the published kinetics.
+        #
+        # v_rest = −62.5 mV: with VT = −67 mV and g_Ih = 2.0 mS/cm², the HCN
+        # channel provides ~6% activation at −60 mV, yielding ~4 µA/cm² inward
+        # current that shifts the zero-current equilibrium to −62.5 mV.  This is
+        # within the published resting-potential range for SNc DA neurons
+        # (Grace & Bunney 1983; Lacey et al. 1989: −60 to −65 mV).
+        #
+        # g_NaL + g_KL = 0.3 mS/cm² (τ_m ≈ 3.3 ms); split tuned so that
+        # I_NaL + I_KL + I_channels = 0 at v_rest = −62.5 mV with K_out=4 mM
+        # (E_K ≈ −95 mV) and the Canavier/Komendantov steady-state currents.
+        v_rest=-62.5,
+        g_NaL=0.0615,
+        g_KL=0.2385,
+        T_ref=308.15,
+        na_channel_factory=make_dopaminergic_na_channel,
+        k_channel_factory=make_dopaminergic_k_channel,
         channels=(
             ChannelConfig(make_ih_channel, g_max=2.0),
             ChannelConfig(make_im_channel, g_max=1.0),
@@ -596,33 +618,44 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     DOPAMINERGIC: {
-        # Firing threshold rose with K_out=4.0 mM (E_K ≈ −95 mV, stronger outward
-        # drive); 15 µA/cm² at 5 ms evokes a single AP, short enough to prevent
-        # a second spike from the large g_NaL inward current at rest.
+        # Subthreshold: Canavier/Komendantov kinetics (VT=-67 mV) lower the
+        # firing threshold to ~0.3 µA/cm² for a 30 ms step; 0.1 µA/cm² is
+        # comfortably sub-threshold and produces a passive depolarisation.
+        SUBTHRESHOLD_RESPONSE: {
+            "min_stimulus": 0.1,
+            "max_stimulus": 0.1,
+        },
+        # 4 µA/cm² at 5 ms evokes a single AP; lower amplitudes are subthreshold
+        # and higher amplitudes (≥12 µA/cm²) fire two APs within 30 ms.
         ACTION_POTENTIAL: {
-            "min_stimulus": 15.0,
-            "max_stimulus": 15.0,
+            "min_stimulus": 4.0,
+            "max_stimulus": 4.0,
             "stimulus_duration": 5.0,
         },
-        # Long pacemaking window; 15 µA/cm² drives sustained high-frequency firing.
+        # Long pacemaking window; 2 µA/cm² drives sustained supra-threshold
+        # firing (≥5 APs) over 480 ms with Canavier/Komendantov kinetics.
+        # Duration must stay at 480 ms — this override is used as a regression
+        # target in test_neuron_protocol_adjustments_change_stimulus_duration.
         REPETITIVE_FIRING: {
-            "min_stimulus": 15.0,
-            "max_stimulus": 15.0,
+            "min_stimulus": 2.0,
+            "max_stimulus": 2.0,
             "stimulus_duration": 480.0,
         },
-        # Threshold ~1.75 µA/cm²; narrow range with finer steps to show
-        # the subthreshold-to-firing transition clearly.
+        # Threshold ~1 µA/cm²; 0 → 12 µA/cm² in 1.5 µA steps spans the
+        # subthreshold zone through repetitive firing.  200 ms duration shows
+        # the steady-state F-I relationship.
         FI_CURVE: {
             "max_stimulus": 12.0,
             "stimulus_step": 1.5,
             "stimulus_duration": 200.0,
         },
-        # R_in ≈ 3.5 kΩ·cm²; needs larger currents for visible hyperpolarization.
-        # −20 → −5 µA/cm² gives peaks of −69 to −62 mV with clear Ih-driven sag
-        # (2–5 mV).  At step release, Ih (g=2.0 mS/cm²) — still activated from
-        # the step — drives a transient depolarisation above threshold, producing
-        # a rebound spike for −15 µA/cm² and above.  This is an Ih-mediated
-        # rebound; the cell has no ICaT.
+        # R_in ≈ 3.3 kΩ·cm²; −20 → −5 µA/cm² gives peaks of −106 to −71 mV
+        # with clear Ih-driven sag (25–8 mV).  At step release, Ih (g=2.0 mS/cm²
+        # activated during the step) drives a transient depolarisation above
+        # threshold, producing a rebound spike at the most-negative step.  This is
+        # an Ih-mediated rebound using Canavier/Komendantov Na⁺ kinetics (VT = −67 mV
+        # gives m_inf ≈ 27% at −48 mV, enough for Ih to trigger firing).  The cell
+        # has no ICaT.
         HYPERPOLARIZATION_STEPS: {
             "min_stimulus": -20.0,
             "max_stimulus": -5.0,

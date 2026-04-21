@@ -6,6 +6,7 @@ import pytest
 
 from patch_sim.channels import IonChannel, IonSpecies, NernstSpec, RateFn
 from patch_sim.core_channels import (
+    DOPAMINERGIC_VT,
     POSPISCHIL_VT,
     PURKINJE_VT,
     _stn_alpha_h,
@@ -20,6 +21,14 @@ from patch_sim.core_channels import (
     beta_h,
     beta_m,
     beta_n,
+    dopaminergic_alpha_h,
+    dopaminergic_alpha_m,
+    dopaminergic_alpha_n,
+    dopaminergic_beta_h,
+    dopaminergic_beta_m,
+    dopaminergic_beta_n,
+    make_dopaminergic_k_channel,
+    make_dopaminergic_na_channel,
     make_k_channel,
     make_k_leak_channel,
     make_na_channel,
@@ -771,6 +780,196 @@ def test_make_purkinje_na_channel_structure() -> None:
 def test_make_purkinje_k_channel_structure() -> None:
     """make_purkinje_k_channel returns a channel with n⁴ gating and K⁺ reversal."""
     ch = make_purkinje_k_channel(g_max=36.0)
+    assert isinstance(ch, IonChannel)
+    assert ch.name == "K"
+    assert ch.g_max == pytest.approx(36.0)
+    assert len(ch.gating_variables) == 1
+    assert ch.gating_variables[0].name == "n"
+    assert ch.gating_variables[0].power == 4
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
+    assert not ch.carries_calcium
+
+
+# ===========================================================================
+# Komendantov et al. (2004) SNc dopaminergic (VT = -67 mV) kinetics
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Rate function positivity
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, -54.0, 0.0, 40.0])
+def test_dopaminergic_alpha_m_positive(V: float) -> None:
+    """dopaminergic_alpha_m is positive at physiological voltages and singularity."""
+    assert dopaminergic_alpha_m(V, 0.0) > 0
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, -27.0, 0.0, 40.0])
+def test_dopaminergic_beta_m_positive(V: float) -> None:
+    """dopaminergic_beta_m is positive at physiological voltages and singularity."""
+    assert dopaminergic_beta_m(V, 0.0) > 0
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, 0.0, 40.0])
+def test_dopaminergic_alpha_h_positive(V: float) -> None:
+    """dopaminergic_alpha_h is positive at physiological voltages."""
+    assert dopaminergic_alpha_h(V, 0.0) > 0
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, 0.0, 40.0])
+def test_dopaminergic_beta_h_positive(V: float) -> None:
+    """dopaminergic_beta_h is positive at physiological voltages."""
+    assert dopaminergic_beta_h(V, 0.0) > 0
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, -52.0, 0.0, 40.0])
+def test_dopaminergic_alpha_n_positive(V: float) -> None:
+    """dopaminergic_alpha_n is positive at physiological voltages and singularity."""
+    assert dopaminergic_alpha_n(V, 0.0) > 0
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, 0.0, 40.0])
+def test_dopaminergic_beta_n_positive(V: float) -> None:
+    """dopaminergic_beta_n is positive at physiological voltages."""
+    assert dopaminergic_beta_n(V, 0.0) > 0
+
+
+# ---------------------------------------------------------------------------
+# Singularity guards  (VT = -67 mV → singularities at -54, -27, -52 mV)
+# ---------------------------------------------------------------------------
+
+_DA_ALPHA_M_SINGULARITY = DOPAMINERGIC_VT + 13  # -54 mV; limit = 0.32 * 4 = 1.28
+_DA_BETA_M_SINGULARITY = DOPAMINERGIC_VT + 40  # -27 mV; limit = 0.28 * 5 = 1.4
+_DA_ALPHA_N_SINGULARITY = DOPAMINERGIC_VT + 15  # -52 mV; limit = 0.032 * 5 = 0.16
+
+
+def test_dopaminergic_alpha_m_singularity_guard() -> None:
+    """dopaminergic_alpha_m returns L'Hôpital limit 1.28 at V = VT + 13 = -54 mV."""
+    assert dopaminergic_alpha_m(_DA_ALPHA_M_SINGULARITY, 0.0) == pytest.approx(1.28)
+
+
+def test_dopaminergic_alpha_m_near_singularity_continuous_above() -> None:
+    """dopaminergic_alpha_m is continuous approaching -54 mV from above."""
+    assert dopaminergic_alpha_m(_DA_ALPHA_M_SINGULARITY + 1e-5, 0.0) == pytest.approx(
+        1.28, rel=1e-3
+    )
+
+
+def test_dopaminergic_alpha_m_near_singularity_continuous_below() -> None:
+    """dopaminergic_alpha_m is continuous approaching -54 mV from below."""
+    assert dopaminergic_alpha_m(_DA_ALPHA_M_SINGULARITY - 1e-5, 0.0) == pytest.approx(
+        1.28, rel=1e-3
+    )
+
+
+def test_dopaminergic_beta_m_singularity_guard() -> None:
+    """dopaminergic_beta_m returns L'Hôpital limit 1.4 at V = VT + 40 = -27 mV."""
+    assert dopaminergic_beta_m(_DA_BETA_M_SINGULARITY, 0.0) == pytest.approx(1.4)
+
+
+def test_dopaminergic_beta_m_near_singularity_continuous_above() -> None:
+    """dopaminergic_beta_m is continuous approaching -27 mV from above."""
+    assert dopaminergic_beta_m(_DA_BETA_M_SINGULARITY + 1e-5, 0.0) == pytest.approx(
+        1.4, rel=1e-3
+    )
+
+
+def test_dopaminergic_beta_m_near_singularity_continuous_below() -> None:
+    """dopaminergic_beta_m is continuous approaching -27 mV from below."""
+    assert dopaminergic_beta_m(_DA_BETA_M_SINGULARITY - 1e-5, 0.0) == pytest.approx(
+        1.4, rel=1e-3
+    )
+
+
+def test_dopaminergic_alpha_n_singularity_guard() -> None:
+    """dopaminergic_alpha_n returns L'Hôpital limit 0.16 at V = VT + 15 = -52 mV."""
+    assert dopaminergic_alpha_n(_DA_ALPHA_N_SINGULARITY, 0.0) == pytest.approx(0.16)
+
+
+def test_dopaminergic_alpha_n_near_singularity_continuous_above() -> None:
+    """dopaminergic_alpha_n is continuous approaching -52 mV from above."""
+    assert dopaminergic_alpha_n(_DA_ALPHA_N_SINGULARITY + 1e-5, 0.0) == pytest.approx(
+        0.16, rel=1e-3
+    )
+
+
+def test_dopaminergic_alpha_n_near_singularity_continuous_below() -> None:
+    """dopaminergic_alpha_n is continuous approaching -52 mV from below."""
+    assert dopaminergic_alpha_n(_DA_ALPHA_N_SINGULARITY - 1e-5, 0.0) == pytest.approx(
+        0.16, rel=1e-3
+    )
+
+
+# ---------------------------------------------------------------------------
+# ca_i independence
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("V", [-65.0, 0.0])
+@pytest.mark.parametrize(
+    "fn",
+    [
+        dopaminergic_alpha_m,
+        dopaminergic_beta_m,
+        dopaminergic_alpha_h,
+        dopaminergic_beta_h,
+        dopaminergic_alpha_n,
+        dopaminergic_beta_n,
+    ],
+)
+def test_dopaminergic_rate_functions_ignore_ca_i(V: float, fn: RateFn) -> None:
+    """All dopaminergic rate functions return the same value regardless of ca_i."""
+    assert fn(V, 0.0) == pytest.approx(fn(V, 1.0))
+
+
+# ---------------------------------------------------------------------------
+# Steady-state bounds
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, 0.0, 40.0])
+def test_dopaminergic_steady_state_gating_bounds(V: float) -> None:
+    """Dopaminergic steady-state gating variables are in [0, 1]."""
+    n_inf = dopaminergic_alpha_n(V, 0.0) / (
+        dopaminergic_alpha_n(V, 0.0) + dopaminergic_beta_n(V, 0.0)
+    )
+    m_inf = dopaminergic_alpha_m(V, 0.0) / (
+        dopaminergic_alpha_m(V, 0.0) + dopaminergic_beta_m(V, 0.0)
+    )
+    h_inf = dopaminergic_alpha_h(V, 0.0) / (
+        dopaminergic_alpha_h(V, 0.0) + dopaminergic_beta_h(V, 0.0)
+    )
+    assert 0.0 <= n_inf <= 1.0
+    assert 0.0 <= m_inf <= 1.0
+    assert 0.0 <= h_inf <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# Factory function structure
+# ---------------------------------------------------------------------------
+
+
+def test_make_dopaminergic_na_channel_structure() -> None:
+    """make_dopaminergic_na_channel returns a Na⁺ channel with m³h gating."""
+    ch = make_dopaminergic_na_channel(g_max=120.0)
+    assert isinstance(ch, IonChannel)
+    assert ch.name == "Na"
+    assert ch.g_max == pytest.approx(120.0)
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "m"
+    assert ch.gating_variables[0].power == 3
+    assert ch.gating_variables[1].name == "h"
+    assert ch.gating_variables[1].power == 1
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.SODIUM
+    assert not ch.carries_calcium
+
+
+def test_make_dopaminergic_k_channel_structure() -> None:
+    """make_dopaminergic_k_channel returns a channel with n⁴ gating and K⁺ reversal."""
+    ch = make_dopaminergic_k_channel(g_max=36.0)
     assert isinstance(ch, IonChannel)
     assert ch.name == "K"
     assert ch.g_max == pytest.approx(36.0)

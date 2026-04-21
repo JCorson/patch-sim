@@ -3,7 +3,7 @@
 import pytest
 
 from patch_sim import find_zero_current_voltage
-from patch_sim.constants import PURKINJE, TRN
+from patch_sim.constants import DOPAMINERGIC, PURKINJE, TRN
 from patch_sim.equilibrium import _total_ionic_current
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
@@ -61,7 +61,18 @@ def test_find_zero_current_voltage_no_bracket() -> None:
 # subthreshold voltages, so I_total has no sign change.  v_rest = −65 mV is
 # the simulation starting point (near the INaP threshold), not an equilibrium.
 # See test_fires_spontaneously in tests/integration/test_purkinje.py.
-_EQUILIBRIUM_PRESET_NAMES = [p for p in NEURON_PRESET_NAMES if p not in (TRN, PURKINJE)]
+#
+# DOPAMINERGIC is excluded: Canavier/Komendantov kinetics (VT=−67 mV) combined
+# with large Ih (g_max=2.0) create multiple sign changes in the default search
+# range [−100, −20] mV — one near the physiological rest (~−62.5 mV) and at
+# least one more near the Na⁺ activation threshold (~−37 mV).  Brent's method
+# finds whichever root the endpoint signs bracket; with the default endpoints it
+# converges on the non-physiological root near −37 mV rather than the resting
+# equilibrium.  Stability at v_rest is verified instead by the simulation-based
+# test_all_presets_stable_at_rest in tests/integration/test_current_clamp.py.
+_EQUILIBRIUM_PRESET_NAMES = [
+    p for p in NEURON_PRESET_NAMES if p not in (TRN, PURKINJE, DOPAMINERGIC)
+]
 
 
 @pytest.mark.parametrize("preset_name", _EQUILIBRIUM_PRESET_NAMES)
