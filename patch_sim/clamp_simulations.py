@@ -315,11 +315,21 @@ def _rk4_step_current_clamp(
     dV1, d1, dca1 = _hh_derivatives(neuron, V, gating_state, I_ext, ca_i, e_rev_by_name)
     s2 = _advance_state(gating_state, d1, 0.5 * dt)
     dV2, d2, dca2 = _hh_derivatives(
-        neuron, _clamp_v(V + 0.5 * dt * dV1), s2, I_ext, ca_i + 0.5 * dt * dca1, e_rev_by_name
+        neuron,
+        _clamp_v(V + 0.5 * dt * dV1),
+        s2,
+        I_ext,
+        ca_i + 0.5 * dt * dca1,
+        e_rev_by_name,
     )
     s3 = _advance_state(gating_state, d2, 0.5 * dt)
     dV3, d3, dca3 = _hh_derivatives(
-        neuron, _clamp_v(V + 0.5 * dt * dV2), s3, I_ext, ca_i + 0.5 * dt * dca2, e_rev_by_name
+        neuron,
+        _clamp_v(V + 0.5 * dt * dV2),
+        s3,
+        I_ext,
+        ca_i + 0.5 * dt * dca2,
+        e_rev_by_name,
     )
     s4 = _advance_state(gating_state, d3, dt)
     dV4, d4, dca4 = _hh_derivatives(
@@ -529,7 +539,13 @@ def _simulate_current_clamp_core(
         V = V_arr[i - 1]
 
         V_new, gating_state, ca_i = _rk4_step_current_clamp(
-            neuron, V, gating_state, current_external[i - 1], time_step, ca_i, e_rev_by_name
+            neuron,
+            V,
+            gating_state,
+            current_external[i - 1],
+            time_step,
+            ca_i,
+            e_rev_by_name,
         )
 
         V_arr[i] = V_new

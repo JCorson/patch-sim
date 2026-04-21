@@ -9,7 +9,7 @@ from patch_sim.neuron import Neuron
 
 
 def test_compute_reversal_potentials_covers_all_channels() -> None:
-    """_compute_reversal_potentials returns one entry per channel with the correct value."""
+    """_compute_reversal_potentials keys match all channels; values match live calls."""
     neuron = Neuron(
         additional_channels=(make_ical_channel(), make_ikca_channel()),
         calcium_dynamics=CalciumDynamics(),
@@ -22,7 +22,11 @@ def test_compute_reversal_potentials_covers_all_channels() -> None:
 
 
 def test_compute_reversal_potentials_hh_only() -> None:
-    """_compute_reversal_potentials works for a plain HH neuron with no additional channels."""
+    """_compute_reversal_potentials works for a plain HH neuron with no extra channels.
+
+    Verifies that the helper handles the minimal case (core channels only) and
+    that every returned value matches the per-channel live computation.
+    """
     neuron = Neuron()
     cache = _compute_reversal_potentials(neuron)
 
