@@ -168,6 +168,40 @@ def test_base_ion_channel_satisfies_protocol():
     assert isinstance(ch, IonChannel)
 
 
+def test_compute_current_accepts_precomputed_e_rev():
+    """compute_current uses an explicit e_rev without touching the neuron concentrations."""
+    neuron = Neuron()
+    ch = _make_simple_channel(g_max=2.0)
+    # gate=0.5, power=1, g=1.0 → current = 1.0 * (0.0 - sentinel)
+    sentinel = 99.0
+    result = ch.compute_current(V=0.0, gating_state={"x": 0.5}, neuron=neuron, e_rev=sentinel)
+    assert result == pytest.approx(2.0 * 0.5 * (0.0 - sentinel))
+
+
+def test_compute_current_precomputed_matches_dispatch():
+    """compute_current with cached e_rev equals the result from the live dispatch path."""
+    neuron = Neuron()
+    ch = _make_simple_channel(g_max=1.5)
+    gs = {"x": 0.7}
+    e_rev = ch.reversal_potential(neuron)
+    result_live = ch.compute_current(V=-40.0, gating_state=gs, neuron=neuron)
+    result_cached = ch.compute_current(V=-40.0, gating_state=gs, neuron=neuron, e_rev=e_rev)
+    assert result_cached == pytest.approx(result_live)
+
+
+def test_compute_current_precomputed_overrides_neuron():
+    """Passing e_rev short-circuits reversal_potential; a bogus value changes the result."""
+    neuron = Neuron()
+    ch = _make_simple_channel(g_max=1.0)
+    gs = {"x": 1.0}
+    true_e_rev = ch.reversal_potential(neuron)
+    bogus_e_rev = true_e_rev + 100.0
+    result_true = ch.compute_current(V=0.0, gating_state=gs, neuron=neuron, e_rev=true_e_rev)
+    result_bogus = ch.compute_current(V=0.0, gating_state=gs, neuron=neuron, e_rev=bogus_e_rev)
+    assert result_bogus != pytest.approx(result_true)
+    assert result_bogus == pytest.approx(1.0 * (0.0 - bogus_e_rev))
+
+
 # ---------------------------------------------------------------------------
 # IonSpecies, NernstSpec, GoldmanSpec
 # ---------------------------------------------------------------------------
