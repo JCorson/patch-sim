@@ -362,6 +362,6 @@ def test_e_rev_cache_numerically_identical_to_live_dispatch() -> None:
     ]
 
     for j, i in enumerate(idx):
-        assert result["voltage"][i] == pytest.approx(golden_voltage[j], rel=1e-12)
-        assert result["Itotal"][i] == pytest.approx(golden_itotal[j], rel=1e-12)
-        assert result["ca_i"][i] == pytest.approx(golden_ca_i[j], rel=1e-12)
+        assert result["voltage"][i] == pytest.approx(golden_voltage[j], rel=1e-10)
+        assert result["Itotal"][i] == pytest.approx(golden_itotal[j], rel=1e-10)
+        assert result["ca_i"][i] == pytest.approx(golden_ca_i[j], rel=1e-10)

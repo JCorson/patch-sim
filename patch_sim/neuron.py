@@ -261,7 +261,7 @@ class Neuron:
                 V,
                 gating_state,
                 self,
-                e_rev_by_name.get(ch.name) if e_rev_by_name is not None else None,
+                e_rev_by_name[ch.name] if e_rev_by_name is not None else None,
             )
             for ch in self.all_channels
             if ch.carries_calcium
