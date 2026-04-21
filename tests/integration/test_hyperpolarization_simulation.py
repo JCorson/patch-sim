@@ -97,13 +97,26 @@ def _run_hyperpolarization_sweeps(
     return analyze_hyperpolarization(time, voltages, current_steps, pre, pre + stim)
 
 
+@pytest.fixture(scope="module")
+def _hyp_sweeps_by_preset() -> dict[str, HyperpolarizationAnalysisResult]:
+    """Run hyperpolarization sweeps for all presets once and cache per module.
+
+    Returns:
+        Mapping from preset name to its :class:`HyperpolarizationAnalysisResult`.
+    """
+    return {name: _run_hyperpolarization_sweeps(name) for name in NEURON_PRESET_NAMES}
+
+
 # ---------------------------------------------------------------------------
 # Structural plausibility — all 9 neuron types
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("preset_name", NEURON_PRESET_NAMES)
-def test_hyperpolarization_preset_is_structurally_plausible(preset_name: str) -> None:
+def test_hyperpolarization_preset_is_structurally_plausible(
+    preset_name: str,
+    _hyp_sweeps_by_preset: dict[str, HyperpolarizationAnalysisResult],
+) -> None:
     """Hyperpolarization Steps preset runs without errors for every neuron type.
 
     For every neuron, the protocol must:
@@ -115,8 +128,9 @@ def test_hyperpolarization_preset_is_structurally_plausible(preset_name: str) ->
 
     Args:
         preset_name: Key in NEURON_PRESETS selecting the neuron configuration.
+        _hyp_sweeps_by_preset: Module-scoped cache of all preset sweep results.
     """
-    result = _run_hyperpolarization_sweeps(preset_name)
+    result = _hyp_sweeps_by_preset[preset_name]
 
     assert len(result.points) > 0, (
         f"{preset_name}: expected at least one SagPoint, got 0"
@@ -155,15 +169,20 @@ def test_hyperpolarization_preset_is_structurally_plausible(preset_name: str) ->
 # ---------------------------------------------------------------------------
 
 
-def test_sag_in_cortical_pyramidal() -> None:
+def test_sag_in_cortical_pyramidal(
+    _hyp_sweeps_by_preset: dict[str, HyperpolarizationAnalysisResult],
+) -> None:
     """Cortical pyramidal shows clear Ih-driven voltage sag during hyperpolarization.
 
     Ih is a depolarising inward current activated by hyperpolarisation.  During
     a sustained negative step, Ih activates and drives the membrane back toward
     rest — the characteristic sag.  The most negative step should show ≥5 mV
     of sag in this model (Ih conductance is significant in the CP preset).
+
+    Args:
+        _hyp_sweeps_by_preset: Module-scoped cache of all preset sweep results.
     """
-    result = _run_hyperpolarization_sweeps(CORTICAL_PYRAMIDAL)
+    result = _hyp_sweeps_by_preset[CORTICAL_PYRAMIDAL]
     most_negative = result.points[0]
     assert most_negative.sag_amplitude > 5.0, (
         f"Cortical Pyramidal: expected sag > 5 mV at most negative step, "
@@ -173,43 +192,69 @@ def test_sag_in_cortical_pyramidal() -> None:
     )
 
 
-def test_sag_in_thalamic_relay() -> None:
-    """Thalamic relay neuron shows Ih-driven voltage sag during hyperpolarization."""
-    result = _run_hyperpolarization_sweeps(THALAMIC_RELAY)
+def test_sag_in_thalamic_relay(
+    _hyp_sweeps_by_preset: dict[str, HyperpolarizationAnalysisResult],
+) -> None:
+    """Thalamic relay neuron shows Ih-driven voltage sag during hyperpolarization.
+
+    Args:
+        _hyp_sweeps_by_preset: Module-scoped cache of all preset sweep results.
+    """
+    result = _hyp_sweeps_by_preset[THALAMIC_RELAY]
     most_negative = result.points[0]
     assert most_negative.sag_amplitude > 1.0, (
         f"Thalamic Relay: expected sag > 1 mV, got {most_negative.sag_amplitude:.2f} mV"
     )
 
 
-def test_sag_in_ca1_pyramidal() -> None:
-    """Hippocampal CA1 pyramidal neuron shows Ih-driven sag."""
-    result = _run_hyperpolarization_sweeps(CA1_PYRAMIDAL)
+def test_sag_in_ca1_pyramidal(
+    _hyp_sweeps_by_preset: dict[str, HyperpolarizationAnalysisResult],
+) -> None:
+    """Hippocampal CA1 pyramidal neuron shows Ih-driven sag.
+
+    Args:
+        _hyp_sweeps_by_preset: Module-scoped cache of all preset sweep results.
+    """
+    result = _hyp_sweeps_by_preset[CA1_PYRAMIDAL]
     most_negative = result.points[0]
     assert most_negative.sag_amplitude > 1.0, (
         f"CA1 Pyramidal: expected sag > 1 mV, got {most_negative.sag_amplitude:.2f} mV"
     )
 
 
-def test_sag_in_stn() -> None:
-    """Subthalamic nucleus neuron shows Ih-driven sag during hyperpolarization."""
-    result = _run_hyperpolarization_sweeps(STN)
+def test_sag_in_stn(
+    _hyp_sweeps_by_preset: dict[str, HyperpolarizationAnalysisResult],
+) -> None:
+    """Subthalamic nucleus neuron shows Ih-driven sag during hyperpolarization.
+
+    Args:
+        _hyp_sweeps_by_preset: Module-scoped cache of all preset sweep results.
+    """
+    result = _hyp_sweeps_by_preset[STN]
     most_negative = result.points[0]
     assert most_negative.sag_amplitude > 2.0, (
         f"STN: expected sag > 2 mV, got {most_negative.sag_amplitude:.2f} mV"
     )
 
 
-def test_sag_in_dopaminergic() -> None:
-    """Dopaminergic neuron shows Ih-driven sag during hyperpolarization."""
-    result = _run_hyperpolarization_sweeps(DOPAMINERGIC)
+def test_sag_in_dopaminergic(
+    _hyp_sweeps_by_preset: dict[str, HyperpolarizationAnalysisResult],
+) -> None:
+    """Dopaminergic neuron shows Ih-driven sag during hyperpolarization.
+
+    Args:
+        _hyp_sweeps_by_preset: Module-scoped cache of all preset sweep results.
+    """
+    result = _hyp_sweeps_by_preset[DOPAMINERGIC]
     most_negative = result.points[0]
     assert most_negative.sag_amplitude > 1.0, (
         f"Dopaminergic: expected sag > 1 mV, got {most_negative.sag_amplitude:.2f} mV"
     )
 
 
-def test_squid_giant_axon_minimal_sag() -> None:
+def test_squid_giant_axon_minimal_sag(
+    _hyp_sweeps_by_preset: dict[str, HyperpolarizationAnalysisResult],
+) -> None:
     """Classic HH squid axon has no Ih channel and shows minimal voltage sag.
 
     The HH52 model contains only Na⁺ and K⁺ conductance-based channels plus a
@@ -217,8 +262,11 @@ def test_squid_giant_axon_minimal_sag() -> None:
     deactivation (reduction in outward current), which is a small effect.  The
     sag amplitude should be well below the 1 mV threshold used for Ih-expressing
     neurons across the full current range of the preset.
+
+    Args:
+        _hyp_sweeps_by_preset: Module-scoped cache of all preset sweep results.
     """
-    result = _run_hyperpolarization_sweeps(SQUID_GIANT_AXON)
+    result = _hyp_sweeps_by_preset[SQUID_GIANT_AXON]
     for pt in result.points:
         assert pt.sag_amplitude < 2.0, (
             f"Squid: unexpected sag {pt.sag_amplitude:.2f} mV at I={pt.current_step} "
@@ -231,7 +279,9 @@ def test_squid_giant_axon_minimal_sag() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_rebound_burst_in_thalamic_relay() -> None:
+def test_rebound_burst_in_thalamic_relay(
+    _hyp_sweeps_by_preset: dict[str, HyperpolarizationAnalysisResult],
+) -> None:
     """Thalamic relay neuron fires a rebound burst after hyperpolarization release.
 
     Sustained hyperpolarisation de-inactivates T-type Ca²⁺ channels (ICaT).
@@ -239,8 +289,11 @@ def test_rebound_burst_in_thalamic_relay() -> None:
     a burst of action potentials — the post-inhibitory rebound.  At the most
     negative current step (−10 µA/cm² base preset), ≥1 rebound spike is expected
     within 50 ms of step offset.
+
+    Args:
+        _hyp_sweeps_by_preset: Module-scoped cache of all preset sweep results.
     """
-    result = _run_hyperpolarization_sweeps(THALAMIC_RELAY)
+    result = _hyp_sweeps_by_preset[THALAMIC_RELAY]
     most_negative = result.points[0]
     assert most_negative.rebound_spike_count >= 1, (
         f"Thalamic Relay: expected ≥1 rebound spike after most negative step, "
@@ -249,7 +302,9 @@ def test_rebound_burst_in_thalamic_relay() -> None:
     )
 
 
-def test_hyperpolarization_sag_in_ca1_pyramidal() -> None:
+def test_hyperpolarization_sag_in_ca1_pyramidal(
+    _hyp_sweeps_by_preset: dict[str, HyperpolarizationAnalysisResult],
+) -> None:
     """CA1 pyramidal neuron shows Ih-driven sag during hyperpolarization.
 
     The Pospischil Na⁺/K⁺ kinetics (34 °C reference) produce sufficient outward
@@ -258,9 +313,9 @@ def test_hyperpolarization_sag_in_ca1_pyramidal() -> None:
     distinguishing feature verified here.
 
     Args:
-        None
+        _hyp_sweeps_by_preset: Module-scoped cache of all preset sweep results.
     """
-    result = _run_hyperpolarization_sweeps(CA1_PYRAMIDAL)
+    result = _hyp_sweeps_by_preset[CA1_PYRAMIDAL]
     most_negative = result.points[0]
     assert most_negative.sag_amplitude > 0.0, (
         f"CA1 Pyramidal: expected Ih-driven sag at most negative step, "
@@ -273,7 +328,9 @@ def test_hyperpolarization_sag_in_ca1_pyramidal() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_anode_break_in_squid_giant_axon() -> None:
+def test_anode_break_in_squid_giant_axon(
+    _hyp_sweeps_by_preset: dict[str, HyperpolarizationAnalysisResult],
+) -> None:
     """Squid giant axon fires a post-hyperpolarization spike via HH anode-break.
 
     The plain HH52 model contains only Na⁺, K⁺, and leak conductances — no
@@ -284,8 +341,11 @@ def test_anode_break_in_squid_giant_axon() -> None:
     still elevated and g_K is negligible, triggering a post-hyperpolarization
     action potential — classic anode-break excitation first described by Hodgkin
     & Huxley (1952, J. Physiol. 117:500).
+
+    Args:
+        _hyp_sweeps_by_preset: Module-scoped cache of all preset sweep results.
     """
-    result = _run_hyperpolarization_sweeps(SQUID_GIANT_AXON)
+    result = _hyp_sweeps_by_preset[SQUID_GIANT_AXON]
     most_negative = result.points[0]
     assert most_negative.rebound_spike_count >= 1, (
         f"Squid Giant Axon: expected ≥1 anode-break spike after most negative step, "
@@ -294,7 +354,9 @@ def test_anode_break_in_squid_giant_axon() -> None:
     )
 
 
-def test_rebound_in_cortical_pyramidal() -> None:
+def test_rebound_in_cortical_pyramidal(
+    _hyp_sweeps_by_preset: dict[str, HyperpolarizationAnalysisResult],
+) -> None:
     """Cortical pyramidal neuron fires a rebound spike via anode-break and Ih overshoot.
 
     The cortical pyramidal preset reaches ~−109 mV at the most negative step
@@ -303,8 +365,11 @@ def test_rebound_in_cortical_pyramidal() -> None:
     the step) continues to conduct after step offset, providing an inward
     depolarising current that accelerates return to threshold.  The cell has no
     ICaT, so the rebound is driven entirely by these Na⁺ and Ih mechanisms.
+
+    Args:
+        _hyp_sweeps_by_preset: Module-scoped cache of all preset sweep results.
     """
-    result = _run_hyperpolarization_sweeps(CORTICAL_PYRAMIDAL)
+    result = _hyp_sweeps_by_preset[CORTICAL_PYRAMIDAL]
     most_negative = result.points[0]
     assert most_negative.rebound_spike_count >= 1, (
         f"Cortical Pyramidal: expected ≥1 rebound spike after most negative step, "
@@ -313,7 +378,9 @@ def test_rebound_in_cortical_pyramidal() -> None:
     )
 
 
-def test_hyperpolarization_in_fast_spiking_interneuron() -> None:
+def test_hyperpolarization_in_fast_spiking_interneuron(
+    _hyp_sweeps_by_preset: dict[str, HyperpolarizationAnalysisResult],
+) -> None:
     """Fast-spiking interneuron hyperpolarizes cleanly with no Ih sag.
 
     The FSI has no HCN channels, so hyperpolarizing steps produce a flat
@@ -321,8 +388,11 @@ def test_hyperpolarization_in_fast_spiking_interneuron() -> None:
     (issue #231) have a higher firing threshold and stronger outward K⁺
     rectification than the previous HH52 model, so the post-step voltage
     does not exceed threshold and no rebound spike is generated.
+
+    Args:
+        _hyp_sweeps_by_preset: Module-scoped cache of all preset sweep results.
     """
-    result = _run_hyperpolarization_sweeps(FAST_SPIKING_INTERNEURON)
+    result = _hyp_sweeps_by_preset[FAST_SPIKING_INTERNEURON]
     most_negative = result.points[0]
     assert most_negative.sag_amplitude < 0.01, (
         f"Fast-Spiking Interneuron: expected zero sag (no Ih), "
@@ -330,7 +400,9 @@ def test_hyperpolarization_in_fast_spiking_interneuron() -> None:
     )
 
 
-def test_rebound_in_dopaminergic() -> None:
+def test_rebound_in_dopaminergic(
+    _hyp_sweeps_by_preset: dict[str, HyperpolarizationAnalysisResult],
+) -> None:
     """Dopaminergic neuron fires a rebound spike driven by Ih.
 
     The dopaminergic preset has a high HCN conductance (g_Ih = 2.0 mS/cm²) but
@@ -340,8 +412,11 @@ def test_rebound_in_dopaminergic() -> None:
     a cell with low firing threshold (pacemaker) the transient overshoot is
     sufficient to trigger a spike.  Rebound appears for steps of −15 µA/cm² and
     above.
+
+    Args:
+        _hyp_sweeps_by_preset: Module-scoped cache of all preset sweep results.
     """
-    result = _run_hyperpolarization_sweeps(DOPAMINERGIC)
+    result = _hyp_sweeps_by_preset[DOPAMINERGIC]
     most_negative = result.points[0]
     assert most_negative.rebound_spike_count >= 1, (
         f"Dopaminergic: expected ≥1 Ih-driven rebound spike after most negative "

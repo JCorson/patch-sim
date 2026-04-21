@@ -349,15 +349,17 @@ def test_na_channel_activation_preset(preset_name: str) -> None:
 
     assert len(protocol) >= 1, f"{preset_name}: Na+ Channel Activation needs ≥1 sweep"
 
+    last_result = None
     for i, sweep in enumerate(protocol):
         result = simulate_voltage_clamp(neuron, voltage_protocol=sweep)
         _assert_voltage_clamp_valid(result)
         assert np.isfinite(result["INa"]).all(), (
             f"{preset_name} sweep {i}: INa contains non-finite values"
         )
+        last_result = result
 
     # At the most depolarized step, Na⁺ current must be clearly inward.
-    last_result = simulate_voltage_clamp(neuron, voltage_protocol=protocol[-1])
+    assert last_result is not None
     ina_min = float(last_result["INa"].min())
     assert ina_min < -1.0, (
         f"{preset_name}: INa minimum at max depolarization = {ina_min:.3f} µA/cm²; "
