@@ -771,15 +771,17 @@ class SimulationState(rx.State):
             "if(/^[xy]axis/.test(k)){"
             "_layout[k]=Object.assign({},fig.layout[k],_ax);}});"
             "}"
-            f"await Plotly.react(gd,fig.data,_layout);"
-            # Monkey-patch Plotly.react once so that subsequent empty-data
-            # re-renders from react-plotly.js (triggered by React context
-            # updates) don't wipe our injected traces.  Only skips calls
-            # where data is an empty array on a div we have taken over.
-            # Lifetime: the patch persists for the page session.  If the
-            # Plotly div is destroyed and recreated (has_result flips False
-            # then True), _psManagedByFetch is absent on the new node and a
-            # full Plotly.react will run — which is correct behaviour.
+            # Install the monkey-patch and mark the div BEFORE awaiting
+            # Plotly.react.  The `await` yields to the event loop, which lets
+            # React process pending re-renders in the gap.  Without the patch
+            # and flag in place first, React can call Plotly.react with the
+            # empty skeleton between our call and the Promise resolving, wiping
+            # the injected traces.  The flag on the div is the guard: the patch
+            # blocks calls where data is empty on a div we have taken over.
+            # Lifetime: the patch persists for the page session.  When the div
+            # is destroyed and recreated (has_result flips False then True),
+            # _psManagedByFetch is absent on the new node so a full
+            # Plotly.react runs — which is correct.
             "if(!window._psPatchedPlotlyReact){"
             "window._psPatchedPlotlyReact=true;"
             "var _origReact=window.Plotly.react;"
@@ -790,6 +792,7 @@ class SimulationState(rx.State):
             "return _origReact.apply(this,arguments);};"
             "}"
             "gd._psManagedByFetch=true;"
+            f"await Plotly.react(gd,fig.data,_layout);"
             f"{post_js}"
             f"}}catch(err){{console.error('[patch_sim] fetch figure error:',err);}}"
             f"}},0)"
