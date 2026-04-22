@@ -6,18 +6,34 @@ from patch_sim_ui.state import SimulationState
 
 # Layout overrides applied client-side so they track the active colour mode
 # without requiring a server round-trip.  These take precedence over any
-# server-built layout values.  In dark mode the transparent backgrounds let
-# the Radix surface colour show through; ``plotly_dark`` applies the matching
-# trace/axis colour scheme.  In light mode no overrides are needed because the
-# server already builds the figure with ``plotly_white`` and light legend
-# colours.
-_LAYOUT_LIGHT: dict = {}
-_LAYOUT_DARK = {
-    "template": "plotly_dark",
+# server-built layout values.
+#
+# Design rationale: the server builds figures with ``plotly_white`` which has
+# subtle light-grey gridlines.  Switching to ``plotly_dark`` replaces those
+# with bright white gridlines that are too prominent on a transparent dark
+# surface.  Instead we keep ``plotly_white``'s gridlines and only override
+# the things that don't work on a dark background: backgrounds (transparent)
+# and text/axis colours (white).
+_LAYOUT_LIGHT: dict = {
     "paper_bgcolor": "rgba(0,0,0,0)",
     "plot_bgcolor": "rgba(0,0,0,0)",
-    "legend": {"bgcolor": "rgba(40,40,40,0.9)"},
-    "legend2": {"bgcolor": "rgba(40,40,40,0.9)"},
+}
+_AXIS_DARK = {
+    "gridcolor": "rgba(255,255,255,0.1)",
+    "linecolor": "rgba(255,255,255,0.25)",
+    "zerolinecolor": "rgba(255,255,255,0.2)",
+    "tickcolor": "rgba(255,255,255,0.4)",
+}
+_LAYOUT_DARK = {
+    "paper_bgcolor": "rgba(0,0,0,0)",
+    "plot_bgcolor": "rgba(0,0,0,0)",
+    "font": {"color": "#e8e8e8"},
+    "legend": {"bgcolor": "rgba(40,40,40,0.9)", "font": {"color": "#e8e8e8"}},
+    "legend2": {"bgcolor": "rgba(40,40,40,0.9)", "font": {"color": "#e8e8e8"}},
+    **{
+        k: _AXIS_DARK
+        for k in ("xaxis", "yaxis", "xaxis2", "yaxis2", "xaxis3", "yaxis3")
+    },
 }
 
 

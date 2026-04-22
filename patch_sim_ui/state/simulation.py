@@ -16,6 +16,7 @@ from typing import Any, AsyncGenerator
 import numpy as np
 import plotly.graph_objects as go
 import reflex as rx
+from reflex.config import get_config as _get_config
 
 import patch_sim
 import patch_sim.clamp_simulations
@@ -727,16 +728,67 @@ class SimulationState(rx.State):
             post_parts.append(self._sweep_highlight_js())
         post_js = "".join(post_parts)
 
+        api_url = _get_config().api_url.rstrip("/")
         return (
             f"setTimeout(async function(){{"
             f"try{{"
-            f"var resp=await fetch('/api/figure/{token}');"
+            f"var resp=await fetch('{api_url}/api/figure/{token}');"
             "if(!resp.ok){"
             "console.error('[patch_sim] fetch figure HTTP',resp.status);return;}"
             f"var fig=await resp.json();"
-            f"var gd=document.querySelector('.js-plotly-plot');"
+            # Poll for the Plotly div — on the first run React is mounting it
+            # for the first time (has_result just flipped True) so it may not
+            # exist at setTimeout(0) time.  Retry every 50 ms for up to 2 s.
+            "var gd=null;"
+            "for(var _i=0;_i<40;_i++){"
+            "gd=document.querySelector('.js-plotly-plot');"
+            "if(gd)break;"
+            "await new Promise(function(r){setTimeout(r,50);});}"
             f"if(!gd){{console.warn('[patch_sim] plot div not found');return;}}"
-            f"await Plotly.react(gd,fig.data,fig.layout);"
+            # Merge colour-mode overrides into the layout before calling
+            # Plotly.react — mirrors _LAYOUT_DARK/_LAYOUT_LIGHT in
+            # trace_display.py.  We keep the plotly_white template (subtle
+            # grey gridlines) and only override backgrounds and text colour
+            # rather than switching to plotly_dark whose white gridlines are
+            # too prominent on a transparent dark surface.
+            "var _dark=document.documentElement.classList.contains('dark');"
+            "var _layout=Object.assign({},fig.layout);"
+            "_layout.paper_bgcolor='rgba(0,0,0,0)';"
+            "_layout.plot_bgcolor='rgba(0,0,0,0)';"
+            "if(_dark){"
+            "_layout.font=Object.assign({},fig.layout.font,{color:'#e8e8e8'});"
+            "_layout.legend=Object.assign({},fig.layout.legend,"
+            "{bgcolor:'rgba(40,40,40,0.9)',font:{color:'#e8e8e8'}});"
+            "_layout.legend2=Object.assign({},fig.layout.legend2,"
+            "{bgcolor:'rgba(40,40,40,0.9)',font:{color:'#e8e8e8'}});"
+            # plotly_white gridlines are near-white (#EBF0F8) which is subtle
+            # on a white background but very prominent on a dark surface.
+            # Dim every axis's grid/line colours explicitly.
+            "var _ax={"
+            "gridcolor:'rgba(255,255,255,0.1)',"
+            "linecolor:'rgba(255,255,255,0.25)',"
+            "zerolinecolor:'rgba(255,255,255,0.2)',"
+            "tickcolor:'rgba(255,255,255,0.4)'"
+            "};"
+            "Object.keys(fig.layout).forEach(function(k){"
+            "if(/^[xy]axis/.test(k)){"
+            "_layout[k]=Object.assign({},fig.layout[k],_ax);}});"
+            "}"
+            f"await Plotly.react(gd,fig.data,_layout);"
+            # Monkey-patch Plotly.react once so that subsequent empty-data
+            # re-renders from react-plotly.js (triggered by React context
+            # updates) don't wipe our injected traces.  Only skips calls
+            # where data is an empty array on a div we have taken over.
+            "if(!window._psPatchedPlotlyReact){"
+            "window._psPatchedPlotlyReact=true;"
+            "var _origReact=window.Plotly.react;"
+            "window.Plotly.react=function(el,data,layout,config){"
+            "if(el&&el._psManagedByFetch"
+            "&&Array.isArray(data)&&data.length===0)"
+            "{return Promise.resolve({});}"
+            "return _origReact.apply(this,arguments);};"
+            "}"
+            "gd._psManagedByFetch=true;"
             f"{post_js}"
             f"}}catch(err){{console.error('[patch_sim] fetch figure error:',err);}}"
             f"}},0)"
@@ -1004,8 +1056,6 @@ class SimulationState(rx.State):
                 self.is_running = False
                 return
 
-        _start_ms = time.monotonic() * 1000
-        _t: dict[str, float] = {"start": _start_ms}
         logger.info(
             "Simulation started: mode=%s, protocol=%s",
             mode,
@@ -1047,7 +1097,6 @@ class SimulationState(rx.State):
                     return new_sweeps
 
                 new_sweeps = await loop.run_in_executor(None, _run_batch)
-                _t["after_batch"] = time.monotonic() * 1000
 
                 # Build and serialise the figure outside the state lock so that
                 # fig.to_json() (the expensive part) doesn't inflate the flush.
@@ -1060,13 +1109,10 @@ class SimulationState(rx.State):
                 )
                 _sim_token = uuid.uuid4().hex
                 traces.put(_sim_token, _fig)
-                _t["after_figure_put"] = time.monotonic() * 1000
 
                 async with self:
-                    _t["after_lock"] = time.monotonic() * 1000
                     self._current_sweeps = new_sweeps
                     self.sim_token = _sim_token
-                    _t["after_sweeps_assign"] = time.monotonic() * 1000
                     analysis_st = await self.get_state(AnalysisState)
                     if mode == VOLTAGE_CLAMP:
                         analysis_st.clear_results()
@@ -1110,7 +1156,6 @@ class SimulationState(rx.State):
                                 proto_st.stimulus_duration,
                             )
                         )
-                        _t["after_analysis"] = time.monotonic() * 1000
                         analysis_st.clear_results()
                         analysis_st.ap_metrics = ms_metrics
                         analysis_st.ap_summary = ms_summary
@@ -1121,9 +1166,6 @@ class SimulationState(rx.State):
                         analysis_st.phase_plane_data = _build_phase_plane_data(
                             new_sweeps
                         )
-                        _t["after_phase_plane"] = time.monotonic() * 1000
-
-                _t["after_state_flush"] = time.monotonic() * 1000
 
             else:
                 stimulus, _ = protocols[0]
@@ -1193,54 +1235,7 @@ class SimulationState(rx.State):
             async with self:
                 self.error_message = str(exc)
         else:
-            elapsed = time.monotonic() * 1000 - _start_ms
-            logger.info("Simulation complete: %.0f ms", elapsed)
-            if len(_t) > 1:
-
-                def _ms(a: str, b: str) -> str:
-                    return f"{_t[b] - _t[a]:.0f} ms"
-
-                _rows = [
-                    ("simulate_batch + Sweep.from_result", _ms("start", "after_batch")),
-                    (
-                        "build_figure + traces.put",
-                        _ms("after_batch", "after_figure_put")
-                        if "after_figure_put" in _t
-                        else "—",
-                    ),
-                    (
-                        "state-lock wait",
-                        _ms("after_figure_put", "after_lock")
-                        if "after_figure_put" in _t
-                        else _ms("after_batch", "after_lock"),
-                    ),
-                    (
-                        "_current_sweeps + sim_token assign",
-                        _ms("after_lock", "after_sweeps_assign"),
-                    ),
-                    (
-                        "_compute_cc_multi_sweep_analysis",
-                        _ms("after_sweeps_assign", "after_analysis")
-                        if "after_analysis" in _t
-                        else "—",
-                    ),
-                    (
-                        "state assigns + phase_plane_data",
-                        _ms("after_analysis", "after_phase_plane")
-                        if "after_phase_plane" in _t
-                        else "—",
-                    ),
-                    (
-                        "Reflex state flush (exit `async with`)",
-                        _ms("after_phase_plane", "after_state_flush")
-                        if "after_state_flush" in _t
-                        else "—",
-                    ),
-                    ("TOTAL", f"{elapsed:.0f} ms"),
-                ]
-                _lines = ["[FI-PROFILE] breakdown (multi-sweep CC only):"]
-                _lines += [f"  {k:<36}: {v}" for k, v in _rows]
-                print("\n".join(_lines), flush=True)  # noqa: T201
+            logger.info("Simulation complete")
             yield SimulationState.run_membrane_test
         finally:
             async with self:

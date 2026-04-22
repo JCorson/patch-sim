@@ -244,14 +244,14 @@ def test_is_multi_sweep_false_when_no_sweeps() -> None:
 def test_is_multi_sweep_false_for_single_sweep() -> None:
     """is_multi_sweep is False when there is exactly one current sweep."""
     s = _make_state()
-    s.current_sweeps = [_make_sweep()]
+    s._current_sweeps = [_make_sweep()]
     assert s.is_multi_sweep is False
 
 
 def test_is_multi_sweep_true_for_multiple_sweeps() -> None:
     """is_multi_sweep is True when current_sweeps has more than one entry."""
     s = _make_state()
-    s.current_sweeps = [_make_sweep(), _make_sweep()]
+    s._current_sweeps = [_make_sweep(), _make_sweep()]
     assert s.is_multi_sweep is True
 
 
@@ -296,12 +296,12 @@ async def test_set_clamp_mode_clears_current_sweeps() -> None:
     """set_clamp_mode resets current_sweeps on the SimulationState."""
     ps = _make_protocol_state()
     sim_st = _make_state()
-    sim_st.current_sweeps = [_make_sweep()]
+    sim_st._current_sweeps = [_make_sweep()]
     with patch.object(
         ProtocolState, "get_state", new=_make_get_state_fn({SimulationState: sim_st})
     ):
         await ps.set_clamp_mode("Voltage Clamp")
-    assert len(sim_st.current_sweeps) == 0
+    assert len(sim_st._current_sweeps) == 0
 
 
 async def test_set_clamp_mode_clears_stored_traces() -> None:
@@ -436,7 +436,7 @@ async def test_load_neuron_preset_keeps_sweeps_when_stored() -> None:
     """
     sim_st = _make_state()
     sim_st.stored_traces = [_make_sweep()]
-    sim_st.current_sweeps = [_make_sweep()]
+    sim_st._current_sweeps = [_make_sweep()]
     ns = _make_neuron_state()
     with patch.object(
         NeuronState,
@@ -444,7 +444,7 @@ async def test_load_neuron_preset_keeps_sweeps_when_stored() -> None:
         new=_make_get_state_fn({SimulationState: sim_st}),
     ):
         [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
-    assert len(sim_st.current_sweeps) == 1
+    assert len(sim_st._current_sweeps) == 1
 
 
 async def test_load_neuron_preset_clears_sweeps_without_stored() -> None:
@@ -455,7 +455,7 @@ async def test_load_neuron_preset_clears_sweeps_without_stored() -> None:
     """
     sim_st = _make_state()
     sim_st.stored_traces = []
-    sim_st.current_sweeps = [_make_sweep()]
+    sim_st._current_sweeps = [_make_sweep()]
     ns = _make_neuron_state()
     with patch.object(
         NeuronState,
@@ -463,14 +463,14 @@ async def test_load_neuron_preset_clears_sweeps_without_stored() -> None:
         new=_make_get_state_fn({SimulationState: sim_st}),
     ):
         [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
-    assert len(sim_st.current_sweeps) == 0
+    assert len(sim_st._current_sweeps) == 0
 
 
 async def test_store_trace_label_includes_neuron_type() -> None:
     """store_trace includes the active neuron type in the stored trace label."""
     s = _make_state()
     s._label_neuron_type = CORTICAL_PYRAMIDAL
-    s.current_sweeps = [_make_sweep()]
+    s._current_sweeps = [_make_sweep()]
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
         await s.store_trace()
     assert CORTICAL_PYRAMIDAL in s.stored_traces[0].label
@@ -541,7 +541,7 @@ async def test_protocol_preset_dopaminergic_repetitive_firing_long_duration() ->
 async def test_store_trace_appends_to_stored_traces() -> None:
     """store_trace promotes the current sweep to stored_traces."""
     s = _make_state()
-    s.current_sweeps = [_make_sweep()]
+    s._current_sweeps = [_make_sweep()]
     assert len(s.stored_traces) == 0
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
         await s.store_trace()
@@ -551,7 +551,7 @@ async def test_store_trace_appends_to_stored_traces() -> None:
 async def test_store_trace_sets_stored_label() -> None:
     """store_trace labels the stored entry with index and neuron type."""
     s = _make_state()
-    s.current_sweeps = [_make_sweep()]
+    s._current_sweeps = [_make_sweep()]
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
         await s.store_trace()
     assert s.stored_traces[0].label == f"Stored 1 ({s._label_neuron_type})"
@@ -560,7 +560,7 @@ async def test_store_trace_sets_stored_label() -> None:
 async def test_store_trace_twice_increments_label() -> None:
     """Calling store_trace twice creates sequentially numbered labels."""
     s = _make_state()
-    s.current_sweeps = [_make_sweep()]
+    s._current_sweeps = [_make_sweep()]
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
         await s.store_trace()
         await s.store_trace()
@@ -571,7 +571,7 @@ async def test_store_trace_twice_increments_label() -> None:
 async def test_store_trace_does_nothing_when_no_result() -> None:
     """store_trace is a no-op when current_sweeps is empty."""
     s = _make_state()
-    assert len(s.current_sweeps) == 0
+    assert len(s._current_sweeps) == 0
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
         await s.store_trace()
     assert len(s.stored_traces) == 0
@@ -596,7 +596,7 @@ def test_has_stored_traces_false_when_empty() -> None:
 async def test_has_stored_traces_true_after_store() -> None:
     """has_stored_traces is True after store_trace is called."""
     s = _make_state()
-    s.current_sweeps = [_make_sweep()]
+    s._current_sweeps = [_make_sweep()]
     with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
         await s.store_trace()
     assert s.has_stored_traces is True

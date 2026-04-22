@@ -40,7 +40,7 @@ class TestTracesStore:
         _STORE.clear()
 
     def test_put_and_get_round_trip(self) -> None:
-        """put then get_bytes returns valid JSON-encoded figure dict."""
+        """Put then get_bytes returns valid JSON-encoded figure dict."""
         from patch_sim_ui.api.traces import get_bytes, put
 
         fig = _make_fig()
