@@ -10,7 +10,7 @@ exclusively within a single substate are defined in that module instead.
 
 # Shared JS snippet for targeting the Plotly graph element.
 # Used by VisibilityState and SimulationState.
-_PLOTLY_GD_JS = "var gd=document.querySelector('.js-plotly-plot');"
+_PLOTLY_GD_JS = "var gd=document.getElementById('ps-trace-plot');"
 
 # Scroll the log panel viewport to the top so the newest entry (displayed
 # first in newest-first order) is always visible after a refresh.

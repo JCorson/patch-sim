@@ -14,7 +14,6 @@ import uuid
 from typing import Any, AsyncGenerator
 
 import numpy as np
-import plotly.graph_objects as go
 import reflex as rx
 from reflex.config import get_config as _get_config
 
@@ -495,28 +494,6 @@ class SimulationState(rx.State):
         """True when continuous mode is enabled and the loop is running."""
         return self.continuous_mode and self.continuous_loop_running
 
-    @rx.var
-    def figure_skeleton(self) -> go.Figure:
-        """Subplot skeleton (no trace data) used as the rx.plotly mount point.
-
-        Contains only the layout structure for the current clamp mode (CC or
-        VC subplots, axis labels, etc.) with zero data traces.  Actual trace
-        data is fetched by the browser via /api/figure/{sim_token} and injected
-        with ``Plotly.react`` once the side-channel store has been populated.
-
-        Depends only on ``_figure_clamp_mode`` so it re-computes only when the
-        user switches CC ↔ VC, not on every simulation result or stored-trace
-        change.  Hover mode is managed client-side via ``Plotly.relayout``
-        (see ``toggle_hover``).
-        """
-        return build_figure(
-            current_sweeps=[],
-            visibility=TraceVisibility(),
-            clamp_mode=self._figure_clamp_mode,
-            stored_traces=[],
-            show_hover=True,
-        )
-
     # ------------------------------------------------------------------ #
     # Event handlers                                                     #
     # ------------------------------------------------------------------ #
@@ -681,7 +658,7 @@ class SimulationState(rx.State):
         body = "".join(parts)
         return (
             f"setTimeout(function(){{"
-            f"var gd=document.querySelector('.js-plotly-plot');"
+            f"var gd=document.getElementById('ps-trace-plot');"
             f"{body}"
             f"}},0)"
         )
@@ -736,12 +713,13 @@ class SimulationState(rx.State):
             "if(!resp.ok){"
             "console.error('[patch_sim] fetch figure HTTP',resp.status);return;}"
             f"var fig=await resp.json();"
-            # Poll for the Plotly div — on the first run React is mounting it
-            # for the first time (has_result just flipped True) so it may not
-            # exist at setTimeout(0) time.  Retry every 50 ms for up to 2 s.
+            # Poll for the mount div — on the first run React is still
+            # flushing the state update (has_result just flipped True) so the
+            # div may not be in the DOM at setTimeout(0) time.
+            # Retry every 50 ms for up to 2 s.
             "var gd=null;"
             "for(var _i=0;_i<40;_i++){"
-            "gd=document.querySelector('.js-plotly-plot');"
+            "gd=document.getElementById('ps-trace-plot');"
             "if(gd)break;"
             "await new Promise(function(r){setTimeout(r,50);});}"
             f"if(!gd){{console.error('[patch_sim] plot div not found');return;}}"
@@ -771,28 +749,9 @@ class SimulationState(rx.State):
             "if(/^[xy]axis/.test(k)){"
             "_layout[k]=Object.assign({},fig.layout[k],_ax);}});"
             "}"
-            # Install the monkey-patch and mark the div BEFORE awaiting
-            # Plotly.react.  The `await` yields to the event loop, which lets
-            # React process pending re-renders in the gap.  Without the patch
-            # and flag in place first, React can call Plotly.react with the
-            # empty skeleton between our call and the Promise resolving, wiping
-            # the injected traces.  The flag on the div is the guard: the patch
-            # blocks calls where data is empty on a div we have taken over.
-            # Lifetime: the patch persists for the page session.  When the div
-            # is destroyed and recreated (has_result flips False then True),
-            # _psManagedByFetch is absent on the new node so a full
-            # Plotly.react runs — which is correct.
-            "if(!window._psPatchedPlotlyReact){"
-            "window._psPatchedPlotlyReact=true;"
-            "var _origReact=window.Plotly.react;"
-            "window.Plotly.react=function(el,data,layout,config){"
-            "if(el&&el._psManagedByFetch"
-            "&&Array.isArray(data)&&data.length===0)"
-            "{return Promise.resolve({});}"
-            "return _origReact.apply(this,arguments);};"
-            "}"
-            "gd._psManagedByFetch=true;"
-            f"await Plotly.react(gd,fig.data,_layout);"
+            # The div is a plain HTML element — React has no Plotly.react
+            # lifecycle here, so injected traces are never wiped.
+            f"await Plotly.react(gd,fig.data,_layout,{{responsive:true}});"
             f"{post_js}"
             f"}}catch(err){{console.error('[patch_sim] fetch figure error:',err);}}"
             f"}},0)"
