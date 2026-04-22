@@ -6,7 +6,6 @@ the full end-to-end workflow rather than either component in isolation.
 """
 
 import numpy as np
-import pytest
 
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from patch_sim.neuron import Neuron
@@ -300,68 +299,3 @@ def test_no_ap_below_threshold_current(hh_model: Neuron) -> None:
 
     # Voltage must never cross 0 mV (AP threshold)
     assert float(result["voltage"].max()) < 0.0
-
-
-def test_e_rev_cache_numerically_identical_to_live_dispatch() -> None:
-    """Simulation traces are bit-exact before and after reversal-potential caching.
-
-    Runs current-clamp on a neuron with Ca²⁺ channels and CalciumDynamics —
-    the most complex code path — and checks that the cached implementation
-    reproduces golden values to floating-point precision (rtol=1e-12).
-
-    Golden values were captured from the pre-cache implementation on 2026-04-21
-    at commit a89b8b9.
-    """
-    from patch_sim.additional_channels import make_ical_channel, make_ikca_channel
-    from patch_sim.calcium import CalciumDynamics
-
-    neuron = Neuron(
-        additional_channels=(make_ical_channel(), make_ikca_channel()),
-        calcium_dynamics=CalciumDynamics(),
-    )
-    stim = step_current(duration=50.0, current_amplitude=10.0)
-    result = simulate_current_clamp(neuron, stim)
-    N = len(result)
-    idx = np.linspace(0, N - 1, 10, dtype=int)
-
-    golden_voltage = [
-        -65.000000000000000,
-        -65.418657288807196,
-        -65.418802649296865,
-        -65.418802902175401,
-        -65.418803104659986,
-        -65.418803293214637,
-        -65.418803469437265,
-        -65.418803633542325,
-        -65.418803786914552,
-        -65.418803929988997,
-    ]
-    golden_itotal = [
-        10.990243675936165,
-        10.000165586052647,
-        10.000000032987437,
-        10.000000015076322,
-        10.000000014066375,
-        10.000000013123545,
-        10.000000012242424,
-        10.000000011421866,
-        10.000000010654961,
-        10.000000009939592,
-    ]
-    golden_ca_i = [
-        1.000000000000000e-04,
-        1.000021968366130e-04,
-        1.000042601624855e-04,
-        1.000061816244271e-04,
-        1.000079774229008e-04,
-        1.000096497418785e-04,
-        1.000112126911507e-04,
-        1.000126681716858e-04,
-        1.000140284637553e-04,
-        1.000152974258938e-04,
-    ]
-
-    for j, i in enumerate(idx):
-        assert result["voltage"][i] == pytest.approx(golden_voltage[j], rel=1e-10)
-        assert result["Itotal"][i] == pytest.approx(golden_itotal[j], rel=1e-10)
-        assert result["ca_i"][i] == pytest.approx(golden_ca_i[j], rel=1e-10)

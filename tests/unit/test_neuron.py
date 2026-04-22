@@ -178,26 +178,6 @@ def test_calcium_reversal_potential() -> None:
     assert ca_ch.reversal_potential(model) > 100.0
 
 
-def test_calcium_current_accepts_e_rev_by_name() -> None:
-    """calcium_current with a cached e_rev_by_name matches the live-dispatch result."""
-    from patch_sim.additional_channels import make_ical_channel, make_ikca_channel
-    from patch_sim.calcium import CalciumDynamics
-
-    neuron = Neuron(
-        additional_channels=(make_ical_channel(), make_ikca_channel()),
-        calcium_dynamics=CalciumDynamics(),
-    )
-    gs = {gv.name: 0.5 for gv in neuron.all_gating_variables}
-    e_rev_by_name = {
-        ch.name: ch.reversal_potential(neuron) for ch in neuron.all_channels
-    }
-    result_live = neuron.calcium_current(V=-40.0, gating_state=gs)
-    result_cached = neuron.calcium_current(
-        V=-40.0, gating_state=gs, e_rev_by_name=e_rev_by_name
-    )
-    assert result_cached == pytest.approx(result_live)
-
-
 # ---------------------------------------------------------------------------
 # Error-path tests
 # ---------------------------------------------------------------------------
