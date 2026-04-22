@@ -13,15 +13,13 @@ from patch_sim_ui.state import SimulationState
 # subtle light-grey gridlines.  Switching to ``plotly_dark`` replaces those
 # with bright white gridlines that are too prominent on a transparent dark
 # surface.  Instead we keep ``plotly_white``'s gridlines and only override
-# the things that don't work on a dark background: backgrounds (transparent)
-# and text/axis colours (white).
+# the things that don't work on a dark background (dark mode only): transparent
+# backgrounds and white text/axis colours.  Light mode needs no overrides
+# because ``plotly_white`` already supplies the correct opaque white surfaces.
 #
 # DARK_AXIS_STYLE is defined in patch_sim_ui.constants and also referenced by
 # _build_fetch_figure_js in state/simulation.py to keep both sites in sync.
-_LAYOUT_LIGHT: dict = {
-    "paper_bgcolor": "rgba(0,0,0,0)",
-    "plot_bgcolor": "rgba(0,0,0,0)",
-}
+_LAYOUT_LIGHT: dict = {}
 _LAYOUT_DARK = {
     "paper_bgcolor": "rgba(0,0,0,0)",
     "plot_bgcolor": "rgba(0,0,0,0)",
