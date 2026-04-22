@@ -482,7 +482,12 @@ def _simulate_current_clamp_core(
         V = V_arr[i - 1]
 
         V_new, gating_state, ca_i = _rk4_step_current_clamp(
-            neuron, V, gating_state, current_external[i - 1], time_step, ca_i
+            neuron,
+            V,
+            gating_state,
+            current_external[i - 1],
+            time_step,
+            ca_i,
         )
 
         V_arr[i] = V_new

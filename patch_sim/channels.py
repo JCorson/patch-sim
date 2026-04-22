@@ -221,19 +221,23 @@ class IonChannel:
         return goldman_potential(neuron.T, cation_terms, anion_terms)
 
     def compute_current(
-        self, V: float, gating_state: dict[str, float], neuron: Any
+        self,
+        V: float,
+        gating_state: dict[str, float],
+        neuron: Any,
     ) -> float:
         """Compute the ionic current through this channel.
 
         Evaluates ``g_max * prod(gate^power) * (V - E_rev)`` where ``E_rev``
-        is computed dynamically from the neuron's ion concentrations via
-        :meth:`reversal_potential`.
+        is read from ``neuron.reversal_potentials`` when this channel is
+        registered on *neuron*, or computed on-the-fly via
+        :meth:`reversal_potential` otherwise.
 
         Args:
             V: Membrane voltage in mV.
             gating_state: Mapping from gating variable name to current value.
-            neuron: The :class:`~patch_sim.neuron.Neuron` model
-                used to compute the reversal potential.
+            neuron: The :class:`~patch_sim.neuron.Neuron` model whose
+                ``reversal_potentials`` cache and ion concentrations are used.
 
         Returns:
             Ionic current in µA/cm².
@@ -241,4 +245,7 @@ class IonChannel:
         g = self.g_max
         for gv in self.gating_variables:
             g *= gating_state[gv.name] ** gv.power
-        return g * (V - self.reversal_potential(neuron))
+        e_rev = neuron.reversal_potentials.get(self.name)
+        if e_rev is None:
+            e_rev = self.reversal_potential(neuron)
+        return g * (V - e_rev)

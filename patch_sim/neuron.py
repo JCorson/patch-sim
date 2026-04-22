@@ -86,6 +86,8 @@ class Neuron:
             channels, in channel-declaration order.
         q10_factor: Dimensionless scaling factor ``Q10^((T - T_ref) / 10)``
             applied to all gating rate constants at simulation time.
+        reversal_potentials: Dict mapping each channel name to its reversal
+            potential in mV, computed once on first access.
     """
 
     # Membrane properties
@@ -233,7 +235,25 @@ class Neuron:
             result.extend(ch.gating_variables)
         return tuple(result)
 
-    def calcium_current(self, V: float, gating_state: dict[str, float]) -> float:
+    @cached_property
+    def reversal_potentials(self) -> dict[str, float]:
+        """Return per-channel reversal potentials, computed once on first access.
+
+        Because this dataclass is frozen, ion concentrations and temperature
+        are constant over the neuron's lifetime, so each channel's reversal
+        potential is also constant.  Building the map lazily here eliminates a
+        ``numpy.log`` call per channel per RK4 substep in the simulation loop.
+
+        Returns:
+            Dict mapping each channel name to its reversal potential in mV.
+        """
+        return {ch.name: ch.reversal_potential(self) for ch in self.all_channels}
+
+    def calcium_current(
+        self,
+        V: float,
+        gating_state: dict[str, float],
+    ) -> float:
         """Return the total current from all calcium-carrying channels.
 
         Sums the current from every channel (core or additional) that has
