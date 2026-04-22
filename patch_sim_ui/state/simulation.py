@@ -901,6 +901,8 @@ class SimulationState(rx.State):
                     prior_V = self._cont_V
                     prior_gating = dict(self._cont_gating)
                     prior_ca_i = self._cont_ca_i
+                    stored_traces_snap = list(self.stored_traces)
+                    show_hover_snap = self.show_hover
 
                     _iteration += 1
                     logger.debug(
@@ -968,14 +970,30 @@ class SimulationState(rx.State):
 
                 sweep = Sweep.from_result(result, stimulus, "", "", mode)
 
+                # Build and serialise the figure outside the state lock so that
+                # fig.to_json() does not inflate the flush time.
+                _cont_fig = build_figure(
+                    current_sweeps=[sweep],
+                    visibility=TraceVisibility(),
+                    clamp_mode=mode,
+                    stored_traces=stored_traces_snap,
+                    show_hover=show_hover_snap,
+                )
+                _cont_token = uuid.uuid4().hex
+                traces.put(_cont_token, _cont_fig)
+
                 async with self:
                     if not self.continuous_mode:
                         break
                     self._current_sweeps = [sweep]
+                    self.sim_token = _cont_token
                     self._cont_V = last_V
                     self._cont_gating = last_gating
                     self._cont_ca_i = last_ca_i
                     self._cont_has_state = True
+                    vis_st = await self.get_state(VisibilityState)
+
+                yield rx.call_script(self._build_fetch_figure_js(_cont_token, vis_st))
 
                 _iter_elapsed_ms = (time.monotonic() - _iter_start) * 1000
                 if _iter_elapsed_ms > 500:
