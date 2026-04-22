@@ -270,7 +270,7 @@ class NeuronState(rx.State):
                 setattr(self, key, value)
         sim_st = await self.get_state(SimulationState)
         if not sim_st.stored_traces:
-            sim_st.current_sweeps = []
+            sim_st._current_sweeps = []
         sim_st._cont_has_state = False
         sim_st._label_neuron_type = name
         sim_st._figure_clamp_mode = proto_st.clamp_mode

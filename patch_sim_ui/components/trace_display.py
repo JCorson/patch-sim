@@ -27,7 +27,7 @@ def trace_display() -> rx.Component:
         rx.cond(
             SimulationState.has_result,
             rx.plotly(
-                data=SimulationState.figure_data,
+                data=SimulationState.figure_layout,
                 layout=rx.color_mode_cond(
                     light=_LAYOUT_LIGHT,
                     dark=_LAYOUT_DARK,

@@ -2,6 +2,7 @@
 
 import reflex as rx
 
+from patch_sim_ui.api.traces import starlette_app as _traces_app
 from patch_sim_ui.components.log_panel import log_panel
 from patch_sim_ui.components.metrics_panel import analysis_sidebar
 from patch_sim_ui.components.neuron_panel import neuron_panel
@@ -176,7 +177,8 @@ app = rx.App(
         appearance="inherit",
         accent_color="blue",
         radius="medium",
-    )
+    ),
+    api_transformer=_traces_app,
 )
 app.add_page(
     index,

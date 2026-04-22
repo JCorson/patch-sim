@@ -10,6 +10,7 @@ import json
 import logging
 import pathlib
 import time
+import uuid
 from typing import Any, AsyncGenerator
 
 import numpy as np
@@ -25,6 +26,7 @@ from patch_sim.constants import (
     VOLTAGE_CLAMP,
 )
 from patch_sim_ui import constants, presets
+from patch_sim_ui.api import traces
 from patch_sim_ui.channels import (
     ADDITIONAL_CURRENT_FIELD_MAP,
     ADDITIONAL_GATING_FIELD_MAP,
@@ -423,8 +425,14 @@ class SimulationState(rx.State):
     # ------------------------------------------------------------------ #
     # Simulation results                                                  #
     # ------------------------------------------------------------------ #
-    current_sweeps: list[Sweep] = []  # Latest simulation result
+    # Backend-only: excluded from the Reflex state delta so that millions of
+    # floats are not JSON-serialised on every state flush.  Served to the
+    # browser via /api/figure/{sim_token} (see patch_sim_ui/api/traces.py).
+    _current_sweeps: list[Sweep] = []  # Latest simulation result
     stored_traces: list[Sweep] = []  # Oscilloscope-style stored reference traces
+    # Short token identifying the latest figure in the side-channel store.
+    # Pushed to the client so JS can fetch /api/figure/{sim_token}.
+    sim_token: str = ""
 
     # ------------------------------------------------------------------ #
     # Continuous simulation mode                                        #
@@ -469,7 +477,7 @@ class SimulationState(rx.State):
     @rx.var
     def has_result(self) -> bool:
         """Whether a simulation result is available."""
-        return len(self.current_sweeps) > 0
+        return len(self._current_sweeps) > 0
 
     @rx.var
     def has_stored_traces(self) -> bool:
@@ -479,7 +487,7 @@ class SimulationState(rx.State):
     @rx.var
     def is_multi_sweep(self) -> bool:
         """Whether the current simulation has multiple sweeps (e.g. I-V protocol)."""
-        return len(self.current_sweeps) > 1
+        return len(self._current_sweeps) > 1
 
     @rx.var
     def continuous_active(self) -> bool:
@@ -487,25 +495,25 @@ class SimulationState(rx.State):
         return self.continuous_mode and self.continuous_loop_running
 
     @rx.var
-    def figure_data(self) -> go.Figure:
-        """Plotly figure rebuilt when sweeps, clamp mode, or hover state change.
+    def figure_layout(self) -> go.Figure:
+        """Subplot skeleton (no trace data) used as the rx.plotly mount point.
 
-        All traces are built with full visibility; toggling show_* flags is
-        handled client-side via ``Plotly.restyle`` so that figure rebuilds are
-        not triggered by visibility changes.  The ``show_hover`` flag is
-        respected here so that hovermode is baked into the figure data and takes
-        effect immediately, even without a client-side relayout.
+        Contains only the layout structure for the current clamp mode (CC or
+        VC subplots, axis labels, etc.) with zero data traces.  Actual trace
+        data is fetched by the browser via /api/figure/{sim_token} and injected
+        with ``Plotly.react`` once the side-channel store has been populated.
 
-        Dark/light theming is applied client-side by the ``rx.plotly``
-        component via its ``layout`` and ``template`` props, so no server-side
-        colour mode state is needed.
+        Depends only on ``_figure_clamp_mode`` so it re-computes only when the
+        user switches CC ↔ VC, not on every simulation result or stored-trace
+        change.  Hover mode is managed client-side via ``Plotly.relayout``
+        (see ``toggle_hover``).
         """
         return build_figure(
-            current_sweeps=self.current_sweeps,
-            visibility=TraceVisibility(),  # all visible; toggling handled client-side
+            current_sweeps=[],
+            visibility=TraceVisibility(),
             clamp_mode=self._figure_clamp_mode,
-            stored_traces=self.stored_traces,
-            show_hover=self.show_hover,
+            stored_traces=[],
+            show_hover=True,
         )
 
     # ------------------------------------------------------------------ #
@@ -517,8 +525,9 @@ class SimulationState(rx.State):
         Called by ProtocolState when the clamp mode or a protocol preset
         changes, ensuring stale results are not shown for the new protocol.
         """
-        self.current_sweeps = []
+        self._current_sweeps = []
         self.stored_traces = []
+        self.sim_token = ""
         self._cont_has_state = False
         self.selected_sweep = -1
 
@@ -609,7 +618,7 @@ class SimulationState(rx.State):
         """
         self.show_hover = not self.show_hover
         if self.show_hover:
-            hovermode = "x" if len(self.current_sweeps) > 1 else "x unified"
+            hovermode = "x" if len(self._current_sweeps) > 1 else "x unified"
             hovermode_js = f'"{hovermode}"'
         else:
             hovermode_js = "false"
@@ -641,7 +650,7 @@ class SimulationState(rx.State):
             sweep highlight, or ``None`` when nothing needs to be applied.
         """
         trace_map = compute_trace_visibility_map(
-            current_sweeps=self.current_sweeps,
+            current_sweeps=self._current_sweeps,
             clamp_mode=self._figure_clamp_mode,
             additional_current_field_map=ADDITIONAL_CURRENT_FIELD_MAP,
             additional_gating_field_map=ADDITIONAL_GATING_FIELD_MAP,
@@ -662,7 +671,7 @@ class SimulationState(rx.State):
             parts.append("if(gd&&gd.layout)Plotly.relayout(gd,{hovermode:false});")
 
         # Inject sweep highlight listeners in multi-sweep mode.
-        is_multi = len(self.current_sweeps) > 1
+        is_multi = len(self._current_sweeps) > 1
         if is_multi:
             parts.append(self._sweep_highlight_js())
 
@@ -673,6 +682,63 @@ class SimulationState(rx.State):
             f"setTimeout(function(){{"
             f"var gd=document.querySelector('.js-plotly-plot');"
             f"{body}"
+            f"}},0)"
+        )
+
+    def _build_fetch_figure_js(self, token: str, vis_st: "VisibilityState") -> str:
+        """Build a JS snippet that fetches the stored figure and swaps it in.
+
+        Fetches ``/api/figure/{token}`` (JSON Plotly figure), calls
+        ``Plotly.react`` to replace the current traces, then immediately
+        re-applies the current visibility state (hidden traces, hover mode,
+        sweep-highlight listeners).
+
+        The entire snippet is wrapped in ``setTimeout(async fn, 0)`` so it
+        runs after the Reflex state flush has finished updating the DOM.
+
+        Args:
+            token: UUID hex token identifying the figure in the side-channel
+                store.
+            vis_st: Current ``VisibilityState`` instance providing show_* values.
+
+        Returns:
+            A self-contained JS string suitable for ``rx.call_script``.
+        """
+        trace_map = compute_trace_visibility_map(
+            current_sweeps=self._current_sweeps,
+            clamp_mode=self._figure_clamp_mode,
+            additional_current_field_map=ADDITIONAL_CURRENT_FIELD_MAP,
+            additional_gating_field_map=ADDITIONAL_GATING_FIELD_MAP,
+            stored_traces=self.stored_traces,
+        )
+        hidden: list[int] = []
+        for field_name, indices in trace_map.items():
+            if not getattr(vis_st, field_name, True):
+                hidden.extend(indices)
+
+        post_parts: list[str] = []
+        if hidden:
+            post_parts.append(
+                f"Plotly.restyle(gd,{{visible:false}},{json.dumps(hidden)});"
+            )
+        if not self.show_hover:
+            post_parts.append("Plotly.relayout(gd,{hovermode:false});")
+        if len(self._current_sweeps) > 1:
+            post_parts.append(self._sweep_highlight_js())
+        post_js = "".join(post_parts)
+
+        return (
+            f"setTimeout(async function(){{"
+            f"try{{"
+            f"var resp=await fetch('/api/figure/{token}');"
+            "if(!resp.ok){"
+            "console.error('[patch_sim] fetch figure HTTP',resp.status);return;}"
+            f"var fig=await resp.json();"
+            f"var gd=document.querySelector('.js-plotly-plot');"
+            f"if(!gd){{console.warn('[patch_sim] plot div not found');return;}}"
+            f"await Plotly.react(gd,fig.data,fig.layout);"
+            f"{post_js}"
+            f"}}catch(err){{console.error('[patch_sim] fetch figure error:',err);}}"
             f"}},0)"
         )
 
@@ -705,13 +771,25 @@ class SimulationState(rx.State):
         color = constants.STORED_TRACE_COLORS[idx % len(constants.STORED_TRACE_COLORS)]
         label = f"Stored {idx + 1} ({self._label_neuron_type})"
         self.stored_traces.append(
-            self.current_sweeps[0].model_copy(update={"color": color, "label": label})
+            self._current_sweeps[0].model_copy(update={"color": color, "label": label})
         )
 
     async def store_trace(self) -> None:
         """Snapshot the current sweep into the oscilloscope stored traces."""
         self._do_store_trace()
         vis_st = await self.get_state(VisibilityState)
+        if self._current_sweeps:
+            fig = build_figure(
+                current_sweeps=self._current_sweeps,
+                visibility=TraceVisibility(),
+                clamp_mode=self._figure_clamp_mode,
+                stored_traces=self.stored_traces,
+                show_hover=self.show_hover,
+            )
+            new_token = uuid.uuid4().hex
+            traces.put(new_token, fig)
+            self.sim_token = new_token
+            return rx.call_script(self._build_fetch_figure_js(new_token, vis_st))
         js = self._apply_visibility_js(vis_st)
         if js:
             return rx.call_script(js)
@@ -727,6 +805,18 @@ class SimulationState(rx.State):
         """Remove all oscilloscope stored traces."""
         self._do_clear_stored_traces()
         vis_st = await self.get_state(VisibilityState)
+        if self._current_sweeps:
+            fig = build_figure(
+                current_sweeps=self._current_sweeps,
+                visibility=TraceVisibility(),
+                clamp_mode=self._figure_clamp_mode,
+                stored_traces=[],
+                show_hover=self.show_hover,
+            )
+            new_token = uuid.uuid4().hex
+            traces.put(new_token, fig)
+            self.sim_token = new_token
+            return rx.call_script(self._build_fetch_figure_js(new_token, vis_st))
         js = self._apply_visibility_js(vis_st)
         if js:
             return rx.call_script(js)
@@ -855,7 +945,7 @@ class SimulationState(rx.State):
                 async with self:
                     if not self.continuous_mode:
                         break
-                    self.current_sweeps = [sweep]
+                    self._current_sweeps = [sweep]
                     self._cont_V = last_V
                     self._cont_gating = last_gating
                     self._cont_ca_i = last_ca_i
@@ -915,6 +1005,7 @@ class SimulationState(rx.State):
                 return
 
         _start_ms = time.monotonic() * 1000
+        _t: dict[str, float] = {"start": _start_ms}
         logger.info(
             "Simulation started: mode=%s, protocol=%s",
             mode,
@@ -927,6 +1018,9 @@ class SimulationState(rx.State):
             else patch_sim.simulate_voltage_clamp
         )
         is_multi = len(protocols) > 1
+        # Set when either run path succeeds; read by the finally block to
+        # decide whether to fetch-and-swap the figure.
+        _sim_token: str = ""
         try:
             if is_multi:
                 # Run each sweep independently so gating variables are reset
@@ -953,8 +1047,26 @@ class SimulationState(rx.State):
                     return new_sweeps
 
                 new_sweeps = await loop.run_in_executor(None, _run_batch)
+                _t["after_batch"] = time.monotonic() * 1000
+
+                # Build and serialise the figure outside the state lock so that
+                # fig.to_json() (the expensive part) doesn't inflate the flush.
+                _fig = build_figure(
+                    current_sweeps=new_sweeps,
+                    visibility=TraceVisibility(),
+                    clamp_mode=mode,
+                    stored_traces=self.stored_traces,
+                    show_hover=self.show_hover,
+                )
+                _sim_token = uuid.uuid4().hex
+                traces.put(_sim_token, _fig)
+                _t["after_figure_put"] = time.monotonic() * 1000
+
                 async with self:
-                    self.current_sweeps = new_sweeps
+                    _t["after_lock"] = time.monotonic() * 1000
+                    self._current_sweeps = new_sweeps
+                    self.sim_token = _sim_token
+                    _t["after_sweeps_assign"] = time.monotonic() * 1000
                     analysis_st = await self.get_state(AnalysisState)
                     if mode == VOLTAGE_CLAMP:
                         analysis_st.clear_results()
@@ -998,6 +1110,7 @@ class SimulationState(rx.State):
                                 proto_st.stimulus_duration,
                             )
                         )
+                        _t["after_analysis"] = time.monotonic() * 1000
                         analysis_st.clear_results()
                         analysis_st.ap_metrics = ms_metrics
                         analysis_st.ap_summary = ms_summary
@@ -1008,14 +1121,26 @@ class SimulationState(rx.State):
                         analysis_st.phase_plane_data = _build_phase_plane_data(
                             new_sweeps
                         )
+                        _t["after_phase_plane"] = time.monotonic() * 1000
+
+                _t["after_state_flush"] = time.monotonic() * 1000
 
             else:
                 stimulus, _ = protocols[0]
                 result = await loop.run_in_executor(None, sim_fn, neuron, stimulus)
+                sweep = Sweep.from_result(result, stimulus, "", "", mode)
+                _fig = build_figure(
+                    current_sweeps=[sweep],
+                    visibility=TraceVisibility(),
+                    clamp_mode=mode,
+                    stored_traces=self.stored_traces,
+                    show_hover=self.show_hover,
+                )
+                _sim_token = uuid.uuid4().hex
+                traces.put(_sim_token, _fig)
                 async with self:
-                    self.current_sweeps = [
-                        Sweep.from_result(result, stimulus, "", "", mode)
-                    ]
+                    self._current_sweeps = [sweep]
+                    self.sim_token = _sim_token
                     analysis_st = await self.get_state(AnalysisState)
                     analysis_st.clear_results()
                     if mode == CURRENT_CLAMP:
@@ -1060,7 +1185,7 @@ class SimulationState(rx.State):
                             else {}
                         )
                         analysis_st.phase_plane_data = _build_phase_plane_data(
-                            self.current_sweeps
+                            self._current_sweeps
                         )
 
         except ValueError as exc:
@@ -1070,6 +1195,52 @@ class SimulationState(rx.State):
         else:
             elapsed = time.monotonic() * 1000 - _start_ms
             logger.info("Simulation complete: %.0f ms", elapsed)
+            if len(_t) > 1:
+
+                def _ms(a: str, b: str) -> str:
+                    return f"{_t[b] - _t[a]:.0f} ms"
+
+                _rows = [
+                    ("simulate_batch + Sweep.from_result", _ms("start", "after_batch")),
+                    (
+                        "build_figure + traces.put",
+                        _ms("after_batch", "after_figure_put")
+                        if "after_figure_put" in _t
+                        else "—",
+                    ),
+                    (
+                        "state-lock wait",
+                        _ms("after_figure_put", "after_lock")
+                        if "after_figure_put" in _t
+                        else _ms("after_batch", "after_lock"),
+                    ),
+                    (
+                        "_current_sweeps + sim_token assign",
+                        _ms("after_lock", "after_sweeps_assign"),
+                    ),
+                    (
+                        "_compute_cc_multi_sweep_analysis",
+                        _ms("after_sweeps_assign", "after_analysis")
+                        if "after_analysis" in _t
+                        else "—",
+                    ),
+                    (
+                        "state assigns + phase_plane_data",
+                        _ms("after_analysis", "after_phase_plane")
+                        if "after_phase_plane" in _t
+                        else "—",
+                    ),
+                    (
+                        "Reflex state flush (exit `async with`)",
+                        _ms("after_phase_plane", "after_state_flush")
+                        if "after_state_flush" in _t
+                        else "—",
+                    ),
+                    ("TOTAL", f"{elapsed:.0f} ms"),
+                ]
+                _lines = ["[FI-PROFILE] breakdown (multi-sweep CC only):"]
+                _lines += [f"  {k:<36}: {v}" for k, v in _rows]
+                print("\n".join(_lines), flush=True)  # noqa: T201
             yield SimulationState.run_membrane_test
         finally:
             async with self:
@@ -1077,9 +1248,15 @@ class SimulationState(rx.State):
                 log_st = await self.get_state(LogState)
                 log_st._refresh_logs()
                 vis_st = await self.get_state(VisibilityState)
-            js = self._apply_visibility_js(vis_st)
-            if js:
-                yield rx.call_script(js)
+            if _sim_token:
+                # Side-channel path: fetch the figure from /api/figure/{token}
+                # and swap it in via Plotly.react (includes visibility re-apply).
+                yield rx.call_script(self._build_fetch_figure_js(_sim_token, vis_st))
+            else:
+                # Legacy path: continuous mode, errors, or pre-token flows.
+                js = self._apply_visibility_js(vis_st)
+                if js:
+                    yield rx.call_script(js)
             yield rx.call_script(_LOG_SCROLL_JS)
 
     @rx.event(background=True)
