@@ -2,6 +2,7 @@
 
 import reflex as rx
 
+from patch_sim_ui.constants import DARK_AXIS_STYLE
 from patch_sim_ui.state import SimulationState
 
 # Layout overrides applied client-side so they track the active colour mode
@@ -14,15 +15,12 @@ from patch_sim_ui.state import SimulationState
 # surface.  Instead we keep ``plotly_white``'s gridlines and only override
 # the things that don't work on a dark background: backgrounds (transparent)
 # and text/axis colours (white).
+#
+# DARK_AXIS_STYLE is defined in patch_sim_ui.constants and also referenced by
+# _build_fetch_figure_js in state/simulation.py to keep both sites in sync.
 _LAYOUT_LIGHT: dict = {
     "paper_bgcolor": "rgba(0,0,0,0)",
     "plot_bgcolor": "rgba(0,0,0,0)",
-}
-_AXIS_DARK = {
-    "gridcolor": "rgba(255,255,255,0.1)",
-    "linecolor": "rgba(255,255,255,0.25)",
-    "zerolinecolor": "rgba(255,255,255,0.2)",
-    "tickcolor": "rgba(255,255,255,0.4)",
 }
 _LAYOUT_DARK = {
     "paper_bgcolor": "rgba(0,0,0,0)",
@@ -31,7 +29,7 @@ _LAYOUT_DARK = {
     "legend": {"bgcolor": "rgba(40,40,40,0.9)", "font": {"color": "#e8e8e8"}},
     "legend2": {"bgcolor": "rgba(40,40,40,0.9)", "font": {"color": "#e8e8e8"}},
     **{
-        k: _AXIS_DARK
+        k: DARK_AXIS_STYLE
         for k in ("xaxis", "yaxis", "xaxis2", "yaxis2", "xaxis3", "yaxis3")
     },
 }
@@ -43,7 +41,7 @@ def trace_display() -> rx.Component:
         rx.cond(
             SimulationState.has_result,
             rx.plotly(
-                data=SimulationState.figure_layout,
+                data=SimulationState.figure_skeleton,
                 layout=rx.color_mode_cond(
                     light=_LAYOUT_LIGHT,
                     dark=_LAYOUT_DARK,

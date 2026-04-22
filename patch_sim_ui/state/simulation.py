@@ -496,7 +496,7 @@ class SimulationState(rx.State):
         return self.continuous_mode and self.continuous_loop_running
 
     @rx.var
-    def figure_layout(self) -> go.Figure:
+    def figure_skeleton(self) -> go.Figure:
         """Subplot skeleton (no trace data) used as the rx.plotly mount point.
 
         Contains only the layout structure for the current clamp mode (CC or
@@ -744,7 +744,7 @@ class SimulationState(rx.State):
             "gd=document.querySelector('.js-plotly-plot');"
             "if(gd)break;"
             "await new Promise(function(r){setTimeout(r,50);});}"
-            f"if(!gd){{console.warn('[patch_sim] plot div not found');return;}}"
+            f"if(!gd){{console.error('[patch_sim] plot div not found');return;}}"
             # Merge colour-mode overrides into the layout before calling
             # Plotly.react — mirrors _LAYOUT_DARK/_LAYOUT_LIGHT in
             # trace_display.py.  We keep the plotly_white template (subtle
@@ -763,13 +763,9 @@ class SimulationState(rx.State):
             "{bgcolor:'rgba(40,40,40,0.9)',font:{color:'#e8e8e8'}});"
             # plotly_white gridlines are near-white (#EBF0F8) which is subtle
             # on a white background but very prominent on a dark surface.
-            # Dim every axis's grid/line colours explicitly.
-            "var _ax={"
-            "gridcolor:'rgba(255,255,255,0.1)',"
-            "linecolor:'rgba(255,255,255,0.25)',"
-            "zerolinecolor:'rgba(255,255,255,0.2)',"
-            "tickcolor:'rgba(255,255,255,0.4)'"
-            "};"
+            # Dim every axis's grid/line colours — values from constants.DARK_AXIS_STYLE
+            # (same source used by _LAYOUT_DARK in trace_display.py).
+            f"var _ax={json.dumps(constants.DARK_AXIS_STYLE)};"
             "Object.keys(fig.layout).forEach(function(k){"
             "if(/^[xy]axis/.test(k)){"
             "_layout[k]=Object.assign({},fig.layout[k],_ax);}});"
@@ -779,6 +775,10 @@ class SimulationState(rx.State):
             # re-renders from react-plotly.js (triggered by React context
             # updates) don't wipe our injected traces.  Only skips calls
             # where data is an empty array on a div we have taken over.
+            # Lifetime: the patch persists for the page session.  If the
+            # Plotly div is destroyed and recreated (has_result flips False
+            # then True), _psManagedByFetch is absent on the new node and a
+            # full Plotly.react will run — which is correct behaviour.
             "if(!window._psPatchedPlotlyReact){"
             "window._psPatchedPlotlyReact=true;"
             "var _origReact=window.Plotly.react;"
@@ -809,6 +809,35 @@ class SimulationState(rx.State):
             .replace("/*SELECTED_SWEEP*/", str(self.selected_sweep))
         )
 
+    def _rebuild_figure_and_fetch_js(
+        self, stored_traces: list[Sweep], vis_st: "VisibilityState"
+    ) -> str:
+        """Build and store a fresh figure, return JS to fetch-and-swap it.
+
+        Builds a figure from ``_current_sweeps`` and *stored_traces*, serialises
+        it into the side-channel store under a fresh token, updates
+        ``sim_token``, and returns the fetch-and-swap JS snippet ready for
+        ``rx.call_script``.
+
+        Args:
+            stored_traces: Reference traces to include alongside current sweeps.
+            vis_st: Current VisibilityState for post-swap visibility application.
+
+        Returns:
+            JS string for ``rx.call_script``.
+        """
+        fig = build_figure(
+            current_sweeps=self._current_sweeps,
+            visibility=TraceVisibility(),
+            clamp_mode=self._figure_clamp_mode,
+            stored_traces=stored_traces,
+            show_hover=self.show_hover,
+        )
+        new_token = uuid.uuid4().hex
+        traces.put(new_token, fig)
+        self.sim_token = new_token
+        return self._build_fetch_figure_js(new_token, vis_st)
+
     # ------------------------------------------------------------------ #
     # Stored trace management                                            #
     # ------------------------------------------------------------------ #
@@ -831,17 +860,9 @@ class SimulationState(rx.State):
         self._do_store_trace()
         vis_st = await self.get_state(VisibilityState)
         if self._current_sweeps:
-            fig = build_figure(
-                current_sweeps=self._current_sweeps,
-                visibility=TraceVisibility(),
-                clamp_mode=self._figure_clamp_mode,
-                stored_traces=self.stored_traces,
-                show_hover=self.show_hover,
+            return rx.call_script(
+                self._rebuild_figure_and_fetch_js(self.stored_traces, vis_st)
             )
-            new_token = uuid.uuid4().hex
-            traces.put(new_token, fig)
-            self.sim_token = new_token
-            return rx.call_script(self._build_fetch_figure_js(new_token, vis_st))
         js = self._apply_visibility_js(vis_st)
         if js:
             return rx.call_script(js)
@@ -858,17 +879,7 @@ class SimulationState(rx.State):
         self._do_clear_stored_traces()
         vis_st = await self.get_state(VisibilityState)
         if self._current_sweeps:
-            fig = build_figure(
-                current_sweeps=self._current_sweeps,
-                visibility=TraceVisibility(),
-                clamp_mode=self._figure_clamp_mode,
-                stored_traces=[],
-                show_hover=self.show_hover,
-            )
-            new_token = uuid.uuid4().hex
-            traces.put(new_token, fig)
-            self.sim_token = new_token
-            return rx.call_script(self._build_fetch_figure_js(new_token, vis_st))
+            return rx.call_script(self._rebuild_figure_and_fetch_js([], vis_st))
         js = self._apply_visibility_js(vis_st)
         if js:
             return rx.call_script(js)
@@ -1068,6 +1079,7 @@ class SimulationState(rx.State):
             else patch_sim.simulate_voltage_clamp
         )
         is_multi = len(protocols) > 1
+        _start_ms = time.monotonic() * 1000
         # Set when either run path succeeds; read by the finally block to
         # decide whether to fetch-and-swap the figure.
         _sim_token: str = ""
@@ -1235,7 +1247,8 @@ class SimulationState(rx.State):
             async with self:
                 self.error_message = str(exc)
         else:
-            logger.info("Simulation complete")
+            elapsed = time.monotonic() * 1000 - _start_ms
+            logger.info("Simulation complete: %.0f ms", elapsed)
             yield SimulationState.run_membrane_test
         finally:
             async with self:

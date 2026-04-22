@@ -108,3 +108,14 @@ HIGHLIGHT_HOVER_WIDTH: float = 4.0
 
 HIGHLIGHT_DIM_WIDTH: float = 0.5
 """Line width (px) applied to dimmed (non-selected) sweep traces."""
+
+# Dark-mode axis colour overrides — single source of truth shared between the
+# Python-side _LAYOUT_DARK dict (trace_display.py) and the server-generated JS
+# snippet in _build_fetch_figure_js (state/simulation.py).  Both sites import
+# this constant so a single edit propagates to both.
+DARK_AXIS_STYLE: dict[str, str] = {
+    "gridcolor": "rgba(255,255,255,0.1)",
+    "linecolor": "rgba(255,255,255,0.25)",
+    "zerolinecolor": "rgba(255,255,255,0.2)",
+    "tickcolor": "rgba(255,255,255,0.4)",
+}
