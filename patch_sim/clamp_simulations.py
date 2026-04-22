@@ -343,9 +343,13 @@ def _simulate_voltage_clamp_core(
         np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
     )
 
-    # Record initial state
+    # Record initial state — skip keys not in this neuron's gating variable set.
+    # Stale keys from a different neuron (e.g. after a mid-iteration switch) are
+    # harmless extras; missing keys are left uninitialised by np.empty but the
+    # caller validates compatibility before reaching here.
     for gv_name, val in gating_state.items():
-        gating_arrs[gv_name][0] = val
+        if gv_name in gating_arrs:
+            gating_arrs[gv_name][0] = val
 
     if ca_arr is not None:
         ca_arr[0] = ca_i
@@ -461,9 +465,10 @@ def _simulate_current_clamp_core(
         np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
     )
 
-    # Record initial state
+    # Record initial state — same defensive filter as _simulate_voltage_clamp_core.
     for gv_name, val in gating_state.items():
-        gating_arrs[gv_name][0] = val
+        if gv_name in gating_arrs:
+            gating_arrs[gv_name][0] = val
 
     if ca_arr is not None:
         ca_arr[0] = ca_i

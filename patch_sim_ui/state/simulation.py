@@ -897,12 +897,28 @@ class SimulationState(rx.State):
                     neuron_st = await self.get_state(NeuronState)
                     neuron = neuron_st._build_neuron()
                     stimulus = proto_st._build_protocols()[0][0]
-                    use_prior_state = self._cont_has_state
                     prior_V = self._cont_V
-                    prior_gating = dict(self._cont_gating)
                     prior_ca_i = self._cont_ca_i
                     stored_traces_snap = list(self.stored_traces)
                     show_hover_snap = self.show_hover
+                    # Validate that the stored gating state is compatible with the
+                    # current neuron before choosing the from-state path.  A neuron
+                    # switch during the previous simulation iteration can leave
+                    # _cont_gating with a different set of variable names (e.g.
+                    # 'r' from an Ih channel the new neuron does not have), which
+                    # would raise KeyError inside _simulate_*_core.
+                    _cur_gv = frozenset(gv.name for gv in neuron.all_gating_variables)
+                    _stored_gv = frozenset(self._cont_gating.keys())
+                    use_prior_state = self._cont_has_state and _cur_gv == _stored_gv
+                    if self._cont_has_state and not use_prior_state:
+                        logger.warning(
+                            "Continuous mode: gating variable mismatch after "
+                            "neuron change (current=%s stored=%s) — "
+                            "restarting from steady state.",
+                            sorted(_cur_gv),
+                            sorted(_stored_gv),
+                        )
+                    prior_gating = dict(self._cont_gating) if use_prior_state else {}
 
                     _iteration += 1
                     logger.debug(
