@@ -225,22 +225,19 @@ class IonChannel:
         V: float,
         gating_state: dict[str, float],
         neuron: Any,
-        e_rev: float | None = None,
     ) -> float:
         """Compute the ionic current through this channel.
 
-        Evaluates ``g_max * prod(gate^power) * (V - E_rev)``.  When *e_rev* is
-        supplied it is used directly, bypassing :meth:`reversal_potential`.  The
-        simulation core passes a pre-computed value here to avoid recomputing
-        the Nernst/Goldman log on every RK4 substep.
+        Evaluates ``g_max * prod(gate^power) * (V - E_rev)`` where ``E_rev``
+        is read from ``neuron.reversal_potentials`` when this channel is
+        registered on *neuron*, or computed on-the-fly via
+        :meth:`reversal_potential` otherwise.
 
         Args:
             V: Membrane voltage in mV.
             gating_state: Mapping from gating variable name to current value.
-            neuron: The :class:`~patch_sim.neuron.Neuron` model used to compute
-                the reversal potential when *e_rev* is not supplied.
-            e_rev: Pre-computed reversal potential in mV.  When ``None``
-                (default), :meth:`reversal_potential` is called instead.
+            neuron: The :class:`~patch_sim.neuron.Neuron` model whose
+                ``reversal_potentials`` cache and ion concentrations are used.
 
         Returns:
             Ionic current in µA/cm².
@@ -248,6 +245,7 @@ class IonChannel:
         g = self.g_max
         for gv in self.gating_variables:
             g *= gating_state[gv.name] ** gv.power
+        e_rev = neuron.reversal_potentials.get(self.name)
         if e_rev is None:
             e_rev = self.reversal_potential(neuron)
         return g * (V - e_rev)

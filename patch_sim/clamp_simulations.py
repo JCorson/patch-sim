@@ -84,27 +84,6 @@ def _setup_simulation(
     return time_step, time_array
 
 
-def _compute_reversal_potentials(neuron: "Neuron") -> dict[str, float]:
-    """Precompute reversal potentials for every channel in the neuron.
-
-    Because :class:`~patch_sim.neuron.Neuron` is a frozen dataclass, ion
-    concentrations and temperature are constant over a simulation run, so each
-    channel's reversal potential is also constant.  Computing it once and
-    threading the result through the RK4 loop eliminates a ``numpy.log`` call
-    per channel per RK4 substep.
-
-    If per-step ion-concentration tracking is ever added (see issue #264),
-    this function and its call sites must be revisited for Ca²⁺ channels.
-
-    Args:
-        neuron: The conductance-based neuron model.
-
-    Returns:
-        Mapping from channel name to reversal potential in mV.
-    """
-    return {ch.name: ch.reversal_potential(neuron) for ch in neuron.all_channels}
-
-
 def _initialize_gating_variables(
     neuron: "Neuron",
     initial_voltage: float,
@@ -136,7 +115,6 @@ def _gating_derivatives(
     V: float,
     gating_state: dict[str, float],
     ca_i: float = 0.0,
-    e_rev_by_name: dict[str, float] | None = None,
 ) -> tuple[dict[str, float], float]:
     """Compute derivatives for all gating variables at a prescribed voltage.
 
@@ -149,9 +127,6 @@ def _gating_derivatives(
         V: Membrane voltage in mV.
         gating_state: Current gating state mapping variable name → value.
         ca_i: Current intracellular Ca²⁺ concentration in mM.
-        e_rev_by_name: Optional pre-computed reversal potentials keyed by
-            channel name.  Forwarded to :meth:`~patch_sim.neuron.Neuron.calcium_current`
-            to avoid recomputing Nernst/Goldman potentials on each RK4 substep.
 
     Returns:
         Tuple of (derivs, dca_i) where derivs maps each gating variable name
@@ -163,7 +138,7 @@ def _gating_derivatives(
         x = gating_state[gv.name]
         derivs[gv.name] = phi * (gv.alpha(V, ca_i) * (1 - x) - gv.beta(V, ca_i) * x)
     if neuron.calcium_dynamics is not None:
-        I_Ca = neuron.calcium_current(V, gating_state, e_rev_by_name)
+        I_Ca = neuron.calcium_current(V, gating_state)
         dca_i = neuron.calcium_dynamics.derivative(I_Ca, ca_i)
     else:
         dca_i = 0.0
@@ -176,7 +151,6 @@ def _hh_derivatives(
     gating_state: dict[str, float],
     I_ext: float,
     ca_i: float,
-    e_rev_by_name: dict[str, float] | None = None,
 ) -> tuple[float, dict[str, float], float]:
     """Compute HH ODE derivatives for the current-clamp system.
 
@@ -189,9 +163,6 @@ def _hh_derivatives(
         gating_state: Current gating state mapping variable name → value.
         I_ext: External current in µA/cm².
         ca_i: Current intracellular Ca²⁺ concentration in mM.
-        e_rev_by_name: Optional pre-computed reversal potentials keyed by
-            channel name.  When supplied, bypasses Nernst/Goldman computation
-            for each channel on every RK4 substep.
 
     Returns:
         Tuple of (dV, derivs, dca_i) where dV is dV/dt in mV/ms, derivs maps
@@ -199,16 +170,10 @@ def _hh_derivatives(
         calcium_dynamics are configured.
     """
     I_total = sum(
-        ch.compute_current(
-            V,
-            gating_state,
-            neuron,
-            e_rev_by_name[ch.name] if e_rev_by_name is not None else None,
-        )
-        for ch in neuron.all_channels
+        ch.compute_current(V, gating_state, neuron) for ch in neuron.all_channels
     )
     dV = (I_ext - I_total) / neuron.C_m
-    derivs, dca_i = _gating_derivatives(neuron, V, gating_state, ca_i, e_rev_by_name)
+    derivs, dca_i = _gating_derivatives(neuron, V, gating_state, ca_i)
     return dV, derivs, dca_i
 
 
@@ -248,7 +213,6 @@ def _rk4_step_voltage_clamp(
     gating_state: dict[str, float],
     dt: float,
     ca_i: float,
-    e_rev_by_name: dict[str, float] | None = None,
 ) -> tuple[dict[str, float], float]:
     """Advance voltage-clamp gating variables by one RK4 step.
 
@@ -261,20 +225,18 @@ def _rk4_step_voltage_clamp(
         gating_state: Current gating state mapping variable name → value.
         dt: Time step in milliseconds.
         ca_i: Current intracellular Ca²⁺ concentration in mM.
-        e_rev_by_name: Optional pre-computed reversal potentials keyed by
-            channel name.  Forwarded to each :func:`_gating_derivatives` call.
 
     Returns:
         Tuple of (new_gating_state, new_ca_i) with gating variables clipped to
         [0, 1] and ca_i floored at 0.0.
     """
-    d1, dca1 = _gating_derivatives(neuron, V, gating_state, ca_i, e_rev_by_name)
+    d1, dca1 = _gating_derivatives(neuron, V, gating_state, ca_i)
     s2 = _advance_state(gating_state, d1, 0.5 * dt)
-    d2, dca2 = _gating_derivatives(neuron, V, s2, ca_i + 0.5 * dt * dca1, e_rev_by_name)
+    d2, dca2 = _gating_derivatives(neuron, V, s2, ca_i + 0.5 * dt * dca1)
     s3 = _advance_state(gating_state, d2, 0.5 * dt)
-    d3, dca3 = _gating_derivatives(neuron, V, s3, ca_i + 0.5 * dt * dca2, e_rev_by_name)
+    d3, dca3 = _gating_derivatives(neuron, V, s3, ca_i + 0.5 * dt * dca2)
     s4 = _advance_state(gating_state, d3, dt)
-    d4, dca4 = _gating_derivatives(neuron, V, s4, ca_i + dt * dca3, e_rev_by_name)
+    d4, dca4 = _gating_derivatives(neuron, V, s4, ca_i + dt * dca3)
     new_state = _clip_state(
         {
             k: gating_state[k] + (dt / 6.0) * (d1[k] + 2 * d2[k] + 2 * d3[k] + d4[k])
@@ -292,7 +254,6 @@ def _rk4_step_current_clamp(
     I_ext: float,
     dt: float,
     ca_i: float,
-    e_rev_by_name: dict[str, float] | None = None,
 ) -> tuple[float, dict[str, float], float]:
     """Advance the current-clamp state by one RK4 step.
 
@@ -305,35 +266,23 @@ def _rk4_step_current_clamp(
         I_ext: External current in µA/cm², held constant over the step.
         dt: Time step in milliseconds.
         ca_i: Current intracellular Ca²⁺ concentration in mM.
-        e_rev_by_name: Optional pre-computed reversal potentials keyed by
-            channel name.  Forwarded to each :func:`_hh_derivatives` call.
 
     Returns:
         Tuple of (new_V, new_gating_state, new_ca_i) with gating variables
         clipped to [0, 1] and ca_i floored at 0.0.
     """
-    dV1, d1, dca1 = _hh_derivatives(neuron, V, gating_state, I_ext, ca_i, e_rev_by_name)
+    dV1, d1, dca1 = _hh_derivatives(neuron, V, gating_state, I_ext, ca_i)
     s2 = _advance_state(gating_state, d1, 0.5 * dt)
     dV2, d2, dca2 = _hh_derivatives(
-        neuron,
-        _clamp_v(V + 0.5 * dt * dV1),
-        s2,
-        I_ext,
-        ca_i + 0.5 * dt * dca1,
-        e_rev_by_name,
+        neuron, _clamp_v(V + 0.5 * dt * dV1), s2, I_ext, ca_i + 0.5 * dt * dca1
     )
     s3 = _advance_state(gating_state, d2, 0.5 * dt)
     dV3, d3, dca3 = _hh_derivatives(
-        neuron,
-        _clamp_v(V + 0.5 * dt * dV2),
-        s3,
-        I_ext,
-        ca_i + 0.5 * dt * dca2,
-        e_rev_by_name,
+        neuron, _clamp_v(V + 0.5 * dt * dV2), s3, I_ext, ca_i + 0.5 * dt * dca2
     )
     s4 = _advance_state(gating_state, d3, dt)
     dV4, d4, dca4 = _hh_derivatives(
-        neuron, _clamp_v(V + dt * dV3), s4, I_ext, ca_i + dt * dca3, e_rev_by_name
+        neuron, _clamp_v(V + dt * dV3), s4, I_ext, ca_i + dt * dca3
     )
     V_new = _clamp_v(V + (dt / 6.0) * (dV1 + 2 * dV2 + 2 * dV3 + dV4))
     new_state = _clip_state(
@@ -381,8 +330,6 @@ def _simulate_voltage_clamp_core(
 
     time_step, time_array = _setup_simulation(num_time_steps, SIM_SAMPLING_FREQ)
 
-    e_rev_by_name = _compute_reversal_potentials(neuron)
-
     ch_current_arrs: dict[str, np.ndarray] = {
         ch.name: np.empty(num_time_steps) for ch in neuron.all_channels
     }
@@ -406,8 +353,7 @@ def _simulate_voltage_clamp_core(
     # Compute initial currents
     V0 = voltage_protocol[0]
     ch_currents_0 = [
-        ch.compute_current(V0, gating_state, neuron, e_rev_by_name[ch.name])
-        for ch in neuron.all_channels
+        ch.compute_current(V0, gating_state, neuron) for ch in neuron.all_channels
     ]
     for ch, i_ch in zip(neuron.all_channels, ch_currents_0):
         ch_current_arrs[ch.name][0] = i_ch
@@ -418,7 +364,7 @@ def _simulate_voltage_clamp_core(
         V = voltage_protocol[i]
 
         gating_state, ca_i = _rk4_step_voltage_clamp(
-            neuron, V, gating_state, time_step, ca_i, e_rev_by_name
+            neuron, V, gating_state, time_step, ca_i
         )
 
         for gv_name, val in gating_state.items():
@@ -428,8 +374,7 @@ def _simulate_voltage_clamp_core(
             ca_arr[i] = ca_i
 
         ch_currents_i = [
-            ch.compute_current(V, gating_state, neuron, e_rev_by_name[ch.name])
-            for ch in neuron.all_channels
+            ch.compute_current(V, gating_state, neuron) for ch in neuron.all_channels
         ]
         for ch, i_ch in zip(neuron.all_channels, ch_currents_i):
             ch_current_arrs[ch.name][i] = i_ch
@@ -500,8 +445,6 @@ def _simulate_current_clamp_core(
 
     time_step, time_array = _setup_simulation(num_time_steps, SIM_SAMPLING_FREQ)
 
-    e_rev_by_name = _compute_reversal_potentials(neuron)
-
     V_arr = np.empty(num_time_steps)
     V_arr[0] = initial_V
 
@@ -527,7 +470,7 @@ def _simulate_current_clamp_core(
 
     # Compute initial currents
     ch_currents_0 = [
-        ch.compute_current(initial_V, gating_state, neuron, e_rev_by_name[ch.name])
+        ch.compute_current(initial_V, gating_state, neuron)
         for ch in neuron.all_channels
     ]
     for ch, i_ch in zip(neuron.all_channels, ch_currents_0):
@@ -545,7 +488,6 @@ def _simulate_current_clamp_core(
             current_external[i - 1],
             time_step,
             ca_i,
-            e_rev_by_name,
         )
 
         V_arr[i] = V_new
@@ -555,7 +497,7 @@ def _simulate_current_clamp_core(
             ca_arr[i] = ca_i
 
         ch_currents_i = [
-            ch.compute_current(V_new, gating_state, neuron, e_rev_by_name[ch.name])
+            ch.compute_current(V_new, gating_state, neuron)
             for ch in neuron.all_channels
         ]
         for ch, i_ch in zip(neuron.all_channels, ch_currents_i):

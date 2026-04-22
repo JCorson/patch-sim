@@ -86,6 +86,8 @@ class Neuron:
             channels, in channel-declaration order.
         q10_factor: Dimensionless scaling factor ``Q10^((T - T_ref) / 10)``
             applied to all gating rate constants at simulation time.
+        reversal_potentials: Dict mapping each channel name to its reversal
+            potential in mV, computed once on first access.
     """
 
     # Membrane properties
@@ -233,11 +235,24 @@ class Neuron:
             result.extend(ch.gating_variables)
         return tuple(result)
 
+    @cached_property
+    def reversal_potentials(self) -> dict[str, float]:
+        """Return per-channel reversal potentials, computed once on first access.
+
+        Because this dataclass is frozen, ion concentrations and temperature
+        are constant over the neuron's lifetime, so each channel's reversal
+        potential is also constant.  Building the map lazily here eliminates a
+        ``numpy.log`` call per channel per RK4 substep in the simulation loop.
+
+        Returns:
+            Dict mapping each channel name to its reversal potential in mV.
+        """
+        return {ch.name: ch.reversal_potential(self) for ch in self.all_channels}
+
     def calcium_current(
         self,
         V: float,
         gating_state: dict[str, float],
-        e_rev_by_name: dict[str, float] | None = None,
     ) -> float:
         """Return the total current from all calcium-carrying channels.
 
@@ -249,20 +264,12 @@ class Neuron:
             V: Membrane voltage in mV.
             gating_state: Full gating state mapping variable name → value,
                 covering both core and additional channels.
-            e_rev_by_name: Optional pre-computed reversal potentials keyed by
-                channel name.  When supplied, bypasses the per-call Nernst/
-                Goldman computation for each Ca²⁺-carrying channel.
 
         Returns:
             Total calcium current in µA/cm² (positive = outward).
         """
         return sum(
-            ch.compute_current(
-                V,
-                gating_state,
-                self,
-                e_rev_by_name[ch.name] if e_rev_by_name is not None else None,
-            )
+            ch.compute_current(V, gating_state, self)
             for ch in self.all_channels
             if ch.carries_calcium
         )
