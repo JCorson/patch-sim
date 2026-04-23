@@ -724,14 +724,15 @@ class SimulationState(rx.State):
             "await new Promise(function(r){setTimeout(r,50);});}"
             f"if(!gd){{console.error('[patch_sim] plot div not found');return;}}"
             # Merge colour-mode overrides into the layout before calling
-            # Plotly.react — mirrors _LAYOUT_DARK/_LAYOUT_LIGHT in
-            # trace_display.py.  Light mode needs no overrides (plotly_white
-            # already supplies opaque white surfaces).  Dark mode keeps
-            # plotly_white's subtle grey gridlines and only overrides the
-            # things that don't work on a dark background: transparent
-            # backgrounds and white text/axis colours.
+            # Plotly.react.  In light mode, delete the plotly_white template so
+            # Plotly falls back to its default theme (blue-grey subplot
+            # backgrounds), matching the appearance of the old rx.plotly path.
+            # Dark mode keeps the plotly_white base and overrides the things
+            # that don't work on a dark background: transparent backgrounds,
+            # white text/axis colours, and dimmed gridlines.
             "var _dark=document.documentElement.classList.contains('dark');"
             "var _layout=Object.assign({},fig.layout);"
+            "if(!_dark){delete _layout.template;}"
             "if(_dark){"
             "_layout.paper_bgcolor='rgba(0,0,0,0)';"
             "_layout.plot_bgcolor='rgba(0,0,0,0)';"
