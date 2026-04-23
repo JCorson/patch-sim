@@ -576,6 +576,10 @@ class SimulationState(rx.State):
         self._label_neuron_type = neuron_type
         self._figure_clamp_mode = proto_st.clamp_mode
 
+        yield rx.call_script(
+            "var gd=document.getElementById('ps-trace-plot');"
+            "if(gd&&gd.data){Plotly.purge(gd);}"
+        )
         yield SimulationState.run_membrane_test
 
     def toggle_analysis_panel(self) -> None:

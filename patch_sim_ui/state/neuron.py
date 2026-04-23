@@ -269,11 +269,17 @@ class NeuronState(rx.State):
             ).items():
                 setattr(self, key, value)
         sim_st = await self.get_state(SimulationState)
-        if not sim_st.stored_traces:
+        _cleared = not sim_st.stored_traces
+        if _cleared:
             sim_st._current_sweeps = []
         sim_st._cont_has_state = False
         sim_st._label_neuron_type = name
         sim_st._figure_clamp_mode = proto_st.clamp_mode
+        if _cleared:
+            yield rx.call_script(
+                "var gd=document.getElementById('ps-trace-plot');"
+                "if(gd&&gd.data){Plotly.purge(gd);}"
+            )
         yield SimulationState.run_membrane_test
 
     # ------------------------------------------------------------------ #

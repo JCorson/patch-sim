@@ -1,6 +1,7 @@
 """Protocol parameter state for the patch_sim web UI."""
 
 import logging
+from typing import Any, AsyncGenerator
 
 import numpy as np
 import reflex as rx
@@ -155,7 +156,7 @@ class ProtocolState(rx.State):
             self.protocol_type = constants.VOLTAGE_PROTOCOLS[0]
         self.active_protocol_preset = ""
 
-    async def set_clamp_mode(self, mode: str) -> None:
+    async def set_clamp_mode(self, mode: str) -> AsyncGenerator[Any, None]:
         """Switch between Current Clamp and Voltage Clamp modes.
 
         Resets ``protocol_type`` to the first option for the new mode and
@@ -172,6 +173,10 @@ class ProtocolState(rx.State):
         sim_st = await self.get_state(SimulationState)
         sim_st._clear_for_new_protocol()
         sim_st._figure_clamp_mode = mode
+        yield rx.call_script(
+            "var gd=document.getElementById('ps-trace-plot');"
+            "if(gd&&gd.data){Plotly.purge(gd);}"
+        )
 
     def _apply_protocol_preset(self, name: str, neuron_type: str = "") -> None:
         """Apply protocol preset parameters synchronously.
@@ -194,7 +199,7 @@ class ProtocolState(rx.State):
             setattr(self, key, value)
         self.active_protocol_preset = name
 
-    async def load_protocol_preset(self, name: str) -> None:
+    async def load_protocol_preset(self, name: str) -> AsyncGenerator[Any, None]:
         """Load a protocol preset, applying neuron-type adjustments if active.
 
         Applies the base protocol preset, overlays neuron-type-specific
@@ -219,6 +224,10 @@ class ProtocolState(rx.State):
         sim_st = await self.get_state(SimulationState)
         sim_st._clear_for_new_protocol()
         sim_st._figure_clamp_mode = self.clamp_mode
+        yield rx.call_script(
+            "var gd=document.getElementById('ps-trace-plot');"
+            "if(gd&&gd.data){Plotly.purge(gd);}"
+        )
 
     # ------------------------------------------------------------------ #
     # Numeric field setters                                              #
