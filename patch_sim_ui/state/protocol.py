@@ -161,8 +161,8 @@ class ProtocolState(rx.State):
 
         Resets ``protocol_type`` to the first option for the new mode and
         clears all simulation results in SimulationState.  Syncs the
-        ``_figure_clamp_mode`` shadow copy so that SimulationState's ``figure_data``
-        computed var stays consistent.
+        ``_figure_clamp_mode`` shadow copy so that figures rebuilt by
+        ``SimulationState._rebuild_figure_and_fetch_js`` use the new mode.
 
         Args:
             mode: New clamp mode string (``CURRENT_CLAMP`` or ``VOLTAGE_CLAMP``).

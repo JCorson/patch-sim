@@ -159,6 +159,34 @@ def test_cc_from_state_empty_raises(hh_model):
         )
 
 
+def test_cc_from_state_mismatched_gating_keys_raises(hh_model):
+    """Passing gating_state with wrong keys raises ValueError.
+
+    Guards against a stale gating dict from a different neuron (e.g. after a
+    neuron switch mid-iteration in continuous mode) silently corrupting the
+    simulation.  The check must fail loudly rather than leave index 0
+    uninitialised or silently drop values.
+    """
+    gating = _initialize_gating_variables(hh_model, hh_model.v_rest)
+    bad = {**gating, "r": 0.5}  # extra key absent from HH gating variables
+    with pytest.raises(ValueError, match="gating_state keys do not match"):
+        simulate_current_clamp_from_state(
+            hh_model,
+            _make_steps(1.0),
+            initial_V=hh_model.v_rest,
+            initial_gating_state=bad,
+        )
+
+    del gating[next(iter(gating))]  # drop one required key
+    with pytest.raises(ValueError, match="gating_state keys do not match"):
+        simulate_current_clamp_from_state(
+            hh_model,
+            _make_steps(1.0),
+            initial_V=hh_model.v_rest,
+            initial_gating_state=gating,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Voltage clamp _from_state tests
 # ---------------------------------------------------------------------------
@@ -233,6 +261,31 @@ def test_vc_from_state_empty_raises(hh_model):
         simulate_voltage_clamp_from_state(
             hh_model,
             np.array([]),
+            initial_gating_state=gating,
+        )
+
+
+def test_vc_from_state_mismatched_gating_keys_raises(hh_model):
+    """Passing gating_state with wrong keys raises ValueError.
+
+    Same contract as the current-clamp variant: the set of gating keys must
+    match the neuron's gating variables exactly, otherwise we would corrupt
+    index 0 of the gating arrays.
+    """
+    gating = _initialize_gating_variables(hh_model, hh_model.v_rest)
+    bad = {**gating, "r": 0.5}
+    with pytest.raises(ValueError, match="gating_state keys do not match"):
+        simulate_voltage_clamp_from_state(
+            hh_model,
+            _make_voltage_steps(1.0),
+            initial_gating_state=bad,
+        )
+
+    del gating[next(iter(gating))]
+    with pytest.raises(ValueError, match="gating_state keys do not match"):
+        simulate_voltage_clamp_from_state(
+            hh_model,
+            _make_voltage_steps(1.0),
             initial_gating_state=gating,
         )
 

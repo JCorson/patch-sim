@@ -7,6 +7,19 @@ delta.  This avoids Reflex JSON-encoding millions of floats inside
 
 The store is bounded to ``_MAX_TOKENS`` entries (FIFO eviction).  At ~31 MB
 per figure the RSS ceiling is ~125 MB for the default of 4.
+
+Deployment constraints:
+
+* **Single backend worker only.** ``_STORE`` is a process-local ``OrderedDict``.
+  Running multiple Reflex / ASGI workers (e.g. ``--workers N > 1`` under
+  gunicorn/uvicorn) will route the producer ``put()`` and the consumer HTTP
+  ``GET`` to different processes, and the browser will receive a 404 for every
+  figure fetch.  This module assumes a single-worker dev or single-user
+  deployment.
+* **No authentication on /api/figure/{token}.** The uuid4 token is the only
+  capability; anyone who can reach the backend and guess a 122-bit token can
+  read the latest figure.  Adequate for local/dev use; a shared deployment
+  would need a per-session auth cookie gate in ``_handle_figure``.
 """
 
 import threading

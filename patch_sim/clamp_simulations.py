@@ -343,13 +343,18 @@ def _simulate_voltage_clamp_core(
         np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
     )
 
-    # Record initial state — skip keys not in this neuron's gating variable set.
-    # Stale keys from a different neuron (e.g. after a mid-iteration switch) are
-    # harmless extras; missing keys are left uninitialised by np.empty but the
-    # caller validates compatibility before reaching here.
+    # Record initial state. Callers must pass a gating_state whose keys exactly
+    # match the neuron's gating variables; any mismatch (e.g. stale keys from a
+    # neuron switch mid-iteration) is a programming error. Fail loudly rather
+    # than leaving index 0 uninitialised or silently dropping values.
+    if set(gating_state.keys()) != set(gating_arrs.keys()):
+        raise ValueError(
+            "gating_state keys do not match the neuron's gating variables: "
+            f"got {sorted(gating_state.keys())}, "
+            f"expected {sorted(gating_arrs.keys())}"
+        )
     for gv_name, val in gating_state.items():
-        if gv_name in gating_arrs:
-            gating_arrs[gv_name][0] = val
+        gating_arrs[gv_name][0] = val
 
     if ca_arr is not None:
         ca_arr[0] = ca_i
@@ -465,10 +470,16 @@ def _simulate_current_clamp_core(
         np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
     )
 
-    # Record initial state — same defensive filter as _simulate_voltage_clamp_core.
+    # Record initial state. Same contract as _simulate_voltage_clamp_core:
+    # gating_state keys must match the neuron's gating variables exactly.
+    if set(gating_state.keys()) != set(gating_arrs.keys()):
+        raise ValueError(
+            "gating_state keys do not match the neuron's gating variables: "
+            f"got {sorted(gating_state.keys())}, "
+            f"expected {sorted(gating_arrs.keys())}"
+        )
     for gv_name, val in gating_state.items():
-        if gv_name in gating_arrs:
-            gating_arrs[gv_name][0] = val
+        gating_arrs[gv_name][0] = val
 
     if ca_arr is not None:
         ca_arr[0] = ca_i

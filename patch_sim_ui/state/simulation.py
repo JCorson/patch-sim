@@ -62,6 +62,13 @@ _SWEEP_HIGHLIGHT_JS: str = (
     pathlib.Path(__file__).parents[2] / "assets" / "sweep_highlight.js"
 ).read_text()
 
+# Client-side fetch-and-swap for side-channel figure delivery.  Loaded once
+# at import; placeholder tokens (/*API_URL*/, /*TOKEN*/, /*DARK_AXIS_STYLE*/,
+# /*POST_JS*/) are substituted per call in _build_fetch_figure_js().
+_FETCH_FIGURE_JS: str = (
+    pathlib.Path(__file__).parents[2] / "assets" / "fetch_figure.js"
+).read_text()
+
 
 #: Debounce window (seconds) for slider-driven membrane test requests.
 _MT_DEBOUNCE_S: float = 0.3
@@ -418,8 +425,8 @@ class SimulationState(rx.State):
     # Synced copy of NeuronState.active_neuron_type used by store_trace for
     # labelling (avoids making those handlers async).
     _label_neuron_type: str = "Squid Giant Axon (Classic HH)"
-    # Synced copy of ProtocolState.clamp_mode used by figure_data and
-    # _apply_visibility_js (both are synchronous, cannot call get_state).
+    # Synced copy of ProtocolState.clamp_mode used by _rebuild_figure_and_fetch_js
+    # and _apply_visibility_js (both are synchronous, cannot call get_state).
     _figure_clamp_mode: str = CURRENT_CLAMP
 
     # ------------------------------------------------------------------ #
@@ -711,54 +718,10 @@ class SimulationState(rx.State):
 
         api_url = _get_config().api_url.rstrip("/")
         return (
-            f"setTimeout(async function(){{"
-            f"try{{"
-            f"var resp=await fetch('{api_url}/api/figure/{token}');"
-            "if(!resp.ok){"
-            "console.error('[patch_sim] fetch figure HTTP',resp.status);return;}"
-            f"var fig=await resp.json();"
-            # Poll for the mount div — the div is always in the DOM but
-            # has display:none until has_result flips True.  On the first run
-            # React is still flushing the state update so offsetHeight may be
-            # 0 even though the element exists; calling Plotly.react on a
-            # zero-height div produces an invisible plot.
-            # Retry every 50 ms for up to 2 s.
-            "var gd=null;"
-            "for(var _i=0;_i<40;_i++){"
-            "gd=document.getElementById('ps-trace-plot');"
-            "if(gd&&gd.offsetHeight>0)break;"
-            "gd=null;"
-            "await new Promise(function(r){setTimeout(r,50);});}"
-            f"if(!gd){{console.error('[patch_sim] plot div not found');return;}}"
-            # Merge colour-mode overrides into the layout before calling
-            # Plotly.react.  Dark mode overrides the things that don't work on
-            # a dark background: transparent backgrounds, white text/axis
-            # colours, and dimmed gridlines.
-            "var _dark=document.documentElement.classList.contains('dark');"
-            "var _layout=Object.assign({},fig.layout);"
-            "if(_dark){"
-            "_layout.paper_bgcolor='rgba(0,0,0,0)';"
-            "_layout.plot_bgcolor='rgba(0,0,0,0)';"
-            "_layout.font=Object.assign({},fig.layout.font,{color:'#e8e8e8'});"
-            "_layout.legend=Object.assign({},fig.layout.legend,"
-            "{bgcolor:'rgba(40,40,40,0.9)',font:{color:'#e8e8e8'}});"
-            "_layout.legend2=Object.assign({},fig.layout.legend2,"
-            "{bgcolor:'rgba(40,40,40,0.9)',font:{color:'#e8e8e8'}});"
-            # plotly_white gridlines are near-white (#EBF0F8) which is subtle
-            # on a white background but very prominent on a dark surface.
-            # Dim every axis's grid/line colours — values from constants.DARK_AXIS_STYLE
-            # (same source used by _LAYOUT_DARK in trace_display.py).
-            f"var _ax={json.dumps(constants.DARK_AXIS_STYLE)};"
-            "Object.keys(fig.layout).forEach(function(k){"
-            "if(/^[xy]axis/.test(k)){"
-            "_layout[k]=Object.assign({},fig.layout[k],_ax);}});"
-            "}"
-            # The div is a plain HTML element — React has no Plotly.react
-            # lifecycle here, so injected traces are never wiped.
-            f"await Plotly.react(gd,fig.data,_layout,{{responsive:true}});"
-            f"{post_js}"
-            f"}}catch(err){{console.error('[patch_sim] fetch figure error:',err);}}"
-            f"}},0)"
+            _FETCH_FIGURE_JS.replace("/*API_URL*/", api_url)
+            .replace("/*TOKEN*/", token)
+            .replace("/*DARK_AXIS_STYLE*/", json.dumps(constants.DARK_AXIS_STYLE))
+            .replace("/*POST_JS*/", post_js)
         )
 
     def _sweep_highlight_js(self) -> str:
