@@ -774,7 +774,6 @@ def build_figure(
     fig.update_layout(
         autosize=True,
         margin=_PLOT_MARGIN,
-        template="plotly_white",
         hovermode=hovermode,
         showlegend=True,
         legend=dict(**_legend_common, y=_row1_top, yanchor="top"),

@@ -7,31 +7,30 @@ from patch_sim_ui.state import SimulationState
 
 def trace_display() -> rx.Component:
     """Main plot area: stacked Plotly subplots with sweep overlays."""
+    # Both the plot div and the placeholder are always in the DOM.
+    # Toggling display (not DOM presence) avoids the first-run problem where
+    # Plotly.react is called before the browser has computed the div's layout.
+    # rx.cond would add a wrapper element that breaks height:100% propagation.
     return rx.box(
-        rx.cond(
-            SimulationState.has_result,
-            # Plain div — Plotly is managed entirely by the side-channel JS
-            # (_build_fetch_figure_js in state/simulation.py).  Using a plain
-            # div prevents react-plotly.js from calling Plotly.react on every
-            # React re-render and wiping our injected traces.
-            rx.box(
-                id="ps-trace-plot",
-                width="100%",
-                height="100%",
-            ),
-            rx.center(
-                rx.vstack(
-                    rx.icon("chart-line", size=48, color="gray"),
-                    rx.text(
-                        "Run a simulation to see traces",
-                        size="3",
-                        color="gray",
-                    ),
-                    spacing="3",
-                    align="center",
+        rx.box(
+            id="ps-trace-plot",
+            width="100%",
+            height="100%",
+            display=rx.cond(SimulationState.has_result, "block", "none"),
+        ),
+        rx.center(
+            rx.vstack(
+                rx.icon("chart-line", size=48, color="gray"),
+                rx.text(
+                    "Run a simulation to see traces",
+                    size="3",
+                    color="gray",
                 ),
-                height="400px",
+                spacing="3",
+                align="center",
             ),
+            display=rx.cond(SimulationState.has_result, "none", "flex"),
+            height="400px",
         ),
         width="100%",
         height="100%",

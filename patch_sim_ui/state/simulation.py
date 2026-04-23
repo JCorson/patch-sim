@@ -713,26 +713,25 @@ class SimulationState(rx.State):
             "if(!resp.ok){"
             "console.error('[patch_sim] fetch figure HTTP',resp.status);return;}"
             f"var fig=await resp.json();"
-            # Poll for the mount div — on the first run React is still
-            # flushing the state update (has_result just flipped True) so the
-            # div may not be in the DOM at setTimeout(0) time.
+            # Poll for the mount div — the div is always in the DOM but
+            # has display:none until has_result flips True.  On the first run
+            # React is still flushing the state update so offsetHeight may be
+            # 0 even though the element exists; calling Plotly.react on a
+            # zero-height div produces an invisible plot.
             # Retry every 50 ms for up to 2 s.
             "var gd=null;"
             "for(var _i=0;_i<40;_i++){"
             "gd=document.getElementById('ps-trace-plot');"
-            "if(gd)break;"
+            "if(gd&&gd.offsetHeight>0)break;"
+            "gd=null;"
             "await new Promise(function(r){setTimeout(r,50);});}"
             f"if(!gd){{console.error('[patch_sim] plot div not found');return;}}"
             # Merge colour-mode overrides into the layout before calling
-            # Plotly.react.  In light mode, delete the plotly_white template so
-            # Plotly falls back to its default theme (blue-grey subplot
-            # backgrounds), matching the appearance of the old rx.plotly path.
-            # Dark mode keeps the plotly_white base and overrides the things
-            # that don't work on a dark background: transparent backgrounds,
-            # white text/axis colours, and dimmed gridlines.
+            # Plotly.react.  Dark mode overrides the things that don't work on
+            # a dark background: transparent backgrounds, white text/axis
+            # colours, and dimmed gridlines.
             "var _dark=document.documentElement.classList.contains('dark');"
             "var _layout=Object.assign({},fig.layout);"
-            "if(!_dark){delete _layout.template;}"
             "if(_dark){"
             "_layout.paper_bgcolor='rgba(0,0,0,0)';"
             "_layout.plot_bgcolor='rgba(0,0,0,0)';"
