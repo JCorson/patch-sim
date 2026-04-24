@@ -74,7 +74,7 @@ def test_dict_to_array_ordering_follows_gating_index(hh_model):
 # ---------------------------------------------------------------------------
 
 
-def _make_leak_channel() -> IonChannel:
+def _make_zero_gate_channel() -> IonChannel:
     """Build a zero-gate Na leak channel for testing."""
     return IonChannel(
         name="NaLeak",
@@ -125,7 +125,7 @@ def _make_two_gate_channel() -> IonChannel:
 def test_compute_current_array_zero_gate_fast_path():
     """Zero-gate channel returns g_max * (V - e_rev) without touching state."""
     neuron = Neuron()
-    ch = _make_leak_channel()
+    ch = _make_zero_gate_channel()
     state_array = np.array([], dtype=np.float64)
     gate_indices = np.empty(0, dtype=np.intp)
     gate_powers = np.empty(0, dtype=np.intp)
@@ -145,7 +145,7 @@ def test_compute_current_array_single_power1_fast_path():
 
     dict_state = _initialize_gating_variables(neuron, -65.0)
     arr_state = _dict_to_array(dict_state, neuron)
-    specs = neuron._channel_gate_specs
+    specs = neuron.channel_gate_specs
     ch_idx = list(neuron.all_channels).index(ch)
     idxs, pows = specs[ch_idx]
 
@@ -163,7 +163,7 @@ def test_compute_current_array_general_path_matches_dict():
 
     dict_state = _initialize_gating_variables(neuron, -65.0)
     arr_state = _dict_to_array(dict_state, neuron)
-    specs = neuron._channel_gate_specs
+    specs = neuron.channel_gate_specs
     ch_idx = list(neuron.all_channels).index(ch)
     idxs, pows = specs[ch_idx]
 

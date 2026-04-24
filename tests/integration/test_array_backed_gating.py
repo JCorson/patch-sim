@@ -179,6 +179,36 @@ def test_cc_from_state_array_mismatched_keys_raises(hh_model):
 
 
 # ---------------------------------------------------------------------------
+# Purkinje preset — many additional channels, GoldmanSpec, Ca²⁺
+# ---------------------------------------------------------------------------
+
+
+def _make_purkinje_neuron() -> Neuron:
+    """Build the Purkinje preset neuron for higher-gate-count coverage."""
+    from patch_sim.constants import PURKINJE
+    from patch_sim.neuron_factory import make_neuron
+    from patch_sim.presets import NEURON_PRESETS
+
+    return make_neuron(NEURON_PRESETS[PURKINJE])
+
+
+def test_vc_array_matches_dict_purkinje():
+    """Voltage clamp matches dict path for the Purkinje preset (many channels)."""
+    neuron = _make_purkinje_neuron()
+    dict_result = simulate_voltage_clamp(neuron, _VC_PROT)
+    arr_result = simulate_voltage_clamp(neuron, _VC_PROT, use_array_state=True)
+    _assert_results_match(dict_result, arr_result)
+
+
+def test_cc_array_matches_dict_purkinje():
+    """Current clamp matches dict path for the Purkinje preset (many channels)."""
+    neuron = _make_purkinje_neuron()
+    dict_result = simulate_current_clamp(neuron, _CC_PROT)
+    arr_result = simulate_current_clamp(neuron, _CC_PROT, use_array_state=True)
+    _assert_results_match(dict_result, arr_result)
+
+
+# ---------------------------------------------------------------------------
 # Output structure — column names and dtypes are unchanged
 # ---------------------------------------------------------------------------
 

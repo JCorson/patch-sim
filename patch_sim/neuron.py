@@ -251,7 +251,7 @@ class Neuron:
         return {gv.name: i for i, gv in enumerate(self.all_gating_variables)}
 
     @cached_property
-    def _channel_gate_specs(
+    def channel_gate_specs(
         self,
     ) -> tuple[tuple[np.ndarray, np.ndarray], ...]:
         """Return per-channel (indices, powers) arrays for the array-backed path.

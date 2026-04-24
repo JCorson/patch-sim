@@ -11,11 +11,13 @@ flag.  When ``True``, gating state is held in a flat ``np.ndarray`` (indexed by
 ``neuron.gating_index``) instead of a ``dict``, gate products are computed via
 ``np.prod``, and voltage-clamp rate tables are 2-D arrays instead of per-name
 dicts.  The default remains ``False`` to preserve byte-identical results with
-the original implementation until benchmarks confirm a net win on all preset
-sizes.  See issue #262 for profiling context.
+the original implementation.
 
-# TODO(issue #262-followup): remove dict path once use_array_state has been
-# default-True for one release cycle.
+Benchmarks (issue #262) showed the array path is 2–4× slower than the dict
+baseline for current preset sizes (HH: 3 gates, Purkinje: ~14 gates) because
+numpy overhead exceeds the dict-lookup savings.  The opt-in path is retained
+for future evaluation; it may become competitive if presets grow to 30+ gates
+or if the per-channel loops are replaced with true cross-channel vectorisation.
 """
 
 import logging
@@ -587,7 +589,7 @@ def _gating_derivatives_arr(
 
     if neuron.calcium_dynamics is not None:
         i_ca_total = 0.0
-        specs = neuron._channel_gate_specs
+        specs = neuron.channel_gate_specs
         e_revs = neuron.reversal_potentials
         for j, ch in enumerate(neuron.all_channels):
             if ch.carries_calcium:
@@ -663,7 +665,7 @@ def _gating_derivatives_tabled_arr(
     dca_i = 0.0
     if neuron.calcium_dynamics is not None:
         i_ca_total = 0.0
-        specs = neuron._channel_gate_specs
+        specs = neuron.channel_gate_specs
         e_revs = neuron.reversal_potentials
         for j, ch in enumerate(neuron.all_channels):
             if ch.carries_calcium:
@@ -699,7 +701,7 @@ def _hh_derivatives_arr(
     Returns:
         Tuple ``(dV, derivs_array, dca_i)`` where *dV* is dV/dt in mV/ms.
     """
-    specs = neuron._channel_gate_specs
+    specs = neuron.channel_gate_specs
     e_revs = neuron.reversal_potentials
     I_total = 0.0
     for j, ch in enumerate(neuron.all_channels):
@@ -903,7 +905,7 @@ def _simulate_voltage_clamp_core(
 
     if use_array_state:
         state_array = _dict_to_array(gating_state, neuron)
-        specs = neuron._channel_gate_specs
+        specs = neuron.channel_gate_specs
         e_revs = neuron.reversal_potentials
         gating_vars = neuron.all_gating_variables
 
@@ -1097,7 +1099,7 @@ def _simulate_current_clamp_core(
 
     if use_array_state:
         state_array = _dict_to_array(gating_state, neuron)
-        specs = neuron._channel_gate_specs
+        specs = neuron.channel_gate_specs
         e_revs = neuron.reversal_potentials
         gating_vars = neuron.all_gating_variables
 
