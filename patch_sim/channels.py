@@ -4,12 +4,11 @@ Provides the building blocks for defining additional ion channels that can be
 added on top of the classic Na, K, and leak channels.
 """
 
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-RateFn = Callable[[float, float], float]
+from .rates import Rate
 
 
 class IonSpecies(Enum):
@@ -125,8 +124,8 @@ class GatingVariable:
 
     name: str
     power: int
-    alpha: RateFn
-    beta: RateFn
+    alpha: Rate
+    beta: Rate
 
 
 @dataclass(frozen=True)

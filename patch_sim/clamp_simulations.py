@@ -14,8 +14,7 @@ from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
-from .channels import RateFn
-from .electrochemistry import BoltzmannCoshRate
+from .rates import VoltageOnlyRate
 
 if TYPE_CHECKING:
     from typing import Any
@@ -218,47 +217,6 @@ def _clip_state(state: dict[str, float]) -> dict[str, float]:
     return {k: max(0.0, min(1.0, v)) for k, v in state.items()}
 
 
-_CA_PROBE_VOLTAGES: tuple[float, ...] = (-90.0, -60.0, -30.0, 0.0, 30.0)
-# Probe across resting, near-threshold, and above-K_d values.  A rate function
-# whose Ca²⁺-dependence vanishes at every one of these would be a pathological
-# coincidence, so treating the pair-agreement result as V-only is safe.
-_CA_PROBE_VALUES: tuple[float, ...] = (0.0, 1.0e-4, 1.0e-3, 1.0e-2)
-
-
-def _is_voltage_only(rate_fn: RateFn) -> bool:
-    """Return True when rate_fn's output does not depend on ca_i.
-
-    :class:`BoltzmannCoshRate` instances ignore ca_i by construction, so this
-    check short-circuits for them.  Any other callable is probed across a
-    sweep of voltages and Ca²⁺ concentrations spanning the physiological
-    range; if the function returns the same value at every (V, ca_i) pair
-    it is treated as V-only.  Any raised exception is logged at debug level
-    and treated as Ca-dependent (conservative fallback).
-
-    Args:
-        rate_fn: A rate callable with signature ``(V, ca_i) -> rate``.
-
-    Returns:
-        True if rate_fn's output is independent of ca_i at every probe voltage.
-    """
-    if isinstance(rate_fn, BoltzmannCoshRate):
-        return True
-    try:
-        for v in _CA_PROBE_VOLTAGES:
-            reference = rate_fn(v, _CA_PROBE_VALUES[0])
-            for ca in _CA_PROBE_VALUES[1:]:
-                if rate_fn(v, ca) != reference:
-                    return False
-    except Exception:
-        logger.debug(
-            "Rate function %r raised during Ca²⁺ probe; treating as Ca-dependent",
-            rate_fn,
-            exc_info=True,
-        )
-        return False
-    return True
-
-
 def _precompute_rate_tables(
     neuron: "Neuron",
     voltage_protocol: np.ndarray,
@@ -284,7 +242,9 @@ def _precompute_rate_tables(
     alpha_tables: dict[str, np.ndarray | None] = {}
     beta_tables: dict[str, np.ndarray | None] = {}
     for gv in neuron.all_gating_variables:
-        if _is_voltage_only(gv.alpha) and _is_voltage_only(gv.beta):
+        if isinstance(gv.alpha, VoltageOnlyRate) and isinstance(
+            gv.beta, VoltageOnlyRate
+        ):
             alpha_fn = gv.alpha
             beta_fn = gv.beta
             alpha_vec = np.vectorize(
