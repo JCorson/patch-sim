@@ -6,6 +6,7 @@ substates (NeuronState, ProtocolState, VisibilityState, AnalysisState, LogState)
 """
 
 import asyncio
+import dataclasses
 import json
 import logging
 import pathlib
@@ -419,6 +420,213 @@ def _compute_gv_data(
     }
 
 
+# ------------------------------------------------------------------ #
+# Simulation computation helpers                                      #
+# ------------------------------------------------------------------ #
+
+
+@dataclasses.dataclass(frozen=True)
+class _SimResult:
+    """Output of a complete simulation run, ready to apply to state.
+
+    Produced by :func:`_compute_simulation` and consumed by
+    :meth:`SimulationState._do_apply_simulation`.  All fields have
+    empty defaults so callers only set what is relevant for the current
+    clamp mode.
+    """
+
+    sweeps: list[Sweep]
+    sim_token: str
+    iv_data: dict[str, Any] = dataclasses.field(default_factory=dict)
+    gv_data: dict[str, Any] = dataclasses.field(default_factory=dict)
+    ap_metrics: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    ap_summary: dict[str, Any] = dataclasses.field(default_factory=dict)
+    ap_is_multi_sweep: bool = False
+    fi_data: dict[str, Any] = dataclasses.field(default_factory=dict)
+    sfa_data: dict[str, Any] = dataclasses.field(default_factory=dict)
+    hyperpolarization_data: dict[str, Any] = dataclasses.field(default_factory=dict)
+    phase_plane_data: dict[str, Any] = dataclasses.field(default_factory=dict)
+
+
+def _compute_simulation(
+    neuron: "patch_sim.Neuron",
+    protocols: "list[tuple[np.ndarray, str]]",
+    mode: str,
+    stored_traces: "list[Sweep]",
+    show_hover: bool,
+    min_stimulus: float,
+    max_stimulus: float,
+    stimulus_step: float,
+    pre_stimulus_duration: float,
+    stimulus_duration: float,
+) -> _SimResult:
+    """Run the simulation synchronously and compute all analysis.
+
+    Designed to be called via ``run_in_executor`` in production (no state
+    mutation) and directly in tests.  Raises :exc:`ValueError` on invalid
+    protocol parameters so the caller can propagate the error to
+    :attr:`~SimulationState.error_message`.
+
+    Args:
+        neuron: Built neuron model.
+        protocols: List of ``(stimulus_array, label)`` tuples from
+            :meth:`~patch_sim_ui.state.protocol.ProtocolState._build_protocols`.
+        mode: ``"Current Clamp"`` or ``"Voltage Clamp"``.
+        stored_traces: Snapshot of current stored traces for figure building.
+        show_hover: Whether hover tooltips are enabled.
+        min_stimulus: Minimum stimulus value for analysis range.
+        max_stimulus: Maximum stimulus value for analysis range.
+        stimulus_step: Stimulus step size for analysis range.
+        pre_stimulus_duration: Pre-stimulus duration (ms) for analysis windows.
+        stimulus_duration: Stimulus duration (ms) for analysis windows.
+
+    Returns:
+        A :class:`_SimResult` containing sweeps, figure token, and all
+        analysis data ready for :meth:`~SimulationState._do_apply_simulation`.
+    """
+    sim_fn = (
+        patch_sim.simulate_current_clamp
+        if mode == CURRENT_CLAMP
+        else patch_sim.simulate_voltage_clamp
+    )
+    is_multi = len(protocols) > 1
+
+    if is_multi:
+        new_sweeps: list[Sweep] = []
+        for sweep_result, (protocol, label) in zip(
+            patch_sim.simulate_batch(neuron, [p for p, _ in protocols], sim_fn),
+            protocols,
+        ):
+            color_index = len(new_sweeps) % len(constants.SWEEP_COLORS)
+            new_sweeps.append(
+                Sweep.from_result(
+                    sweep_result,
+                    protocol,
+                    label,
+                    constants.SWEEP_COLORS[color_index],
+                    mode,
+                )
+            )
+
+        fig = build_figure(
+            current_sweeps=new_sweeps,
+            visibility=TraceVisibility(),
+            clamp_mode=mode,
+            stored_traces=stored_traces,
+            show_hover=show_hover,
+        )
+        sim_token = uuid.uuid4().hex
+        traces.put(sim_token, fig)
+
+        if mode == VOLTAGE_CLAMP:
+            iv_data, iv_result = _compute_iv_data(
+                new_sweeps,
+                min_stimulus,
+                max_stimulus,
+                stimulus_step,
+                pre_stimulus_duration,
+                stimulus_duration,
+            )
+            if iv_result is not None:
+                na_channel = next(
+                    (
+                        ch
+                        for ch in neuron.core_channels
+                        if isinstance(ch.reversal_spec, patch_sim.NernstSpec)
+                        and ch.reversal_spec.species is patch_sim.IonSpecies.SODIUM
+                    ),
+                    None,
+                )
+                gv_data = (
+                    _compute_gv_data(iv_result, na_channel.reversal_potential(neuron))
+                    if na_channel is not None
+                    else {}
+                )
+            else:
+                gv_data = {}
+            return _SimResult(
+                sweeps=new_sweeps,
+                sim_token=sim_token,
+                iv_data=iv_data,
+                gv_data=gv_data,
+            )
+
+        ms_metrics, ms_summary, ms_fi, ms_sfa, ms_hyp = (
+            _compute_cc_multi_sweep_analysis(
+                new_sweeps,
+                min_stimulus,
+                max_stimulus,
+                stimulus_step,
+                pre_stimulus_duration,
+                stimulus_duration,
+            )
+        )
+        return _SimResult(
+            sweeps=new_sweeps,
+            sim_token=sim_token,
+            ap_metrics=ms_metrics,
+            ap_summary=ms_summary,
+            ap_is_multi_sweep=True,
+            fi_data=ms_fi,
+            sfa_data=ms_sfa,
+            hyperpolarization_data=ms_hyp,
+            phase_plane_data=_build_phase_plane_data(new_sweeps),
+        )
+
+    # Single sweep
+    stimulus, _ = protocols[0]
+    result = sim_fn(neuron, stimulus)
+    sweep = Sweep.from_result(result, stimulus, "", "", mode)
+
+    fig = build_figure(
+        current_sweeps=[sweep],
+        visibility=TraceVisibility(),
+        clamp_mode=mode,
+        stored_traces=stored_traces,
+        show_hover=show_hover,
+    )
+    sim_token = uuid.uuid4().hex
+    traces.put(sim_token, fig)
+
+    if mode == CURRENT_CLAMP:
+        ap_result = patch_sim.analyze_aps_from_result(result)
+        sfa_curve = patch_sim.compute_sfa(ap_result)
+        return _SimResult(
+            sweeps=[sweep],
+            sim_token=sim_token,
+            ap_metrics=[_format_spike_dict(s.index, s) for s in ap_result.spikes],
+            ap_summary={
+                "spike_count": str(ap_result.spike_count),
+                "mean_threshold_voltage": _fmt_optional(
+                    ap_result.mean_threshold_voltage, ".1f"
+                ),
+                "mean_peak_voltage": _fmt_optional(ap_result.mean_peak_voltage, ".1f"),
+                "mean_rise_time": _fmt_optional(ap_result.mean_rise_time, ".2f"),
+                "mean_half_width": _fmt_optional(ap_result.mean_half_width, ".2f"),
+                "mean_ahp_depth": _fmt_optional(ap_result.mean_ahp_depth, ".1f"),
+                "mean_isi": _fmt_optional(ap_result.mean_isi, ".1f"),
+                "firing_rate": _fmt_optional(ap_result.firing_rate, ".1f"),
+                "adaptation_index": (
+                    f"{sfa_curve.adaptation_index:.2f}"
+                    if sfa_curve is not None
+                    else "—"
+                ),
+                "rheobase": (
+                    f"≤ {min_stimulus:.2f}" if ap_result.spike_count >= 1 else "—"
+                ),
+            },
+            sfa_data=(
+                {"curves": [_serialise_sfa_curve(sfa_curve)]}
+                if sfa_curve is not None
+                else {}
+            ),
+            phase_plane_data=_build_phase_plane_data([sweep]),
+        )
+
+    # Single VC sweep — no per-sweep analysis (requires multi-sweep for IV/GV)
+    return _SimResult(sweeps=[sweep], sim_token=sim_token)
+
+
 class SimulationState(rx.State):
     """State for simulation results, sweep collections, and figure rendering."""
 
@@ -814,6 +1022,35 @@ class SimulationState(rx.State):
         if js:
             return rx.call_script(js)
 
+    def _do_apply_simulation(
+        self,
+        result: _SimResult,
+        analysis_st: "AnalysisState",
+    ) -> None:
+        """Apply a :class:`_SimResult` to self and *analysis_st*.
+
+        Core logic extracted for testability.  In production this is called
+        inside ``async with self:`` (under the Reflex state lock) immediately
+        after :func:`_compute_simulation` returns from the thread executor.
+        Tests may call it directly on bare state instances.
+
+        Args:
+            result: Computation result from :func:`_compute_simulation`.
+            analysis_st: The :class:`AnalysisState` sibling to update.
+        """
+        self._current_sweeps = result.sweeps
+        self.sim_token = result.sim_token
+        analysis_st.clear_results()
+        analysis_st.iv_data = result.iv_data
+        analysis_st.gv_data = result.gv_data
+        analysis_st.ap_metrics = result.ap_metrics
+        analysis_st.ap_summary = result.ap_summary
+        analysis_st.ap_is_multi_sweep = result.ap_is_multi_sweep
+        analysis_st.fi_data = result.fi_data
+        analysis_st.sfa_data = result.sfa_data
+        analysis_st.hyperpolarization_data = result.hyperpolarization_data
+        analysis_st.phase_plane_data = result.phase_plane_data
+
     # ------------------------------------------------------------------ #
     # Continuous simulation mode                                        #
     # ------------------------------------------------------------------ #
@@ -1009,10 +1246,10 @@ class SimulationState(rx.State):
         """Build protocol and run the simulation asynchronously.
 
         Uses background=True so the UI stays responsive during long runs.
-        State is snapshotted inside the lock before any blocking work begins,
-        and all blocking simulation calls are offloaded via run_in_executor so
-        the event loop can flush the is_running=True update to the client
-        before the computation starts.
+        All inputs are snapshotted inside the state lock before blocking work
+        begins; :func:`_compute_simulation` runs via ``run_in_executor`` so the
+        event loop can flush ``is_running=True`` to the client first; results
+        are applied under the lock via :meth:`_do_apply_simulation`.
         """
         async with self:
             self.is_running = True
@@ -1030,182 +1267,35 @@ class SimulationState(rx.State):
                 self.error_message = str(exc)
                 self.is_running = False
                 return
+            # Snapshot scalar protocol params so the executor call is thread-safe.
+            stored_traces_snap = list(self.stored_traces)
+            show_hover_snap = self.show_hover
+            min_stimulus = proto_st.min_stimulus
+            max_stimulus = proto_st.max_stimulus
+            stimulus_step = proto_st.stimulus_step
+            pre_stimulus_duration = proto_st.pre_stimulus_duration
+            stimulus_duration = proto_st.stimulus_duration
 
-        logger.info(
-            "Simulation started: mode=%s, protocol=%s",
-            mode,
-            ptype,
-        )
-        loop = asyncio.get_running_loop()
-        sim_fn = (
-            patch_sim.simulate_current_clamp
-            if mode == CURRENT_CLAMP
-            else patch_sim.simulate_voltage_clamp
-        )
-        is_multi = len(protocols) > 1
+        logger.info("Simulation started: mode=%s, protocol=%s", mode, ptype)
+
         _start_ms = time.monotonic() * 1000
-        # Set when either run path succeeds; read by the finally block to
-        # decide whether to fetch-and-swap the figure.
-        _sim_token: str = ""
+        _sim_result: _SimResult | None = None
         try:
-            if is_multi:
-                # Run each sweep independently so gating variables are reset
-                # between steps — matching real patch-clamp I-V experiments.
-                def _run_batch() -> list[Sweep]:
-                    """Run all sweeps via simulate_batch and assemble Sweep list."""
-                    new_sweeps: list[Sweep] = []
-                    for sweep_result, (protocol, label) in zip(
-                        patch_sim.simulate_batch(
-                            neuron, [p for p, _ in protocols], sim_fn
-                        ),
-                        protocols,
-                    ):
-                        color_index = len(new_sweeps) % len(constants.SWEEP_COLORS)
-                        new_sweeps.append(
-                            Sweep.from_result(
-                                sweep_result,
-                                protocol,
-                                label,
-                                constants.SWEEP_COLORS[color_index],
-                                mode,
-                            )
-                        )
-                    return new_sweeps
-
-                new_sweeps = await loop.run_in_executor(None, _run_batch)
-
-                # Build and serialise the figure outside the state lock so that
-                # fig.to_json() (the expensive part) doesn't inflate the flush.
-                _fig = build_figure(
-                    current_sweeps=new_sweeps,
-                    visibility=TraceVisibility(),
-                    clamp_mode=mode,
-                    stored_traces=self.stored_traces,
-                    show_hover=self.show_hover,
-                )
-                _sim_token = uuid.uuid4().hex
-                traces.put(_sim_token, _fig)
-
-                async with self:
-                    self._current_sweeps = new_sweeps
-                    self.sim_token = _sim_token
-                    analysis_st = await self.get_state(AnalysisState)
-                    if mode == VOLTAGE_CLAMP:
-                        analysis_st.clear_results()
-                        iv_data, iv_result = _compute_iv_data(
-                            new_sweeps,
-                            proto_st.min_stimulus,
-                            proto_st.max_stimulus,
-                            proto_st.stimulus_step,
-                            proto_st.pre_stimulus_duration,
-                            proto_st.stimulus_duration,
-                        )
-                        analysis_st.iv_data = iv_data
-                        if iv_result is not None:
-                            na_channel = next(
-                                (
-                                    ch
-                                    for ch in neuron.core_channels
-                                    if isinstance(
-                                        ch.reversal_spec, patch_sim.NernstSpec
-                                    )
-                                    and ch.reversal_spec.species
-                                    is patch_sim.IonSpecies.SODIUM
-                                ),
-                                None,
-                            )
-                            if na_channel is not None:
-                                e_rev = na_channel.reversal_potential(neuron)
-                                analysis_st.gv_data = _compute_gv_data(iv_result, e_rev)
-                            else:
-                                analysis_st.gv_data = {}
-                        else:
-                            analysis_st.gv_data = {}
-                    else:
-                        ms_metrics, ms_summary, ms_fi, ms_sfa, ms_hyp = (
-                            _compute_cc_multi_sweep_analysis(
-                                new_sweeps,
-                                proto_st.min_stimulus,
-                                proto_st.max_stimulus,
-                                proto_st.stimulus_step,
-                                proto_st.pre_stimulus_duration,
-                                proto_st.stimulus_duration,
-                            )
-                        )
-                        analysis_st.clear_results()
-                        analysis_st.ap_metrics = ms_metrics
-                        analysis_st.ap_summary = ms_summary
-                        analysis_st.ap_is_multi_sweep = True
-                        analysis_st.fi_data = ms_fi
-                        analysis_st.sfa_data = ms_sfa
-                        analysis_st.hyperpolarization_data = ms_hyp
-                        analysis_st.phase_plane_data = _build_phase_plane_data(
-                            new_sweeps
-                        )
-
-            else:
-                stimulus, _ = protocols[0]
-                result = await loop.run_in_executor(None, sim_fn, neuron, stimulus)
-                sweep = Sweep.from_result(result, stimulus, "", "", mode)
-                _fig = build_figure(
-                    current_sweeps=[sweep],
-                    visibility=TraceVisibility(),
-                    clamp_mode=mode,
-                    stored_traces=self.stored_traces,
-                    show_hover=self.show_hover,
-                )
-                _sim_token = uuid.uuid4().hex
-                traces.put(_sim_token, _fig)
-                async with self:
-                    self._current_sweeps = [sweep]
-                    self.sim_token = _sim_token
-                    analysis_st = await self.get_state(AnalysisState)
-                    analysis_st.clear_results()
-                    if mode == CURRENT_CLAMP:
-                        ap_result = patch_sim.analyze_aps_from_result(result)
-                        sfa_curve = patch_sim.compute_sfa(ap_result)
-                        analysis_st.ap_metrics = [
-                            _format_spike_dict(s.index, s) for s in ap_result.spikes
-                        ]
-                        analysis_st.ap_summary = {
-                            "spike_count": str(ap_result.spike_count),
-                            "mean_threshold_voltage": _fmt_optional(
-                                ap_result.mean_threshold_voltage, ".1f"
-                            ),
-                            "mean_peak_voltage": _fmt_optional(
-                                ap_result.mean_peak_voltage, ".1f"
-                            ),
-                            "mean_rise_time": _fmt_optional(
-                                ap_result.mean_rise_time, ".2f"
-                            ),
-                            "mean_half_width": _fmt_optional(
-                                ap_result.mean_half_width, ".2f"
-                            ),
-                            "mean_ahp_depth": _fmt_optional(
-                                ap_result.mean_ahp_depth, ".1f"
-                            ),
-                            "mean_isi": _fmt_optional(ap_result.mean_isi, ".1f"),
-                            "firing_rate": _fmt_optional(ap_result.firing_rate, ".1f"),
-                            "adaptation_index": (
-                                f"{sfa_curve.adaptation_index:.2f}"
-                                if sfa_curve is not None
-                                else "\u2014"
-                            ),
-                            "rheobase": (
-                                f"\u2264\u202f{proto_st.min_stimulus:.2f}"
-                                if ap_result.spike_count >= 1
-                                else "\u2014"
-                            ),
-                        }
-                        analysis_st.sfa_data = (
-                            {"curves": [_serialise_sfa_curve(sfa_curve)]}
-                            if sfa_curve is not None
-                            else {}
-                        )
-                        analysis_st.phase_plane_data = _build_phase_plane_data(
-                            self._current_sweeps
-                        )
-
+            loop = asyncio.get_running_loop()
+            _sim_result = await loop.run_in_executor(
+                None,
+                _compute_simulation,
+                neuron,
+                protocols,
+                mode,
+                stored_traces_snap,
+                show_hover_snap,
+                min_stimulus,
+                max_stimulus,
+                stimulus_step,
+                pre_stimulus_duration,
+                stimulus_duration,
+            )
         except ValueError as exc:
             logger.exception("Simulation error: %s", exc)
             async with self:
@@ -1213,6 +1303,9 @@ class SimulationState(rx.State):
         else:
             elapsed = time.monotonic() * 1000 - _start_ms
             logger.info("Simulation complete: %.0f ms", elapsed)
+            async with self:
+                analysis_st = await self.get_state(AnalysisState)
+                self._do_apply_simulation(_sim_result, analysis_st)
             yield SimulationState.run_membrane_test
         finally:
             async with self:
@@ -1220,12 +1313,14 @@ class SimulationState(rx.State):
                 log_st = await self.get_state(LogState)
                 log_st._refresh_logs()
                 vis_st = await self.get_state(VisibilityState)
-            if _sim_token:
+            if _sim_result is not None:
                 # Side-channel path: fetch the figure from /api/figure/{token}
                 # and swap it in via Plotly.react (includes visibility re-apply).
-                yield rx.call_script(self._build_fetch_figure_js(_sim_token, vis_st))
+                yield rx.call_script(
+                    self._build_fetch_figure_js(_sim_result.sim_token, vis_st)
+                )
             else:
-                # Legacy path: continuous mode, errors, or pre-token flows.
+                # Error path: no figure was produced; re-apply existing visibility.
                 js = self._apply_visibility_js(vis_st)
                 if js:
                     yield rx.call_script(js)
