@@ -290,6 +290,7 @@ def _gating_derivatives_tabled(
         Tuple of (derivs, dca_i) — same shape as :func:`_gating_derivatives`.
     """
     derivs: dict[str, float] = {}
+    phi = neuron.q10_factor
     if neuron.calcium_dynamics is not None:
         i_ca_total = 0.0
         for ch in neuron.all_channels:
@@ -300,7 +301,6 @@ def _gating_derivatives_tabled(
                 a_tbl = alpha_tables[gv.name]
                 b_tbl = beta_tables[gv.name]
                 if a_tbl is None or b_tbl is None:
-                    phi = neuron.q10_factor
                     a = phi * gv.alpha(V, ca_i)
                     b = phi * gv.beta(V, ca_i)
                 else:
@@ -314,7 +314,6 @@ def _gating_derivatives_tabled(
             a_tbl = alpha_tables[gv.name]
             b_tbl = beta_tables[gv.name]
             if a_tbl is None or b_tbl is None:
-                phi = neuron.q10_factor
                 a = phi * gv.alpha(V, ca_i)
                 b = phi * gv.beta(V, ca_i)
             else:
@@ -515,8 +514,8 @@ def _simulate_voltage_clamp_core(
     I_total[0] = sum(ch_currents_0)
 
     # Precompute alpha/beta tables once — V is prescribed so V-only gates
-    # can be evaluated in a single vectorised pass instead of 4× per step in
-    # the RK4 loop. Ca²⁺-dependent gates (e.g. IKCa) stay scalar.
+    # can be evaluated in one pass before the loop instead of 4× per step
+    # inside it (once per RK4 sub-step). Ca²⁺-dependent gates stay scalar.
     alpha_tables, beta_tables = _precompute_rate_tables(neuron, voltage_protocol)
 
     # Main simulation loop

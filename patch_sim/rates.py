@@ -53,6 +53,13 @@ class CalciumDependentRate(Rate):
 class VoltageOnlyFn(VoltageOnlyRate):
     """Adapter wrapping a plain callable as a :class:`VoltageOnlyRate`.
 
+    .. warning::
+        Wrapping a function that *does* depend on ``ca_i`` in
+        ``VoltageOnlyFn`` causes silent numerical errors: the voltage-clamp
+        precompute pass evaluates the rate with ``ca_i=0.0`` and caches the
+        result.  Use :class:`CalciumDependentFn` for any rate that reads
+        ``ca_i``.
+
     Attributes:
         fn: Plain ``(V, ca_i) -> float`` callable.  Must be independent of
             ``ca_i`` — wrap Ca²⁺-dependent functions with
