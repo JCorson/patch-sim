@@ -54,8 +54,10 @@ def _channel_trace_group(
     gating_label: str,
     gating_var: rx.Var,
     gating_handler,
+    *,
+    include_current: bool = True,
 ) -> rx.Component:
-    """Render a per-channel group: separator, header, current checkbox, gating checkbox.
+    """Render a per-channel group with optional current and required gating checkboxes.
 
     The group is wrapped in ``rx.cond`` and only rendered when the channel is
     enabled.
@@ -69,16 +71,23 @@ def _channel_trace_group(
         gating_label: Label for the gating trace checkbox.
         gating_var: State var for gating trace visibility.
         gating_handler: Event handler for gating trace checkbox.
+        include_current: When False, omit the current checkbox. Use False for
+            current clamp mode where additional channel currents are not plotted.
 
     Returns:
         A fragment containing the conditional channel group.
     """
+    current_row = (
+        [_trace_checkbox(current_label, current_var, current_handler)]
+        if include_current
+        else []
+    )
     return rx.cond(
         enabled_var,
         rx.fragment(
             rx.separator(),
             _section_label(header),
-            _trace_checkbox(current_label, current_var, current_handler),
+            *current_row,
             _trace_checkbox(gating_label, gating_var, gating_handler),
         ),
     )
@@ -102,16 +111,24 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
 ]
 
 
-def _additional_channels_section() -> rx.Component:
-    """Render conditional trace groups for all 10 additional channels.
+def _additional_channels_section(*, include_current: bool = True) -> rx.Component:
+    """Render conditional trace groups for all additional channels.
 
     Each group is only shown when the corresponding channel is enabled.
+
+    Args:
+        include_current: When False, omit the current checkbox from each group.
+            Pass False for current clamp mode where additional channel currents
+            are not plotted.
 
     Returns:
         A fragment containing all additional channel trace groups.
     """
     return rx.fragment(
-        *[_channel_trace_group(*spec) for spec in _ADDITIONAL_CHANNEL_TRACE_SPECS]
+        *[
+            _channel_trace_group(*spec, include_current=include_current)
+            for spec in _ADDITIONAL_CHANNEL_TRACE_SPECS
+        ]
     )
 
 
@@ -148,7 +165,7 @@ def _cc_popover_content() -> rx.Component:
             VisibilityState.show_sodium_inactivation,
             VisibilityState.set_show_sodium_inactivation,
         ),
-        _additional_channels_section(),
+        _additional_channels_section(include_current=False),
         spacing="1",
         padding="2",
         max_height="60vh",
