@@ -167,12 +167,15 @@ class ProtocolState(rx.State):
         Args:
             mode: New clamp mode string (``CURRENT_CLAMP`` or ``VOLTAGE_CLAMP``).
         """
+        from patch_sim_ui.state.analysis import AnalysisState
         from patch_sim_ui.state.simulation import SimulationState
 
         self._apply_clamp_mode(mode)
         sim_st = await self.get_state(SimulationState)
         sim_st._clear_for_new_protocol()
         sim_st._figure_clamp_mode = mode
+        analysis_st = await self.get_state(AnalysisState)
+        analysis_st.clear_results()
         yield rx.call_script(
             "var gd=document.getElementById('ps-trace-plot');"
             "if(gd&&gd.data){Plotly.purge(gd);}"
@@ -210,6 +213,7 @@ class ProtocolState(rx.State):
         Args:
             name: Key into PROTOCOL_PRESETS.  Ignored if not found.
         """
+        from patch_sim_ui.state.analysis import AnalysisState
         from patch_sim_ui.state.neuron import NeuronState
         from patch_sim_ui.state.simulation import SimulationState
 
@@ -224,6 +228,8 @@ class ProtocolState(rx.State):
         sim_st = await self.get_state(SimulationState)
         sim_st._clear_for_new_protocol()
         sim_st._figure_clamp_mode = self.clamp_mode
+        analysis_st = await self.get_state(AnalysisState)
+        analysis_st.clear_results()
         yield rx.call_script(
             "var gd=document.getElementById('ps-trace-plot');"
             "if(gd&&gd.data){Plotly.purge(gd);}"

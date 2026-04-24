@@ -253,6 +253,7 @@ class NeuronState(rx.State):
             name: Key into ``patch_sim_ui.presets.NEURON_UI_PRESETS``.
                 Ignored if not found.
         """
+        from patch_sim_ui.state.analysis import AnalysisState
         from patch_sim_ui.state.protocol import ProtocolState
         from patch_sim_ui.state.simulation import SimulationState
 
@@ -272,6 +273,8 @@ class NeuronState(rx.State):
         _cleared = not sim_st.stored_traces
         if _cleared:
             sim_st._current_sweeps = []
+            analysis_st = await self.get_state(AnalysisState)
+            analysis_st.clear_results()
         sim_st._cont_has_state = False
         sim_st._label_neuron_type = name
         sim_st._figure_clamp_mode = proto_st.clamp_mode
