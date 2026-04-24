@@ -57,7 +57,7 @@ def _channel_trace_group(
     *,
     include_current: bool = True,
 ) -> rx.Component:
-    """Render a per-channel group: separator, header, current checkbox, gating checkbox.
+    """Render a per-channel group with optional current and required gating checkboxes.
 
     The group is wrapped in ``rx.cond`` and only rendered when the channel is
     enabled.

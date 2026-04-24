@@ -5,19 +5,20 @@ import pytest
 pytest.importorskip("reflex")
 
 
-def _true_branch_children(cond_component):
-    """Return the children of the true branch inside an ``rx.cond`` component.
+def _label_present(component, label: str) -> bool:
+    """Return True if ``label`` appears as visible text in the component tree.
+
+    Checks the component's repr, which Reflex populates with all rendered text
+    contents including checkbox labels.
 
     Args:
-        cond_component: The component returned by ``rx.cond``, which is a
-            ``Fragment`` wrapping a single ``Cond`` node.
+        component: Any Reflex component.
+        label: The label string to search for.
 
     Returns:
-        The children list of the true-branch ``Fragment``.
+        True when the label is found in the rendered component output.
     """
-    cond_node = cond_component.children[0]
-    true_fragment = cond_node.children[0]
-    return true_fragment.children
+    return label in repr(component)
 
 
 def test_neuron_panel_renders_without_error():
@@ -49,10 +50,10 @@ def test_sweep_manager_renders_without_error():
 
 
 def test_channel_trace_group_excludes_current_when_flag_false():
-    """_channel_trace_group with include_current=False must omit the current checkbox.
+    """_channel_trace_group with include_current=False must omit the current label.
 
-    The true branch of the ``rx.cond`` should have 3 children (separator,
-    section header, gating checkbox) rather than 4.
+    The current checkbox label (e.g. ``"I_Ih"``) must not appear in the rendered
+    component while the gating label must still be present.
     """
     from patch_sim_ui.components.sweep_manager import (
         _ADDITIONAL_CHANNEL_TRACE_SPECS,
@@ -60,18 +61,21 @@ def test_channel_trace_group_excludes_current_when_flag_false():
     )
 
     spec = _ADDITIONAL_CHANNEL_TRACE_SPECS[0]
+    current_label, gating_label = spec[2], spec[5]
     comp = _channel_trace_group(*spec, include_current=False)
-    children = _true_branch_children(comp)
-    assert len(children) == 3, (
-        f"Expected 3 children (separator, header, gating); got {len(children)}"
+    assert not _label_present(comp, current_label), (
+        f"Current label {current_label!r} must not appear when include_current=False"
+    )
+    assert _label_present(comp, gating_label), (
+        f"Gating label {gating_label!r} must still appear when include_current=False"
     )
 
 
 def test_channel_trace_group_includes_current_by_default():
     """_channel_trace_group must include the current checkbox by default.
 
-    The true branch of the ``rx.cond`` should have 4 children (separator,
-    section header, current checkbox, gating checkbox).
+    Both the current label (e.g. ``"I_Ih"``) and the gating label must appear
+    in the rendered component.
     """
     from patch_sim_ui.components.sweep_manager import (
         _ADDITIONAL_CHANNEL_TRACE_SPECS,
@@ -79,18 +83,21 @@ def test_channel_trace_group_includes_current_by_default():
     )
 
     spec = _ADDITIONAL_CHANNEL_TRACE_SPECS[0]
+    current_label, gating_label = spec[2], spec[5]
     comp = _channel_trace_group(*spec)
-    children = _true_branch_children(comp)
-    assert len(children) == 4, (
-        f"Expected 4 children (separator, header, current, gating); got {len(children)}"
+    assert _label_present(comp, current_label), (
+        f"Current label {current_label!r} must appear by default"
+    )
+    assert _label_present(comp, gating_label), (
+        f"Gating label {gating_label!r} must appear by default"
     )
 
 
 def test_cc_additional_channels_section_gating_only():
-    """_additional_channels_section(include_current=False) must render without error.
+    """_additional_channels_section(include_current=False) must hide all current labels.
 
-    Every channel group in the CC section must have exactly 3 children in its
-    true branch — the current checkbox must be absent.
+    For every additional channel the current label (e.g. ``"I_Ih"``) must not
+    appear in the rendered group while the gating label must remain visible.
     """
     from patch_sim_ui.channels import ADDITIONAL_CHANNELS
     from patch_sim_ui.components.sweep_manager import (
@@ -101,17 +108,19 @@ def test_cc_additional_channels_section_gating_only():
     for i, ch in enumerate(ADDITIONAL_CHANNELS):
         spec = _ADDITIONAL_CHANNEL_TRACE_SPECS[i]
         comp = _channel_trace_group(*spec, include_current=False)
-        children = _true_branch_children(comp)
-        assert len(children) == 3, (
-            f"Channel {ch.label!r}: expected 3 children in CC mode, got {len(children)}"
+        assert not _label_present(comp, ch.current_label), (
+            f"Channel {ch.label!r}: {ch.current_label!r} must be absent in CC mode"
+        )
+        assert _label_present(comp, ch.gating_label), (
+            f"Channel {ch.label!r}: {ch.gating_label!r} must be present in CC mode"
         )
 
 
 def test_vc_additional_channels_section_includes_current():
-    """_additional_channels_section() (VC default) must include the current checkbox.
+    """_additional_channels_section() (VC default) must show both labels.
 
-    Every channel group in the VC section must have exactly 4 children in its
-    true branch — both the current and gating checkboxes must be present.
+    For every additional channel both the current label (e.g. ``"I_Ih"``) and
+    the gating label must appear in the rendered group.
     """
     from patch_sim_ui.channels import ADDITIONAL_CHANNELS
     from patch_sim_ui.components.sweep_manager import (
@@ -122,9 +131,11 @@ def test_vc_additional_channels_section_includes_current():
     for i, ch in enumerate(ADDITIONAL_CHANNELS):
         spec = _ADDITIONAL_CHANNEL_TRACE_SPECS[i]
         comp = _channel_trace_group(*spec, include_current=True)
-        children = _true_branch_children(comp)
-        assert len(children) == 4, (
-            f"Channel {ch.label!r}: expected 4 children in VC mode, got {len(children)}"
+        assert _label_present(comp, ch.current_label), (
+            f"Channel {ch.label!r}: {ch.current_label!r} must be present in VC mode"
+        )
+        assert _label_present(comp, ch.gating_label), (
+            f"Channel {ch.label!r}: {ch.gating_label!r} must be present in VC mode"
         )
 
 
