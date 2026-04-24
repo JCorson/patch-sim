@@ -11,7 +11,12 @@ import numpy as np
 import pytest
 
 from patch_sim import clamp_simulations
-from patch_sim.clamp_simulations import simulate_voltage_clamp
+from patch_sim.channels import GatingVariable, IonChannel, IonSpecies, NernstSpec
+from patch_sim.clamp_simulations import (
+    _is_voltage_only,
+    _precompute_rate_tables,
+    simulate_voltage_clamp,
+)
 from patch_sim.constants import DOPAMINERGIC, PURKINJE
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
@@ -59,7 +64,7 @@ def _step_protocol(num_steps: int = 12_000) -> np.ndarray:
 @pytest.mark.parametrize(
     "neuron_factory",
     [
-        pytest.param(Neuron, id="hh-default"),
+        pytest.param(lambda: Neuron(), id="hh-default"),
         pytest.param(
             lambda: make_neuron(NEURON_PRESETS[PURKINJE]),
             id="purkinje",
@@ -97,3 +102,84 @@ def test_tabled_and_scalar_paths_agree(monkeypatch, neuron_factory):
             atol=1e-14,
             err_msg=f"Field {field!r} diverges between tabled and scalar paths",
         )
+
+
+def test_is_voltage_only_detects_custom_ca_dependent_rate():
+    """A hand-rolled Ca²⁺-dependent rate must probe as Ca-dependent.
+
+    Exercises the probe path (non-:class:`BoltzmannCoshRate` callable) with
+    a callable whose output is a linear function of ca_i, ensuring
+    ``_precompute_rate_tables`` emits ``None`` for such gates.
+    """
+
+    def ca_linear_alpha(V: float, ca_i: float) -> float:
+        """Linear-in-ca_i rate (alpha-like).
+
+        Args:
+            V: Membrane voltage in mV (unused).
+            ca_i: Intracellular Ca²⁺ concentration in mM.
+
+        Returns:
+            A value that varies with ca_i.
+        """
+        del V
+        return 0.1 + 10.0 * ca_i
+
+    def ca_linear_beta(V: float, ca_i: float) -> float:
+        """Another linear-in-ca_i rate (beta-like).
+
+        Args:
+            V: Membrane voltage in mV (unused).
+            ca_i: Intracellular Ca²⁺ concentration in mM.
+
+        Returns:
+            A value that varies with ca_i.
+        """
+        del V
+        return 0.5 + 5.0 * ca_i
+
+    assert _is_voltage_only(ca_linear_alpha) is False
+    assert _is_voltage_only(ca_linear_beta) is False
+
+    custom_gate = GatingVariable(
+        name="ca_probe",
+        power=1,
+        alpha=ca_linear_alpha,
+        beta=ca_linear_beta,
+    )
+    custom_channel = IonChannel(
+        name="CaProbe",
+        g_max=0.0,
+        gating_variables=(custom_gate,),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
+    neuron = Neuron(additional_channels=(custom_channel,))
+
+    protocol = _step_protocol(num_steps=200)
+    alpha_tables, beta_tables = _precompute_rate_tables(neuron, protocol)
+
+    assert alpha_tables["ca_probe"] is None
+    assert beta_tables["ca_probe"] is None
+
+
+def test_is_voltage_only_handles_raising_rate():
+    """A rate that raises must be classified Ca-dependent (conservative).
+
+    This keeps the optimization safe for rate functions with unusual
+    signatures that happen to reject the probe's Ca²⁺ values.
+    """
+
+    def raising_rate(V: float, ca_i: float) -> float:
+        """Rate function that always raises.
+
+        Args:
+            V: Membrane voltage in mV (unused).
+            ca_i: Intracellular Ca²⁺ concentration in mM (unused).
+
+        Raises:
+            RuntimeError: Always.
+        """
+        del V, ca_i
+        raise RuntimeError("probe failure")
+
+    assert _is_voltage_only(raising_rate) is False

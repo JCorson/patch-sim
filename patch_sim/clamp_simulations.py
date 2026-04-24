@@ -219,18 +219,21 @@ def _clip_state(state: dict[str, float]) -> dict[str, float]:
 
 
 _CA_PROBE_VOLTAGES: tuple[float, ...] = (-90.0, -60.0, -30.0, 0.0, 30.0)
-_CA_PROBE_VALUES: tuple[float, float] = (0.0, 1.0e-3)
+# Probe across resting, near-threshold, and above-K_d values.  A rate function
+# whose Ca²⁺-dependence vanishes at every one of these would be a pathological
+# coincidence, so treating the pair-agreement result as V-only is safe.
+_CA_PROBE_VALUES: tuple[float, ...] = (0.0, 1.0e-4, 1.0e-3, 1.0e-2)
 
 
 def _is_voltage_only(rate_fn: RateFn) -> bool:
     """Return True when rate_fn's output does not depend on ca_i.
 
     :class:`BoltzmannCoshRate` instances ignore ca_i by construction, so this
-    check short-circuits for them.  Any other callable is probed by comparing
-    its value at two physiologically reasonable Ca²⁺ concentrations
-    (0 mM and 1 µM) across a sweep of voltages spanning the operating range.
-    If the two probes agree at every voltage the rate is treated as V-only.
-    Any raised exception is treated as Ca-dependent (conservative fallback).
+    check short-circuits for them.  Any other callable is probed across a
+    sweep of voltages and Ca²⁺ concentrations spanning the physiological
+    range; if the function returns the same value at every (V, ca_i) pair
+    it is treated as V-only.  Any raised exception is logged at debug level
+    and treated as Ca-dependent (conservative fallback).
 
     Args:
         rate_fn: A rate callable with signature ``(V, ca_i) -> rate``.
@@ -242,11 +245,16 @@ def _is_voltage_only(rate_fn: RateFn) -> bool:
         return True
     try:
         for v in _CA_PROBE_VOLTAGES:
-            y0 = rate_fn(v, _CA_PROBE_VALUES[0])
-            y1 = rate_fn(v, _CA_PROBE_VALUES[1])
-            if y0 != y1:
-                return False
+            reference = rate_fn(v, _CA_PROBE_VALUES[0])
+            for ca in _CA_PROBE_VALUES[1:]:
+                if rate_fn(v, ca) != reference:
+                    return False
     except Exception:
+        logger.debug(
+            "Rate function %r raised during Ca²⁺ probe; treating as Ca-dependent",
+            rate_fn,
+            exc_info=True,
+        )
         return False
     return True
 
@@ -307,7 +315,7 @@ def _gating_derivatives_tabled(
     Used in voltage-clamp mode: V is prescribed so all four RK4 sub-steps share
     a single ``step_idx``.  Tabled values already have ``q10_factor`` folded in.
     Gating variables whose table entry is ``None`` (Ca²⁺-dependent rates) fall
-    through to a scalar call with ``phi`` re-applied.
+    through to a scalar call with ``q10_factor`` re-applied.
 
     Args:
         neuron: The conductance-based neuron model.
@@ -321,7 +329,6 @@ def _gating_derivatives_tabled(
     Returns:
         Tuple of (derivs, dca_i) — same shape as :func:`_gating_derivatives`.
     """
-    phi = neuron.q10_factor
     derivs: dict[str, float] = {}
     if neuron.calcium_dynamics is not None:
         i_ca_total = 0.0
@@ -331,13 +338,13 @@ def _gating_derivatives_tabled(
             for gv in ch.gating_variables:
                 x = gating_state[gv.name]
                 a_tbl = alpha_tables[gv.name]
-                if a_tbl is None:
+                b_tbl = beta_tables[gv.name]
+                if a_tbl is None or b_tbl is None:
+                    phi = neuron.q10_factor
                     a = phi * gv.alpha(V, ca_i)
                     b = phi * gv.beta(V, ca_i)
                 else:
                     a = a_tbl[step_idx]
-                    b_tbl = beta_tables[gv.name]
-                    assert b_tbl is not None  # paired by _precompute_rate_tables
                     b = b_tbl[step_idx]
                 derivs[gv.name] = a * (1 - x) - b * x
         dca_i = neuron.calcium_dynamics.derivative(i_ca_total, ca_i)
@@ -345,13 +352,13 @@ def _gating_derivatives_tabled(
         for gv in neuron.all_gating_variables:
             x = gating_state[gv.name]
             a_tbl = alpha_tables[gv.name]
-            if a_tbl is None:
+            b_tbl = beta_tables[gv.name]
+            if a_tbl is None or b_tbl is None:
+                phi = neuron.q10_factor
                 a = phi * gv.alpha(V, ca_i)
                 b = phi * gv.beta(V, ca_i)
             else:
                 a = a_tbl[step_idx]
-                b_tbl = beta_tables[gv.name]
-                assert b_tbl is not None  # paired by _precompute_rate_tables
                 b = b_tbl[step_idx]
             derivs[gv.name] = a * (1 - x) - b * x
         dca_i = 0.0
