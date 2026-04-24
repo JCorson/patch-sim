@@ -42,6 +42,7 @@ from patch_sim_ui.presets import (  # noqa: E402
     neuron_config_to_ui_state,
 )
 from patch_sim_ui.state import SimulationState  # noqa: E402
+from patch_sim_ui.state.analysis import AnalysisState  # noqa: E402
 from patch_sim_ui.state.log import LogState  # noqa: E402
 from patch_sim_ui.state.neuron import NeuronState  # noqa: E402
 from patch_sim_ui.state.protocol import ProtocolState  # noqa: E402
@@ -76,6 +77,11 @@ def _make_protocol_state() -> ProtocolState:
 def _make_visibility_state() -> VisibilityState:
     """Return a fresh VisibilityState instance bypassing the Reflex runtime guard."""
     return VisibilityState(_reflex_internal_init=True)
+
+
+def _make_analysis_state() -> AnalysisState:
+    """Return a fresh AnalysisState instance bypassing the Reflex runtime guard."""
+    return AnalysisState(_reflex_internal_init=True)
 
 
 def _make_sweep(label: str = "test", color: str = "#000000") -> Sweep:
@@ -1343,3 +1349,161 @@ async def test_reset_to_defaults_preserves_current_selection() -> None:
     assert ps.active_protocol_preset == REPETITIVE_FIRING
     assert SimulationState.run_membrane_test in yielded
     assert SimulationState.initialize_defaults not in yielded
+
+
+# ---------------------------------------------------------------------------
+# Analysis results cleared when traces are cleared (issue #271)
+# ---------------------------------------------------------------------------
+
+
+def _prime_analysis(an_st: AnalysisState) -> None:
+    """Populate every analysis field on an AnalysisState with non-empty data.
+
+    Args:
+        an_st: The AnalysisState instance to populate.
+    """
+    an_st.ap_metrics = [{"peak_v": 40.0}]
+    an_st.ap_summary = {"mean_peak_v": 40.0}
+    an_st.ap_is_multi_sweep = True
+    an_st.fi_data = {"current_steps": [0.1]}
+    an_st.iv_data = {"voltage_steps": [-70.0]}
+    an_st.gv_data = {"conductance": [0.5]}
+    an_st.sfa_data = {"isi": [10.0]}
+    an_st.hyperpolarization_data = {"sag_ratio": 0.1}
+    an_st.phase_plane_data = {"v": [-65.0]}
+
+
+def _assert_analysis_cleared(an_st: AnalysisState) -> None:
+    """Assert that all per-simulation analysis fields are reset to empty defaults.
+
+    Args:
+        an_st: The AnalysisState instance to inspect.
+    """
+    assert an_st.ap_metrics == []
+    assert an_st.ap_summary == {}
+    assert an_st.ap_is_multi_sweep is False
+    assert an_st.fi_data == {}
+    assert an_st.iv_data == {}
+    assert an_st.gv_data == {}
+    assert an_st.sfa_data == {}
+    assert an_st.hyperpolarization_data == {}
+    assert an_st.phase_plane_data == {}
+
+
+async def test_set_clamp_mode_clears_analysis_results() -> None:
+    """set_clamp_mode clears all per-simulation analysis fields on AnalysisState."""
+    ps = _make_protocol_state()
+    sim_st = _make_state()
+    an_st = _make_analysis_state()
+    _prime_analysis(an_st)
+    with patch.object(
+        ProtocolState,
+        "get_state",
+        new=_make_get_state_fn({SimulationState: sim_st, AnalysisState: an_st}),
+    ):
+        [_ async for _ in ps.set_clamp_mode("Voltage Clamp")]
+    _assert_analysis_cleared(an_st)
+
+
+async def test_set_clamp_mode_preserves_membrane_test_cache() -> None:
+    """set_clamp_mode does not clear membrane test cache on AnalysisState.
+
+    The mt_* fields are fingerprint-based and should survive protocol switches.
+    """
+    ps = _make_protocol_state()
+    sim_st = _make_state()
+    an_st = _make_analysis_state()
+    an_st.mt_input_resistance = "100 kΩ·cm²"
+    an_st.mt_neuron_fingerprint = "abc123"
+    with patch.object(
+        ProtocolState,
+        "get_state",
+        new=_make_get_state_fn({SimulationState: sim_st, AnalysisState: an_st}),
+    ):
+        [_ async for _ in ps.set_clamp_mode("Voltage Clamp")]
+    assert an_st.mt_input_resistance == "100 kΩ·cm²"
+    assert an_st.mt_neuron_fingerprint == "abc123"
+
+
+async def test_load_protocol_preset_clears_analysis_results() -> None:
+    """load_protocol_preset clears all per-simulation analysis fields."""
+    ps = _make_protocol_state()
+    sim_st = _make_state()
+    an_st = _make_analysis_state()
+    _prime_analysis(an_st)
+    with patch.object(
+        ProtocolState,
+        "get_state",
+        new=_make_get_state_fn({SimulationState: sim_st, AnalysisState: an_st}),
+    ):
+        [_ async for _ in ps.load_protocol_preset(ACTION_POTENTIAL)]
+    _assert_analysis_cleared(an_st)
+
+
+async def test_load_neuron_preset_clears_analysis_when_no_stored_traces() -> None:
+    """load_neuron_preset clears analysis results when no stored traces exist.
+
+    Without stored traces the simulation sweeps are cleared, so analysis
+    results from a previous run should not persist for the new neuron type.
+    """
+    ns = _make_neuron_state()
+    sim_st = _make_state()
+    an_st = _make_analysis_state()
+    sim_st.stored_traces = []
+    _prime_analysis(an_st)
+    with patch.object(
+        NeuronState,
+        "get_state",
+        new=_make_get_state_fn({SimulationState: sim_st, AnalysisState: an_st}),
+    ):
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
+    _assert_analysis_cleared(an_st)
+
+
+async def test_load_neuron_preset_preserves_analysis_with_stored_traces() -> None:
+    """load_neuron_preset keeps analysis results when stored traces exist.
+
+    When the user has stored a trace and changes neuron type, the previous
+    simulation (and its analysis) remain visible alongside the stored trace.
+    """
+    ns = _make_neuron_state()
+    sim_st = _make_state()
+    an_st = _make_analysis_state()
+    sim_st.stored_traces = [_make_sweep()]
+    _prime_analysis(an_st)
+    with patch.object(
+        NeuronState,
+        "get_state",
+        new=_make_get_state_fn({SimulationState: sim_st, AnalysisState: an_st}),
+    ):
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
+    assert an_st.ap_metrics == [{"peak_v": 40.0}]
+    assert an_st.fi_data == {"current_steps": [0.1]}
+
+
+async def test_clear_stored_traces_preserves_analysis_results() -> None:
+    """clear_stored_traces does not affect analysis results on AnalysisState.
+
+    Analysis results correspond to the current simulation sweeps, not the
+    stored reference traces, so removing stored traces must not clear analysis.
+    """
+    s = _make_state()
+    s.stored_traces = [_make_sweep()]
+    an_st = _make_analysis_state()
+    _prime_analysis(an_st)
+    with patch.object(SimulationState, "get_state", new=_make_get_state_fn({})):
+        await s.clear_stored_traces()
+    assert an_st.ap_metrics == [{"peak_v": 40.0}]
+    assert an_st.fi_data == {"current_steps": [0.1]}
+
+
+def test_analysis_state_clear_results_resets_simulation_fields() -> None:
+    """clear_results resets per-simulation fields and leaves mt_* fields untouched."""
+    an_st = _make_analysis_state()
+    _prime_analysis(an_st)
+    an_st.mt_input_resistance = "50 kΩ·cm²"
+    an_st.mt_neuron_fingerprint = "xyz"
+    an_st.clear_results()
+    _assert_analysis_cleared(an_st)
+    assert an_st.mt_input_resistance == "50 kΩ·cm²"
+    assert an_st.mt_neuron_fingerprint == "xyz"
