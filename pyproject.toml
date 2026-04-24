@@ -28,10 +28,15 @@ patch_sim = {path = "./patch_sim", editable = true}
 include = ["./patch_sim", "./patch_sim_ui", "./tests"]
 
 [[tool.ty.overrides]]
-include = ["patch_sim_ui/**", "tests/ui/test_state.py", "tests/ui/test_plotting.py"]
+include = [
+    "patch_sim_ui/**",
+    "tests/ui/test_state.py",
+    "tests/ui/test_plotting.py",
+    "tests/ui/test_traces_api.py",
+]
 
 [tool.ty.overrides.analysis]
-replace-imports-with-any = ["reflex.**", "plotly.**", "patch_sim_ui.**"]
+replace-imports-with-any = ["reflex.**", "plotly.**", "patch_sim_ui.**", "starlette.**"]
 
 # NumPy structured arrays use string-key subscript assignment which ty does not
 # model. Suppress the false-positive invalid-assignment errors in files that

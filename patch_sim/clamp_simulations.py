@@ -343,7 +343,16 @@ def _simulate_voltage_clamp_core(
         np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
     )
 
-    # Record initial state
+    # Record initial state. Callers must pass a gating_state whose keys exactly
+    # match the neuron's gating variables; any mismatch (e.g. stale keys from a
+    # neuron switch mid-iteration) is a programming error. Fail loudly rather
+    # than leaving index 0 uninitialised or silently dropping values.
+    if set(gating_state.keys()) != set(gating_arrs.keys()):
+        raise ValueError(
+            "gating_state keys do not match the neuron's gating variables: "
+            f"got {sorted(gating_state.keys())}, "
+            f"expected {sorted(gating_arrs.keys())}"
+        )
     for gv_name, val in gating_state.items():
         gating_arrs[gv_name][0] = val
 
@@ -461,7 +470,14 @@ def _simulate_current_clamp_core(
         np.empty(num_time_steps) if neuron.calcium_dynamics is not None else None
     )
 
-    # Record initial state
+    # Record initial state. Same contract as _simulate_voltage_clamp_core:
+    # gating_state keys must match the neuron's gating variables exactly.
+    if set(gating_state.keys()) != set(gating_arrs.keys()):
+        raise ValueError(
+            "gating_state keys do not match the neuron's gating variables: "
+            f"got {sorted(gating_state.keys())}, "
+            f"expected {sorted(gating_arrs.keys())}"
+        )
     for gv_name, val in gating_state.items():
         gating_arrs[gv_name][0] = val
 
