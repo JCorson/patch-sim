@@ -1305,7 +1305,6 @@ class SimulationState(rx.State):
             logger.info("Simulation complete: %.0f ms", elapsed)
             async with self:
                 analysis_st = await self.get_state(AnalysisState)
-                assert _sim_result is not None
                 self._do_apply_simulation(_sim_result, analysis_st)
             yield SimulationState.run_membrane_test
         finally:
