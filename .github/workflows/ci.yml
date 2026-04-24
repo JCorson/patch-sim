@@ -35,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [unit, integration, ui]
+        suite: [unit, integration, ui, e2e]
 
     steps:
       - uses: actions/checkout@v6
