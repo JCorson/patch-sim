@@ -20,27 +20,36 @@ setTimeout(async function () {
     }
     var fig = await resp.json();
 
-    // The mount div is always in the DOM but has display:none until
-    // has_result flips to true.  React is still flushing that flip when we
-    // arrive, so offsetHeight may be 0 even though getElementById succeeds.
-    // Calling Plotly.react on a zero-height div produces an invisible plot
-    // (traces are there, layout is zero-sized, nothing paints).
+    // Wait for two preconditions before rendering:
+    //
+    // 1. The mount div has display:block and non-zero offsetHeight.  It is
+    //    always in the DOM but stays display:none until has_result flips
+    //    true, and React may still be flushing that flip when we arrive.
+    //    Calling Plotly.react on a zero-height div produces an invisible plot.
+    //
+    // 2. window.Plotly is defined.  react-plotly.js is lazy-loaded
+    //    (ClientSide dynamic import) when the first <Plot> component mounts,
+    //    which happens concurrently with this fetch on the first simulation
+    //    run.  If we call Plotly.react before the module finishes loading,
+    //    it throws ReferenceError and the plot stays blank until the next run.
     //
     // TODO: replace this poll with a proper signal once we have one — e.g.
-    // a ResizeObserver on the mount div, or a callback the UI fires when the
-    // display:block transition is committed.  2 s at 50 ms gives the browser
-    // generous room for a slow frame without blocking forever.
+    // a ResizeObserver on the mount div plus a Plotly-ready event.  2 s at
+    // 50 ms gives the browser generous room for a slow frame and a slow
+    // module import without blocking forever.
     var gd = null;
     for (var _i = 0; _i < 40; _i++) {
       gd = document.getElementById("ps-trace-plot");
-      if (gd && gd.offsetHeight > 0) break;
+      if (gd && gd.offsetHeight > 0 && typeof window.Plotly !== "undefined") {
+        break;
+      }
       gd = null;
       await new Promise(function (r) {
         setTimeout(r, 50);
       });
     }
     if (!gd) {
-      console.error("[patch_sim] plot div not found");
+      console.error("[patch_sim] plot div / Plotly not ready after 2 s");
       return;
     }
 
