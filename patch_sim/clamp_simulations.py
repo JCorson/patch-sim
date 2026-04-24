@@ -177,9 +177,9 @@ def _hh_derivatives(
         each gating variable name to its derivative, and dca_i is 0.0 when no
         calcium_dynamics are configured.
     """
-    I_total = sum(
-        ch.compute_current(V, gating_state, neuron) for ch in neuron.all_channels
-    )
+    I_total = 0.0
+    for ch in neuron.all_channels:
+        I_total += ch.compute_current(V, gating_state, neuron)
     dV = (I_ext - I_total) / neuron.C_m
     derivs, dca_i = _gating_derivatives(neuron, V, gating_state, ca_i)
     return dV, derivs, dca_i
