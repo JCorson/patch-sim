@@ -10,10 +10,11 @@ Reflex state classes are imported; this module sets it at import time.
 
 import os
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
-from unittest.mock import patch
+from typing import AsyncIterator, Awaitable, Callable
+from unittest.mock import MagicMock, patch
 
-# Must be set before importing any Reflex or patch_sim_ui modules.
+# Reflex's State.__init__ checks for PYTEST_CURRENT_TEST to permit bare
+# instantiation outside a live app; set it before any state imports.
 os.environ.setdefault("PYTEST_CURRENT_TEST", "conftest::e2e")
 
 import pytest  # noqa: E402
@@ -95,21 +96,22 @@ class StateTree:
         self.visibility = make_visibility_state()
         self.log = make_log_state()
 
-    def get_state_fn(self, host_cls: type):
-        """Return an async *get_state* replacement for *host_cls*.
+    def get_state_fn(
+        self, _host_cls: type
+    ) -> Callable[[object, type], Awaitable[object]]:
+        """Return an async *get_state* replacement bound to this tree.
 
         The returned function resolves sibling classes to their instances
         within this tree, and returns a fresh MagicMock for anything else
         (so handlers that access rarely-used siblings don't crash).
 
         Args:
-            host_cls: The state class whose ``get_state`` is being patched.
+            _host_cls: Accepted for call-site symmetry with ``patch.object``
+                usage; not used in the returned function.
 
         Returns:
             An async callable suitable for use with ``patch.object``.
         """
-        from unittest.mock import MagicMock
-
         mapping = {
             SimulationState: self.sim,
             NeuronState: self.neuron,
@@ -201,6 +203,38 @@ async def run_flow(
     protocols = tree.protocol._build_protocols()
     mode = tree.protocol.clamp_mode
 
+    result = _compute_simulation(
+        neuron=neuron,
+        protocols=protocols,
+        mode=mode,
+        stored_traces=list(tree.sim.stored_traces),
+        show_hover=tree.sim.show_hover,
+        min_stimulus=tree.protocol.min_stimulus,
+        max_stimulus=tree.protocol.max_stimulus,
+        stimulus_step=tree.protocol.stimulus_step,
+        pre_stimulus_duration=tree.protocol.pre_stimulus_duration,
+        stimulus_duration=tree.protocol.stimulus_duration,
+    )
+    tree.sim._do_apply_simulation(result, tree.analysis)
+    return result
+
+
+def simulate_and_apply(tree: StateTree) -> _SimResult:
+    """Run the simulation on the already-loaded neuron/protocol state.
+
+    Unlike :func:`run_flow`, skips preset loading so stored traces and
+    any other state configured before the call are preserved.
+
+    Args:
+        tree: :class:`StateTree` with neuron and protocol already configured.
+
+    Returns:
+        The :class:`~patch_sim_ui.state.simulation._SimResult` produced by
+        the simulation, also already applied to ``tree.sim`` and ``tree.analysis``.
+    """
+    neuron = tree.neuron._build_neuron()
+    protocols = tree.protocol._build_protocols()
+    mode = tree.protocol.clamp_mode
     result = _compute_simulation(
         neuron=neuron,
         protocols=protocols,

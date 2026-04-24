@@ -87,7 +87,12 @@ async def test_vc_after_cc_clears_ap_summary(state_tree: StateTree) -> None:
 
 
 async def test_two_cc_runs_replace_analysis(state_tree: StateTree) -> None:
-    """A second CC run replaces AP analysis from the first run, not appends."""
+    """A second CC run replaces AP analysis from the first run, not appends.
+
+    ACTION_POTENTIAL (30 ms, 10 µA/cm²) and REPETITIVE_FIRING (180 ms,
+    15 µA/cm²) produce different spike counts for the squid axon, so the
+    change in spike_count proves the analysis was replaced by the second run.
+    """
     await run_flow(
         state_tree,
         neuron_preset=SQUID_GIANT_AXON,
@@ -95,7 +100,6 @@ async def test_two_cc_runs_replace_analysis(state_tree: StateTree) -> None:
     )
     first_count = int(state_tree.analysis.ap_summary.get("spike_count", "0"))
 
-    # Load a different protocol that produces different firing behaviour.
     await run_flow(
         state_tree,
         neuron_preset=SQUID_GIANT_AXON,
@@ -103,9 +107,5 @@ async def test_two_cc_runs_replace_analysis(state_tree: StateTree) -> None:
     )
     second_count = int(state_tree.analysis.ap_summary.get("spike_count", "0"))
 
-    # Spike counts differ because the protocols inject different currents.
-    # The key assertion is that there is exactly one set of analysis — no
-    # accumulation across runs.
     assert len(state_tree.sim._current_sweeps) == 1
-    # The analysis reflects the second run (not accumulated from both).
-    assert "spike_count" in state_tree.analysis.ap_summary
+    assert second_count != first_count

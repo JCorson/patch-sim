@@ -77,7 +77,7 @@ async def test_action_potential_preset_populates_ap_summary(
 
 
 async def test_squid_action_potential_spikes(state_tree: StateTree) -> None:
-    """Squid giant axon with Action Potential preset fires at least one spike."""
+    """Squid giant axon with Action Potential preset fires exactly one spike."""
     await run_flow(
         state_tree,
         neuron_preset=SQUID_GIANT_AXON,
@@ -85,7 +85,7 @@ async def test_squid_action_potential_spikes(state_tree: StateTree) -> None:
     )
 
     spike_count = int(state_tree.analysis.ap_summary.get("spike_count", "0"))
-    assert spike_count >= 1
+    assert spike_count == 1
 
 
 async def test_repetitive_firing_preset_produces_sweep(state_tree: StateTree) -> None:

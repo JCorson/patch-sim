@@ -4,33 +4,7 @@ Exercises the wiring between run → store_trace → run again → clear_stored_
 """
 
 from patch_sim.constants import ACTION_POTENTIAL, SQUID_GIANT_AXON
-from patch_sim_ui.state.simulation import _compute_simulation
-from tests.e2e.conftest import StateTree, run_flow
-
-
-async def _rerun(tree: StateTree) -> None:
-    """Re-run the simulation using the already-loaded neuron/protocol state.
-
-    Unlike run_flow, this skips preset loading (which would call
-    _clear_for_new_protocol and reset stored_traces) and calls
-    _compute_simulation + _do_apply_simulation directly.
-    """
-    neuron = tree.neuron._build_neuron()
-    protocols = tree.protocol._build_protocols()
-    mode = tree.protocol.clamp_mode
-    result = _compute_simulation(
-        neuron=neuron,
-        protocols=protocols,
-        mode=mode,
-        stored_traces=list(tree.sim.stored_traces),
-        show_hover=tree.sim.show_hover,
-        min_stimulus=tree.protocol.min_stimulus,
-        max_stimulus=tree.protocol.max_stimulus,
-        stimulus_step=tree.protocol.stimulus_step,
-        pre_stimulus_duration=tree.protocol.pre_stimulus_duration,
-        stimulus_duration=tree.protocol.stimulus_duration,
-    )
-    tree.sim._do_apply_simulation(result, tree.analysis)
+from tests.e2e.conftest import StateTree, run_flow, simulate_and_apply
 
 
 async def test_do_store_trace_after_run(state_tree: StateTree) -> None:
@@ -72,7 +46,7 @@ async def test_second_run_does_not_affect_stored_traces(state_tree: StateTree) -
     stored_label = state_tree.sim.stored_traces[0].label
 
     # Run again without reloading presets (which would clear stored traces).
-    await _rerun(state_tree)
+    simulate_and_apply(state_tree)
 
     assert len(state_tree.sim.stored_traces) == 1
     assert state_tree.sim.stored_traces[0].label == stored_label
@@ -114,7 +88,7 @@ async def test_multiple_stores_accumulate(state_tree: StateTree) -> None:
     state_tree.sim._do_store_trace()
 
     # Re-run without reloading presets so stored_traces are not cleared.
-    await _rerun(state_tree)
+    simulate_and_apply(state_tree)
     state_tree.sim._do_store_trace()
 
     assert len(state_tree.sim.stored_traces) == 2
