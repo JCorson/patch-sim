@@ -14,6 +14,9 @@ from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
+from .channels import RateFn
+from .electrochemistry import BoltzmannCoshRate
+
 if TYPE_CHECKING:
     from typing import Any
 
@@ -215,17 +218,162 @@ def _clip_state(state: dict[str, float]) -> dict[str, float]:
     return {k: max(0.0, min(1.0, v)) for k, v in state.items()}
 
 
+_CA_PROBE_VOLTAGES: tuple[float, ...] = (-90.0, -60.0, -30.0, 0.0, 30.0)
+_CA_PROBE_VALUES: tuple[float, float] = (0.0, 1.0e-3)
+
+
+def _is_voltage_only(rate_fn: RateFn) -> bool:
+    """Return True when rate_fn's output does not depend on ca_i.
+
+    :class:`BoltzmannCoshRate` instances ignore ca_i by construction, so this
+    check short-circuits for them.  Any other callable is probed by comparing
+    its value at two physiologically reasonable Ca²⁺ concentrations
+    (0 mM and 1 µM) across a sweep of voltages spanning the operating range.
+    If the two probes agree at every voltage the rate is treated as V-only.
+    Any raised exception is treated as Ca-dependent (conservative fallback).
+
+    Args:
+        rate_fn: A rate callable with signature ``(V, ca_i) -> rate``.
+
+    Returns:
+        True if rate_fn's output is independent of ca_i at every probe voltage.
+    """
+    if isinstance(rate_fn, BoltzmannCoshRate):
+        return True
+    try:
+        for v in _CA_PROBE_VOLTAGES:
+            y0 = rate_fn(v, _CA_PROBE_VALUES[0])
+            y1 = rate_fn(v, _CA_PROBE_VALUES[1])
+            if y0 != y1:
+                return False
+    except Exception:
+        return False
+    return True
+
+
+def _precompute_rate_tables(
+    neuron: "Neuron",
+    voltage_protocol: np.ndarray,
+) -> tuple[dict[str, np.ndarray | None], dict[str, np.ndarray | None]]:
+    """Precompute per-gate alpha/beta arrays over the voltage-clamp protocol.
+
+    For each gating variable whose alpha and beta are both V-only, builds
+    arrays ``alpha[i] = phi * gv.alpha(V[i])`` and ``beta[i] = phi * gv.beta(V[i])``
+    — with ``phi = neuron.q10_factor`` folded in so the hot loop needs no extra
+    multiplication.  Gating variables with any Ca²⁺-dependent rate store
+    ``None`` in both dicts and must be evaluated scalar-wise on the fly.
+
+    Args:
+        neuron: The conductance-based neuron model.
+        voltage_protocol: Prescribed voltage array for the run in mV.
+
+    Returns:
+        Tuple ``(alpha_tables, beta_tables)``.  Each dict maps gating-variable
+        name to a 1-D ``float64`` array (same length as *voltage_protocol*) or
+        ``None`` when that rate is Ca²⁺-dependent.
+    """
+    phi = neuron.q10_factor
+    alpha_tables: dict[str, np.ndarray | None] = {}
+    beta_tables: dict[str, np.ndarray | None] = {}
+    for gv in neuron.all_gating_variables:
+        if _is_voltage_only(gv.alpha) and _is_voltage_only(gv.beta):
+            alpha_fn = gv.alpha
+            beta_fn = gv.beta
+            alpha_vec = np.vectorize(
+                lambda v, fn=alpha_fn: fn(v, 0.0), otypes=[np.float64]
+            )
+            beta_vec = np.vectorize(
+                lambda v, fn=beta_fn: fn(v, 0.0), otypes=[np.float64]
+            )
+            alpha_tables[gv.name] = phi * alpha_vec(voltage_protocol)
+            beta_tables[gv.name] = phi * beta_vec(voltage_protocol)
+        else:
+            alpha_tables[gv.name] = None
+            beta_tables[gv.name] = None
+    return alpha_tables, beta_tables
+
+
+def _gating_derivatives_tabled(
+    neuron: "Neuron",
+    V: float,
+    gating_state: dict[str, float],
+    ca_i: float,
+    alpha_tables: dict[str, np.ndarray | None],
+    beta_tables: dict[str, np.ndarray | None],
+    step_idx: int,
+) -> tuple[dict[str, float], float]:
+    """Compute gating derivatives using precomputed rate tables where possible.
+
+    Used in voltage-clamp mode: V is prescribed so all four RK4 sub-steps share
+    a single ``step_idx``.  Tabled values already have ``q10_factor`` folded in.
+    Gating variables whose table entry is ``None`` (Ca²⁺-dependent rates) fall
+    through to a scalar call with ``phi`` re-applied.
+
+    Args:
+        neuron: The conductance-based neuron model.
+        V: Prescribed membrane voltage in mV.
+        gating_state: Current gating state mapping variable name → value.
+        ca_i: Current intracellular Ca²⁺ concentration in mM.
+        alpha_tables: Per-gate alpha arrays (or None when Ca-dependent).
+        beta_tables: Per-gate beta arrays (or None when Ca-dependent).
+        step_idx: Index into the tables for the current protocol step.
+
+    Returns:
+        Tuple of (derivs, dca_i) — same shape as :func:`_gating_derivatives`.
+    """
+    phi = neuron.q10_factor
+    derivs: dict[str, float] = {}
+    if neuron.calcium_dynamics is not None:
+        i_ca_total = 0.0
+        for ch in neuron.all_channels:
+            if ch.carries_calcium:
+                i_ca_total += ch.compute_current(V, gating_state, neuron)
+            for gv in ch.gating_variables:
+                x = gating_state[gv.name]
+                a_tbl = alpha_tables[gv.name]
+                if a_tbl is None:
+                    a = phi * gv.alpha(V, ca_i)
+                    b = phi * gv.beta(V, ca_i)
+                else:
+                    a = a_tbl[step_idx]
+                    b_tbl = beta_tables[gv.name]
+                    assert b_tbl is not None  # paired by _precompute_rate_tables
+                    b = b_tbl[step_idx]
+                derivs[gv.name] = a * (1 - x) - b * x
+        dca_i = neuron.calcium_dynamics.derivative(i_ca_total, ca_i)
+    else:
+        for gv in neuron.all_gating_variables:
+            x = gating_state[gv.name]
+            a_tbl = alpha_tables[gv.name]
+            if a_tbl is None:
+                a = phi * gv.alpha(V, ca_i)
+                b = phi * gv.beta(V, ca_i)
+            else:
+                a = a_tbl[step_idx]
+                b_tbl = beta_tables[gv.name]
+                assert b_tbl is not None  # paired by _precompute_rate_tables
+                b = b_tbl[step_idx]
+            derivs[gv.name] = a * (1 - x) - b * x
+        dca_i = 0.0
+    return derivs, dca_i
+
+
 def _rk4_step_voltage_clamp(
     neuron: "Neuron",
     V: float,
     gating_state: dict[str, float],
     dt: float,
     ca_i: float,
+    alpha_tables: dict[str, np.ndarray | None],
+    beta_tables: dict[str, np.ndarray | None],
+    step_idx: int,
 ) -> tuple[dict[str, float], float]:
     """Advance voltage-clamp gating variables by one RK4 step.
 
     Voltage is held constant at *V*; only the gating variables and optional
-    Ca²⁺ concentration evolve.
+    Ca²⁺ concentration evolve.  Uses precomputed alpha/beta tables indexed by
+    *step_idx* for V-only rates, falling back to scalar calls for Ca²⁺-dependent
+    rates (identified by ``None`` entries in *alpha_tables* / *beta_tables*).
 
     Args:
         neuron: The conductance-based neuron model.
@@ -233,18 +381,41 @@ def _rk4_step_voltage_clamp(
         gating_state: Current gating state mapping variable name → value.
         dt: Time step in milliseconds.
         ca_i: Current intracellular Ca²⁺ concentration in mM.
+        alpha_tables: Per-gate alpha arrays (or None when Ca-dependent).
+        beta_tables: Per-gate beta arrays (or None when Ca-dependent).
+        step_idx: Index into the tables for the current protocol step.
 
     Returns:
         Tuple of (new_gating_state, new_ca_i) with gating variables clipped to
         [0, 1] and ca_i floored at 0.0.
     """
-    d1, dca1 = _gating_derivatives(neuron, V, gating_state, ca_i)
+    d1, dca1 = _gating_derivatives_tabled(
+        neuron, V, gating_state, ca_i, alpha_tables, beta_tables, step_idx
+    )
     s2 = _advance_state(gating_state, d1, 0.5 * dt)
-    d2, dca2 = _gating_derivatives(neuron, V, s2, ca_i + 0.5 * dt * dca1)
+    d2, dca2 = _gating_derivatives_tabled(
+        neuron,
+        V,
+        s2,
+        ca_i + 0.5 * dt * dca1,
+        alpha_tables,
+        beta_tables,
+        step_idx,
+    )
     s3 = _advance_state(gating_state, d2, 0.5 * dt)
-    d3, dca3 = _gating_derivatives(neuron, V, s3, ca_i + 0.5 * dt * dca2)
+    d3, dca3 = _gating_derivatives_tabled(
+        neuron,
+        V,
+        s3,
+        ca_i + 0.5 * dt * dca2,
+        alpha_tables,
+        beta_tables,
+        step_idx,
+    )
     s4 = _advance_state(gating_state, d3, dt)
-    d4, dca4 = _gating_derivatives(neuron, V, s4, ca_i + dt * dca3)
+    d4, dca4 = _gating_derivatives_tabled(
+        neuron, V, s4, ca_i + dt * dca3, alpha_tables, beta_tables, step_idx
+    )
     new_state = _clip_state(
         {
             k: gating_state[k] + (dt / 6.0) * (d1[k] + 2 * d2[k] + 2 * d3[k] + d4[k])
@@ -376,12 +547,17 @@ def _simulate_voltage_clamp_core(
         ch_current_arrs[ch.name][0] = i_ch
     I_total[0] = sum(ch_currents_0)
 
+    # Precompute alpha/beta tables once — V is prescribed so V-only gates
+    # can be evaluated in a single vectorised pass instead of 4× per step in
+    # the RK4 loop. Ca²⁺-dependent gates (e.g. IKCa) stay scalar.
+    alpha_tables, beta_tables = _precompute_rate_tables(neuron, voltage_protocol)
+
     # Main simulation loop
     for i in range(1, num_time_steps):
         V = voltage_protocol[i]
 
         gating_state, ca_i = _rk4_step_voltage_clamp(
-            neuron, V, gating_state, time_step, ca_i
+            neuron, V, gating_state, time_step, ca_i, alpha_tables, beta_tables, i
         )
 
         for gv_name, val in gating_state.items():
