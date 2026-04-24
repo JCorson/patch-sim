@@ -9,6 +9,10 @@ pytest.importorskip("plotly")
 pytest.importorskip("starlette")
 
 import plotly.graph_objects as go  # noqa: E402
+from starlette.testclient import TestClient  # noqa: E402
+
+from patch_sim_ui.api import traces  # noqa: E402
+from patch_sim_ui.api.traces import get_bytes, put, starlette_app  # noqa: E402
 
 
 def _make_fig(n_traces: int = 2, n_pts: int = 10) -> go.Figure:
@@ -32,9 +36,7 @@ def _make_fig(n_traces: int = 2, n_pts: int = 10) -> go.Figure:
 @pytest.fixture(autouse=True)
 def _clear_store():
     """Reset the side-channel figure store to empty before each test."""
-    from patch_sim_ui.api.traces import _STORE
-
-    _STORE.clear()
+    traces._STORE.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -44,8 +46,6 @@ def _clear_store():
 
 def test_put_and_get_round_trip() -> None:
     """Put then get_bytes returns valid JSON-encoded figure dict."""
-    from patch_sim_ui.api.traces import get_bytes, put
-
     fig = _make_fig()
     put("tok1", fig)
     raw = get_bytes("tok1")
@@ -56,8 +56,6 @@ def test_put_and_get_round_trip() -> None:
 
 def test_trace_values_preserved() -> None:
     """Float values in the stored figure match the original sweep arrays."""
-    from patch_sim_ui.api.traces import get_bytes, put
-
     fig = _make_fig(n_traces=1, n_pts=5)
     original_x = list(fig.data[0].x)
     put("tok-vals", fig)
@@ -68,17 +66,12 @@ def test_trace_values_preserved() -> None:
 
 def test_missing_token_raises() -> None:
     """get_bytes raises KeyError for an unknown token."""
-    from patch_sim_ui.api.traces import get_bytes
-
     with pytest.raises(KeyError):
         get_bytes("no-such-token")
 
 
 def test_fifo_eviction() -> None:
     """Inserting more than _MAX_TOKENS entries evicts the oldest."""
-    from patch_sim_ui.api import traces
-    from patch_sim_ui.api.traces import put
-
     max_t = traces._MAX_TOKENS
     fig = _make_fig()
     tokens = [f"t{i}" for i in range(max_t + 1)]
@@ -97,10 +90,6 @@ def test_fifo_eviction() -> None:
 
 def test_route_200_for_known_token() -> None:
     """GET /api/figure/{token} returns 200 with JSON body for a known token."""
-    from starlette.testclient import TestClient
-
-    from patch_sim_ui.api.traces import put, starlette_app
-
     put("tok-http", _make_fig())
     client = TestClient(starlette_app)
     resp = client.get("/api/figure/tok-http")
@@ -111,10 +100,6 @@ def test_route_200_for_known_token() -> None:
 
 def test_route_404_for_unknown_token() -> None:
     """GET /api/figure/{token} returns 404 when the token is absent."""
-    from starlette.testclient import TestClient
-
-    from patch_sim_ui.api.traces import starlette_app
-
     client = TestClient(starlette_app)
     resp = client.get("/api/figure/nonexistent")
     assert resp.status_code == 404
