@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+import numpy as np
+
 from .rates import Rate
 
 
@@ -247,4 +249,50 @@ class IonChannel:
         e_rev = neuron.reversal_potentials.get(self.name)
         if e_rev is None:
             e_rev = self.reversal_potential(neuron)
+        return g * (V - e_rev)
+
+    def compute_current_array(
+        self,
+        V: float,
+        state_array: np.ndarray,
+        gate_indices: np.ndarray,
+        gate_powers: np.ndarray,
+        e_rev: float,
+    ) -> float:
+        """Compute ionic current using the flat array-backed gating state.
+
+        This is the array-path equivalent of :meth:`compute_current`.  The
+        caller pre-fetches *e_rev* from ``neuron.reversal_potentials`` and the
+        per-channel ``(gate_indices, gate_powers)`` from
+        ``neuron._channel_gate_specs`` so no dict lookups occur inside the hot
+        simulation loop.
+
+        Three fast paths avoid ``np.prod`` overhead for the common cases:
+
+        * Zero-gate channels (e.g. leak channels): returns ``g_max * (V - e_rev)``
+          immediately.
+        * Single gate with power 1 (e.g. Ih, INaP, IM, IKir, IKCa): returns
+          ``g_max * state_array[gate_indices[0]] * (V - e_rev)`` without
+          constructing a temporary array.
+        * General case: ``g_max * prod(state_array[gate_indices] ** gate_powers)
+          * (V - e_rev)`` via numpy ufuncs.
+
+        Args:
+            V: Membrane voltage in mV.
+            state_array: Flat ``float64`` gating state array ordered by
+                ``neuron.gating_index``.
+            gate_indices: ``intp`` indices of this channel's gates in
+                *state_array* — element ``i`` of ``neuron._channel_gate_specs``.
+            gate_powers: ``intp`` exponents matching *gate_indices* in order.
+            e_rev: Reversal potential in mV, pre-fetched from
+                ``neuron.reversal_potentials``.
+
+        Returns:
+            Ionic current in µA/cm².
+        """
+        if gate_indices.size == 0:
+            return self.g_max * (V - e_rev)
+        if gate_indices.size == 1 and gate_powers[0] == 1:
+            return self.g_max * float(state_array[gate_indices[0]]) * (V - e_rev)
+        g = self.g_max * float(np.prod(state_array[gate_indices] ** gate_powers))
         return g * (V - e_rev)

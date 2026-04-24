@@ -8,6 +8,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import cached_property
 
+import numpy as np
+
 from .calcium import CalciumDynamics
 from .channels import GatingVariable, IonChannel, IonSpecies
 from .constants import (
@@ -234,6 +236,53 @@ class Neuron:
         for ch in self.all_channels:
             result.extend(ch.gating_variables)
         return tuple(result)
+
+    @cached_property
+    def gating_index(self) -> dict[str, int]:
+        """Return a mapping from gating variable name to its flat-array index.
+
+        The ordering matches :attr:`all_gating_variables` — gate at position
+        ``i`` in that tuple has index ``i`` in the flat state array used by the
+        array-backed simulation path.
+
+        Returns:
+            Dict mapping each gating variable name to its integer index.
+        """
+        return {gv.name: i for i, gv in enumerate(self.all_gating_variables)}
+
+    @cached_property
+    def _channel_gate_specs(
+        self,
+    ) -> tuple[tuple[np.ndarray, np.ndarray], ...]:
+        """Return per-channel (indices, powers) arrays for the array-backed path.
+
+        Each element corresponds to the channel at the same position in
+        :attr:`all_channels`.  ``indices`` is an ``intp`` array of the
+        positions that this channel's gates occupy in the flat gating state
+        array; ``powers`` is a matching ``intp`` array of gate exponents.
+
+        Channels with no gating variables get empty length-0 arrays so that
+        :meth:`~patch_sim.channels.IonChannel.compute_current_array` can handle
+        them with the zero-gate fast path.
+
+        Returns:
+            Tuple of ``(indices, powers)`` pairs, one per channel.
+        """
+        idx = self.gating_index
+        specs: list[tuple[np.ndarray, np.ndarray]] = []
+        for ch in self.all_channels:
+            if ch.gating_variables:
+                indices = np.array(
+                    [idx[gv.name] for gv in ch.gating_variables], dtype=np.intp
+                )
+                powers = np.array(
+                    [gv.power for gv in ch.gating_variables], dtype=np.intp
+                )
+            else:
+                indices = np.empty(0, dtype=np.intp)
+                powers = np.empty(0, dtype=np.intp)
+            specs.append((indices, powers))
+        return tuple(specs)
 
     @cached_property
     def reversal_potentials(self) -> dict[str, float]:
