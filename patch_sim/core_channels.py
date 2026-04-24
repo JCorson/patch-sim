@@ -18,6 +18,7 @@ intracellular [Cl⁻] that arose when using a single chloride-Nernst leak.
 """
 
 from .channels import GatingVariable, IonChannel, IonSpecies, NernstSpec
+from .rates import VoltageOnlyFn
 from .utils import safe_exp
 
 __all__ = [
@@ -95,7 +96,7 @@ __all__ = [
 SINGULARITY_THRESHOLD = 1e-6
 
 
-def alpha_n(V: float, ca_i: float) -> float:
+def _alpha_n_impl(V: float, ca_i: float) -> float:
     """Forward rate for potassium channel activation gate n.
 
     Has a removable singularity at V = −55 mV; the L'Hôpital limit (0.1) is
@@ -114,7 +115,10 @@ def alpha_n(V: float, ca_i: float) -> float:
     return 0.01 * (V + 55) / denominator
 
 
-def beta_n(V: float, ca_i: float) -> float:
+alpha_n = VoltageOnlyFn(_alpha_n_impl)
+
+
+def _beta_n_impl(V: float, ca_i: float) -> float:
     """Backward rate for potassium channel activation gate n.
 
     Args:
@@ -127,7 +131,10 @@ def beta_n(V: float, ca_i: float) -> float:
     return 0.125 * safe_exp(-(V + 65) / 80)
 
 
-def alpha_m(V: float, ca_i: float) -> float:
+beta_n = VoltageOnlyFn(_beta_n_impl)
+
+
+def _alpha_m_impl(V: float, ca_i: float) -> float:
     """Forward rate for sodium channel activation gate m.
 
     Has a removable singularity at V = −40 mV; the L'Hôpital limit (1.0) is
@@ -146,7 +153,10 @@ def alpha_m(V: float, ca_i: float) -> float:
     return 0.1 * (V + 40) / denominator
 
 
-def beta_m(V: float, ca_i: float) -> float:
+alpha_m = VoltageOnlyFn(_alpha_m_impl)
+
+
+def _beta_m_impl(V: float, ca_i: float) -> float:
     """Backward rate for sodium channel activation gate m.
 
     Args:
@@ -159,7 +169,10 @@ def beta_m(V: float, ca_i: float) -> float:
     return 4.0 * safe_exp(-(V + 65) / 18)
 
 
-def alpha_h(V: float, ca_i: float) -> float:
+beta_m = VoltageOnlyFn(_beta_m_impl)
+
+
+def _alpha_h_impl(V: float, ca_i: float) -> float:
     """Forward rate for sodium inactivation gate h.
 
     Args:
@@ -172,7 +185,10 @@ def alpha_h(V: float, ca_i: float) -> float:
     return 0.07 * safe_exp(-(V + 65) / 20)
 
 
-def beta_h(V: float, ca_i: float) -> float:
+alpha_h = VoltageOnlyFn(_alpha_h_impl)
+
+
+def _beta_h_impl(V: float, ca_i: float) -> float:
     """Backward rate for sodium inactivation gate h.
 
     Args:
@@ -183,6 +199,9 @@ def beta_h(V: float, ca_i: float) -> float:
         Backward rate in 1/ms.
     """
     return 1 / (1 + safe_exp(-(V + 35) / 10))
+
+
+beta_h = VoltageOnlyFn(_beta_h_impl)
 
 
 def make_na_channel(g_max: float) -> IonChannel:
@@ -405,7 +424,7 @@ def _traub_miles_beta_n(V: float, vt: float) -> float:
 POSPISCHIL_VT: float = -56.2
 
 
-def pospischil_alpha_m(V: float, ca_i: float) -> float:
+def _pospischil_alpha_m_impl(V: float, ca_i: float) -> float:
     """Forward rate for Pospischil Na⁺ activation gate m.
 
     Adopted from Traub & Miles (1991).  Has a removable singularity at
@@ -422,7 +441,10 @@ def pospischil_alpha_m(V: float, ca_i: float) -> float:
     return _traub_miles_alpha_m(V, POSPISCHIL_VT)
 
 
-def pospischil_beta_m(V: float, ca_i: float) -> float:
+pospischil_alpha_m = VoltageOnlyFn(_pospischil_alpha_m_impl)
+
+
+def _pospischil_beta_m_impl(V: float, ca_i: float) -> float:
     """Backward rate for Pospischil Na⁺ activation gate m.
 
     Adopted from Traub & Miles (1991).  Has a removable singularity at
@@ -439,7 +461,10 @@ def pospischil_beta_m(V: float, ca_i: float) -> float:
     return _traub_miles_beta_m(V, POSPISCHIL_VT)
 
 
-def pospischil_alpha_h(V: float, ca_i: float) -> float:
+pospischil_beta_m = VoltageOnlyFn(_pospischil_beta_m_impl)
+
+
+def _pospischil_alpha_h_impl(V: float, ca_i: float) -> float:
     """Forward rate for Pospischil Na⁺ inactivation gate h.
 
     Adopted from Traub & Miles (1991).
@@ -454,7 +479,10 @@ def pospischil_alpha_h(V: float, ca_i: float) -> float:
     return _traub_miles_alpha_h(V, POSPISCHIL_VT)
 
 
-def pospischil_beta_h(V: float, ca_i: float) -> float:
+pospischil_alpha_h = VoltageOnlyFn(_pospischil_alpha_h_impl)
+
+
+def _pospischil_beta_h_impl(V: float, ca_i: float) -> float:
     """Backward rate for Pospischil Na⁺ inactivation gate h.
 
     Adopted from Traub & Miles (1991).
@@ -469,7 +497,10 @@ def pospischil_beta_h(V: float, ca_i: float) -> float:
     return _traub_miles_beta_h(V, POSPISCHIL_VT)
 
 
-def pospischil_alpha_n(V: float, ca_i: float) -> float:
+pospischil_beta_h = VoltageOnlyFn(_pospischil_beta_h_impl)
+
+
+def _pospischil_alpha_n_impl(V: float, ca_i: float) -> float:
     """Forward rate for Pospischil K⁺ delayed-rectifier activation gate n.
 
     Adopted from Traub & Miles (1991).  Has a removable singularity at
@@ -486,7 +517,10 @@ def pospischil_alpha_n(V: float, ca_i: float) -> float:
     return _traub_miles_alpha_n(V, POSPISCHIL_VT)
 
 
-def pospischil_beta_n(V: float, ca_i: float) -> float:
+pospischil_alpha_n = VoltageOnlyFn(_pospischil_alpha_n_impl)
+
+
+def _pospischil_beta_n_impl(V: float, ca_i: float) -> float:
     """Backward rate for Pospischil K⁺ delayed-rectifier activation gate n.
 
     Adopted from Traub & Miles (1991).
@@ -499,6 +533,9 @@ def pospischil_beta_n(V: float, ca_i: float) -> float:
         Backward rate in 1/ms.
     """
     return _traub_miles_beta_n(V, POSPISCHIL_VT)
+
+
+pospischil_beta_n = VoltageOnlyFn(_pospischil_beta_n_impl)
 
 
 def make_pospischil_na_channel(g_max: float) -> IonChannel:
@@ -587,7 +624,7 @@ def make_pospischil_k_channel(g_max: float) -> IonChannel:
 THALAMIC_RELAY_VT: float = -52.0
 
 
-def thalamic_relay_alpha_m(V: float, ca_i: float) -> float:
+def _thalamic_relay_alpha_m_impl(V: float, ca_i: float) -> float:
     """Forward rate for thalamic relay Na⁺ activation gate m.
 
     Traub-Miles form parameterised for thalamic relay cells (VT = −52 mV).
@@ -607,7 +644,10 @@ def thalamic_relay_alpha_m(V: float, ca_i: float) -> float:
     return _traub_miles_alpha_m(V, THALAMIC_RELAY_VT)
 
 
-def thalamic_relay_beta_m(V: float, ca_i: float) -> float:
+thalamic_relay_alpha_m = VoltageOnlyFn(_thalamic_relay_alpha_m_impl)
+
+
+def _thalamic_relay_beta_m_impl(V: float, ca_i: float) -> float:
     """Backward rate for thalamic relay Na⁺ activation gate m.
 
     Traub-Miles form parameterised for thalamic relay cells (VT = −52 mV).
@@ -627,7 +667,10 @@ def thalamic_relay_beta_m(V: float, ca_i: float) -> float:
     return _traub_miles_beta_m(V, THALAMIC_RELAY_VT)
 
 
-def thalamic_relay_alpha_h(V: float, ca_i: float) -> float:
+thalamic_relay_beta_m = VoltageOnlyFn(_thalamic_relay_beta_m_impl)
+
+
+def _thalamic_relay_alpha_h_impl(V: float, ca_i: float) -> float:
     """Forward rate for thalamic relay Na⁺ inactivation gate h.
 
     Traub-Miles form parameterised for thalamic relay cells (VT = −52 mV).
@@ -645,7 +688,10 @@ def thalamic_relay_alpha_h(V: float, ca_i: float) -> float:
     return _traub_miles_alpha_h(V, THALAMIC_RELAY_VT)
 
 
-def thalamic_relay_beta_h(V: float, ca_i: float) -> float:
+thalamic_relay_alpha_h = VoltageOnlyFn(_thalamic_relay_alpha_h_impl)
+
+
+def _thalamic_relay_beta_h_impl(V: float, ca_i: float) -> float:
     """Backward rate for thalamic relay Na⁺ inactivation gate h.
 
     Traub-Miles form parameterised for thalamic relay cells (VT = −52 mV).
@@ -663,7 +709,10 @@ def thalamic_relay_beta_h(V: float, ca_i: float) -> float:
     return _traub_miles_beta_h(V, THALAMIC_RELAY_VT)
 
 
-def thalamic_relay_alpha_n(V: float, ca_i: float) -> float:
+thalamic_relay_beta_h = VoltageOnlyFn(_thalamic_relay_beta_h_impl)
+
+
+def _thalamic_relay_alpha_n_impl(V: float, ca_i: float) -> float:
     """Forward rate for thalamic relay K⁺ delayed-rectifier activation gate n.
 
     Traub-Miles form parameterised for thalamic relay cells (VT = −52 mV).
@@ -683,7 +732,10 @@ def thalamic_relay_alpha_n(V: float, ca_i: float) -> float:
     return _traub_miles_alpha_n(V, THALAMIC_RELAY_VT)
 
 
-def thalamic_relay_beta_n(V: float, ca_i: float) -> float:
+thalamic_relay_alpha_n = VoltageOnlyFn(_thalamic_relay_alpha_n_impl)
+
+
+def _thalamic_relay_beta_n_impl(V: float, ca_i: float) -> float:
     """Backward rate for thalamic relay K⁺ delayed-rectifier activation gate n.
 
     Traub-Miles form parameterised for thalamic relay cells (VT = −52 mV).
@@ -699,6 +751,9 @@ def thalamic_relay_beta_n(V: float, ca_i: float) -> float:
         Backward rate in 1/ms.
     """
     return _traub_miles_beta_n(V, THALAMIC_RELAY_VT)
+
+
+thalamic_relay_beta_n = VoltageOnlyFn(_thalamic_relay_beta_n_impl)
 
 
 def make_thalamic_relay_na_channel(g_max: float) -> IonChannel:
@@ -809,7 +864,7 @@ def make_thalamic_relay_k_channel(g_max: float) -> IonChannel:
 TRN_VT: float = -67.0
 
 
-def trn_alpha_m(V: float, ca_i: float) -> float:
+def _trn_alpha_m_impl(V: float, ca_i: float) -> float:
     """Forward rate for TRN Na⁺ activation gate m.
 
     Traub-Miles form parameterised for thalamic reticular nucleus cells
@@ -831,7 +886,10 @@ def trn_alpha_m(V: float, ca_i: float) -> float:
     return _traub_miles_alpha_m(V, TRN_VT)
 
 
-def trn_beta_m(V: float, ca_i: float) -> float:
+trn_alpha_m = VoltageOnlyFn(_trn_alpha_m_impl)
+
+
+def _trn_beta_m_impl(V: float, ca_i: float) -> float:
     """Backward rate for TRN Na⁺ activation gate m.
 
     Traub-Miles form parameterised for thalamic reticular nucleus cells
@@ -853,7 +911,10 @@ def trn_beta_m(V: float, ca_i: float) -> float:
     return _traub_miles_beta_m(V, TRN_VT)
 
 
-def trn_alpha_h(V: float, ca_i: float) -> float:
+trn_beta_m = VoltageOnlyFn(_trn_beta_m_impl)
+
+
+def _trn_alpha_h_impl(V: float, ca_i: float) -> float:
     """Forward rate for TRN Na⁺ inactivation gate h.
 
     Traub-Miles form parameterised for thalamic reticular nucleus cells
@@ -873,7 +934,10 @@ def trn_alpha_h(V: float, ca_i: float) -> float:
     return _traub_miles_alpha_h(V, TRN_VT)
 
 
-def trn_beta_h(V: float, ca_i: float) -> float:
+trn_alpha_h = VoltageOnlyFn(_trn_alpha_h_impl)
+
+
+def _trn_beta_h_impl(V: float, ca_i: float) -> float:
     """Backward rate for TRN Na⁺ inactivation gate h.
 
     Traub-Miles form parameterised for thalamic reticular nucleus cells
@@ -893,7 +957,10 @@ def trn_beta_h(V: float, ca_i: float) -> float:
     return _traub_miles_beta_h(V, TRN_VT)
 
 
-def trn_alpha_n(V: float, ca_i: float) -> float:
+trn_beta_h = VoltageOnlyFn(_trn_beta_h_impl)
+
+
+def _trn_alpha_n_impl(V: float, ca_i: float) -> float:
     """Forward rate for TRN K⁺ delayed-rectifier activation gate n.
 
     Traub-Miles form parameterised for thalamic reticular nucleus cells
@@ -915,7 +982,10 @@ def trn_alpha_n(V: float, ca_i: float) -> float:
     return _traub_miles_alpha_n(V, TRN_VT)
 
 
-def trn_beta_n(V: float, ca_i: float) -> float:
+trn_alpha_n = VoltageOnlyFn(_trn_alpha_n_impl)
+
+
+def _trn_beta_n_impl(V: float, ca_i: float) -> float:
     """Backward rate for TRN K⁺ delayed-rectifier activation gate n.
 
     Traub-Miles form parameterised for thalamic reticular nucleus cells
@@ -933,6 +1003,9 @@ def trn_beta_n(V: float, ca_i: float) -> float:
         Backward rate in 1/ms.
     """
     return _traub_miles_beta_n(V, TRN_VT)
+
+
+trn_beta_n = VoltageOnlyFn(_trn_beta_n_impl)
 
 
 def make_trn_na_channel(g_max: float) -> IonChannel:
@@ -1022,7 +1095,7 @@ def make_trn_k_channel(g_max: float) -> IonChannel:
 PURKINJE_VT: float = -58.0
 
 
-def purkinje_alpha_m(V: float, ca_i: float) -> float:
+def _purkinje_alpha_m_impl(V: float, ca_i: float) -> float:
     """Forward rate for Purkinje Na⁺ activation gate m.
 
     Traub-Miles form parameterised for cerebellar Purkinje cells (VT = −58 mV).
@@ -1041,7 +1114,10 @@ def purkinje_alpha_m(V: float, ca_i: float) -> float:
     return _traub_miles_alpha_m(V, PURKINJE_VT)
 
 
-def purkinje_beta_m(V: float, ca_i: float) -> float:
+purkinje_alpha_m = VoltageOnlyFn(_purkinje_alpha_m_impl)
+
+
+def _purkinje_beta_m_impl(V: float, ca_i: float) -> float:
     """Backward rate for Purkinje Na⁺ activation gate m.
 
     Traub-Miles form parameterised for cerebellar Purkinje cells (VT = −58 mV).
@@ -1060,7 +1136,10 @@ def purkinje_beta_m(V: float, ca_i: float) -> float:
     return _traub_miles_beta_m(V, PURKINJE_VT)
 
 
-def purkinje_alpha_h(V: float, ca_i: float) -> float:
+purkinje_beta_m = VoltageOnlyFn(_purkinje_beta_m_impl)
+
+
+def _purkinje_alpha_h_impl(V: float, ca_i: float) -> float:
     """Forward rate for Purkinje Na⁺ inactivation gate h.
 
     Traub-Miles form parameterised for cerebellar Purkinje cells (VT = −58 mV).
@@ -1077,7 +1156,10 @@ def purkinje_alpha_h(V: float, ca_i: float) -> float:
     return _traub_miles_alpha_h(V, PURKINJE_VT)
 
 
-def purkinje_beta_h(V: float, ca_i: float) -> float:
+purkinje_alpha_h = VoltageOnlyFn(_purkinje_alpha_h_impl)
+
+
+def _purkinje_beta_h_impl(V: float, ca_i: float) -> float:
     """Backward rate for Purkinje Na⁺ inactivation gate h.
 
     Traub-Miles form parameterised for cerebellar Purkinje cells (VT = −58 mV).
@@ -1094,7 +1176,10 @@ def purkinje_beta_h(V: float, ca_i: float) -> float:
     return _traub_miles_beta_h(V, PURKINJE_VT)
 
 
-def purkinje_alpha_n(V: float, ca_i: float) -> float:
+purkinje_beta_h = VoltageOnlyFn(_purkinje_beta_h_impl)
+
+
+def _purkinje_alpha_n_impl(V: float, ca_i: float) -> float:
     """Forward rate for Purkinje K⁺ delayed-rectifier activation gate n.
 
     Traub-Miles form parameterised for cerebellar Purkinje cells (VT = −58 mV).
@@ -1113,7 +1198,10 @@ def purkinje_alpha_n(V: float, ca_i: float) -> float:
     return _traub_miles_alpha_n(V, PURKINJE_VT)
 
 
-def purkinje_beta_n(V: float, ca_i: float) -> float:
+purkinje_alpha_n = VoltageOnlyFn(_purkinje_alpha_n_impl)
+
+
+def _purkinje_beta_n_impl(V: float, ca_i: float) -> float:
     """Backward rate for Purkinje K⁺ delayed-rectifier activation gate n.
 
     Traub-Miles form parameterised for cerebellar Purkinje cells (VT = −58 mV).
@@ -1128,6 +1216,9 @@ def purkinje_beta_n(V: float, ca_i: float) -> float:
         Backward rate in 1/ms.
     """
     return _traub_miles_beta_n(V, PURKINJE_VT)
+
+
+purkinje_beta_n = VoltageOnlyFn(_purkinje_beta_n_impl)
 
 
 def make_purkinje_na_channel(g_max: float) -> IonChannel:
@@ -1212,7 +1303,7 @@ def make_purkinje_k_channel(g_max: float) -> IonChannel:
 #   beta_x  = (1 − x_inf) / tau_x
 
 
-def _stn_alpha_m(V: float, ca_i: float) -> float:
+def _stn_alpha_m_impl(V: float, ca_i: float) -> float:
     """Forward rate for STN Na⁺ activation gate m (Otsuka et al. 2004).
 
     Derived from m_inf(V) = 1/(1 + exp(−(V + 40)/8)) and τ_m = 0.2 ms.
@@ -1228,7 +1319,10 @@ def _stn_alpha_m(V: float, ca_i: float) -> float:
     return m_inf / 0.2
 
 
-def _stn_beta_m(V: float, ca_i: float) -> float:
+_stn_alpha_m = VoltageOnlyFn(_stn_alpha_m_impl)
+
+
+def _stn_beta_m_impl(V: float, ca_i: float) -> float:
     """Backward rate for STN Na⁺ activation gate m (Otsuka et al. 2004).
 
     Derived from m_inf(V) = 1/(1 + exp(−(V + 40)/8)) and τ_m = 0.2 ms.
@@ -1244,7 +1338,10 @@ def _stn_beta_m(V: float, ca_i: float) -> float:
     return (1.0 - m_inf) / 0.2
 
 
-def _stn_alpha_h(V: float, ca_i: float) -> float:
+_stn_beta_m = VoltageOnlyFn(_stn_beta_m_impl)
+
+
+def _stn_alpha_h_impl(V: float, ca_i: float) -> float:
     """Forward rate for STN Na⁺ inactivation gate h (Otsuka et al. 2004).
 
     Derived from:
@@ -1265,7 +1362,10 @@ def _stn_alpha_h(V: float, ca_i: float) -> float:
     return h_inf * inv_tau_h
 
 
-def _stn_beta_h(V: float, ca_i: float) -> float:
+_stn_alpha_h = VoltageOnlyFn(_stn_alpha_h_impl)
+
+
+def _stn_beta_h_impl(V: float, ca_i: float) -> float:
     """Backward rate for STN Na⁺ inactivation gate h (Otsuka et al. 2004).
 
     Derived from:
@@ -1286,7 +1386,10 @@ def _stn_beta_h(V: float, ca_i: float) -> float:
     return (1.0 - h_inf) * inv_tau_h
 
 
-def _stn_alpha_n(V: float, ca_i: float) -> float:
+_stn_beta_h = VoltageOnlyFn(_stn_beta_h_impl)
+
+
+def _stn_alpha_n_impl(V: float, ca_i: float) -> float:
     """Forward rate for STN K⁺ DR activation gate n (Otsuka et al. 2004).
 
     Derived from:
@@ -1305,7 +1408,10 @@ def _stn_alpha_n(V: float, ca_i: float) -> float:
     return n_inf / tau_n
 
 
-def _stn_beta_n(V: float, ca_i: float) -> float:
+_stn_alpha_n = VoltageOnlyFn(_stn_alpha_n_impl)
+
+
+def _stn_beta_n_impl(V: float, ca_i: float) -> float:
     """Backward rate for STN K⁺ DR activation gate n (Otsuka et al. 2004).
 
     Derived from:
@@ -1322,6 +1428,9 @@ def _stn_beta_n(V: float, ca_i: float) -> float:
     n_inf = 1.0 / (1.0 + safe_exp(-(V + 41.0) / 14.0))
     tau_n = 0.25 + 10.75 / (safe_exp(-(V + 51.0) / 12.0) + safe_exp((V + 51.0) / 15.0))
     return (1.0 - n_inf) / tau_n
+
+
+_stn_beta_n = VoltageOnlyFn(_stn_beta_n_impl)
 
 
 def make_stn_na_channel(g_max: float) -> IonChannel:
@@ -1424,7 +1533,7 @@ def make_stn_k_channel(g_max: float) -> IonChannel:
 DOPAMINERGIC_VT: float = -67.0
 
 
-def dopaminergic_alpha_m(V: float, ca_i: float) -> float:
+def _dopaminergic_alpha_m_impl(V: float, ca_i: float) -> float:
     """Forward rate for dopaminergic Na⁺ activation gate m.
 
     Traub-Miles form parameterised for midbrain dopaminergic (SNc/VTA) cells
@@ -1448,7 +1557,10 @@ def dopaminergic_alpha_m(V: float, ca_i: float) -> float:
     return _traub_miles_alpha_m(V, DOPAMINERGIC_VT)
 
 
-def dopaminergic_beta_m(V: float, ca_i: float) -> float:
+dopaminergic_alpha_m = VoltageOnlyFn(_dopaminergic_alpha_m_impl)
+
+
+def _dopaminergic_beta_m_impl(V: float, ca_i: float) -> float:
     """Backward rate for dopaminergic Na⁺ activation gate m.
 
     Traub-Miles form parameterised for midbrain dopaminergic (SNc/VTA) cells
@@ -1472,7 +1584,10 @@ def dopaminergic_beta_m(V: float, ca_i: float) -> float:
     return _traub_miles_beta_m(V, DOPAMINERGIC_VT)
 
 
-def dopaminergic_alpha_h(V: float, ca_i: float) -> float:
+dopaminergic_beta_m = VoltageOnlyFn(_dopaminergic_beta_m_impl)
+
+
+def _dopaminergic_alpha_h_impl(V: float, ca_i: float) -> float:
     """Forward rate for dopaminergic Na⁺ inactivation gate h.
 
     Traub-Miles form parameterised for midbrain dopaminergic (SNc/VTA) cells
@@ -1491,7 +1606,10 @@ def dopaminergic_alpha_h(V: float, ca_i: float) -> float:
     return _traub_miles_alpha_h(V, DOPAMINERGIC_VT)
 
 
-def dopaminergic_beta_h(V: float, ca_i: float) -> float:
+dopaminergic_alpha_h = VoltageOnlyFn(_dopaminergic_alpha_h_impl)
+
+
+def _dopaminergic_beta_h_impl(V: float, ca_i: float) -> float:
     """Backward rate for dopaminergic Na⁺ inactivation gate h.
 
     Traub-Miles form parameterised for midbrain dopaminergic (SNc/VTA) cells
@@ -1510,7 +1628,10 @@ def dopaminergic_beta_h(V: float, ca_i: float) -> float:
     return _traub_miles_beta_h(V, DOPAMINERGIC_VT)
 
 
-def dopaminergic_alpha_n(V: float, ca_i: float) -> float:
+dopaminergic_beta_h = VoltageOnlyFn(_dopaminergic_beta_h_impl)
+
+
+def _dopaminergic_alpha_n_impl(V: float, ca_i: float) -> float:
     """Forward rate for dopaminergic K⁺ delayed-rectifier activation gate n.
 
     Traub-Miles form parameterised for midbrain dopaminergic (SNc/VTA) cells
@@ -1534,7 +1655,10 @@ def dopaminergic_alpha_n(V: float, ca_i: float) -> float:
     return _traub_miles_alpha_n(V, DOPAMINERGIC_VT)
 
 
-def dopaminergic_beta_n(V: float, ca_i: float) -> float:
+dopaminergic_alpha_n = VoltageOnlyFn(_dopaminergic_alpha_n_impl)
+
+
+def _dopaminergic_beta_n_impl(V: float, ca_i: float) -> float:
     """Backward rate for dopaminergic K⁺ delayed-rectifier activation gate n.
 
     Traub-Miles form parameterised for midbrain dopaminergic (SNc/VTA) cells
@@ -1551,6 +1675,9 @@ def dopaminergic_beta_n(V: float, ca_i: float) -> float:
         Backward rate in 1/ms.
     """
     return _traub_miles_beta_n(V, DOPAMINERGIC_VT)
+
+
+dopaminergic_beta_n = VoltageOnlyFn(_dopaminergic_beta_n_impl)
 
 
 def make_dopaminergic_na_channel(g_max: float) -> IonChannel:

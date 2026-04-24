@@ -15,6 +15,7 @@ from patch_sim.channels import (
     IonSpecies,
     NernstSpec,
 )
+from patch_sim.rates import VoltageOnlyFn
 
 # ---------------------------------------------------------------------------
 # Minimal calcium channel for use in tests.
@@ -23,8 +24,8 @@ from patch_sim.channels import (
 _CA_GATE = GatingVariable(
     name="ca_gate",
     power=1,
-    alpha=lambda V, ca_i: 0.1,
-    beta=lambda V, ca_i: 0.1,
+    alpha=VoltageOnlyFn(lambda V, ca_i: 0.1),
+    beta=VoltageOnlyFn(lambda V, ca_i: 0.1),
 )
 
 _MOCK_CALCIUM_CHANNEL = IonChannel(
@@ -122,7 +123,10 @@ def test_validation_ca_rest_zero_is_valid() -> None:
 def test_plain_ion_channel_does_not_carry_calcium() -> None:
     """An IonChannel created without carries_calcium has carries_calcium=False."""
     gv = GatingVariable(
-        name="x", power=1, alpha=lambda V, ca_i: 0.01, beta=lambda V, ca_i: 0.01
+        name="x",
+        power=1,
+        alpha=VoltageOnlyFn(lambda V, ca_i: 0.01),
+        beta=VoltageOnlyFn(lambda V, ca_i: 0.01),
     )
     ch = IonChannel(
         name="test_ch",

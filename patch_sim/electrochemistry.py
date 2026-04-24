@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .channels import RateFn
+from .rates import VoltageOnlyRate
 from .utils import safe_cosh, safe_exp
 
 # Constants
@@ -128,7 +128,7 @@ def goldman_potential(
 
 
 @dataclass(frozen=True)
-class BoltzmannCoshRate:
+class BoltzmannCoshRate(VoltageOnlyRate):
     """Picklable callable implementing a single Boltzmann/cosh rate function.
 
     Stores all kinetic parameters and computes either the alpha or beta rate
@@ -190,7 +190,7 @@ def boltzmann_cosh_rates(
     inverted: bool = False,
     tau_cosh_scale: float | None = None,
     tau_rate: float = 1.0,
-) -> tuple[RateFn, RateFn]:
+) -> tuple["BoltzmannCoshRate", "BoltzmannCoshRate"]:
     """Return (alpha, beta) callables from Boltzmann/cosh kinetic parameters.
 
     Constructs a pair of rate functions for a gating variable whose steady

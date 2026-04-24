@@ -60,6 +60,7 @@ from patch_sim.channels import (
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from patch_sim.neuron import Neuron
 from patch_sim.protocols import step_current, step_voltage
+from patch_sim.rates import CalciumDependentFn, VoltageOnlyFn
 
 # ---------------------------------------------------------------------------
 # GatingVariable
@@ -104,8 +105,8 @@ def _make_simple_channel(g_max: float = 1.0) -> IonChannel:
     gv = GatingVariable(
         name="x",
         power=1,
-        alpha=lambda V, ca_i: 0.1,
-        beta=lambda V, ca_i: 0.1,
+        alpha=VoltageOnlyFn(lambda V, ca_i: 0.1),
+        beta=VoltageOnlyFn(lambda V, ca_i: 0.1),
     )
     return IonChannel(
         name="test",
@@ -129,7 +130,10 @@ def test_base_ion_channel_power_two():
     """compute_current correctly raises the gate to its power."""
     neuron = Neuron()
     gv = GatingVariable(
-        name="y", power=2, alpha=lambda V, ca_i: 0.1, beta=lambda V, ca_i: 0.1
+        name="y",
+        power=2,
+        alpha=VoltageOnlyFn(lambda V, ca_i: 0.1),
+        beta=VoltageOnlyFn(lambda V, ca_i: 0.1),
     )
     ch = IonChannel(
         name="pow2",
@@ -230,10 +234,16 @@ def test_base_ion_channel_negative_gmax_raises():
 def test_base_ion_channel_duplicate_gating_names_raises():
     """Duplicate gating variable names within a channel raise ValueError."""
     gv1 = GatingVariable(
-        name="x", power=1, alpha=lambda V, ca_i: 0.1, beta=lambda V, ca_i: 0.1
+        name="x",
+        power=1,
+        alpha=VoltageOnlyFn(lambda V, ca_i: 0.1),
+        beta=VoltageOnlyFn(lambda V, ca_i: 0.1),
     )
     gv2 = GatingVariable(
-        name="x", power=2, alpha=lambda V, ca_i: 0.2, beta=lambda V, ca_i: 0.2
+        name="x",
+        power=2,
+        alpha=VoltageOnlyFn(lambda V, ca_i: 0.2),
+        beta=VoltageOnlyFn(lambda V, ca_i: 0.2),
     )
     with pytest.raises(ValueError, match="names must be unique"):
         IonChannel(
@@ -254,7 +264,10 @@ def test_hh_duplicate_additional_channel_names_raises():
 def test_hh_builtin_channel_name_collision_raises():
     """Additional channel named 'Na' collides with built-in and raises ValueError."""
     gv = GatingVariable(
-        name="r", power=1, alpha=lambda V, ca_i: 0.1, beta=lambda V, ca_i: 0.1
+        name="r",
+        power=1,
+        alpha=VoltageOnlyFn(lambda V, ca_i: 0.1),
+        beta=VoltageOnlyFn(lambda V, ca_i: 0.1),
     )
     ch = IonChannel(
         name="Na",
@@ -441,7 +454,10 @@ def test_multiple_optional_channels_coexist():
     """Two distinct optional channels can coexist and each contributes columns."""
     ch1 = make_ih_channel(g_max=0.1)
     gv2 = GatingVariable(
-        name="q", power=1, alpha=lambda V, ca_i: 0.05, beta=lambda V, ca_i: 0.05
+        name="q",
+        power=1,
+        alpha=VoltageOnlyFn(lambda V, ca_i: 0.05),
+        beta=VoltageOnlyFn(lambda V, ca_i: 0.05),
     )
     ch2 = IonChannel(
         name="q",
@@ -1271,8 +1287,8 @@ def test_calcium_gating_variable_in_integrator():
     cg = GatingVariable(
         name="q_test",
         power=1,
-        alpha=lambda V, ca_i: 0.1 * ca_i if ca_i > 0 else 0.0,
-        beta=lambda V, ca_i: 0.1,
+        alpha=CalciumDependentFn(lambda V, ca_i: 0.1 * ca_i if ca_i > 0 else 0.0),
+        beta=VoltageOnlyFn(lambda V, ca_i: 0.1),
     )
     ch = IonChannel(
         name="Test",
@@ -1304,8 +1320,8 @@ def test_calcium_gating_variable_steady_state_depends_on_ca():
     cg = GatingVariable(
         name="q_test2",
         power=1,
-        alpha=lambda V, ca_i: ca_i / (ca_i + 0.001),
-        beta=lambda V, ca_i: 1.0 - ca_i / (ca_i + 0.001),
+        alpha=CalciumDependentFn(lambda V, ca_i: ca_i / (ca_i + 0.001)),
+        beta=CalciumDependentFn(lambda V, ca_i: 1.0 - ca_i / (ca_i + 0.001)),
     )
     V = -65.0
     ca_low = 1e-4

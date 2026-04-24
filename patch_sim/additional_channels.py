@@ -27,10 +27,11 @@ from .constants import (
     DEFAULT_IH_P_NA,
 )
 from .electrochemistry import boltzmann_cosh_rates
+from .rates import CalciumDependentFn, VoltageOnlyFn
 from .utils import safe_cosh, safe_exp
 
 
-def _alpha_r(V: float, ca_i: float) -> float:
+def _alpha_r_impl(V: float, ca_i: float) -> float:
     """Forward rate for Ih gating variable r (Destexhe-style HCN kinetics).
 
     The Ih current is activated by hyperpolarization; alpha_r increases as
@@ -46,7 +47,10 @@ def _alpha_r(V: float, ca_i: float) -> float:
     return safe_exp(-14.59 - 0.086 * V)
 
 
-def _beta_r(V: float, ca_i: float) -> float:
+_alpha_r = VoltageOnlyFn(_alpha_r_impl)
+
+
+def _beta_r_impl(V: float, ca_i: float) -> float:
     """Backward rate for Ih gating variable r (Destexhe-style HCN kinetics).
 
     Args:
@@ -59,10 +63,13 @@ def _beta_r(V: float, ca_i: float) -> float:
     return safe_exp(-1.87 + 0.0701 * V)
 
 
+_beta_r = VoltageOnlyFn(_beta_r_impl)
+
+
 _SINGULARITY_TOL: float = 1e-7
 
 
-def _alpha_a(V: float, ca_i: float) -> float:
+def _alpha_a_impl(V: float, ca_i: float) -> float:
     """Forward rate for IKa activation gating variable a (Traub & Miles 1991).
 
     Uses a Boltzmann-style rate shifted to the absolute voltage convention
@@ -82,7 +89,10 @@ def _alpha_a(V: float, ca_i: float) -> float:
     return 0.02 * x / (safe_exp(x / 10.0) - 1.0)
 
 
-def _beta_a(V: float, ca_i: float) -> float:
+_alpha_a = VoltageOnlyFn(_alpha_a_impl)
+
+
+def _beta_a_impl(V: float, ca_i: float) -> float:
     """Backward rate for IKa activation gating variable a (Traub & Miles 1991).
 
     A singularity guard replaces the 0/0 form at V = -24.9 mV with the
@@ -101,7 +111,10 @@ def _beta_a(V: float, ca_i: float) -> float:
     return 0.0175 * x / (safe_exp(x / 10.0) - 1.0)
 
 
-def _alpha_b(V: float, ca_i: float) -> float:
+_beta_a = VoltageOnlyFn(_beta_a_impl)
+
+
+def _alpha_b_impl(V: float, ca_i: float) -> float:
     """Forward rate for IKa inactivation gating variable b (Traub & Miles 1991).
 
     Args:
@@ -114,7 +127,10 @@ def _alpha_b(V: float, ca_i: float) -> float:
     return 0.0016 * safe_exp(-(V + 73.0) / 18.0)
 
 
-def _beta_b(V: float, ca_i: float) -> float:
+_alpha_b = VoltageOnlyFn(_alpha_b_impl)
+
+
+def _beta_b_impl(V: float, ca_i: float) -> float:
     """Backward rate for IKa inactivation gating variable b (Traub & Miles 1991).
 
     Args:
@@ -125,6 +141,9 @@ def _beta_b(V: float, ca_i: float) -> float:
         Backward rate beta_b in 1/ms.
     """
     return 0.05 / (1.0 + safe_exp(-(V + 13.0) / 10.0))
+
+
+_beta_b = VoltageOnlyFn(_beta_b_impl)
 
 
 def make_ika_channel(
@@ -344,7 +363,7 @@ def _nar_tau_hr(V: float) -> float:
     )
 
 
-def _alpha_hr(V: float, ca_i: float) -> float:
+def _alpha_hr_impl(V: float, ca_i: float) -> float:
     """Forward rate for INaR unblocking gating variable hr.
 
     Derived as alpha_hr = hr_inf / tau_hr.
@@ -359,7 +378,10 @@ def _alpha_hr(V: float, ca_i: float) -> float:
     return _nar_hr_inf(V) / _nar_tau_hr(V)
 
 
-def _beta_hr(V: float, ca_i: float) -> float:
+_alpha_hr = VoltageOnlyFn(_alpha_hr_impl)
+
+
+def _beta_hr_impl(V: float, ca_i: float) -> float:
     """Backward rate for INaR unblocking gating variable hr.
 
     Derived as beta_hr = (1 - hr_inf) / tau_hr.
@@ -372,6 +394,9 @@ def _beta_hr(V: float, ca_i: float) -> float:
         Backward rate beta_hr in 1/ms.
     """
     return (1.0 - _nar_hr_inf(V)) / _nar_tau_hr(V)
+
+
+_beta_hr = VoltageOnlyFn(_beta_hr_impl)
 
 
 def make_inar_channel(
@@ -540,7 +565,7 @@ def _ikca_tau(V: float) -> float:
     return max(tau, _IKCA_TAU_FLOOR)
 
 
-def _alpha_q(V: float, ca_i: float) -> float:
+def _alpha_q_impl(V: float, ca_i: float) -> float:
     """Forward rate for IKCa gating variable q.
 
     Derived as alpha_q = q_inf(V, ca_i) / tau(V).
@@ -555,7 +580,10 @@ def _alpha_q(V: float, ca_i: float) -> float:
     return _ikca_q_inf(V, ca_i) / _ikca_tau(V)
 
 
-def _beta_q(V: float, ca_i: float) -> float:
+_alpha_q = CalciumDependentFn(_alpha_q_impl)
+
+
+def _beta_q_impl(V: float, ca_i: float) -> float:
     """Backward rate for IKCa gating variable q.
 
     Derived as beta_q = (1 - q_inf(V, ca_i)) / tau(V).
@@ -568,6 +596,9 @@ def _beta_q(V: float, ca_i: float) -> float:
         Backward rate beta_q in 1/ms.
     """
     return (1.0 - _ikca_q_inf(V, ca_i)) / _ikca_tau(V)
+
+
+_beta_q = CalciumDependentFn(_beta_q_impl)
 
 
 def make_ikca_channel(

@@ -18,6 +18,7 @@ from patch_sim.channels import (
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from patch_sim.neuron import Neuron
 from patch_sim.protocols import step_current, step_voltage
+from patch_sim.rates import VoltageOnlyFn
 
 # ---------------------------------------------------------------------------
 # Minimal calcium channel shared across tests.
@@ -26,8 +27,8 @@ from patch_sim.protocols import step_current, step_voltage
 _CA_GATE = GatingVariable(
     name="ca_gate",
     power=1,
-    alpha=lambda V, ca_i: 0.1,
-    beta=lambda V, ca_i: 0.1,
+    alpha=VoltageOnlyFn(lambda V, ca_i: 0.1),
+    beta=VoltageOnlyFn(lambda V, ca_i: 0.1),
 )
 
 _MOCK_CALCIUM_CHANNEL = IonChannel(
