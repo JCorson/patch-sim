@@ -122,10 +122,6 @@ def _gating_derivatives(
     variables evolve.  Also computes the Ca²⁺ concentration derivative when
     calcium dynamics are active.
 
-    When calcium dynamics are active, the Ca²⁺ current is accumulated inline
-    while iterating the channels, avoiding a separate pass through
-    :meth:`~patch_sim.neuron.Neuron.calcium_current` (see issue #258).
-
     Args:
         neuron: The conductance-based neuron model.
         V: Membrane voltage in mV.
