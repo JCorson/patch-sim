@@ -109,7 +109,3 @@ async def test_two_cc_runs_replace_analysis(state_tree: StateTree) -> None:
     assert len(state_tree.sim._current_sweeps) == 1
     # The analysis reflects the second run (not accumulated from both).
     assert "spike_count" in state_tree.analysis.ap_summary
-    # If the second preset produces more spikes the counts differ; if not,
-    # we still confirm only one run's worth of sweeps is present.
-    assert first_count >= 0
-    assert second_count >= 0

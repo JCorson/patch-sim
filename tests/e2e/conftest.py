@@ -34,7 +34,13 @@ from patch_sim_ui.state.visibility import VisibilityState  # noqa: E402
 
 
 def make_sim_state() -> SimulationState:
-    """Return a fresh SimulationState bypassing the Reflex runtime guard."""
+    """Return a fresh SimulationState bypassing the Reflex runtime guard.
+
+    ``_reflex_internal_init=True`` is a private Reflex kwarg that skips the
+    runtime-presence check (``State.__init__`` normally raises outside a live
+    Reflex app).  If a Reflex upgrade breaks this, search for the kwarg in the
+    Reflex source to find the new bypass mechanism.
+    """
     return SimulationState(_reflex_internal_init=True)
 
 
