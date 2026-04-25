@@ -98,6 +98,13 @@ class NeuronConfig:
         k_leak_channel_factory: Factory for the K⁺ leak channel. Defaults to
             make_k_leak_channel.
         channels: Tuple of additional channel configs to include.
+        calcium_dynamics: Optional per-preset :class:`~patch_sim.CalciumDynamics`
+            override.  When set, ``make_neuron`` uses it directly instead of
+            constructing ``CalciumDynamics()`` with module-level defaults.
+            Raises :class:`ValueError` if provided for a configuration whose
+            channels carry no Ca²⁺.  ``None`` (default) falls back to
+            auto-detection: a default ``CalciumDynamics()`` is created whenever
+            at least one channel carries Ca²⁺, and ``None`` is passed otherwise.
     """
 
     g_Na: float = DEFAULT_G_NA
@@ -124,6 +131,7 @@ class NeuronConfig:
         default=make_k_leak_channel
     )
     channels: tuple[ChannelConfig, ...] = ()
+    calcium_dynamics: CalciumDynamics | None = None
 
     def __post_init__(self) -> None:
         """Validate Q10 and T_ref on construction.
@@ -188,7 +196,17 @@ def make_neuron(config: NeuronConfig) -> Neuron:
     built_channels = tuple(
         cc.factory(g_max=cc.g_max, **cc.extra_kwargs) for cc in config.channels
     )
-    calcium_dynamics = CalciumDynamics() if _needs_calcium(built_channels) else None
+    if config.calcium_dynamics is not None:
+        if not _needs_calcium(built_channels):
+            raise ValueError(
+                "calcium_dynamics provided but none of the configured channels "
+                "carry Ca²⁺ — remove the override or add a Ca²⁺ channel."
+            )
+        calcium_dynamics: CalciumDynamics | None = config.calcium_dynamics
+    elif _needs_calcium(built_channels):
+        calcium_dynamics = CalciumDynamics()
+    else:
+        calcium_dynamics = None
     return Neuron(
         g_Na=config.g_Na,
         g_K=config.g_K,
