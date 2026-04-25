@@ -2,7 +2,7 @@
 
 import pytest
 
-from patch_sim import find_zero_current_voltage
+from patch_sim import find_coupled_equilibrium, find_zero_current_voltage
 from patch_sim.constants import DOPAMINERGIC, PURKINJE, TRN
 from patch_sim.equilibrium import _total_ionic_current
 from patch_sim.neuron import Neuron
@@ -77,14 +77,19 @@ _EQUILIBRIUM_PRESET_NAMES = [
 
 @pytest.mark.parametrize("preset_name", _EQUILIBRIUM_PRESET_NAMES)
 def test_find_zero_current_voltage_all_presets(preset_name: str) -> None:
-    """Every non-TRN, non-Purkinje preset has a zero-current equilibrium.
+    """Every non-TRN, non-Purkinje preset has a coupled equilibrium near v_rest.
+
+    Uses :func:`find_coupled_equilibrium` so that Ca²⁺-carrying presets with
+    window currents at rest are tested against the dynamically-coupled (V, ca_i)
+    equilibrium, which is what ``v_rest`` is calibrated to.  For non-Ca presets
+    the coupled and static equilibria are identical.
 
     The declared v_rest should equal the computed equilibrium within 0.5 mV.
     """
     config = NEURON_PRESETS[preset_name]
     neuron = make_neuron(config)
-    v_eq = find_zero_current_voltage(neuron)
+    v_eq, _ = find_coupled_equilibrium(neuron)
     assert abs(v_eq - neuron.v_rest) < 0.5, (
-        f"{preset_name}: computed equilibrium {v_eq:.2f} mV differs from "
-        f"v_rest={neuron.v_rest:.1f} mV by {abs(v_eq - neuron.v_rest):.2f} mV"
+        f"{preset_name}: computed equilibrium {v_eq:.4f} mV differs from "
+        f"v_rest={neuron.v_rest:.4f} mV by {abs(v_eq - neuron.v_rest):.4f} mV"
     )
