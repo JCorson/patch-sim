@@ -124,22 +124,36 @@ def _format_ca_transient_dict(
 ) -> dict[str, Any]:
     """Serialise a single :class:`~patch_sim.CalciumTransient` to a display dict.
 
+    The ``decay_tau`` column carries a trailing ``*`` when the τ value came
+    from the 1/e fallback rather than a converged ``curve_fit``, so the user
+    can tell when the decay-fit convergence failed.
+
     Args:
         index: Display index to assign.
         transient: The transient to serialise.
 
     Returns:
         A dict with pre-formatted string values for each metric column
-        (``index``, ``peak_time``, ``peak_concentration``, ``time_to_peak``,
-        ``decay_tau``, ``amplitude``).  All concentrations are in µM and all
-        times in ms.
+        (``index``, ``sweep_index``, ``peak_time``, ``peak_concentration``,
+        ``time_to_peak``, ``decay_tau``, ``amplitude``).  All concentrations
+        are in µM and all times in ms.  ``sweep_index`` is 0 for
+        single-sweep results; multi-sweep callers overwrite it with a
+        1-based sweep number.
     """
+    if transient.decay_tau is None:
+        decay_str = "—"
+    elif transient.decay_fit_converged:
+        decay_str = f"{transient.decay_tau:.1f}"
+    else:
+        decay_str = f"{transient.decay_tau:.1f}*"
+
     return {
         "index": index,
+        "sweep_index": 0,
         "peak_time": f"{transient.peak_time:.1f}",
         "peak_concentration": f"{transient.peak_concentration:.3f}",
         "time_to_peak": f"{transient.time_to_peak:.2f}",
-        "decay_tau": _fmt_optional(transient.decay_tau, ".1f"),
+        "decay_tau": decay_str,
         "amplitude": f"{transient.amplitude:.3f}",
     }
 
@@ -194,14 +208,16 @@ def _compute_ca_transient_data(
     return metrics, summary
 
 
-def _compute_cc_multi_sweep_ca_transient_data(
+def _compute_multi_sweep_ca_transient_data(
     sweeps: "list[Sweep]",
 ) -> "tuple[list[dict[str, Any]], dict[str, Any]]":
-    """Pool calcium-transient analysis across multi-sweep CC sweeps.
+    """Pool calcium-transient analysis across a multi-sweep simulation result.
 
-    Each sweep that exposes a ``ca_i`` field is analysed in isolation, and
-    transients are concatenated and renumbered globally.  Aggregate summary
-    statistics are computed from the pooled transient list.
+    Used for both multi-sweep current clamp and multi-sweep voltage clamp:
+    each sweep that exposes a ``ca_i`` trace is analysed in isolation, and
+    each per-transient display dict carries its 1-based ``sweep_index`` (in
+    protocol order) so the UI can identify which sweep produced which
+    transient.  Aggregate summary statistics are pooled across all sweeps.
 
     Args:
         sweeps: Ordered list of :class:`Sweep` objects.
@@ -211,9 +227,9 @@ def _compute_cc_multi_sweep_ca_transient_data(
         are empty when no sweep has a ``ca_i`` field or when no transients
         were detected across the pool.
     """
-    pooled: list[patch_sim.CalciumTransient] = []
+    pooled: list[tuple[int, patch_sim.CalciumTransient]] = []
     baselines: list[float] = []
-    for sweep in sweeps:
+    for sweep_idx, sweep in enumerate(sweeps):
         ca_trace = sweep.additional_gating.get("ca_i")
         if not ca_trace:
             continue
@@ -222,25 +238,33 @@ def _compute_cc_multi_sweep_ca_transient_data(
         analysis = patch_sim.analyze_calcium_transients(time_arr, ca_arr)
         if analysis.baseline_concentration is not None:
             baselines.append(analysis.baseline_concentration)
-        pooled.extend(analysis.transients)
+        pooled.extend((sweep_idx, t) for t in analysis.transients)
 
     if not pooled:
         return [], {}
 
-    metrics = [_format_ca_transient_dict(i, t) for i, t in enumerate(pooled)]
-    peak_vals = [t.peak_concentration for t in pooled]
-    ttp_vals = [t.time_to_peak for t in pooled]
-    amp_vals = [t.amplitude for t in pooled]
-    tau_vals = [t.decay_tau for t in pooled if t.decay_tau is not None]
+    metrics: list[dict[str, Any]] = []
+    for i, (sweep_idx, transient) in enumerate(pooled):
+        entry = _format_ca_transient_dict(i, transient)
+        # 1-based sweep number for direct display in the UI table.
+        entry["sweep_index"] = sweep_idx + 1
+        metrics.append(entry)
+
+    peak_vals = [t.peak_concentration for _, t in pooled]
+    ttp_vals = [t.time_to_peak for _, t in pooled]
+    amp_vals = [t.amplitude for _, t in pooled]
+    tau_vals = [t.decay_tau for _, t in pooled if t.decay_tau is not None]
 
     summary: dict[str, Any] = {
         "transient_count": str(len(pooled)),
-        "baseline_concentration": (
-            f"{float(np.mean(baselines)):.3f}" if baselines else "—"
+        "baseline_concentration": _fmt_optional(
+            float(np.mean(baselines)) if baselines else None, ".3f"
         ),
         "mean_peak_concentration": f"{float(np.mean(peak_vals)):.3f}",
         "mean_time_to_peak": f"{float(np.mean(ttp_vals)):.2f}",
-        "mean_decay_tau": (f"{float(np.mean(tau_vals)):.1f}" if tau_vals else "—"),
+        "mean_decay_tau": _fmt_optional(
+            float(np.mean(tau_vals)) if tau_vals else None, ".1f"
+        ),
         "mean_amplitude": f"{float(np.mean(amp_vals)):.3f}",
     }
     return metrics, summary
@@ -673,7 +697,7 @@ def _compute_simulation(
                 )
             else:
                 gv_data = {}
-            ms_ca_metrics, ms_ca_summary = _compute_cc_multi_sweep_ca_transient_data(
+            ms_ca_metrics, ms_ca_summary = _compute_multi_sweep_ca_transient_data(
                 new_sweeps
             )
             return _SimResult(
@@ -695,7 +719,7 @@ def _compute_simulation(
                 stimulus_duration,
             )
         )
-        ms_ca_metrics, ms_ca_summary = _compute_cc_multi_sweep_ca_transient_data(
+        ms_ca_metrics, ms_ca_summary = _compute_multi_sweep_ca_transient_data(
             new_sweeps
         )
         return _SimResult(

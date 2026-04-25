@@ -259,6 +259,46 @@ def test_baseline_drift_does_not_block_detection():
     assert result.transients[0].amplitude == pytest.approx(0.9, rel=0.1)
 
 
+def test_fallback_tau_used_when_decay_window_too_short_for_curve_fit():
+    """Direct unit test of `_fit_decay`: short window forces 1/e fallback.
+
+    Tests the private :func:`patch_sim.analysis.calcium_transients._fit_decay`
+    helper directly because the public path requires pathological input to
+    create a sub-`_MIN_DECAY_SAMPLES` decay window.  The fallback contract:
+    when the window is too short, ``curve_fit`` is skipped, ``converged``
+    returns ``False``, and τ is the 1/e crossing (or ``None`` when the trace
+    never crosses 1/e).  This pins the fallback path so a future refactor
+    that silently drops it will fail the test.
+    """
+    from patch_sim.analysis.calcium_transients import _fit_decay
+
+    # 4 samples (< _MIN_DECAY_SAMPLES = 5) with a clean 1/e crossing.
+    t_decay = np.array([0.0, 0.025, 0.05, 0.1])
+    peak_uM = 1.0
+    baseline_uM = 0.1
+    # ca[1] = baseline + amplitude/e exactly → 1/e fallback returns t=0.025
+    target = baseline_uM + (peak_uM - baseline_uM) / np.e
+    ca_decay = np.array([peak_uM, target, baseline_uM + 0.1, baseline_uM])
+
+    tau, converged = _fit_decay(t_decay, ca_decay, peak_uM, baseline_uM)
+    assert converged is False
+    assert tau == pytest.approx(0.025, abs=1e-6)
+
+
+def test_fallback_returns_none_when_trace_never_decays_below_one_over_e():
+    """Direct unit test: short window without a 1/e crossing → τ is None."""
+    from patch_sim.analysis.calcium_transients import _fit_decay
+
+    t_decay = np.array([0.0, 0.025, 0.05, 0.1])
+    peak_uM = 1.0
+    baseline_uM = 0.1
+    # The trace never falls below `baseline + amplitude/e` — fallback fails.
+    ca_decay = np.array([peak_uM, peak_uM, peak_uM, peak_uM])
+    tau, converged = _fit_decay(t_decay, ca_decay, peak_uM, baseline_uM)
+    assert converged is False
+    assert tau is None
+
+
 def test_short_decay_window_falls_back_or_returns_none():
     """Truncated decay window: fit_converged is False; τ is fallback or None."""
     t, ca = _exponential_transient_uM(

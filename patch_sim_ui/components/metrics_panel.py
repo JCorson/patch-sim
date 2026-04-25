@@ -38,6 +38,11 @@ def _spike_row(spike: dict) -> rx.Component:
 def _ca_transient_row(transient: dict) -> rx.Component:
     """Render one row of the per-transient calcium-metric table.
 
+    The ``decay_tau`` cell carries a trailing ``*`` when the τ value came
+    from the 1/e fallback rather than a converged exponential fit; the
+    ``sweep_index`` column shows the sweep number for multi-sweep runs (it
+    is 0 for single-sweep results, displayed as a blank cell).
+
     Args:
         transient: Dictionary with pre-formatted string values for each metric.
 
@@ -46,6 +51,13 @@ def _ca_transient_row(transient: dict) -> rx.Component:
     """
     return rx.table.row(
         rx.table.cell(rx.text(transient["index"].to(int) + 1, size="1")),
+        rx.table.cell(
+            rx.cond(
+                transient["sweep_index"].to(int) > 0,
+                rx.text(transient["sweep_index"].to(int), size="1"),
+                rx.text("", size="1"),
+            ),
+        ),
         rx.table.cell(rx.text(transient["peak_time"].to(str), size="1")),
         rx.table.cell(rx.text(transient["peak_concentration"].to(str), size="1")),
         rx.table.cell(rx.text(transient["time_to_peak"].to(str), size="1")),
@@ -103,6 +115,7 @@ def _ca_transient_table() -> rx.Component:
             rx.table.header(
                 rx.table.row(
                     rx.table.column_header_cell(rx.text("#", size="1")),
+                    rx.table.column_header_cell(rx.text("Sweep", size="1")),
                     rx.table.column_header_cell(rx.text("Peak t (ms)", size="1")),
                     rx.table.column_header_cell(rx.text("Peak (µM)", size="1")),
                     rx.table.column_header_cell(rx.text("TTP (ms)", size="1")),

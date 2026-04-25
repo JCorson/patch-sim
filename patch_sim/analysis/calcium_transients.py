@@ -200,7 +200,10 @@ def _fit_decay(
     if len(t_decay) < _MIN_DECAY_SAMPLES:
         return _fallback_tau(t_decay, ca_decay_uM, peak_uM, baseline_uM), False
 
-    a0 = peak_uM - baseline_uM
+    # Clamp a0 to satisfy the lower bound (0.0).  In rare cases an over-wide
+    # baseline window can leave baseline ≥ peak; without the clamp curve_fit
+    # would raise ValueError on the violated bound.
+    a0 = max(peak_uM - baseline_uM, 0.0)
 
     def model_fixed_baseline(t: np.ndarray, a: float, tau: float) -> np.ndarray:
         """Single-exponential decay with the per-transient baseline fixed.
