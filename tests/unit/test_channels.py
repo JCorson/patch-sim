@@ -173,6 +173,107 @@ def test_base_ion_channel_satisfies_protocol():
 
 
 # ---------------------------------------------------------------------------
+# Dynamic E_Ca via compute_current(ca_i=...)
+# ---------------------------------------------------------------------------
+
+
+def _make_ca_channel(g_max: float = 1.0) -> IonChannel:
+    """Helper: create a minimal ICaL-type Ca²⁺ channel (carries_calcium=True)."""
+    gv = GatingVariable(
+        name="d",
+        power=1,
+        alpha=VoltageOnlyFn(lambda V, ca_i: 0.1),
+        beta=VoltageOnlyFn(lambda V, ca_i: 0.1),
+    )
+    return IonChannel(
+        name="CaTest",
+        g_max=g_max,
+        gating_variables=(gv,),
+        reversal_spec=NernstSpec(IonSpecies.CALCIUM),
+        carries_calcium=True,
+    )
+
+
+def test_compute_current_ca_uses_live_ca_i() -> None:
+    """Ca²⁺ channel computes E_Ca from live ca_i instead of the cache.
+
+    The current should equal g_max * gate^power * (V - nernst(2, T, Ca_out, ca_i)).
+    """
+    from patch_sim.electrochemistry import nernst_potential
+
+    neuron = Neuron()
+    ch = _make_ca_channel(g_max=2.0)
+    ca_i = 1e-3  # 1 µM
+    gate = 0.5
+    expected_e_ca = nernst_potential(2, neuron.T, neuron.Ca_out, ca_i)
+    expected_current = 2.0 * gate * (0.0 - expected_e_ca)
+    result = ch.compute_current(
+        V=0.0, gating_state={"d": gate}, neuron=neuron, ca_i=ca_i
+    )
+    assert result == pytest.approx(expected_current)
+
+
+def test_compute_current_ca_falls_back_to_ca_in_when_ca_i_none() -> None:
+    """Ca²⁺ channel falls back to neuron.Ca_in when ca_i is not provided."""
+    from patch_sim.electrochemistry import nernst_potential
+
+    neuron = Neuron()
+    ch = _make_ca_channel(g_max=1.0)
+    expected_e_ca = nernst_potential(2, neuron.T, neuron.Ca_out, neuron.Ca_in)
+    expected_current = 1.0 * 0.5 * (0.0 - expected_e_ca)
+    result = ch.compute_current(V=0.0, gating_state={"d": 0.5}, neuron=neuron)
+    assert result == pytest.approx(expected_current)
+
+
+def test_compute_current_ca_floors_zero_ca_i() -> None:
+    """Ca²⁺ channel does not raise when ca_i=0.0; the Nernst floor is applied."""
+    neuron = Neuron()
+    ch = _make_ca_channel(g_max=1.0)
+    # Should not raise despite ca_i=0 (which would cause log(0) without the floor).
+    result = ch.compute_current(V=0.0, gating_state={"d": 0.5}, neuron=neuron, ca_i=0.0)
+    assert isinstance(result, float)
+    assert not (result != result)  # not NaN
+
+
+def test_reversal_potentials_excludes_ca_channels() -> None:
+    """neuron.reversal_potentials does not include Ca²⁺-carrying channels.
+
+    Only channels where carries_calcium=False should be in the cache so that
+    Ca channels always recompute E_Ca from live ca_i.
+    """
+    from patch_sim.calcium import CalciumDynamics
+
+    ca_ch = _make_ca_channel(g_max=1.0)
+    k_ch = _make_simple_channel(g_max=1.0)
+    neuron = Neuron(
+        additional_channels=(ca_ch, k_ch),
+        calcium_dynamics=CalciumDynamics(),
+    )
+    cache = neuron.reversal_potentials
+    # K⁺ channel must be in the cache.
+    assert "test" in cache
+    # Ca²⁺ channel must NOT be in the cache — it uses live-ca_i Nernst.
+    assert "CaTest" not in cache
+
+
+def test_ikca_channel_in_reversal_potentials_cache() -> None:
+    """IKCa (K⁺ channel whose gating depends on ca_i) stays in the cache.
+
+    IKCa is a K⁺ channel (carries_calcium=False).  Only its gating rate
+    functions use ca_i; its reversal potential is a fixed K⁺ Nernst value.
+    """
+    from patch_sim.additional_channels import make_ikca_channel
+    from patch_sim.calcium import CalciumDynamics
+
+    ikca = make_ikca_channel(g_max=1.0)
+    neuron = Neuron(
+        additional_channels=(ikca,),
+        calcium_dynamics=CalciumDynamics(),
+    )
+    assert "KCa" in neuron.reversal_potentials
+
+
+# ---------------------------------------------------------------------------
 # IonSpecies, NernstSpec, GoldmanSpec
 # ---------------------------------------------------------------------------
 

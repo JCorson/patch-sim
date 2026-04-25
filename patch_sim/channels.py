@@ -10,6 +10,10 @@ from typing import Any
 
 from .rates import Rate
 
+# Minimum ca_i passed to nernst_potential for Ca²⁺ channels.  Prevents log(0)
+# when the RK4 floor clips ca_i to 0.0 mid-substep.
+_CA_NERNST_FLOOR: float = 1e-9  # mM (≈ 1 pM — far below any physiological value)
+
 
 class IonSpecies(Enum):
     """Ion species with associated valence and symbol.
@@ -224,27 +228,47 @@ class IonChannel:
         V: float,
         gating_state: dict[str, float],
         neuron: Any,
+        ca_i: float | None = None,
     ) -> float:
         """Compute the ionic current through this channel.
 
-        Evaluates ``g_max * prod(gate^power) * (V - E_rev)`` where ``E_rev``
-        is read from ``neuron.reversal_potentials`` when this channel is
-        registered on *neuron*, or computed on-the-fly via
-        :meth:`reversal_potential` otherwise.
+        Evaluates ``g_max * prod(gate^power) * (V - E_rev)``.
+
+        For Ca²⁺-carrying channels (``carries_calcium=True``), ``E_rev`` is
+        computed from the Nernst equation using *ca_i* as the live intracellular
+        Ca²⁺ concentration, enabling dynamic reversal potentials.  When *ca_i*
+        is ``None``, the neuron's static ``Ca_in`` is used as a fallback (e.g.
+        during equilibrium evaluation).
+
+        For all other channels, ``E_rev`` is read from
+        ``neuron.reversal_potentials`` (the frozen-ion-concentration cache) or
+        computed on-the-fly via :meth:`reversal_potential` when the channel is
+        not registered on *neuron*.
 
         Args:
             V: Membrane voltage in mV.
             gating_state: Mapping from gating variable name to current value.
             neuron: The :class:`~patch_sim.neuron.Neuron` model whose
                 ``reversal_potentials`` cache and ion concentrations are used.
+            ca_i: Live intracellular Ca²⁺ concentration in mM.  Only used when
+                ``carries_calcium=True``; ignored otherwise.
 
         Returns:
             Ionic current in µA/cm².
         """
+        from .electrochemistry import nernst_potential
+
         g = self.g_max
         for gv in self.gating_variables:
             g *= gating_state[gv.name] ** gv.power
-        e_rev = neuron.reversal_potentials.get(self.name)
-        if e_rev is None:
-            e_rev = self.reversal_potential(neuron)
+        if self.carries_calcium:
+            ca = max(
+                ca_i if ca_i is not None else neuron.Ca_in,
+                _CA_NERNST_FLOOR,
+            )
+            e_rev = nernst_potential(2, neuron.T, neuron.Ca_out, ca)
+        else:
+            e_rev = neuron.reversal_potentials.get(self.name)
+            if e_rev is None:
+                e_rev = self.reversal_potential(neuron)
         return g * (V - e_rev)
