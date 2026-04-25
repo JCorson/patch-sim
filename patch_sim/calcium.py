@@ -25,15 +25,29 @@ class CalciumDynamics:
         alpha_ca: Scaling factor converting Ca2+ current to concentration
             change in mM / (µA/cm² · ms).
         tau_ca: Time constant for Ca2+ removal/buffering in ms.
-        ca_rest: Resting intracellular Ca2+ concentration in mM.
+        ca_rest: Resting intracellular Ca2+ concentration in mM.  This is
+            the ODE equilibrium target (the concentration the pumps/buffers
+            maintain in the absence of Ca2+ current) and is NOT necessarily
+            equal to the true simulation starting concentration when window
+            currents are present at rest.  See *ca_init* below.
+        ca_init: Initial intracellular Ca2+ concentration in mM used at the
+            start of :func:`~patch_sim.simulate_current_clamp`.  When
+            ``None`` (default), *ca_rest* is used.  Set this explicitly when
+            the true resting Ca2+ concentration differs from *ca_rest* due to
+            persistent window currents at the resting potential (i.e. the
+            coupled (V, Ca2+) equilibrium has ca_i > ca_rest).  Use
+            :func:`~patch_sim.find_coupled_equilibrium` to compute the
+            correct value.
 
     Raises:
-        ValueError: If ``alpha_ca <= 0``, ``tau_ca <= 0``, or ``ca_rest < 0``.
+        ValueError: If ``alpha_ca <= 0``, ``tau_ca <= 0``, ``ca_rest < 0``,
+            or ``ca_init < 0``.
     """
 
     alpha_ca: float = DEFAULT_ALPHA_CA
     tau_ca: float = DEFAULT_TAU_CA
     ca_rest: float = DEFAULT_CA_REST
+    ca_init: float | None = None
 
     def __post_init__(self) -> None:
         """Validate calcium dynamics parameters on construction."""
@@ -43,6 +57,8 @@ class CalciumDynamics:
             raise ValueError(f"tau_ca must be positive, got {self.tau_ca}.")
         if self.ca_rest < 0:
             raise ValueError(f"ca_rest must be non-negative, got {self.ca_rest}.")
+        if self.ca_init is not None and self.ca_init < 0:
+            raise ValueError(f"ca_init must be non-negative, got {self.ca_init}.")
 
     def derivative(self, I_Ca: float, ca_i: float) -> float:
         """Compute the rate of change of intracellular Ca2+ concentration.

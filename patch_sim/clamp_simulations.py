@@ -140,7 +140,7 @@ def _gating_derivatives(
         i_ca_total = 0.0
         for ch in neuron.all_channels:
             if ch.carries_calcium:
-                i_ca_total += ch.compute_current(V, gating_state, neuron)
+                i_ca_total += ch.compute_current(V, gating_state, neuron, ca_i=ca_i)
             for gv in ch.gating_variables:
                 x = gating_state[gv.name]
                 derivs[gv.name] = phi * (
@@ -181,7 +181,7 @@ def _hh_derivatives(
     """
     I_total = 0.0
     for ch in neuron.all_channels:
-        I_total += ch.compute_current(V, gating_state, neuron)
+        I_total += ch.compute_current(V, gating_state, neuron, ca_i=ca_i)
     dV = (I_ext - I_total) / neuron.C_m
     derivs, dca_i = _gating_derivatives(neuron, V, gating_state, ca_i)
     return dV, derivs, dca_i
@@ -295,7 +295,7 @@ def _gating_derivatives_tabled(
         i_ca_total = 0.0
         for ch in neuron.all_channels:
             if ch.carries_calcium:
-                i_ca_total += ch.compute_current(V, gating_state, neuron)
+                i_ca_total += ch.compute_current(V, gating_state, neuron, ca_i=ca_i)
             for gv in ch.gating_variables:
                 x = gating_state[gv.name]
                 a_tbl = alpha_tables[gv.name]
@@ -507,7 +507,8 @@ def _simulate_voltage_clamp_core(
     # Compute initial currents
     V0 = voltage_protocol[0]
     ch_currents_0 = [
-        ch.compute_current(V0, gating_state, neuron) for ch in neuron.all_channels
+        ch.compute_current(V0, gating_state, neuron, ca_i=ca_i)
+        for ch in neuron.all_channels
     ]
     for ch, i_ch in zip(neuron.all_channels, ch_currents_0):
         ch_current_arrs[ch.name][0] = i_ch
@@ -533,7 +534,8 @@ def _simulate_voltage_clamp_core(
             ca_arr[i] = ca_i
 
         ch_currents_i = [
-            ch.compute_current(V, gating_state, neuron) for ch in neuron.all_channels
+            ch.compute_current(V, gating_state, neuron, ca_i=ca_i)
+            for ch in neuron.all_channels
         ]
         for ch, i_ch in zip(neuron.all_channels, ch_currents_i):
             ch_current_arrs[ch.name][i] = i_ch
@@ -636,7 +638,7 @@ def _simulate_current_clamp_core(
 
     # Compute initial currents
     ch_currents_0 = [
-        ch.compute_current(initial_V, gating_state, neuron)
+        ch.compute_current(initial_V, gating_state, neuron, ca_i=ca_i)
         for ch in neuron.all_channels
     ]
     for ch, i_ch in zip(neuron.all_channels, ch_currents_0):
@@ -663,7 +665,7 @@ def _simulate_current_clamp_core(
             ca_arr[i] = ca_i
 
         ch_currents_i = [
-            ch.compute_current(V_new, gating_state, neuron)
+            ch.compute_current(V_new, gating_state, neuron, ca_i=ca_i)
             for ch in neuron.all_channels
         ]
         for ch, i_ch in zip(neuron.all_channels, ch_currents_i):
@@ -776,8 +778,11 @@ def simulate_current_clamp(
     if not np.all(np.isfinite(current_external)):
         raise ValueError("current_external must not contain NaN or Inf values.")
 
+    cd = neuron.calcium_dynamics
     ca_i: float = (
-        neuron.calcium_dynamics.ca_rest if neuron.calcium_dynamics is not None else 0.0
+        (cd.ca_init if cd.ca_init is not None else cd.ca_rest)
+        if cd is not None
+        else 0.0
     )
     gating_state = _initialize_gating_variables(neuron, neuron.v_rest, ca_i)
     return _simulate_current_clamp_core(

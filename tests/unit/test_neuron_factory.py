@@ -221,3 +221,27 @@ def test_neuron_config_non_positive_t_ref_raises(T_ref: float) -> None:
     """NeuronConfig rejects non-positive T_ref at construction time."""
     with pytest.raises(ValueError, match="T_ref"):
         NeuronConfig(T_ref=T_ref)
+
+
+# ---------------------------------------------------------------------------
+# CalciumDynamics override
+# ---------------------------------------------------------------------------
+
+
+def test_make_neuron_explicit_calcium_dynamics_override_is_honoured() -> None:
+    """An explicit CalciumDynamics in NeuronConfig is used instead of the default."""
+    custom = CalciumDynamics(alpha_ca=1e-6, tau_ca=20.0, ca_rest=1e-4)
+    config = NeuronConfig(
+        channels=(ChannelConfig(make_ical_channel, g_max=1.0),),
+        calcium_dynamics=custom,
+    )
+    model = make_neuron(config)
+    assert model.calcium_dynamics is custom
+
+
+def test_make_neuron_calcium_dynamics_override_on_non_ca_config_raises() -> None:
+    """Providing calcium_dynamics for a non-Ca config raises ValueError."""
+    custom = CalciumDynamics(alpha_ca=1e-6, tau_ca=20.0, ca_rest=1e-4)
+    config = NeuronConfig(calcium_dynamics=custom)  # no Ca channels
+    with pytest.raises(ValueError, match="Ca"):
+        make_neuron(config)

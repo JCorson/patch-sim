@@ -22,6 +22,7 @@ from .additional_channels import (
     make_inap_channel,
     make_inar_channel,
 )
+from .calcium import CalciumDynamics
 from .constants import (
     ACTION_POTENTIAL,
     CA1_PYRAMIDAL,
@@ -197,6 +198,10 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_inar_channel, g_max=0.1),
             ChannelConfig(make_ih_channel, g_max=1.0),
         ),
+        # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING.
+        # tau_ca=20 ms (vs default 200 ms) prevents inter-spike accumulation at 10 Hz
+        # pacemaking; alpha_ca=1.5e-5 gives a ~2.6 µM peak at 10 µA/cm² for 180 ms.
+        calcium_dynamics=CalciumDynamics(alpha_ca=1.5e-5, tau_ca=20.0, ca_rest=1e-4),
     ),
     DOPAMINERGIC: NeuronConfig(
         # Ih drives pacemaker sag and rebound; IM provides slow
@@ -267,10 +272,12 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # the pure-K⁺ split (g_NaL ≈ 0) achieves a stable rest at −68 mV.
         #
         # WARNING: v_rest depends on ICaT (g=1.5) and Ih (g=1.0) window currents
-        # at −68 mV, not purely on the leak ratio.  If g_CaT or g_Ih are ever
-        # retuned, re-run find_zero_current_voltage to recompute v_rest and
-        # g_KL (keeping g_NaL = 0 and g_KL = 0.15).
-        v_rest=-68.0,
+        # at rest, not purely on the leak ratio.  With dynamic E_Ca, the ICaT
+        # window current at rest elevates ca_i above ca_rest, shifting E_Ca and
+        # moving the coupled equilibrium to −68.27 mV (vs −68.0 mV static).
+        # If g_CaT or g_Ih are ever retuned, re-run find_coupled_equilibrium
+        # to recompute v_rest, g_KL, and ca_init.
+        v_rest=-68.2677,
         g_NaL=0.0,
         g_KL=0.15,
         T_ref=309.15,
@@ -279,6 +286,16 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         channels=(
             ChannelConfig(make_icat_channel, g_max=1.5),
             ChannelConfig(make_ih_channel, g_max=1.0),
+        ),
+        # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
+        # (8 µA/cm², 200 ms).  tau_ca=20 ms allows inter-burst clearance;
+        # alpha_ca=2.6e-5 targets ~2.5 µM peak during sustained tonic firing.
+        # ca_init is the coupled (V, ca_i) equilibrium at v_rest: ICaT window
+        # current at rest keeps ca_i elevated above ca_rest; use
+        # find_coupled_equilibrium to recompute if CalciumDynamics or channel
+        # parameters change.
+        calcium_dynamics=CalciumDynamics(
+            alpha_ca=2.6e-5, tau_ca=20.0, ca_rest=1e-4, ca_init=5.377e-4
         ),
     ),
     CA1_PYRAMIDAL: NeuronConfig(
@@ -316,6 +333,10 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_icat_channel, g_max=0.3),
             ChannelConfig(make_ikca_channel, g_max=2.0),
         ),
+        # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
+        # (12 µA/cm², 300 ms).  Three Ca channel types (ICaL + ICaN + ICaT) combined
+        # with IKCa require lower alpha_ca than single-channel presets to stay in band.
+        calcium_dynamics=CalciumDynamics(alpha_ca=2.1e-5, tau_ca=20.0, ca_rest=1e-4),
     ),
     STN: NeuronConfig(
         # High-threshold Na⁺ (Otsuka 2004) and fast K⁺ DR replace the default
@@ -332,12 +353,15 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # g_NaL + g_KL = 0.25 mS/cm² gives τ_m ≈ 4 ms and R_in ≈ 4 kΩ·cm².
         # Lower total leak (< 0.25) shifts the zero-current equilibrium away
-        # from v_rest, breaking the resting stability of this preset.  Values
-        # tuned to preserve v_rest = −67 mV.  With Na_out = 145 mM (mammalian),
-        # E_Na ≈ +60.6 mV, and K_out = 5 mM gives E_K ≈ −89 mV.
+        # from v_rest.  With Na_out = 145 mM (mammalian), E_Na ≈ +60.6 mV,
+        # and K_out = 5 mM gives E_K ≈ −89 mV.
+        # v_rest = −68.02 mV: with dynamic E_Ca, ICaT and ICaL window currents
+        # at rest elevate ca_i above ca_rest, shifting E_Ca and moving the
+        # coupled equilibrium to −68.02 mV (vs −67 mV static).
+        # Re-run find_coupled_equilibrium if channel parameters change.
         g_Na=49.0,
         g_K=57.0,
-        v_rest=-67.0,
+        v_rest=-68.0152,
         Na_out=145.0,
         K_out=5.0,
         g_NaL=0.038,
@@ -350,6 +374,14 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ika_channel, g_max=3.0),
             ChannelConfig(make_ikca_channel, g_max=1.0),
             ChannelConfig(make_ih_channel, g_max=0.5),
+        ),
+        # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
+        # (2 µA/cm², 200 ms).  ICaT g=5.0 mS/cm² is the largest Ca conductance in any
+        # preset; low alpha_ca=1.1e-5 compensates for the high Ca influx per spike.
+        # ca_init is the coupled (V, ca_i) equilibrium at v_rest: ICaT/ICaL window
+        # currents keep ca_i elevated above ca_rest at rest.
+        calcium_dynamics=CalciumDynamics(
+            alpha_ca=1.1e-5, tau_ca=20.0, ca_rest=1e-4, ca_init=7.325e-4
         ),
     ),
     TRN: NeuronConfig(
@@ -393,6 +425,10 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         na_channel_factory=make_trn_na_channel,
         k_channel_factory=make_trn_k_channel,
         channels=(ChannelConfig(make_icat_channel, g_max=3.5),),
+        # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
+        # (3 µA/cm², 200 ms).  ICaT g=3.5 mS/cm² is the only Ca source; tau_ca=20 ms
+        # allows de-inactivation between bursts; alpha_ca=1.2e-5 targets ~2.8 µM peak.
+        calcium_dynamics=CalciumDynamics(alpha_ca=1.2e-5, tau_ca=20.0, ca_rest=1e-4),
     ),
 }
 

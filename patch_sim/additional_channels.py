@@ -661,8 +661,9 @@ def make_ical_channel(
     (activation, power 2) and ``f`` (inactivation, power 1).
 
     Because ICaL carries Ca²⁺, ``carries_calcium=True`` is set so that
-    :meth:`~patch_sim.neuron.Neuron.calcium_current` sums its
-    contribution automatically.
+    the simulation loop accumulates its contribution for the Ca²⁺ ODE
+    and :meth:`~patch_sim.channels.IonChannel.compute_current` uses live
+    ``ca_i`` for a dynamic E_Ca.
 
     Kinetics use Boltzmann-cosh rate functions with activation centred at
     -10 mV (slope 6.2 mV) and inactivation centred at -35 mV (slope -9 mV,
