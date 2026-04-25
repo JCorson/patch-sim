@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from .electrochemistry import nernst_potential
 from .rates import Rate
 
 # Minimum ca_i passed to nernst_potential for Ca²⁺ channels.  Prevents log(0)
@@ -256,8 +257,6 @@ class IonChannel:
         Returns:
             Ionic current in µA/cm².
         """
-        from .electrochemistry import nernst_potential
-
         g = self.g_max
         for gv in self.gating_variables:
             g *= gating_state[gv.name] ** gv.power

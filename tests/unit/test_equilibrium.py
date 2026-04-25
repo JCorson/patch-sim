@@ -1,9 +1,11 @@
 """Tests for the equilibrium module."""
 
+import warnings
+
 import pytest
 
 from patch_sim import find_coupled_equilibrium, find_zero_current_voltage
-from patch_sim.constants import DOPAMINERGIC, PURKINJE, TRN
+from patch_sim.constants import DOPAMINERGIC, PURKINJE, THALAMIC_RELAY, TRN
 from patch_sim.equilibrium import _total_ionic_current
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
@@ -93,3 +95,25 @@ def test_find_zero_current_voltage_all_presets(preset_name: str) -> None:
         f"{preset_name}: computed equilibrium {v_eq:.4f} mV differs from "
         f"v_rest={neuron.v_rest:.4f} mV by {abs(v_eq - neuron.v_rest):.4f} mV"
     )
+
+
+def test_find_coupled_equilibrium_warns_on_non_convergence() -> None:
+    """RuntimeWarning is emitted when max_iter elapses without convergence.
+
+    Uses the THALAMIC_RELAY preset, which has window-current-driven coupling
+    between V and ca_i and therefore requires several fixed-point iterations
+    to converge.  Setting max_iter=1 ensures convergence cannot be reached.
+    """
+    neuron = make_neuron(NEURON_PRESETS[THALAMIC_RELAY])
+    with pytest.warns(RuntimeWarning, match="did not converge"):
+        v_eq, ca_i_eq = find_coupled_equilibrium(neuron, max_iter=1)
+    assert isinstance(v_eq, float)
+    assert ca_i_eq > 0.0
+
+
+def test_find_coupled_equilibrium_no_warning_on_convergence() -> None:
+    """No warning is emitted when iteration converges within max_iter."""
+    neuron = make_neuron(NEURON_PRESETS[THALAMIC_RELAY])
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        find_coupled_equilibrium(neuron)

@@ -778,11 +778,12 @@ def simulate_current_clamp(
     if not np.all(np.isfinite(current_external)):
         raise ValueError("current_external must not contain NaN or Inf values.")
 
-    if neuron.calcium_dynamics is not None:
-        cd = neuron.calcium_dynamics
-        ca_i: float = cd.ca_init if cd.ca_init is not None else cd.ca_rest
-    else:
-        ca_i = 0.0
+    cd = neuron.calcium_dynamics
+    ca_i: float = (
+        (cd.ca_init if cd.ca_init is not None else cd.ca_rest)
+        if cd is not None
+        else 0.0
+    )
     gating_state = _initialize_gating_variables(neuron, neuron.v_rest, ca_i)
     return _simulate_current_clamp_core(
         neuron, current_external, neuron.v_rest, gating_state, ca_i

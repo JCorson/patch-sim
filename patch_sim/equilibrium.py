@@ -7,9 +7,12 @@ steady-state gating variables.
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
 from scipy.optimize import brentq
+
+from .channels import _CA_NERNST_FLOOR
 
 if TYPE_CHECKING:
     from .neuron import Neuron
@@ -152,8 +155,11 @@ def find_coupled_equilibrium(
         v_max: Upper bound for the voltage root search in mV.
         tol: Convergence tolerance: iteration stops when both
             ``|V_new − V_old| < tol`` and ``|ca_i_new − ca_i_old| < 1e-10``.
-        max_iter: Maximum number of fixed-point iterations before returning
-            the best estimate found so far.
+        max_iter: Maximum number of fixed-point iterations before giving up.
+            If reached without satisfying *tol*, a :class:`RuntimeWarning` is
+            emitted and the last iterate is returned — calibrating preset
+            constants against a non-converged value will produce silent drift,
+            so callers should treat the warning as a failure.
 
     Returns:
         ``(V_ss, ca_i_ss)`` — equilibrium membrane voltage in mV and
@@ -162,6 +168,9 @@ def find_coupled_equilibrium(
     Raises:
         ValueError: Propagated from :func:`find_zero_current_voltage` if the
             search range does not bracket a root.
+
+    Warns:
+        RuntimeWarning: If *max_iter* iterations elapse without convergence.
     """
     if neuron.calcium_dynamics is None:
         return find_zero_current_voltage(neuron, v_min, v_max, tol), 0.0
@@ -169,6 +178,8 @@ def find_coupled_equilibrium(
     cd = neuron.calcium_dynamics
     ca_i: float = cd.ca_rest
     V_ss: float = find_zero_current_voltage(neuron, v_min, v_max, tol, ca_i=ca_i)
+    dV: float = float("inf")
+    dca: float = float("inf")
 
     for _ in range(max_iter):
         gating_state: dict[str, float] = {}
@@ -182,12 +193,22 @@ def find_coupled_equilibrium(
             for ch in neuron.all_channels
             if ch.carries_calcium
         )
-        ca_i_new = max(cd.ca_rest - cd.alpha_ca * i_ca * cd.tau_ca, 1e-9)
+        ca_i_new = max(cd.ca_rest - cd.alpha_ca * i_ca * cd.tau_ca, _CA_NERNST_FLOOR)
         V_ss_new = find_zero_current_voltage(neuron, v_min, v_max, tol, ca_i=ca_i_new)
 
-        if abs(V_ss_new - V_ss) < tol and abs(ca_i_new - ca_i) < 1e-10:
+        dV = abs(V_ss_new - V_ss)
+        dca = abs(ca_i_new - ca_i)
+        if dV < tol and dca < 1e-10:
             return V_ss_new, ca_i_new
 
         V_ss, ca_i = V_ss_new, ca_i_new
 
+    warnings.warn(
+        f"find_coupled_equilibrium did not converge after {max_iter} iterations "
+        f"(last step: ΔV={dV:.2e} mV, Δca_i={dca:.2e} mM); returning the last "
+        "iterate.  Increase max_iter or investigate whether the neuron has a "
+        "stable resting point.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
     return V_ss, ca_i

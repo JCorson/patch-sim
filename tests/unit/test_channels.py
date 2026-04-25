@@ -4,6 +4,8 @@ Covers IonChannel math, GatingVariable steady states, Ih kinetics,
 backward compatibility with no additional channels, and validation errors.
 """
 
+import math
+
 import numpy as np
 import pytest
 
@@ -232,7 +234,7 @@ def test_compute_current_ca_floors_zero_ca_i() -> None:
     # Should not raise despite ca_i=0 (which would cause log(0) without the floor).
     result = ch.compute_current(V=0.0, gating_state={"d": 0.5}, neuron=neuron, ca_i=0.0)
     assert isinstance(result, float)
-    assert not (result != result)  # not NaN
+    assert not math.isnan(result)
 
 
 def test_reversal_potentials_excludes_ca_channels() -> None:
