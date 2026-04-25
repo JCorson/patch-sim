@@ -148,9 +148,9 @@ class IonChannel:
         reversal_spec: Specification for how the reversal potential is computed
             from the neuron's ion concentrations.
         carries_calcium: ``True`` for channels that carry Ca²⁺ ions (e.g.
-            ICaL, ICaT, ICaN).  Used by
-            :meth:`~patch_sim.neuron.Neuron.calcium_current` to
-            sum Ca²⁺ influx for the intracellular Ca²⁺ ODE.  Defaults to
+            ICaL, ICaT, ICaN).  Used by the simulation loop to accumulate
+            Ca²⁺ influx for the intracellular Ca²⁺ ODE and to compute a
+            live Nernst E_Ca in :meth:`compute_current`.  Defaults to
             ``False``.
 
     Raises:

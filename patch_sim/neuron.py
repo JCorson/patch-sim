@@ -237,42 +237,27 @@ class Neuron:
 
     @cached_property
     def reversal_potentials(self) -> dict[str, float]:
-        """Return per-channel reversal potentials, computed once on first access.
+        """Return constant reversal potentials for all non-Ca²⁺ channels.
 
         Because this dataclass is frozen, ion concentrations and temperature
-        are constant over the neuron's lifetime, so each channel's reversal
-        potential is also constant.  Building the map lazily here eliminates a
-        ``numpy.log`` call per channel per RK4 substep in the simulation loop.
+        are constant over the neuron's lifetime, so non-Ca²⁺ channels always
+        have the same reversal potential.  Building the map lazily here
+        eliminates a ``numpy.log`` call per channel per RK4 substep.
+
+        Ca²⁺-carrying channels are excluded because their reversal potential
+        depends on the live intracellular Ca²⁺ concentration, which changes
+        each substep.  :meth:`~patch_sim.IonChannel.compute_current` recomputes
+        E_Ca from live ``ca_i`` for those channels.
 
         Returns:
-            Dict mapping each channel name to its reversal potential in mV.
+            Dict mapping each non-Ca²⁺ channel name to its reversal potential
+            in mV.
         """
-        return {ch.name: ch.reversal_potential(self) for ch in self.all_channels}
-
-    def calcium_current(
-        self,
-        V: float,
-        gating_state: dict[str, float],
-    ) -> float:
-        """Return the total current from all calcium-carrying channels.
-
-        Sums the current from every channel (core or additional) that has
-        ``carries_calcium=True``.  Used by the Ca2+ ODE to determine how much
-        intracellular Ca2+ is entering the cell each time step.
-
-        Args:
-            V: Membrane voltage in mV.
-            gating_state: Full gating state mapping variable name → value,
-                covering both core and additional channels.
-
-        Returns:
-            Total calcium current in µA/cm² (positive = outward).
-        """
-        return sum(
-            ch.compute_current(V, gating_state, self)
+        return {
+            ch.name: ch.reversal_potential(self)
             for ch in self.all_channels
-            if ch.carries_calcium
-        )
+            if not ch.carries_calcium
+        }
 
     def ion_concentrations(self, species: IonSpecies) -> tuple[float, float]:
         """Return the extracellular and intracellular concentrations for an ion.
