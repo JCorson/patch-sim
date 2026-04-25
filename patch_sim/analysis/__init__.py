@@ -4,6 +4,7 @@ Provides tools for extracting quantitative metrics from simulation results.
 
 Modules:
     ap_metrics: Action potential detection and metric extraction.
+    calcium_transients: Calcium transient detection and decay-τ fitting.
     derivatives: General-purpose derivative utilities (e.g. dV/dt).
     fi_curve: F-I curve construction from current clamp multi-sweep results.
     hyperpolarization: Sag and rebound analysis from hyperpolarization sweeps.
@@ -18,6 +19,12 @@ from .ap_metrics import (
     SpikeMetrics,
     analyze_aps,
     analyze_aps_from_result,
+)
+from .calcium_transients import (
+    CalciumTransient,
+    CalciumTransientAnalysisResult,
+    analyze_calcium_transients,
+    analyze_calcium_transients_from_result,
 )
 from .derivatives import compute_dvdt
 from .fi_curve import (
@@ -58,6 +65,8 @@ from .sfa import SFAAnalysisResult, SFACurve, analyze_sfa, compute_sfa
 __all__ = [
     "analyze_aps",
     "analyze_aps_from_result",
+    "analyze_calcium_transients",
+    "analyze_calcium_transients_from_result",
     "analyze_fi",
     "analyze_hyperpolarization",
     "analyze_iv",
@@ -75,6 +84,8 @@ __all__ = [
     "run_membrane_test",
     "APAnalysisResult",
     "BoltzmannFit",
+    "CalciumTransient",
+    "CalciumTransientAnalysisResult",
     "FIAnalysisResult",
     "FIPoint",
     "HyperpolarizationAnalysisResult",

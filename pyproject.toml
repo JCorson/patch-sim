@@ -46,6 +46,7 @@ include = [
     "patch_sim/clamp_simulations.py",
     "tests/ui/test_plotting.py",
     "tests/ui/test_state.py",
+    "tests/unit/test_calcium_transients.py",
 ]
 
 [tool.ty.overrides.rules]
