@@ -52,6 +52,7 @@ from patch_sim.additional_channels import (
     make_inap_channel,
     make_inar_channel,
 )
+from patch_sim.calcium import CalciumDynamics
 from patch_sim.channels import (
     GatingVariable,
     GoldmanSpec,
@@ -60,6 +61,7 @@ from patch_sim.channels import (
     NernstSpec,
 )
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
+from patch_sim.electrochemistry import nernst_potential
 from patch_sim.neuron import Neuron
 from patch_sim.protocols import step_current, step_voltage
 from patch_sim.rates import CalciumDependentFn, VoltageOnlyFn
@@ -201,8 +203,6 @@ def test_compute_current_ca_uses_live_ca_i() -> None:
 
     The current should equal g_max * gate^power * (V - nernst(2, T, Ca_out, ca_i)).
     """
-    from patch_sim.electrochemistry import nernst_potential
-
     neuron = Neuron()
     ch = _make_ca_channel(g_max=2.0)
     ca_i = 1e-3  # 1 µM
@@ -217,8 +217,6 @@ def test_compute_current_ca_uses_live_ca_i() -> None:
 
 def test_compute_current_ca_falls_back_to_ca_in_when_ca_i_none() -> None:
     """Ca²⁺ channel falls back to neuron.Ca_in when ca_i is not provided."""
-    from patch_sim.electrochemistry import nernst_potential
-
     neuron = Neuron()
     ch = _make_ca_channel(g_max=1.0)
     expected_e_ca = nernst_potential(2, neuron.T, neuron.Ca_out, neuron.Ca_in)
@@ -243,8 +241,6 @@ def test_reversal_potentials_excludes_ca_channels() -> None:
     Only channels where carries_calcium=False should be in the cache so that
     Ca channels always recompute E_Ca from live ca_i.
     """
-    from patch_sim.calcium import CalciumDynamics
-
     ca_ch = _make_ca_channel(g_max=1.0)
     k_ch = _make_simple_channel(g_max=1.0)
     neuron = Neuron(
@@ -264,9 +260,6 @@ def test_ikca_channel_in_reversal_potentials_cache() -> None:
     IKCa is a K⁺ channel (carries_calcium=False).  Only its gating rate
     functions use ca_i; its reversal potential is a fixed K⁺ Nernst value.
     """
-    from patch_sim.additional_channels import make_ikca_channel
-    from patch_sim.calcium import CalciumDynamics
-
     ikca = make_ikca_channel(g_max=1.0)
     neuron = Neuron(
         additional_channels=(ikca,),
