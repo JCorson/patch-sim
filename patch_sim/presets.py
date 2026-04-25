@@ -22,6 +22,7 @@ from .additional_channels import (
     make_inap_channel,
     make_inar_channel,
 )
+from .calcium import CalciumDynamics
 from .constants import (
     ACTION_POTENTIAL,
     CA1_PYRAMIDAL,
@@ -197,6 +198,10 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_inar_channel, g_max=0.1),
             ChannelConfig(make_ih_channel, g_max=1.0),
         ),
+        # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING.
+        # tau_ca=20 ms (vs default 200 ms) prevents inter-spike accumulation at 10 Hz
+        # pacemaking; alpha_ca=1.5e-5 gives a ~2.6 µM peak at 10 µA/cm² for 180 ms.
+        calcium_dynamics=CalciumDynamics(alpha_ca=1.5e-5, tau_ca=20.0, ca_rest=1e-4),
     ),
     DOPAMINERGIC: NeuronConfig(
         # Ih drives pacemaker sag and rebound; IM provides slow
@@ -280,6 +285,10 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_icat_channel, g_max=1.5),
             ChannelConfig(make_ih_channel, g_max=1.0),
         ),
+        # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
+        # (8 µA/cm², 200 ms).  tau_ca=20 ms allows inter-burst clearance;
+        # alpha_ca=2.6e-5 targets ~2.5 µM peak during sustained tonic firing.
+        calcium_dynamics=CalciumDynamics(alpha_ca=2.6e-5, tau_ca=20.0, ca_rest=1e-4),
     ),
     CA1_PYRAMIDAL: NeuronConfig(
         # Reduced g_Na/g_K vs squid axon; IKa shortens ISI; IM provides
@@ -316,6 +325,10 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_icat_channel, g_max=0.3),
             ChannelConfig(make_ikca_channel, g_max=2.0),
         ),
+        # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
+        # (12 µA/cm², 300 ms).  Three Ca channel types (ICaL + ICaN + ICaT) combined
+        # with IKCa require lower alpha_ca than single-channel presets to stay in band.
+        calcium_dynamics=CalciumDynamics(alpha_ca=2.1e-5, tau_ca=20.0, ca_rest=1e-4),
     ),
     STN: NeuronConfig(
         # High-threshold Na⁺ (Otsuka 2004) and fast K⁺ DR replace the default
@@ -351,6 +364,10 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ikca_channel, g_max=1.0),
             ChannelConfig(make_ih_channel, g_max=0.5),
         ),
+        # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
+        # (2 µA/cm², 200 ms).  ICaT g=5.0 mS/cm² is the largest Ca conductance in any
+        # preset; low alpha_ca=1.1e-5 compensates for the high Ca influx per spike.
+        calcium_dynamics=CalciumDynamics(alpha_ca=1.1e-5, tau_ca=20.0, ca_rest=1e-4),
     ),
     TRN: NeuronConfig(
         # ICaT (g_T = 3.5 mS/cm²) drives rhythmic burst firing and
@@ -393,6 +410,10 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         na_channel_factory=make_trn_na_channel,
         k_channel_factory=make_trn_k_channel,
         channels=(ChannelConfig(make_icat_channel, g_max=3.5),),
+        # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
+        # (3 µA/cm², 200 ms).  ICaT g=3.5 mS/cm² is the only Ca source; tau_ca=20 ms
+        # allows de-inactivation between bursts; alpha_ca=1.2e-5 targets ~2.8 µM peak.
+        calcium_dynamics=CalciumDynamics(alpha_ca=1.2e-5, tau_ca=20.0, ca_rest=1e-4),
     ),
 }
 
