@@ -380,21 +380,30 @@ def _compute_multi_sweep_burst_data(
         Both are empty when no current-clamp sweep produced ≥2 spikes.
     """
     pooled: list[tuple[int, patch_sim.BurstMetrics]] = []
-    per_sweep_results: list[tuple[int, patch_sim.BurstAnalysisResult, float]] = []
+    per_sweep_results: list[tuple[int, patch_sim.BurstAnalysisResult]] = []
+    total_window_ms = 0.0
 
     for sweep_idx, sweep in enumerate(sweeps):
         if sweep.clamp_mode != CURRENT_CLAMP:
             continue
         time_arr = np.array(sweep.time)
+        sweep_duration_ms = (
+            float(time_arr[-1] - time_arr[0]) if len(time_arr) > 1 else 0.0
+        )
+        # Every CC sweep contributes to the duty-cycle denominator, not just
+        # sweeps that fire enough spikes to run the burst analyser.  Otherwise
+        # a 10-sweep run where 2 fire would report a duty cycle as a fraction
+        # of those 2 sweeps' duration, overstating the active-burst time.
+        total_window_ms += sweep_duration_ms
+
         voltage_arr = np.array(sweep.voltage)
         ap_result = patch_sim.analyze_aps(time_arr, voltage_arr)
         if ap_result.spike_count < 2:
             continue
-        total_duration_ms = float(time_arr[-1] - time_arr[0])
         analysis = patch_sim.analyze_bursts(
-            ap_result, total_duration_ms=total_duration_ms
+            ap_result, total_duration_ms=sweep_duration_ms
         )
-        per_sweep_results.append((sweep_idx, analysis, total_duration_ms))
+        per_sweep_results.append((sweep_idx, analysis))
         pooled.extend((sweep_idx, b) for b in analysis.bursts)
 
     if not per_sweep_results:
@@ -406,8 +415,8 @@ def _compute_multi_sweep_burst_data(
         entry["sweep_index"] = sweep_idx + 1
         metrics.append(entry)
 
-    burst_count = sum(r.burst_count for _, r, _ in per_sweep_results)
-    unburst = sum(r.unburst_spike_count for _, r, _ in per_sweep_results)
+    burst_count = sum(r.burst_count for _, r in per_sweep_results)
+    unburst = sum(r.unburst_spike_count for _, r in per_sweep_results)
     spike_counts = [b.spike_count for _, b in pooled]
     mean_spikes = float(np.mean(spike_counts)) if spike_counts else None
     freq_values = [
@@ -418,12 +427,11 @@ def _compute_multi_sweep_burst_data(
     mean_freq = float(np.mean(freq_values)) if freq_values else None
     ibi_values = [
         r.mean_inter_burst_interval
-        for _, r, _ in per_sweep_results
+        for _, r in per_sweep_results
         if r.mean_inter_burst_interval is not None
     ]
     mean_ibi = float(np.mean(ibi_values)) if ibi_values else None
     total_burst_ms = sum(b.duration for _, b in pooled)
-    total_window_ms = sum(d for _, _, d in per_sweep_results)
     duty_cycle = (
         float(total_burst_ms / total_window_ms) if total_window_ms > 0 else None
     )
@@ -432,7 +440,7 @@ def _compute_multi_sweep_burst_data(
     # representative value; fall back to the first analysed sweep's when
     # no sweep produced bursts.
     representative = next(
-        (r for _, r, _ in per_sweep_results if r.burst_count > 0),
+        (r for _, r in per_sweep_results if r.burst_count > 0),
         per_sweep_results[0][1],
     )
 

@@ -7,9 +7,10 @@ intra-burst frequency, inter-burst interval, duty cycle), and
 :class:`~patch_sim.clamp_simulations.SimulationResult` structured arrays.
 
 Burst detection consumes the spike list produced by
-:func:`~patch_sim.analysis.ap_metrics.analyze_aps`.  Spikes are grouped into
-bursts whose intra-burst inter-spike intervals are below a threshold; bursts
-are separated by gaps where the inter-spike interval exceeds the threshold.
+:func:`~patch_sim.analysis.ap_metrics.analyze_aps`.  Spikes are grouped
+into bursts whose intra-burst inter-spike intervals are at or below a
+threshold; bursts are separated by gaps where the inter-spike interval
+strictly exceeds the threshold.
 The threshold can be supplied by the caller, or auto-detected from a
 log-spaced histogram of the inter-spike intervals.  When too few intervals
 exist or the distribution is unimodal, a fixed default of 100 ms is used.
@@ -273,41 +274,35 @@ def _group_spikes_into_bursts(
     n_spikes = len(peak_times)
     if n_spikes == 0:
         return bursts, 0
-    if n_spikes == 1:
-        # A single spike with no ISIs cannot form a multi-spike burst.
-        if min_spikes_per_burst <= 1:
-            burst = BurstMetrics(
-                index=0,
-                start_time=float(peak_times[0]),
-                end_time=float(peak_times[0]),
-                duration=0.0,
-                spike_count=1,
-                intra_burst_frequency=None,
-                mean_intra_burst_isi=None,
-            )
-            return [burst], 0
-        return [], 1
 
     # Walk through ISIs, breaking groups whenever an ISI exceeds threshold.
-    group_start = 0  # index into peak_times
+    # Groups are closed both when an inter-burst gap is found and at the
+    # end of the spike list.  A 0-ISI single-spike trace falls through to
+    # the "close the final group" line and is handled there.
+    group_start = 0  # index into peak_times of the first spike in the group
     group_isis: list[float] = []
-    group_end_indices: list[int] = []  # last spike index for each group
 
     def _close_group(end_idx: int) -> None:
         """Finalise the current candidate group ending at ``end_idx``.
 
+        Promotes the group to a :class:`BurstMetrics` when its spike count
+        meets ``min_spikes_per_burst``; otherwise its spikes are added to
+        the running unburst count.
+
         Args:
             end_idx: Index (in ``peak_times``) of the last spike in the group.
         """
-        nonlocal group_start, group_isis
+        nonlocal unburst
         spike_count = end_idx - group_start + 1
         if spike_count >= min_spikes_per_burst:
             start_t = float(peak_times[group_start])
             end_t = float(peak_times[end_idx])
             duration = end_t - start_t
             if spike_count > 1 and duration > 0:
-                freq = (spike_count - 1) * 1000.0 / duration
-                mean_isi = float(np.mean(group_isis)) if group_isis else None
+                freq: float | None = (spike_count - 1) * 1000.0 / duration
+                mean_isi: float | None = (
+                    float(np.mean(group_isis)) if group_isis else None
+                )
             else:
                 freq = None
                 mean_isi = None
@@ -323,19 +318,8 @@ def _group_spikes_into_bursts(
                 )
             )
         else:
-            nonlocal_unburst(spike_count)
+            unburst += spike_count
 
-    def nonlocal_unburst(count: int) -> None:
-        """Add ``count`` to the running unburst spike total.
-
-        Args:
-            count: Number of spikes to add.
-        """
-        nonlocal unburst
-        unburst += count
-
-    # Track group state explicitly via running indices so we can close on
-    # both threshold breaks and end-of-list.
     for i, isi in enumerate(isis):
         if isi <= threshold_ms:
             group_isis.append(float(isi))
@@ -343,7 +327,6 @@ def _group_spikes_into_bursts(
             _close_group(i)
             group_start = i + 1
             group_isis = []
-        group_end_indices.append(i)
 
     # Close the final group at the last spike.
     _close_group(n_spikes - 1)
@@ -409,9 +392,13 @@ def analyze_bursts(
     else:
         threshold, method = _estimate_isi_threshold(list(ap_result.isis))
 
-    if ap_result.spike_count < 2:
+    if ap_result.spike_count == 0:
         return _empty_result(threshold, method)
 
+    # 1-spike traces fall through to the grouper so they are correctly
+    # routed to ``unburst_spike_count`` under the default
+    # ``min_spikes_per_burst=2`` (or to a single 1-spike burst when the
+    # caller has lowered the minimum).
     peak_times = [s.peak_time for s in ap_result.spikes]
     bursts, unburst = _group_spikes_into_bursts(
         peak_times,

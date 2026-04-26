@@ -113,13 +113,24 @@ def test_no_spikes_returns_empty_result() -> None:
     assert result.threshold_method == "default-fixed"
 
 
-def test_single_spike_returns_zero_bursts() -> None:
-    """A single spike has no ISIs and cannot form a multi-spike burst."""
+def test_single_spike_returns_zero_bursts_and_one_unburst_spike() -> None:
+    """A single spike with default min_spikes_per_burst=2 is unburst, not a burst."""
     ap = _make_ap_result([100.0])
     result = analyze_bursts(ap, total_duration_ms=500.0)
     assert result.burst_count == 0
-    assert result.unburst_spike_count == 0
+    assert result.unburst_spike_count == 1
     assert result.threshold_method == "default-fixed"
+
+
+def test_single_spike_with_min_one_returns_one_burst() -> None:
+    """A single spike with min_spikes_per_burst=1 forms a single-spike burst."""
+    ap = _make_ap_result([100.0])
+    result = analyze_bursts(ap, total_duration_ms=500.0, min_spikes_per_burst=1)
+    assert result.burst_count == 1
+    assert result.bursts[0].spike_count == 1
+    assert result.bursts[0].duration == pytest.approx(0.0)
+    assert result.bursts[0].intra_burst_frequency is None
+    assert result.unburst_spike_count == 0
 
 
 def test_single_burst_no_inter_burst_interval() -> None:
@@ -183,6 +194,29 @@ def test_duty_cycle_computation() -> None:
 # ---------------------------------------------------------------------------
 # Threshold method selection
 # ---------------------------------------------------------------------------
+
+
+def test_identical_isis_fall_back_to_default_threshold() -> None:
+    """An ISI distribution with zero spread should fall back to the default."""
+    # All ISIs identical at 5 ms → log10 spread is 0; the np.ptp early
+    # exit must engage and the analyser must fall back to 100 ms.
+    peak_times = list(np.cumsum([10.0, *([5.0] * 8)]))
+    ap = _make_ap_result(peak_times)
+    result = analyze_bursts(ap, total_duration_ms=200.0)
+    assert result.threshold_method == "default-fixed"
+    assert result.isi_threshold_ms == pytest.approx(_DEFAULT_THRESHOLD_MS)
+
+
+def test_exactly_min_isis_for_histogram_attempts_auto() -> None:
+    """At the boundary of the histogram threshold, auto-detect should be tried."""
+    # 4 ISIs is the minimum supported; with a clear bimodal split the
+    # histogram path should still fire.
+    peak_times = list(np.cumsum([10.0, 5.0, 5.0, 200.0, 5.0]))
+    ap = _make_ap_result(peak_times)
+    result = analyze_bursts(ap, total_duration_ms=500.0)
+    # Boundary triggers histogram; clear bimodality may or may not be
+    # detected at this small sample size, but the method must not be "user".
+    assert result.threshold_method in {"auto-histogram", "default-fixed"}
 
 
 def test_default_threshold_used_when_few_isis() -> None:

@@ -85,8 +85,15 @@ class AnalysisState(rx.State):
         return len(self.ca_transient_metrics) > 0
 
     @rx.var
-    def has_burst_metrics(self) -> bool:
-        """Return True when burst analysis results are available for display."""
+    def has_burst_summary(self) -> bool:
+        """Return True when a burst-analysis summary is available for display.
+
+        The summary is emitted whenever the spike train was long enough to
+        run the burst analyser (≥1 spike) — even a zero-burst result still
+        carries the threshold and method, so the UI can show that the
+        analysis ran.  ``burst_metrics`` is a separate list (one entry per
+        detected burst) and is empty when ``burst_count == 0``.
+        """
         return len(self.burst_summary) > 0
 
     @rx.var

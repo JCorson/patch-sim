@@ -437,10 +437,11 @@ def _ap_phase_plane_plot() -> rx.Component:
 def _ap_analysis_tab() -> rx.Component:
     """Render the Analysis sub-tab within the CC pane.
 
-    Shows AP summary statistics, the calcium-transient summary (when calcium
-    dynamics were active), the F-I curve (multi-sweep), the SFA curve, and
-    the V vs dV/dt phase-plane when data are available.  Displays a
-    placeholder when no data exists yet.
+    Shows AP summary statistics, the burst summary (when ≥1 spike was
+    detected), the calcium-transient summary (when calcium dynamics were
+    active), the F-I curve (multi-sweep), the SFA curve, and the V vs
+    dV/dt phase-plane when data are available.  Displays a placeholder
+    when no data exists yet.
 
     Returns:
         The analysis sub-tab content as a scrollable flex column.
@@ -448,12 +449,12 @@ def _ap_analysis_tab() -> rx.Component:
     return rx.cond(
         AnalysisState.has_ap_or_fi
         | AnalysisState.has_ca_transient_metrics
-        | AnalysisState.has_burst_metrics,
+        | AnalysisState.has_burst_summary,
         rx.scroll_area(
             rx.flex(
                 rx.cond(AnalysisState.has_ap_metrics, _ap_summary(), rx.box()),
                 rx.cond(
-                    AnalysisState.has_burst_metrics,
+                    AnalysisState.has_burst_summary,
                     _burst_summary(),
                     rx.box(),
                 ),
@@ -557,7 +558,7 @@ def _ap_bursts_tab() -> rx.Component:
         the burst analyser).
     """
     return rx.cond(
-        AnalysisState.has_burst_metrics,
+        AnalysisState.has_burst_summary,
         rx.cond(
             AnalysisState.burst_metrics.length() > 0,
             _burst_table(),
