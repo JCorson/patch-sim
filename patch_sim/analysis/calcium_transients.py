@@ -48,6 +48,17 @@ _DEFAULT_MIN_SEPARATION_MS: float = 5.0
 #: Default initial guess for the decay time constant (ms).
 _TAU_INITIAL_GUESS_MS: float = 50.0
 
+#: Upper bound on plausible calcium decay τ values in ms.  Single-compartment
+#: somatic Ca²⁺ transients in our presets have τ in the tens-to-hundreds of ms
+#: range; a 5 s ceiling is well above any biologically meaningful decay time
+#: constant for the dynamics modelled here.  Without this bound, ``curve_fit``
+#: can return a runaway τ when the post-peak window is too short to constrain
+#: the decay (the optimizer wanders toward τ → ∞, which makes the exponential
+#: term ≈ 1 and the model degenerates to a constant).  When the fit lands at
+#: this bound :func:`_fit_decay` treats the fit as failed and the 1/e fallback
+#: takes over.
+_MAX_PLAUSIBLE_TAU_MS: float = 5000.0
+
 #: Maximum decay-fit window (ms).  Caps the fit window so that very long
 #: traces with slow drift do not distort the single-exponential fit.
 _MAX_DECAY_WINDOW_MS: float = 500.0
@@ -224,12 +235,21 @@ def _fit_decay(
             t_decay,
             ca_decay_uM,
             p0=[a0, _TAU_INITIAL_GUESS_MS],
-            bounds=([0.0, 1e-3], [np.inf, np.inf]),
+            bounds=([0.0, 1e-3], [np.inf, _MAX_PLAUSIBLE_TAU_MS]),
             maxfev=5000,
         )
         tau = float(popt[1])
         if tau <= 0.0 or not np.isfinite(tau):
             raise RuntimeError("Non-positive or non-finite tau from curve_fit")
+        # When the fit bumps the upper bound the data could not constrain τ
+        # — typically because the post-peak window is much shorter than the
+        # true decay time constant.  Treat as a failed fit so the 1/e
+        # fallback (or None) takes over.
+        if tau >= _MAX_PLAUSIBLE_TAU_MS * 0.99:
+            raise RuntimeError(
+                f"curve_fit tau={tau:.1f} ms hit the plausibility ceiling — "
+                "decay window too short to constrain τ"
+            )
         return tau, True
     except (RuntimeError, ValueError) as exc:
         logger.debug("Calcium decay exponential fit failed: %s", exc)

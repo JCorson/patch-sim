@@ -285,6 +285,36 @@ def test_fallback_tau_used_when_decay_window_too_short_for_curve_fit():
     assert tau == pytest.approx(0.025, abs=1e-6)
 
 
+def test_runaway_tau_is_rejected_for_short_decay_windows():
+    """Short decay window does not produce a runaway τ value.
+
+    Regression for an issue seen on the Purkinje preset where a 25 ms total
+    trace with two close-together transients produced a curve_fit τ of
+    ~460 million ms — the optimizer drove τ → ∞ since the data could not
+    constrain the decay.  The plausibility ceiling
+    (:data:`_MAX_PLAUSIBLE_TAU_MS` = 5 s) catches this case: the fit is
+    treated as failed and the 1/e fallback (or ``None``) takes over.
+    """
+    # 8 ms of decay at peak=5.2 µM, baseline=0.14 µM, true τ on the order
+    # of hundreds of ms — far too long to recover from this window.
+    t_decay = np.arange(0.0, 8.0, _DT)
+    peak_uM = 5.185
+    baseline_uM = 0.137
+    # Mimic the visible decay over 8 ms for τ = 100 ms:
+    # ca(t) = baseline + (peak - baseline) * exp(-t / 100)
+    ca_decay = baseline_uM + (peak_uM - baseline_uM) * np.exp(-t_decay / 100.0)
+
+    from patch_sim.analysis.calcium_transients import _fit_decay
+
+    tau, converged = _fit_decay(t_decay, ca_decay, peak_uM, baseline_uM)
+    # The fit can either succeed with a reasonable τ (the synthetic data is
+    # noise-free) OR fall back; both are acceptable.  What must NOT happen
+    # is τ > 1 second.
+    assert tau is None or tau < 1000.0, (
+        f"Expected τ < 1000 ms or None, got τ={tau} ms (converged={converged})"
+    )
+
+
 def test_fallback_returns_none_when_trace_never_decays_below_one_over_e():
     """Direct unit test: short window without a 1/e crossing → τ is None."""
     from patch_sim.analysis.calcium_transients import _fit_decay
