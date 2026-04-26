@@ -25,6 +25,10 @@ class AnalysisState(rx.State):
     ca_transient_metrics: list[dict[str, Any]] = []
     # Aggregate calcium-transient summary statistics (em-dash for None).
     ca_transient_summary: dict[str, Any] = {}
+    # Per-burst metrics (serialized).
+    burst_metrics: list[dict[str, Any]] = []
+    # Aggregate burst summary statistics (em-dash for None).
+    burst_summary: dict[str, Any] = {}
     fi_data: dict[str, Any] = {}  # Serialized FIAnalysisResult for the UI
     iv_data: dict[str, Any] = {}  # Serialized IVAnalysisResult for the UI
     gv_data: dict[str, Any] = {}  # Serialized GVAnalysisResult for the UI
@@ -51,6 +55,8 @@ class AnalysisState(rx.State):
         self.ap_is_multi_sweep = False
         self.ca_transient_metrics = []
         self.ca_transient_summary = {}
+        self.burst_metrics = []
+        self.burst_summary = {}
         self.fi_data = {}
         self.iv_data = {}
         self.gv_data = {}
@@ -77,6 +83,11 @@ class AnalysisState(rx.State):
     def has_ca_transient_metrics(self) -> bool:
         """Return True when calcium-transient analysis results are available."""
         return len(self.ca_transient_metrics) > 0
+
+    @rx.var
+    def has_burst_metrics(self) -> bool:
+        """Return True when burst analysis results are available for display."""
+        return len(self.burst_summary) > 0
 
     @rx.var
     def has_ap_or_fi(self) -> bool:
