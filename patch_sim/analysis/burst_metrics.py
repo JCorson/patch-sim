@@ -1,0 +1,484 @@
+"""Burst detection and burst-metric extraction.
+
+Provides :func:`analyze_bursts` for grouping detected action potentials into
+bursts and computing standard burst metrics (burst count, spikes per burst,
+intra-burst frequency, inter-burst interval, duty cycle), and
+:func:`analyze_bursts_from_result` as a convenience wrapper for
+:class:`~patch_sim.clamp_simulations.SimulationResult` structured arrays.
+
+Burst detection consumes the spike list produced by
+:func:`~patch_sim.analysis.ap_metrics.analyze_aps`.  Spikes are grouped into
+bursts whose intra-burst inter-spike intervals are below a threshold; bursts
+are separated by gaps where the inter-spike interval exceeds the threshold.
+The threshold can be supplied by the caller, or auto-detected from a
+log-spaced histogram of the inter-spike intervals.  When too few intervals
+exist or the distribution is unimodal, a fixed default of 100 ms is used.
+
+For non-bursting neurons (sub-threshold protocols, tonic firing with all
+intervals above the threshold, etc.) the analysis degrades gracefully:
+``burst_count`` is 0 and aggregate metrics are ``None``.
+
+Data classes:
+    BurstMetrics: Per-burst measurement record.
+    BurstAnalysisResult: Aggregated burst analysis.
+"""
+
+# Needed so that the SimulationResult annotation in the *_from_result wrapper
+# is not evaluated eagerly at import time — SimulationResult is only imported
+# under TYPE_CHECKING to avoid a circular dependency.
+from __future__ import annotations
+
+import dataclasses
+import logging
+from typing import TYPE_CHECKING
+
+import numpy as np
+
+from patch_sim.analysis.ap_metrics import (
+    APAnalysisResult,
+    analyze_aps_from_result,
+)
+
+if TYPE_CHECKING:
+    from patch_sim.clamp_simulations import SimulationResult
+
+logger = logging.getLogger(__name__)
+
+#: Fallback inter-spike interval threshold (ms) used when fewer than
+#: :data:`_MIN_ISIS_FOR_HISTOGRAM` ISIs are available, or when the ISI
+#: distribution is unimodal and bimodality detection cannot place a threshold.
+#: 100 ms corresponds to 10 Hz, which sits comfortably between typical
+#: intra-burst frequencies (>50 Hz) and typical inter-burst gaps (>200 ms).
+_DEFAULT_ISI_THRESHOLD_MS: float = 100.0
+
+#: Minimum number of ISIs required to attempt a histogram-based threshold.
+_MIN_ISIS_FOR_HISTOGRAM: int = 4
+
+#: Number of bins used in the log-spaced ISI histogram.
+_HISTOGRAM_BINS: int = 20
+
+#: Minimum bin separation between the two modes of a putative bimodal ISI
+#: distribution.  A smaller separation is treated as unimodal.
+_MIN_PEAK_SEPARATION_BINS: int = 2
+
+#: Default minimum number of spikes required to call a group of consecutive
+#: spikes a "burst".  Single spikes between long gaps are reported via
+#: :attr:`BurstAnalysisResult.unburst_spike_count`.
+_DEFAULT_MIN_SPIKES_PER_BURST: int = 2
+
+#: Lower bound on the auto-detected threshold (ms).  Guards against degenerate
+#: histogram cases where the minimum lands below the smallest observed ISI.
+_AUTO_THRESHOLD_FLOOR_MS: float = 1e-3
+
+
+@dataclasses.dataclass
+class BurstMetrics:
+    """Metrics for a single detected burst.
+
+    Attributes:
+        index: Zero-based burst number within the trace.
+        start_time: Peak time of the first spike in the burst (ms).
+        end_time: Peak time of the last spike in the burst (ms).
+        duration: ``end_time - start_time`` (ms); 0 for single-spike bursts.
+        spike_count: Number of spikes contained in the burst.
+        intra_burst_frequency: Mean firing rate within the burst (Hz),
+            computed as ``(spike_count - 1) * 1000 / duration``.  ``None``
+            for single-spike bursts (which have zero duration).
+        mean_intra_burst_isi: Mean of the inter-spike intervals inside the
+            burst (ms).  ``None`` for single-spike bursts.
+    """
+
+    index: int
+    start_time: float
+    end_time: float
+    duration: float
+    spike_count: int
+    intra_burst_frequency: float | None
+    mean_intra_burst_isi: float | None
+
+
+@dataclasses.dataclass
+class BurstAnalysisResult:
+    """Complete burst analysis of a spike train.
+
+    Attributes:
+        burst_count: Number of detected bursts.
+        bursts: Per-burst metrics.
+        unburst_spike_count: Number of spikes that were not assigned to any
+            burst because they were isolated by long inter-spike intervals.
+        mean_spikes_per_burst: Mean ``spike_count`` across detected bursts,
+            or ``None`` when no bursts were detected.
+        mean_intra_burst_frequency: Mean ``intra_burst_frequency`` across
+            multi-spike bursts, or ``None`` when no multi-spike burst exists.
+        mean_inter_burst_interval: Mean gap between the end of one burst and
+            the start of the next (ms), or ``None`` when fewer than two
+            bursts were detected.
+        duty_cycle: Fraction of the recording window spent inside a burst
+            (``sum(burst.duration) / total_duration``).  ``None`` when no
+            bursts were detected.
+        isi_threshold_ms: The inter-spike interval threshold (ms) used to
+            separate intra-burst ISIs from inter-burst gaps.  Always set,
+            even when no bursts were detected, so downstream consumers can
+            display the threshold that was applied.
+        threshold_method: How :attr:`isi_threshold_ms` was determined.  One
+            of ``"auto-histogram"``, ``"default-fixed"``, or ``"user"``.
+    """
+
+    burst_count: int
+    bursts: list[BurstMetrics]
+    unburst_spike_count: int
+    mean_spikes_per_burst: float | None
+    mean_intra_burst_frequency: float | None
+    mean_inter_burst_interval: float | None
+    duty_cycle: float | None
+    isi_threshold_ms: float
+    threshold_method: str
+
+
+def _estimate_isi_threshold(isis: list[float]) -> tuple[float, str]:
+    """Estimate the intra/inter-burst ISI threshold from a list of ISIs.
+
+    The estimator builds a histogram of ``log10(isis)`` and looks for a
+    bimodal distribution.  When two non-adjacent peaks separated by a
+    strictly lower minimum are present, the threshold is placed at the bin
+    minimum (in linear ms).  Otherwise the function falls back to
+    :data:`_DEFAULT_ISI_THRESHOLD_MS`.
+
+    Args:
+        isis: Inter-spike intervals (ms).  Values must be positive.
+
+    Returns:
+        Tuple ``(threshold_ms, method)`` where ``method`` is one of
+        ``"auto-histogram"`` or ``"default-fixed"``.
+    """
+    if len(isis) < _MIN_ISIS_FOR_HISTOGRAM:
+        return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
+
+    isi_arr = np.asarray(isis, dtype=float)
+    if np.any(isi_arr <= 0.0) or not np.all(np.isfinite(isi_arr)):
+        return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
+
+    log_isi = np.log10(isi_arr)
+    if float(np.ptp(log_isi)) < 1e-6:
+        # All ISIs are essentially identical → no meaningful split possible.
+        return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
+
+    hist, edges = np.histogram(log_isi, bins=_HISTOGRAM_BINS)
+
+    # Find local maxima: bins strictly greater than both neighbours.  We
+    # only consider populated bins (count > 0) to avoid declaring an empty
+    # plateau a "peak".
+    n_bins = len(hist)
+    peaks: list[int] = []
+    for i in range(n_bins):
+        if hist[i] == 0:
+            continue
+        left = hist[i - 1] if i > 0 else -1
+        right = hist[i + 1] if i + 1 < n_bins else -1
+        if hist[i] > left and hist[i] >= right:
+            peaks.append(i)
+
+    if len(peaks) < 2:
+        return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
+
+    # Pick the two largest, well-separated peaks.
+    peaks_sorted = sorted(peaks, key=lambda b: hist[b], reverse=True)
+    left_peak = right_peak = -1
+    for i in range(len(peaks_sorted)):
+        for j in range(i + 1, len(peaks_sorted)):
+            a, b = sorted((peaks_sorted[i], peaks_sorted[j]))
+            if b - a >= _MIN_PEAK_SEPARATION_BINS:
+                left_peak, right_peak = a, b
+                break
+        if left_peak != -1:
+            break
+
+    if left_peak == -1:
+        return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
+
+    # Locate the minimum-count bin between the two peaks.  If the candidate
+    # minimum is not strictly lower than both peaks, treat as unimodal.
+    between = hist[left_peak + 1 : right_peak]
+    if len(between) == 0:
+        return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
+    min_offset = int(np.argmin(between))
+    min_bin = left_peak + 1 + min_offset
+    if hist[min_bin] >= hist[left_peak] or hist[min_bin] >= hist[right_peak]:
+        return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
+
+    # Threshold = midpoint of the chosen bin in log space, converted back to ms.
+    log_threshold = 0.5 * (edges[min_bin] + edges[min_bin + 1])
+    threshold_ms = float(10.0**log_threshold)
+    threshold_ms = max(
+        _AUTO_THRESHOLD_FLOOR_MS, min(threshold_ms, float(isi_arr.max()))
+    )
+    return threshold_ms, "auto-histogram"
+
+
+def _group_spikes_into_bursts(
+    peak_times: list[float],
+    isis: list[float],
+    threshold_ms: float,
+    min_spikes_per_burst: int,
+) -> tuple[list[BurstMetrics], int]:
+    """Walk the spike list and partition spikes into bursts.
+
+    A burst extends through every spike whose preceding ISI is at or below
+    ``threshold_ms``.  An ISI strictly above the threshold ends the current
+    burst; the next spike starts a new candidate burst.  Candidate bursts
+    with fewer than ``min_spikes_per_burst`` spikes are discarded; their
+    spikes are added to the unburst count.
+
+    Args:
+        peak_times: Spike peak times (ms), in order.
+        isis: Inter-spike intervals (ms).  ``len(isis)`` must equal
+            ``len(peak_times) - 1``.
+        threshold_ms: Maximum intra-burst ISI (ms).
+        min_spikes_per_burst: Minimum spikes for a group to count as a burst.
+
+    Returns:
+        Tuple ``(bursts, unburst_spike_count)``.  ``bursts`` is the list of
+        per-burst metrics in chronological order; ``unburst_spike_count`` is
+        the number of spikes that were dropped from short candidate groups.
+    """
+    bursts: list[BurstMetrics] = []
+    unburst = 0
+
+    n_spikes = len(peak_times)
+    if n_spikes == 0:
+        return bursts, 0
+    if n_spikes == 1:
+        # A single spike with no ISIs cannot form a multi-spike burst.
+        if min_spikes_per_burst <= 1:
+            burst = BurstMetrics(
+                index=0,
+                start_time=float(peak_times[0]),
+                end_time=float(peak_times[0]),
+                duration=0.0,
+                spike_count=1,
+                intra_burst_frequency=None,
+                mean_intra_burst_isi=None,
+            )
+            return [burst], 0
+        return [], 1
+
+    # Walk through ISIs, breaking groups whenever an ISI exceeds threshold.
+    group_start = 0  # index into peak_times
+    group_isis: list[float] = []
+    group_end_indices: list[int] = []  # last spike index for each group
+
+    def _close_group(end_idx: int) -> None:
+        """Finalise the current candidate group ending at ``end_idx``.
+
+        Args:
+            end_idx: Index (in ``peak_times``) of the last spike in the group.
+        """
+        nonlocal group_start, group_isis
+        spike_count = end_idx - group_start + 1
+        if spike_count >= min_spikes_per_burst:
+            start_t = float(peak_times[group_start])
+            end_t = float(peak_times[end_idx])
+            duration = end_t - start_t
+            if spike_count > 1 and duration > 0:
+                freq = (spike_count - 1) * 1000.0 / duration
+                mean_isi = float(np.mean(group_isis)) if group_isis else None
+            else:
+                freq = None
+                mean_isi = None
+            bursts.append(
+                BurstMetrics(
+                    index=len(bursts),
+                    start_time=start_t,
+                    end_time=end_t,
+                    duration=duration,
+                    spike_count=spike_count,
+                    intra_burst_frequency=freq,
+                    mean_intra_burst_isi=mean_isi,
+                )
+            )
+        else:
+            nonlocal_unburst(spike_count)
+
+    def nonlocal_unburst(count: int) -> None:
+        """Add ``count`` to the running unburst spike total.
+
+        Args:
+            count: Number of spikes to add.
+        """
+        nonlocal unburst
+        unburst += count
+
+    # Track group state explicitly via running indices so we can close on
+    # both threshold breaks and end-of-list.
+    for i, isi in enumerate(isis):
+        if isi <= threshold_ms:
+            group_isis.append(float(isi))
+        else:
+            _close_group(i)
+            group_start = i + 1
+            group_isis = []
+        group_end_indices.append(i)
+
+    # Close the final group at the last spike.
+    _close_group(n_spikes - 1)
+
+    return bursts, unburst
+
+
+def _empty_result(
+    isi_threshold_ms: float,
+    threshold_method: str,
+) -> BurstAnalysisResult:
+    """Return a result representing a trace with no detected bursts.
+
+    Args:
+        isi_threshold_ms: Threshold that was applied (ms).
+        threshold_method: How the threshold was chosen.
+
+    Returns:
+        A :class:`BurstAnalysisResult` with ``burst_count`` of 0 and all
+        aggregate metrics set to ``None``.
+    """
+    return BurstAnalysisResult(
+        burst_count=0,
+        bursts=[],
+        unburst_spike_count=0,
+        mean_spikes_per_burst=None,
+        mean_intra_burst_frequency=None,
+        mean_inter_burst_interval=None,
+        duty_cycle=None,
+        isi_threshold_ms=isi_threshold_ms,
+        threshold_method=threshold_method,
+    )
+
+
+def analyze_bursts(
+    ap_result: APAnalysisResult,
+    *,
+    total_duration_ms: float,
+    isi_threshold_ms: float | None = None,
+    min_spikes_per_burst: int = _DEFAULT_MIN_SPIKES_PER_BURST,
+) -> BurstAnalysisResult:
+    """Group detected spikes into bursts and compute burst metrics.
+
+    Args:
+        ap_result: AP analysis from :func:`~patch_sim.analysis.analyze_aps`.
+            Provides the spike list and ISIs that drive grouping.
+        total_duration_ms: Length of the recording window (ms).  Used as the
+            denominator of :attr:`BurstAnalysisResult.duty_cycle`.  Typically
+            ``time[-1] - time[0]``.
+        isi_threshold_ms: Optional user-supplied threshold (ms).  When
+            ``None``, the function attempts a histogram-based auto-detect
+            and falls back to a fixed 100 ms default.
+        min_spikes_per_burst: Minimum spike count for a group to count as a
+            burst.  Defaults to 2; isolated spikes are tracked via
+            :attr:`BurstAnalysisResult.unburst_spike_count`.
+
+    Returns:
+        A :class:`BurstAnalysisResult` with per-burst and aggregate metrics.
+    """
+    if isi_threshold_ms is not None:
+        threshold = float(isi_threshold_ms)
+        method = "user"
+    else:
+        threshold, method = _estimate_isi_threshold(list(ap_result.isis))
+
+    if ap_result.spike_count < 2:
+        return _empty_result(threshold, method)
+
+    peak_times = [s.peak_time for s in ap_result.spikes]
+    bursts, unburst = _group_spikes_into_bursts(
+        peak_times,
+        list(ap_result.isis),
+        threshold,
+        min_spikes_per_burst,
+    )
+
+    if not bursts:
+        return BurstAnalysisResult(
+            burst_count=0,
+            bursts=[],
+            unburst_spike_count=unburst,
+            mean_spikes_per_burst=None,
+            mean_intra_burst_frequency=None,
+            mean_inter_burst_interval=None,
+            duty_cycle=None,
+            isi_threshold_ms=threshold,
+            threshold_method=method,
+        )
+
+    spike_counts = [b.spike_count for b in bursts]
+    mean_spikes = float(np.mean(spike_counts))
+
+    freq_values = [
+        b.intra_burst_frequency for b in bursts if b.intra_burst_frequency is not None
+    ]
+    mean_freq: float | None = float(np.mean(freq_values)) if freq_values else None
+
+    if len(bursts) >= 2:
+        ibis = [
+            bursts[k + 1].start_time - bursts[k].end_time
+            for k in range(len(bursts) - 1)
+        ]
+        mean_ibi: float | None = float(np.mean(ibis))
+    else:
+        mean_ibi = None
+
+    if total_duration_ms > 0:
+        duty_cycle: float | None = float(
+            sum(b.duration for b in bursts) / total_duration_ms
+        )
+    else:
+        duty_cycle = None
+
+    return BurstAnalysisResult(
+        burst_count=len(bursts),
+        bursts=bursts,
+        unburst_spike_count=unburst,
+        mean_spikes_per_burst=mean_spikes,
+        mean_intra_burst_frequency=mean_freq,
+        mean_inter_burst_interval=mean_ibi,
+        duty_cycle=duty_cycle,
+        isi_threshold_ms=threshold,
+        threshold_method=method,
+    )
+
+
+def analyze_bursts_from_result(
+    result: SimulationResult,
+    *,
+    isi_threshold_ms: float | None = None,
+    min_spikes_per_burst: int = _DEFAULT_MIN_SPIKES_PER_BURST,
+    dvdt_threshold: float = 20.0,
+    min_spike_height: float = -20.0,
+) -> BurstAnalysisResult:
+    """Extract burst metrics from a :class:`SimulationResult`.
+
+    Convenience wrapper that runs :func:`analyze_aps_from_result` to obtain
+    the spike list and then forwards to :func:`analyze_bursts`.
+
+    Args:
+        result: A structured NumPy array returned by
+            :func:`~patch_sim.simulate_current_clamp` or its voltage-clamp
+            equivalents.  Must contain ``"time"`` and ``"voltage"`` fields.
+        isi_threshold_ms: Optional user-supplied threshold (ms).
+        min_spikes_per_burst: Minimum spike count for a burst.
+        dvdt_threshold: dV/dt threshold passed to spike detection (mV/ms).
+        min_spike_height: Minimum peak voltage for spike detection (mV).
+
+    Returns:
+        A :class:`BurstAnalysisResult`.
+    """
+    ap_result = analyze_aps_from_result(
+        result,
+        dvdt_threshold=dvdt_threshold,
+        min_spike_height=min_spike_height,
+    )
+    time = result["time"]
+    total_duration_ms = float(time[-1] - time[0]) if len(time) > 1 else 0.0
+    return analyze_bursts(
+        ap_result,
+        total_duration_ms=total_duration_ms,
+        isi_threshold_ms=isi_threshold_ms,
+        min_spikes_per_burst=min_spikes_per_burst,
+    )
