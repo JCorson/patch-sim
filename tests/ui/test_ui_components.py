@@ -49,6 +49,18 @@ def test_sweep_manager_renders_without_error():
     sweep_manager()
 
 
+def test_analysis_sidebar_renders_with_burst_data():
+    """analysis_sidebar must render the new burst panel without error.
+
+    The sidebar wires the burst summary into the Analysis sub-tab and the
+    per-burst table into the new Bursts sub-tab; this smoke test ensures
+    the surrounding tab structure still builds.
+    """
+    from patch_sim_ui.components.metrics_panel import analysis_sidebar
+
+    analysis_sidebar()
+
+
 def test_channel_trace_group_excludes_current_when_flag_false():
     """_channel_trace_group with include_current=False must omit the current label.
 
