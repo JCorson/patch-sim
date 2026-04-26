@@ -70,6 +70,25 @@ _DEFAULT_MIN_SPIKES_PER_BURST: int = 2
 #: histogram cases where the minimum lands below the smallest observed ISI.
 _AUTO_THRESHOLD_FLOOR_MS: float = 1e-3
 
+#: Minimum bin count for a histogram bin to qualify as a mode.  Prevents
+#: single-observation noise from being treated as a peak in narrow
+#: unimodal distributions.
+_MIN_PEAK_COUNT: int = 2
+
+#: A valid bimodal distribution must have a valley with bin count below
+#: this fraction of the smaller of its two peaks.  Rejects shallow dips
+#: that are typical of noisy unimodal data.
+_VALLEY_DEPTH_FRACTION: float = 0.5
+
+#: Minimum ratio (in log10 ISI space) between the centres of the two
+#: candidate peaks.  Genuine burst/pause distributions are typically
+#: separated by an order of magnitude or more (e.g. 5 ms intra-burst vs
+#: 200 ms inter-burst); narrow noisy unimodal data sees its peak centres
+#: only fractions of a log unit apart.  log10(3.0) ≈ 0.48 corresponds to
+#: a 3× ratio in linear ISI space, which comfortably accepts real bursts
+#: while rejecting noise.
+_MIN_PEAK_LOG_RATIO: float = 0.48
+
 
 @dataclasses.dataclass
 class BurstMetrics:
@@ -165,13 +184,13 @@ def _estimate_isi_threshold(isis: list[float]) -> tuple[float, str]:
 
     hist, edges = np.histogram(log_isi, bins=_HISTOGRAM_BINS)
 
-    # Find local maxima: bins strictly greater than both neighbours.  We
-    # only consider populated bins (count > 0) to avoid declaring an empty
-    # plateau a "peak".
+    # Find local maxima: bins strictly greater than both neighbours and
+    # populated above _MIN_PEAK_COUNT.  The latter rejects single-observation
+    # bumps that arise in narrow unimodal distributions.
     n_bins = len(hist)
     peaks: list[int] = []
     for i in range(n_bins):
-        if hist[i] == 0:
+        if hist[i] < _MIN_PEAK_COUNT:
             continue
         left = hist[i - 1] if i > 0 else -1
         right = hist[i + 1] if i + 1 < n_bins else -1
@@ -181,13 +200,18 @@ def _estimate_isi_threshold(isis: list[float]) -> tuple[float, str]:
     if len(peaks) < 2:
         return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
 
-    # Pick the two largest, well-separated peaks.
+    # Pick the two largest peaks that are both well-separated in bin index
+    # and in log10 ISI space.  The latter ensures genuine order-of-magnitude
+    # separation between bursts and gaps; narrow unimodal data with a ~1×
+    # peak-to-peak ratio is rejected.
     peaks_sorted = sorted(peaks, key=lambda b: hist[b], reverse=True)
     left_peak = right_peak = -1
+    bin_centres = 0.5 * (edges[:-1] + edges[1:])
     for i in range(len(peaks_sorted)):
         for j in range(i + 1, len(peaks_sorted)):
             a, b = sorted((peaks_sorted[i], peaks_sorted[j]))
-            if b - a >= _MIN_PEAK_SEPARATION_BINS:
+            log_gap = float(bin_centres[b] - bin_centres[a])
+            if b - a >= _MIN_PEAK_SEPARATION_BINS and log_gap >= _MIN_PEAK_LOG_RATIO:
                 left_peak, right_peak = a, b
                 break
         if left_peak != -1:
@@ -196,14 +220,16 @@ def _estimate_isi_threshold(isis: list[float]) -> tuple[float, str]:
     if left_peak == -1:
         return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
 
-    # Locate the minimum-count bin between the two peaks.  If the candidate
-    # minimum is not strictly lower than both peaks, treat as unimodal.
+    # Locate the minimum-count bin between the two peaks.  Require the
+    # valley to be substantially lower than the smaller peak — shallow dips
+    # are a hallmark of noisy unimodal data, not true bimodality.
     between = hist[left_peak + 1 : right_peak]
     if len(between) == 0:
         return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
     min_offset = int(np.argmin(between))
     min_bin = left_peak + 1 + min_offset
-    if hist[min_bin] >= hist[left_peak] or hist[min_bin] >= hist[right_peak]:
+    smaller_peak_count = min(hist[left_peak], hist[right_peak])
+    if hist[min_bin] >= smaller_peak_count * _VALLEY_DEPTH_FRACTION:
         return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
 
     # Threshold = midpoint of the chosen bin in log space, converted back to ms.
