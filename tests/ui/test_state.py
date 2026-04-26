@@ -1365,6 +1365,8 @@ def _prime_analysis(an_st: AnalysisState) -> None:
     an_st.ap_metrics = [{"peak_v": 40.0}]
     an_st.ap_summary = {"mean_peak_v": 40.0}
     an_st.ap_is_multi_sweep = True
+    an_st.ca_transient_metrics = [{"peak_concentration": "1.0"}]
+    an_st.ca_transient_summary = {"transient_count": "1"}
     an_st.fi_data = {"current_steps": [0.1]}
     an_st.iv_data = {"voltage_steps": [-70.0]}
     an_st.gv_data = {"conductance": [0.5]}
@@ -1382,6 +1384,8 @@ def _assert_analysis_cleared(an_st: AnalysisState) -> None:
     assert an_st.ap_metrics == []
     assert an_st.ap_summary == {}
     assert an_st.ap_is_multi_sweep is False
+    assert an_st.ca_transient_metrics == []
+    assert an_st.ca_transient_summary == {}
     assert an_st.fi_data == {}
     assert an_st.iv_data == {}
     assert an_st.gv_data == {}

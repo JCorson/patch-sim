@@ -21,6 +21,10 @@ class AnalysisState(rx.State):
     ap_metrics: list[dict[str, Any]] = []  # Per-spike metrics (serialized)
     ap_summary: dict[str, Any] = {}  # Aggregate summary statistics
     ap_is_multi_sweep: bool = False  # True when AP data is pooled from multiple sweeps
+    # Per-transient calcium-transient metrics (serialized).
+    ca_transient_metrics: list[dict[str, Any]] = []
+    # Aggregate calcium-transient summary statistics (em-dash for None).
+    ca_transient_summary: dict[str, Any] = {}
     fi_data: dict[str, Any] = {}  # Serialized FIAnalysisResult for the UI
     iv_data: dict[str, Any] = {}  # Serialized IVAnalysisResult for the UI
     gv_data: dict[str, Any] = {}  # Serialized GVAnalysisResult for the UI
@@ -45,6 +49,8 @@ class AnalysisState(rx.State):
         self.ap_metrics = []
         self.ap_summary = {}
         self.ap_is_multi_sweep = False
+        self.ca_transient_metrics = []
+        self.ca_transient_summary = {}
         self.fi_data = {}
         self.iv_data = {}
         self.gv_data = {}
@@ -66,6 +72,11 @@ class AnalysisState(rx.State):
     def has_ap_metrics(self) -> bool:
         """Return True when AP analysis results are available for display."""
         return len(self.ap_metrics) > 0
+
+    @rx.var
+    def has_ca_transient_metrics(self) -> bool:
+        """Return True when calcium-transient analysis results are available."""
+        return len(self.ca_transient_metrics) > 0
 
     @rx.var
     def has_ap_or_fi(self) -> bool:

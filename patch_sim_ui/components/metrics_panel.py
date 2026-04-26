@@ -35,6 +35,107 @@ def _spike_row(spike: dict) -> rx.Component:
     )
 
 
+def _ca_transient_row(transient: dict) -> rx.Component:
+    """Render one row of the per-transient calcium-metric table.
+
+    The ``decay_tau`` cell carries a trailing ``*`` when the τ value came
+    from the 1/e fallback rather than a converged exponential fit; the
+    ``sweep_index`` column shows the sweep number for multi-sweep runs (it
+    is 0 for single-sweep results, displayed as a blank cell).
+
+    Args:
+        transient: Dictionary with pre-formatted string values for each metric.
+
+    Returns:
+        A table row with per-transient metric cells.
+    """
+    return rx.table.row(
+        rx.table.cell(rx.text(transient["index"].to(int) + 1, size="1")),
+        rx.table.cell(
+            rx.cond(
+                transient["sweep_index"].to(int) > 0,
+                rx.text(transient["sweep_index"].to(int), size="1"),
+                rx.text("", size="1"),
+            ),
+        ),
+        rx.table.cell(rx.text(transient["peak_time"].to(str), size="1")),
+        rx.table.cell(rx.text(transient["peak_concentration"].to(str), size="1")),
+        rx.table.cell(rx.text(transient["time_to_peak"].to(str), size="1")),
+        rx.table.cell(rx.text(transient["decay_tau"].to(str), size="1")),
+        rx.table.cell(rx.text(transient["amplitude"].to(str), size="1")),
+    )
+
+
+def _ca_transient_summary() -> rx.Component:
+    """Render the calcium-transient summary statistics section.
+
+    Returns:
+        A compact grid of labelled metric values from
+        AnalysisState.ca_transient_summary.  All concentrations are in µM
+        and all times in ms.
+    """
+    s = AnalysisState.ca_transient_summary
+    return rx.box(
+        rx.heading("Calcium transients", size="1", margin_bottom="2"),
+        rx.grid(
+            rx.text("Transients", size="1", color="gray"),
+            rx.text(s["transient_count"].to(str), size="1", align="left"),
+            rx.text("Baseline", size="1", color="gray"),
+            rx.text(
+                s["baseline_concentration"].to(str) + " µM", size="1", align="left"
+            ),
+            rx.text("Peak", size="1", color="gray"),
+            rx.text(
+                s["mean_peak_concentration"].to(str) + " µM", size="1", align="left"
+            ),
+            rx.text("Time-to-peak", size="1", color="gray"),
+            rx.text(s["mean_time_to_peak"].to(str) + " ms", size="1", align="left"),
+            rx.text("Decay τ", size="1", color="gray"),
+            rx.text(s["mean_decay_tau"].to(str) + " ms", size="1", align="left"),
+            rx.text("Amplitude", size="1", color="gray"),
+            rx.text(s["mean_amplitude"].to(str) + " µM", size="1", align="left"),
+            columns="2",
+            spacing="2",
+            width="100%",
+        ),
+        padding="3",
+        border_bottom="1px solid var(--gray-4)",
+        width="100%",
+    )
+
+
+def _ca_transient_table() -> rx.Component:
+    """Render the scrollable per-transient calcium detail table.
+
+    Returns:
+        A flex-growing scroll area containing the per-transient metrics table.
+    """
+    return rx.scroll_area(
+        rx.table.root(
+            rx.table.header(
+                rx.table.row(
+                    rx.table.column_header_cell(rx.text("#", size="1")),
+                    rx.table.column_header_cell(rx.text("Sweep", size="1")),
+                    rx.table.column_header_cell(rx.text("Peak t (ms)", size="1")),
+                    rx.table.column_header_cell(rx.text("Peak (µM)", size="1")),
+                    rx.table.column_header_cell(rx.text("TTP (ms)", size="1")),
+                    rx.table.column_header_cell(rx.text("τ (ms)", size="1")),
+                    rx.table.column_header_cell(rx.text("Δ[Ca] (µM)", size="1")),
+                ),
+            ),
+            rx.table.body(
+                rx.foreach(AnalysisState.ca_transient_metrics, _ca_transient_row),
+            ),
+            size="1",
+            variant="surface",
+            width="100%",
+        ),
+        padding="3",
+        flex_grow="1",
+        min_height="0",
+    )
+
+
 def _ap_summary() -> rx.Component:
     """Render the AP summary statistics section.
 
@@ -227,18 +328,24 @@ def _ap_phase_plane_plot() -> rx.Component:
 def _ap_analysis_tab() -> rx.Component:
     """Render the Analysis sub-tab within the CC pane.
 
-    Shows AP summary statistics, the F-I curve (multi-sweep), the SFA curve,
-    and the V vs dV/dt phase-plane when data are available.  Displays a
+    Shows AP summary statistics, the calcium-transient summary (when calcium
+    dynamics were active), the F-I curve (multi-sweep), the SFA curve, and
+    the V vs dV/dt phase-plane when data are available.  Displays a
     placeholder when no data exists yet.
 
     Returns:
         The analysis sub-tab content as a scrollable flex column.
     """
     return rx.cond(
-        AnalysisState.has_ap_or_fi,
+        AnalysisState.has_ap_or_fi | AnalysisState.has_ca_transient_metrics,
         rx.scroll_area(
             rx.flex(
                 rx.cond(AnalysisState.has_ap_metrics, _ap_summary(), rx.box()),
+                rx.cond(
+                    AnalysisState.has_ca_transient_metrics,
+                    _ca_transient_summary(),
+                    rx.box(),
+                ),
                 rx.cond(AnalysisState.has_fi_data, _ap_fi_plot(), rx.box()),
                 rx.cond(
                     AnalysisState.has_hyperpolarization_data,
@@ -325,12 +432,38 @@ def _ap_spikes_tab() -> rx.Component:
     )
 
 
+def _ap_calcium_tab() -> rx.Component:
+    """Render the Calcium sub-tab showing the per-transient detail table.
+
+    Returns:
+        The per-transient table wrapped in a flex column, or a placeholder
+        when calcium dynamics were not active or no transients were detected.
+    """
+    return rx.cond(
+        AnalysisState.has_ca_transient_metrics,
+        _ca_transient_table(),
+        rx.flex(
+            rx.text(
+                "No calcium transients detected.",
+                size="1",
+                color="gray",
+                text_align="center",
+            ),
+            padding="4",
+            justify="center",
+        ),
+    )
+
+
 def _ap_metrics_tab() -> rx.Component:
-    """Render the full AP Metrics panel with two sub-tabs.
+    """Render the full AP Metrics panel with three sub-tabs.
 
     Sub-tabs:
-    - **Analysis**: AP summary statistics, F-I curve, SFA curve, phase plane.
+    - **Analysis**: AP summary statistics, calcium-transient summary, F-I
+      curve, SFA curve, phase plane.
     - **Spikes**: Per-spike detail table.
+    - **Calcium**: Per-transient detail table (only relevant when calcium
+      dynamics are active).
 
     Returns:
         A tabbed flex column for the CC analysis pane.
@@ -339,6 +472,7 @@ def _ap_metrics_tab() -> rx.Component:
         rx.tabs.list(
             rx.tabs.trigger("Analysis", value="analysis", size="1"),
             rx.tabs.trigger("Spikes", value="spikes", size="1"),
+            rx.tabs.trigger("Calcium", value="calcium", size="1"),
             size="1",
             width="100%",
         ),
@@ -351,6 +485,12 @@ def _ap_metrics_tab() -> rx.Component:
         rx.tabs.content(
             _ap_spikes_tab(),
             value="spikes",
+            height="100%",
+            overflow="hidden",
+        ),
+        rx.tabs.content(
+            _ap_calcium_tab(),
+            value="calcium",
             height="100%",
             overflow="hidden",
         ),
@@ -389,18 +529,29 @@ def _iv_curve_tab() -> rx.Component:
     Shows a Plotly I-V curve with peak inward, peak outward, and steady-state
     traces when voltage clamp multi-sweep data is available.  When g-V data is
     also available, a normalised conductance plot with Boltzmann fit is shown
-    below the I-V curve.  Displays a placeholder message when no data exists.
+    below the I-V curve.  When calcium dynamics were active, the calcium
+    transient summary is shown above the I-V curve.  Displays a placeholder
+    message when no data exists.
 
     Returns:
         The full tab content as a flex column.
     """
     return rx.cond(
-        AnalysisState.has_iv_data,
+        AnalysisState.has_iv_data | AnalysisState.has_ca_transient_metrics,
         rx.scroll_area(
             rx.flex(
-                rx.plotly(
-                    data=AnalysisState.iv_figure,
-                    width="100%",
+                rx.cond(
+                    AnalysisState.has_ca_transient_metrics,
+                    _ca_transient_summary(),
+                    rx.box(),
+                ),
+                rx.cond(
+                    AnalysisState.has_iv_data,
+                    rx.plotly(
+                        data=AnalysisState.iv_figure,
+                        width="100%",
+                    ),
+                    rx.box(),
                 ),
                 rx.cond(
                     AnalysisState.has_gv_data,

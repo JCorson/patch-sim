@@ -119,6 +119,157 @@ def _format_spike_dict(index: int, spike: "patch_sim.SpikeMetrics") -> dict[str,
     }
 
 
+def _format_ca_transient_dict(
+    index: int, transient: "patch_sim.CalciumTransient"
+) -> dict[str, Any]:
+    """Serialise a single :class:`~patch_sim.CalciumTransient` to a display dict.
+
+    The ``decay_tau`` column carries a trailing ``*`` when the τ value came
+    from the 1/e fallback rather than a converged ``curve_fit``, so the user
+    can tell when the decay-fit convergence failed.
+
+    Args:
+        index: Display index to assign.
+        transient: The transient to serialise.
+
+    Returns:
+        A dict with pre-formatted string values for each metric column
+        (``index``, ``sweep_index``, ``peak_time``, ``peak_concentration``,
+        ``time_to_peak``, ``decay_tau``, ``amplitude``).  All concentrations
+        are in µM and all times in ms.  ``sweep_index`` is 0 for
+        single-sweep results; multi-sweep callers overwrite it with a
+        1-based sweep number.
+    """
+    if transient.decay_tau is None:
+        decay_str = "—"
+    elif transient.decay_fit_converged:
+        decay_str = f"{transient.decay_tau:.1f}"
+    else:
+        decay_str = f"{transient.decay_tau:.1f}*"
+
+    return {
+        "index": index,
+        "sweep_index": 0,
+        "peak_time": f"{transient.peak_time:.1f}",
+        "peak_concentration": f"{transient.peak_concentration:.3f}",
+        "time_to_peak": f"{transient.time_to_peak:.2f}",
+        "decay_tau": decay_str,
+        "amplitude": f"{transient.amplitude:.3f}",
+    }
+
+
+def _serialise_ca_transient_summary(
+    result: "patch_sim.CalciumTransientAnalysisResult",
+) -> dict[str, Any]:
+    """Serialise the aggregate part of a calcium-transient analysis.
+
+    Args:
+        result: The analysis result to summarise.
+
+    Returns:
+        A dict with pre-formatted string values for the metrics-panel
+        aggregate row.  All concentrations are in µM and all times in ms.
+    """
+    return {
+        "transient_count": str(result.transient_count),
+        "baseline_concentration": _fmt_optional(result.baseline_concentration, ".3f"),
+        "mean_peak_concentration": _fmt_optional(result.mean_peak_concentration, ".3f"),
+        "mean_time_to_peak": _fmt_optional(result.mean_time_to_peak, ".2f"),
+        "mean_decay_tau": _fmt_optional(result.mean_decay_tau, ".1f"),
+        "mean_amplitude": _fmt_optional(result.mean_amplitude, ".3f"),
+    }
+
+
+def _compute_ca_transient_data(
+    result: "patch_sim.SimulationResult",
+) -> "tuple[list[dict[str, Any]], dict[str, Any]]":
+    """Compute serialised calcium-transient analysis from a single-sweep result.
+
+    Returns empty ``([], {})`` when the simulation result has no ``ca_i``
+    field (i.e. calcium dynamics were not active) or when no transients
+    were detected.
+
+    Args:
+        result: A single-sweep :class:`~patch_sim.SimulationResult`.
+
+    Returns:
+        A 2-tuple ``(metrics, summary)`` where ``metrics`` is a list of
+        per-transient display dicts and ``summary`` is the aggregate summary
+        dict.  Both are empty when no transients were detected.
+    """
+    analysis = patch_sim.analyze_calcium_transients_from_result(result)
+    if analysis is None or analysis.transient_count == 0:
+        return [], {}
+
+    metrics = [
+        _format_ca_transient_dict(i, t) for i, t in enumerate(analysis.transients)
+    ]
+    summary = _serialise_ca_transient_summary(analysis)
+    return metrics, summary
+
+
+def _compute_multi_sweep_ca_transient_data(
+    sweeps: "list[Sweep]",
+) -> "tuple[list[dict[str, Any]], dict[str, Any]]":
+    """Pool calcium-transient analysis across a multi-sweep simulation result.
+
+    Used for both multi-sweep current clamp and multi-sweep voltage clamp:
+    each sweep that exposes a ``ca_i`` trace is analysed in isolation, and
+    each per-transient display dict carries its 1-based ``sweep_index`` (in
+    protocol order) so the UI can identify which sweep produced which
+    transient.  Aggregate summary statistics are pooled across all sweeps.
+
+    Args:
+        sweeps: Ordered list of :class:`Sweep` objects.
+
+    Returns:
+        A 2-tuple ``(metrics, summary)`` of pre-formatted display dicts.  Both
+        are empty when no sweep has a ``ca_i`` field or when no transients
+        were detected across the pool.
+    """
+    pooled: list[tuple[int, patch_sim.CalciumTransient]] = []
+    baselines: list[float] = []
+    for sweep_idx, sweep in enumerate(sweeps):
+        ca_trace = sweep.additional_gating.get("ca_i")
+        if not ca_trace:
+            continue
+        time_arr = np.array(sweep.time)
+        ca_arr = np.array(ca_trace)
+        analysis = patch_sim.analyze_calcium_transients(time_arr, ca_arr)
+        if analysis.baseline_concentration is not None:
+            baselines.append(analysis.baseline_concentration)
+        pooled.extend((sweep_idx, t) for t in analysis.transients)
+
+    if not pooled:
+        return [], {}
+
+    metrics: list[dict[str, Any]] = []
+    for i, (sweep_idx, transient) in enumerate(pooled):
+        entry = _format_ca_transient_dict(i, transient)
+        # 1-based sweep number for direct display in the UI table.
+        entry["sweep_index"] = sweep_idx + 1
+        metrics.append(entry)
+
+    peak_vals = [t.peak_concentration for _, t in pooled]
+    ttp_vals = [t.time_to_peak for _, t in pooled]
+    amp_vals = [t.amplitude for _, t in pooled]
+    tau_vals = [t.decay_tau for _, t in pooled if t.decay_tau is not None]
+
+    summary: dict[str, Any] = {
+        "transient_count": str(len(pooled)),
+        "baseline_concentration": _fmt_optional(
+            float(np.mean(baselines)) if baselines else None, ".3f"
+        ),
+        "mean_peak_concentration": f"{float(np.mean(peak_vals)):.3f}",
+        "mean_time_to_peak": f"{float(np.mean(ttp_vals)):.2f}",
+        "mean_decay_tau": _fmt_optional(
+            float(np.mean(tau_vals)) if tau_vals else None, ".1f"
+        ),
+        "mean_amplitude": f"{float(np.mean(amp_vals)):.3f}",
+    }
+    return metrics, summary
+
+
 def _serialise_sfa_curve(curve: "patch_sim.SFACurve") -> dict[str, Any]:
     """Serialise a single :class:`~patch_sim.SFACurve` to a plain dict.
 
@@ -442,6 +593,8 @@ class _SimResult:
     ap_metrics: list[dict[str, Any]] = dataclasses.field(default_factory=list)
     ap_summary: dict[str, Any] = dataclasses.field(default_factory=dict)
     ap_is_multi_sweep: bool = False
+    ca_transient_metrics: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    ca_transient_summary: dict[str, Any] = dataclasses.field(default_factory=dict)
     fi_data: dict[str, Any] = dataclasses.field(default_factory=dict)
     sfa_data: dict[str, Any] = dataclasses.field(default_factory=dict)
     hyperpolarization_data: dict[str, Any] = dataclasses.field(default_factory=dict)
@@ -544,11 +697,16 @@ def _compute_simulation(
                 )
             else:
                 gv_data = {}
+            ms_ca_metrics, ms_ca_summary = _compute_multi_sweep_ca_transient_data(
+                new_sweeps
+            )
             return _SimResult(
                 sweeps=new_sweeps,
                 sim_token=sim_token,
                 iv_data=iv_data,
                 gv_data=gv_data,
+                ca_transient_metrics=ms_ca_metrics,
+                ca_transient_summary=ms_ca_summary,
             )
 
         ms_metrics, ms_summary, ms_fi, ms_sfa, ms_hyp = (
@@ -561,12 +719,17 @@ def _compute_simulation(
                 stimulus_duration,
             )
         )
+        ms_ca_metrics, ms_ca_summary = _compute_multi_sweep_ca_transient_data(
+            new_sweeps
+        )
         return _SimResult(
             sweeps=new_sweeps,
             sim_token=sim_token,
             ap_metrics=ms_metrics,
             ap_summary=ms_summary,
             ap_is_multi_sweep=True,
+            ca_transient_metrics=ms_ca_metrics,
+            ca_transient_summary=ms_ca_summary,
             fi_data=ms_fi,
             sfa_data=ms_sfa,
             hyperpolarization_data=ms_hyp,
@@ -591,6 +754,7 @@ def _compute_simulation(
     if mode == CURRENT_CLAMP:
         ap_result = patch_sim.analyze_aps_from_result(result)
         sfa_curve = patch_sim.compute_sfa(ap_result)
+        ca_metrics, ca_summary = _compute_ca_transient_data(result)
         return _SimResult(
             sweeps=[sweep],
             sim_token=sim_token,
@@ -615,6 +779,8 @@ def _compute_simulation(
                     f"≤ {min_stimulus:.2f}" if ap_result.spike_count >= 1 else "—"
                 ),
             },
+            ca_transient_metrics=ca_metrics,
+            ca_transient_summary=ca_summary,
             sfa_data=(
                 {"curves": [_serialise_sfa_curve(sfa_curve)]}
                 if sfa_curve is not None
@@ -623,8 +789,15 @@ def _compute_simulation(
             phase_plane_data=_build_phase_plane_data([sweep]),
         )
 
-    # Single VC sweep — no per-sweep analysis (requires multi-sweep for IV/GV)
-    return _SimResult(sweeps=[sweep], sim_token=sim_token)
+    # Single VC sweep — IV/GV require multi-sweep, but calcium transients can
+    # still appear (e.g. a depolarising VC step opens Ca channels).
+    ca_metrics, ca_summary = _compute_ca_transient_data(result)
+    return _SimResult(
+        sweeps=[sweep],
+        sim_token=sim_token,
+        ca_transient_metrics=ca_metrics,
+        ca_transient_summary=ca_summary,
+    )
 
 
 class SimulationState(rx.State):
@@ -1046,6 +1219,8 @@ class SimulationState(rx.State):
         analysis_st.ap_metrics = result.ap_metrics
         analysis_st.ap_summary = result.ap_summary
         analysis_st.ap_is_multi_sweep = result.ap_is_multi_sweep
+        analysis_st.ca_transient_metrics = result.ca_transient_metrics
+        analysis_st.ca_transient_summary = result.ca_transient_summary
         analysis_st.fi_data = result.fi_data
         analysis_st.sfa_data = result.sfa_data
         analysis_st.hyperpolarization_data = result.hyperpolarization_data
