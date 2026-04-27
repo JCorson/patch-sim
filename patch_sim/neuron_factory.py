@@ -105,6 +105,13 @@ class NeuronConfig:
             channels carry no Ca²⁺.  ``None`` (default) falls back to
             auto-detection: a default ``CalciumDynamics()`` is created whenever
             at least one channel carries Ca²⁺, and ``None`` is passed otherwise.
+        area_cm2: Total membrane surface area in cm².  Analysis-layer metadata
+            only — not consumed by :func:`make_neuron` or the ODE solver, since
+            single-compartment HH dynamics are scale-invariant in per-area
+            units.  When provided, the analysis layer (e.g.
+            :func:`~patch_sim.run_membrane_test`) reports passive properties in
+            absolute units (MΩ, pF) alongside the per-area values.  When
+            ``None`` (default) only per-area density values are reported.
     """
 
     g_Na: float = DEFAULT_G_NA
@@ -132,17 +139,21 @@ class NeuronConfig:
     )
     channels: tuple[ChannelConfig, ...] = ()
     calcium_dynamics: CalciumDynamics | None = None
+    area_cm2: float | None = None
 
     def __post_init__(self) -> None:
-        """Validate Q10 and T_ref on construction.
+        """Validate Q10, T_ref, and area_cm2 on construction.
 
         Raises:
-            ValueError: If Q10 is not positive or T_ref is not positive.
+            ValueError: If Q10 is not positive, T_ref is not positive, or
+                ``area_cm2`` is provided and not strictly positive.
         """
         if self.Q10 <= 0:
             raise ValueError("Q10 must be positive.")
         if self.T_ref <= 0:
             raise ValueError("T_ref must be positive (in Kelvin).")
+        if self.area_cm2 is not None and self.area_cm2 <= 0:
+            raise ValueError("area_cm2 must be positive when provided.")
 
 
 #: Maps short channel names to their factory functions.
