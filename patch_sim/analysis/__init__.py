@@ -12,6 +12,7 @@ Modules:
     membrane_test: Dedicated membrane test for passive property characterisation.
     passive_properties: Passive membrane property extraction (R_in, τₘ, Cₘ).
     sfa: Spike-frequency adaptation curves and adaptation index.
+    tau_v: Activation/inactivation time-constant fits from voltage-clamp sweeps.
 """
 
 from .ap_metrics import (
@@ -61,6 +62,17 @@ from .passive_properties import (
     is_subthreshold,
 )
 from .sfa import SFAAnalysisResult, SFACurve, analyze_sfa, compute_sfa
+from .tau_v import (
+    DoubleExponentialFit,
+    ExponentialFit,
+    TauVAnalysisResult,
+    TauVPoint,
+    analyze_tau_v,
+    compute_tau_v_point,
+    double_exp_decay,
+    single_exp_decay,
+    single_exp_rise,
+)
 
 __all__ = [
     "analyze_aps",
@@ -72,6 +84,7 @@ __all__ = [
     "analyze_iv",
     "analyze_passive_properties",
     "analyze_sfa",
+    "analyze_tau_v",
     "boltzmann",
     "compute_dvdt",
     "compute_fi_point",
@@ -79,13 +92,19 @@ __all__ = [
     "compute_iv_point",
     "compute_sag_point",
     "compute_sfa",
+    "compute_tau_v_point",
+    "double_exp_decay",
     "estimate_rheobase",
     "is_subthreshold",
     "run_membrane_test",
+    "single_exp_decay",
+    "single_exp_rise",
     "APAnalysisResult",
     "BoltzmannFit",
     "CalciumTransient",
     "CalciumTransientAnalysisResult",
+    "DoubleExponentialFit",
+    "ExponentialFit",
     "FIAnalysisResult",
     "FIPoint",
     "HyperpolarizationAnalysisResult",
@@ -102,4 +121,6 @@ __all__ = [
     "SFAAnalysisResult",
     "SFACurve",
     "SpikeMetrics",
+    "TauVAnalysisResult",
+    "TauVPoint",
 ]
