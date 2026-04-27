@@ -523,6 +523,66 @@ def _compute_iv_data(
     return iv_data, iv_result
 
 
+def _compute_tau_v_data(
+    sweeps: "list[Sweep]",
+    min_stimulus: float,
+    max_stimulus: float,
+    stimulus_step: float,
+    pre_stimulus_duration: float,
+    stimulus_duration: float,
+) -> "dict[str, Any]":
+    """Compute serialised τ-V analysis data from multi-sweep voltage clamp results.
+
+    Derives voltage step values from the protocol parameters, extracts total
+    current arrays from each sweep, and calls :func:`patch_sim.analyze_tau_v`.
+    The serialised dict is suitable for use as a Reflex state variable.
+
+    Args:
+        sweeps: Ordered list of :class:`Sweep` objects from the simulation.
+        min_stimulus: Minimum voltage step command (mV).
+        max_stimulus: Maximum voltage step command (mV).
+        stimulus_step: Step size between voltage commands (mV).
+        pre_stimulus_duration: Duration before the step begins (ms).
+        stimulus_duration: Duration of the voltage step (ms).
+
+    Returns:
+        A dict with keys ``voltages``, ``tau_activation``,
+        ``tau_inactivation``, ``tau_inactivation_slow``, and
+        ``has_double_exp`` (each a list of floats / nullable floats / bools
+        sorted by voltage), or an empty dict when fewer than two sweeps are
+        available or the sweep count does not match the voltage steps.
+    """
+    if len(sweeps) < 2:
+        return {}
+
+    n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
+    voltage_steps = list(np.linspace(min_stimulus, max_stimulus, n_steps))
+
+    if len(sweeps) != len(voltage_steps):
+        return {}
+
+    time_arr = np.array(sweeps[0].time)
+    currents = [np.array(s.total_current) for s in sweeps]
+
+    stim_start = pre_stimulus_duration
+    stim_end = pre_stimulus_duration + stimulus_duration
+
+    tau_v_result = patch_sim.analyze_tau_v(
+        time_arr, currents, voltage_steps, stim_start, stim_end
+    )
+
+    if not tau_v_result.points:
+        return {}
+
+    return {
+        "voltages": tau_v_result.voltage_steps,
+        "tau_activation": tau_v_result.tau_activation_values,
+        "tau_inactivation": tau_v_result.tau_inactivation_values,
+        "tau_inactivation_slow": tau_v_result.tau_inactivation_slow_values,
+        "has_double_exp": [p.inactivation_is_double for p in tau_v_result.points],
+    }
+
+
 def _compute_gv_data(
     iv_result: "patch_sim.IVAnalysisResult",
     reversal_potential: float,
@@ -590,6 +650,7 @@ class _SimResult:
     sim_token: str
     iv_data: dict[str, Any] = dataclasses.field(default_factory=dict)
     gv_data: dict[str, Any] = dataclasses.field(default_factory=dict)
+    tau_v_data: dict[str, Any] = dataclasses.field(default_factory=dict)
     ap_metrics: list[dict[str, Any]] = dataclasses.field(default_factory=list)
     ap_summary: dict[str, Any] = dataclasses.field(default_factory=dict)
     ap_is_multi_sweep: bool = False
@@ -697,6 +758,14 @@ def _compute_simulation(
                 )
             else:
                 gv_data = {}
+            tau_v_data = _compute_tau_v_data(
+                new_sweeps,
+                min_stimulus,
+                max_stimulus,
+                stimulus_step,
+                pre_stimulus_duration,
+                stimulus_duration,
+            )
             ms_ca_metrics, ms_ca_summary = _compute_multi_sweep_ca_transient_data(
                 new_sweeps
             )
@@ -705,6 +774,7 @@ def _compute_simulation(
                 sim_token=sim_token,
                 iv_data=iv_data,
                 gv_data=gv_data,
+                tau_v_data=tau_v_data,
                 ca_transient_metrics=ms_ca_metrics,
                 ca_transient_summary=ms_ca_summary,
             )
@@ -1216,6 +1286,7 @@ class SimulationState(rx.State):
         analysis_st.clear_results()
         analysis_st.iv_data = result.iv_data
         analysis_st.gv_data = result.gv_data
+        analysis_st.tau_v_data = result.tau_v_data
         analysis_st.ap_metrics = result.ap_metrics
         analysis_st.ap_summary = result.ap_summary
         analysis_st.ap_is_multi_sweep = result.ap_is_multi_sweep
