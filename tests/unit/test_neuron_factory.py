@@ -224,6 +224,48 @@ def test_neuron_config_non_positive_t_ref_raises(T_ref: float) -> None:
 
 
 # ---------------------------------------------------------------------------
+# area_cm2 (analysis-layer metadata, not consumed by ODE solver)
+# ---------------------------------------------------------------------------
+
+
+def test_neuron_config_area_cm2_defaults_to_none() -> None:
+    """NeuronConfig.area_cm2 is ``None`` by default."""
+    assert NeuronConfig().area_cm2 is None
+
+
+def test_neuron_config_area_cm2_accepts_positive_value() -> None:
+    """A positive area_cm2 is preserved on the config."""
+    cfg = NeuronConfig(area_cm2=20e-6)
+    assert cfg.area_cm2 == pytest.approx(20e-6)
+
+
+@pytest.mark.parametrize("area", [0.0, -1e-6])
+def test_neuron_config_non_positive_area_raises(area: float) -> None:
+    """NeuronConfig rejects non-positive area_cm2 at construction time."""
+    with pytest.raises(ValueError, match="area_cm2"):
+        NeuronConfig(area_cm2=area)
+
+
+def test_make_neuron_ignores_area_cm2() -> None:
+    """make_neuron produces functionally identical neurons for any area_cm2.
+
+    area_cm2 is analysis-layer metadata; the ODE-side Neuron must not depend
+    on it.  Building two neurons with identical density parameters but
+    different areas should yield identical g_Na, g_K, g_NaL, g_KL, C_m.
+    """
+    cfg_no_area = NeuronConfig(g_Na=120.0, g_K=36.0, C_m=1.0)
+    cfg_with_area = NeuronConfig(g_Na=120.0, g_K=36.0, C_m=1.0, area_cm2=20e-6)
+    n1 = make_neuron(cfg_no_area)
+    n2 = make_neuron(cfg_with_area)
+    assert n1.g_Na == pytest.approx(n2.g_Na)
+    assert n1.g_K == pytest.approx(n2.g_K)
+    assert n1.g_NaL == pytest.approx(n2.g_NaL)
+    assert n1.g_KL == pytest.approx(n2.g_KL)
+    assert n1.C_m == pytest.approx(n2.C_m)
+    assert not hasattr(n1, "area_cm2")
+
+
+# ---------------------------------------------------------------------------
 # CalciumDynamics override
 # ---------------------------------------------------------------------------
 
