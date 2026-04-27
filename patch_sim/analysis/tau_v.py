@@ -57,6 +57,13 @@ _DOUBLE_FIT_IMPROVEMENT: float = 0.10
 # used in :mod:`~patch_sim.analysis.gv_curve`.
 _MAXFEV: int = 2000
 
+# Minimum fraction of the global ``|I|`` maximum that a local peak must
+# reach before it is accepted as the activation peak.  Filters out tiny
+# early wiggles (capacitive / gating transients) without rejecting genuine
+# but secondary peaks (e.g. an inward Na⁺ peak that is ~70% of a later
+# outward K⁺ peak).
+_PEAK_PROMINENCE_FRACTION: float = 0.30
+
 
 @dataclasses.dataclass
 class ExponentialFit:
@@ -280,23 +287,46 @@ def _slice_step_window(
 
 
 def _peak_index_in_window(current_window: np.ndarray) -> int:
-    """Return the index of the absolute-value peak inside the stimulus window.
+    """Return the index that splits activation from inactivation.
 
-    Used to split the window into an activation (rise to peak) and
-    inactivation (peak to end) segment.  Operates on absolute current so
-    that both inward (negative) and outward (positive) peaks are detected.
+    Finds the first local maximum of ``|I(t)|`` whose magnitude is at least
+    :data:`_PEAK_PROMINENCE_FRACTION` of the global absolute maximum.  This
+    corresponds to the activation peak.  In total-current voltage-clamp
+    traces with both inward (Na⁺) and outward (K⁺) components, the global
+    ``argmax(|I|)`` can pick a late outward peak with no decay phase after
+    it; conversely, the very first local maximum can be a sub-millisecond
+    wiggle from the capacitive / gating transient.  Requiring the peak to
+    be a meaningful fraction of the global max avoids both pitfalls.  When
+    no qualifying local maximum exists (current rises monotonically through
+    the window), falls back to the global ``argmax(|I|)``.
 
     Args:
         current_window: Current values within the stimulus window
             (µA/cm²).
 
     Returns:
-        The integer index of the most extreme value, or ``0`` when the
+        The integer index of the activation peak, or ``0`` when the
         window is empty.
     """
     if current_window.size == 0:
         return 0
-    return int(np.argmax(np.abs(current_window)))
+    abs_curr = np.abs(current_window)
+    global_max = float(np.max(abs_curr))
+    if global_max == 0.0:
+        return 0
+    threshold = _PEAK_PROMINENCE_FRACTION * global_max
+    diffs = np.diff(abs_curr)
+    # Local maximum: derivative goes from > 0 to <= 0.  np.where indexing
+    # is off by one relative to the original array.
+    if diffs.size >= 2:
+        rising = diffs[:-1] > 0.0
+        falling = diffs[1:] <= 0.0
+        sign_changes = np.where(rising & falling)[0]
+        for idx in sign_changes:
+            peak_idx = int(idx) + 1
+            if abs_curr[peak_idx] >= threshold:
+                return peak_idx
+    return int(np.argmax(abs_curr))
 
 
 def _fit_single_exp(
