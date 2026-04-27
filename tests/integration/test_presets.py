@@ -618,3 +618,10 @@ def test_preset_with_area_yields_finite_absolute_passive_properties(
     # preparation; tighter bands would break on legitimate preset edits.
     assert 0.5 < props.input_resistance_mohm < 10000.0
     assert 0.1 < props.membrane_capacitance_pf < 1000.0
+    # τ_m identity: τ [ms] = R_n [MΩ] × C [pF] / 1000.  This is exact (the
+    # absolute values are derived from the same density values via the same
+    # area), so this is a tight regression guard with biological meaning.
+    tau_from_absolute = (
+        props.input_resistance_mohm * props.membrane_capacitance_pf / 1000.0
+    )
+    assert tau_from_absolute == pytest.approx(props.time_constant, rel=1e-9)

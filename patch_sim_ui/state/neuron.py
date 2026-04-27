@@ -79,10 +79,10 @@ def _make_neuron_float_setter(field_name: str):
     """Factory returning an async generator setter that chains a membrane test.
 
     Wraps :func:`~patch_sim_ui.state._common._set_float` and then yields
-    ``SimulationState.run_membrane_test`` so that any change to a neuron
-    parameter automatically refreshes the displayed passive properties.  Uses
-    ``yield`` (not ``return``) because Reflex only chains events yielded from
-    generators; returning an event from a sync handler has no effect.
+    ``SimulationState.run_membrane_test_debounced`` so that any change to a
+    neuron parameter automatically refreshes the displayed passive properties.
+    Uses ``yield`` (not ``return``) because Reflex only chains events yielded
+    from generators; returning an event from a sync handler has no effect.
 
     The fingerprint-based cache inside ``run_membrane_test`` ensures the
     simulation only re-runs when passive-relevant parameters (g_NaL, g_KL,
@@ -92,8 +92,9 @@ def _make_neuron_float_setter(field_name: str):
         field_name: Name of the ``NeuronState`` attribute to update.
 
     Returns:
-        An async generator event handler that accepts ``str | list[float] | float``,
-        updates the field, and yields ``run_membrane_test``.
+        An async generator event handler that accepts
+        ``str | list[float] | float``, updates the field, and yields
+        ``run_membrane_test_debounced``.
     """
 
     async def setter(self, value: "str | list[float] | float"):
@@ -318,9 +319,11 @@ class NeuronState(rx.State):
 
     # area_cm2 is a float field but is *not* part of NEURON_CONFIG_SCALAR_FIELDS
     # (the auto-discovery filters by ``f.type == "float"`` and ``area_cm2`` is
-    # ``float | None``).  It also does not affect the membrane test simulation
-    # — only its absolute-unit conversion — so the setter chains
-    # ``run_membrane_test_debounced`` purely to refresh the displayed units.
+    # ``float | None``).  Changing area does not affect the membrane test
+    # simulation, so the setter chains ``run_membrane_test_debounced`` to
+    # trigger a display refresh; the cache-hit path inside
+    # :meth:`SimulationState.run_membrane_test` re-derives the display from
+    # cached raw props without re-running the simulation.
     set_area_cm2 = _make_neuron_float_setter("area_cm2")
 
     async def set_has_area_cm2(  # type: ignore[override]

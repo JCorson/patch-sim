@@ -1586,14 +1586,17 @@ def test_apply_membrane_test_display_props_unavailable() -> None:
     assert an_st.mt_units_mode == "density"
 
 
-def test_apply_membrane_test_display_zero_area_falls_back_to_density() -> None:
-    """A zero/negative area falls back to density display rather than error."""
+@pytest.mark.parametrize("area_cm2", [0.0, -1e-6])
+def test_apply_membrane_test_display_non_positive_area_falls_back_to_density(
+    area_cm2: float,
+) -> None:
+    """A zero or negative area falls back to density display rather than error."""
     an_st = _make_analysis_state()
     an_st.mt_props_available = True
     an_st.mt_raw_r_in_density = 5.0
     an_st.mt_raw_c_m_density = 1.0
     an_st.mt_raw_has_c_m = True
     an_st.mt_raw_tau_m = 5.0
-    SimulationState._apply_membrane_test_display(an_st, area_cm2=0.0)
+    SimulationState._apply_membrane_test_display(an_st, area_cm2=area_cm2)
     assert an_st.mt_units_mode == "density"
     assert an_st.mt_r_units == "kΩ·cm²"

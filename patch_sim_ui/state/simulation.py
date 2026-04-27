@@ -7,6 +7,7 @@ substates (NeuronState, ProtocolState, VisibilityState, AnalysisState, LogState)
 
 import asyncio
 import dataclasses
+import functools
 import json
 import logging
 import pathlib
@@ -1558,7 +1559,15 @@ class SimulationState(rx.State):
             neuron = neuron_st._build_neuron()
 
         loop = asyncio.get_running_loop()
-        props = await loop.run_in_executor(None, patch_sim.run_membrane_test, neuron)
+        # Pass area_cm2 through so the returned PassiveProperties carries
+        # absolute MΩ / pF fields when the user has set a cell area.  The
+        # display layer also re-derives these from the cached raw density
+        # values, but forwarding here keeps the analysis-layer contract
+        # consistent for any caller that reads ``props`` directly.
+        props = await loop.run_in_executor(
+            None,
+            functools.partial(patch_sim.run_membrane_test, neuron, area_cm2),
+        )
 
         async with self:
             # Re-read fingerprint: if neuron changed while we were computing,
