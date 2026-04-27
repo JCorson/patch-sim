@@ -1553,9 +1553,7 @@ class SimulationState(rx.State):
                 # against the current area state without re-running the
                 # membrane-test simulation.
                 self._apply_membrane_test_display(analysis_st, area_cm2)
-                logger.debug(
-                    "run_membrane_test: cache hit, refreshed display only"
-                )
+                logger.debug("run_membrane_test: cache hit, refreshed display only")
                 return
             neuron = neuron_st._build_neuron()
 
@@ -1653,9 +1651,7 @@ class SimulationState(rx.State):
             analysis_st.mt_c_units = "pF"
             analysis_st.mt_units_mode = "absolute"
         else:
-            analysis_st.mt_input_resistance = (
-                f"{analysis_st.mt_raw_r_in_density:.2f}"
-            )
+            analysis_st.mt_input_resistance = f"{analysis_st.mt_raw_r_in_density:.2f}"
             analysis_st.mt_membrane_capacitance = (
                 f"{analysis_st.mt_raw_c_m_density:.2f}"
                 if analysis_st.mt_raw_has_c_m

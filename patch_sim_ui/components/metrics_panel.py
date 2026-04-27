@@ -414,9 +414,7 @@ def _membrane_test_section() -> rx.Component:
                 rx.text("τ_m", size="1", color="gray", padding_left="2"),
                 rx.text(s.mt_time_constant + " ms", size="1"),
                 rx.text("C_m", size="1", color="gray", padding_left="2"),
-                rx.text(
-                    s.mt_membrane_capacitance + " " + s.mt_c_units, size="1"
-                ),
+                rx.text(s.mt_membrane_capacitance + " " + s.mt_c_units, size="1"),
                 padding_x="3",
                 padding_y="2",
                 border_bottom="1px solid var(--gray-4)",

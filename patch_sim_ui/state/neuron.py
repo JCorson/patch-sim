@@ -376,11 +376,7 @@ class NeuronState(rx.State):
         # ``area_cm2`` is None when the user has unchecked "Use cell area" or
         # has not provided a positive value.  NeuronConfig.__post_init__
         # rejects ``area_cm2 <= 0``.
-        area_cm2 = (
-            self.area_cm2
-            if (self.has_area_cm2 and self.area_cm2 > 0)
-            else None
-        )
+        area_cm2 = self.area_cm2 if (self.has_area_cm2 and self.area_cm2 > 0) else None
         config = patch_sim.NeuronConfig(
             **scalar_kwargs,
             channels=channels,
