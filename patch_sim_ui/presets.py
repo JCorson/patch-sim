@@ -98,6 +98,13 @@ def neuron_config_to_ui_state(config: NeuronConfig) -> dict[str, Any]:
         state[f"{name}_enabled"] = True
         state[f"{name}_g_max"] = cc.g_max
 
+    # Optional cell surface area: 0.0 acts as the sentinel for "not set"
+    # because Reflex state vars cannot natively be Optional[float].
+    state["has_area_cm2"] = config.area_cm2 is not None
+    state["area_cm2"] = (
+        float(config.area_cm2) if config.area_cm2 is not None else 0.0
+    )
+
     return state
 
 

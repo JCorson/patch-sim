@@ -145,6 +145,19 @@ class NeuronState(rx.State):
     ican_g_max: float = DEFAULT_G_ICAN
 
     # ------------------------------------------------------------------ #
+    # Cell surface area                                                  #
+    # ------------------------------------------------------------------ #
+    #: Total membrane surface area in cm² used by the analysis layer to
+    #: convert per-area passive properties to absolute MΩ / pF.  ``0.0`` is
+    #: the sentinel "not set" value because Reflex state vars cannot be
+    #: ``Optional[float]``; ``has_area_cm2`` carries the explicit set/unset
+    #: flag.
+    area_cm2: float = 0.0
+    #: Whether ``area_cm2`` should be applied.  When ``False`` the analysis
+    #: layer reports density units (kΩ·cm², µF/cm²) only.
+    has_area_cm2: bool = False
+
+    # ------------------------------------------------------------------ #
     # Preset label                                                        #
     # ------------------------------------------------------------------ #
     active_neuron_type: str = "Squid Giant Axon (Classic HH)"
@@ -303,6 +316,33 @@ class NeuronState(rx.State):
     for _f in _NON_VISIBILITY_BOOL_FIELDS:
         vars()[f"set_{_f}"] = _make_bool_setter(_f, "NeuronState")
 
+    # area_cm2 is a float field but is *not* part of NEURON_CONFIG_SCALAR_FIELDS
+    # (the auto-discovery filters by ``f.type == "float"`` and ``area_cm2`` is
+    # ``float | None``).  It also does not affect the membrane test simulation
+    # — only its absolute-unit conversion — so the setter chains
+    # ``run_membrane_test_debounced`` purely to refresh the displayed units.
+    set_area_cm2 = _make_neuron_float_setter("area_cm2")
+
+    async def set_has_area_cm2(  # type: ignore[override]
+        self, value: bool
+    ) -> AsyncGenerator[Any, None]:
+        """Toggle absolute-unit display and queue a membrane-test refresh.
+
+        Yields ``run_membrane_test_debounced`` so the metrics panel re-renders
+        with the new unit mode.  The simulation itself is unaffected; the
+        debounced handler will hit the membrane-test cache and only re-derive
+        display strings.
+
+        Args:
+            value: New value of ``has_area_cm2``.
+        """
+        from patch_sim_ui.state.simulation import (  # noqa: PLC0415
+            SimulationState,
+        )
+
+        self.has_area_cm2 = value
+        yield SimulationState.run_membrane_test_debounced
+
     # ------------------------------------------------------------------ #
     # Simulation helpers                                                 #
     # ------------------------------------------------------------------ #
@@ -333,11 +373,20 @@ class NeuronState(rx.State):
         scalar_kwargs = {
             name: getattr(self, name) for name in presets.NEURON_CONFIG_SCALAR_FIELDS
         }
+        # ``area_cm2`` is None when the user has unchecked "Use cell area" or
+        # has not provided a positive value.  NeuronConfig.__post_init__
+        # rejects ``area_cm2 <= 0``.
+        area_cm2 = (
+            self.area_cm2
+            if (self.has_area_cm2 and self.area_cm2 > 0)
+            else None
+        )
         config = patch_sim.NeuronConfig(
             **scalar_kwargs,
             channels=channels,
             na_channel_factory=na_factory,
             k_channel_factory=k_factory,
+            area_cm2=area_cm2,
         )
         return patch_sim.make_neuron(config=config)
 
