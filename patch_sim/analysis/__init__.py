@@ -58,6 +58,8 @@ from .membrane_test import (
 from .passive_properties import (
     PassiveProperties,
     analyze_passive_properties,
+    density_to_absolute_c_m,
+    density_to_absolute_r_in,
     is_subthreshold,
 )
 from .sfa import SFAAnalysisResult, SFACurve, analyze_sfa, compute_sfa
@@ -79,6 +81,8 @@ __all__ = [
     "compute_iv_point",
     "compute_sag_point",
     "compute_sfa",
+    "density_to_absolute_c_m",
+    "density_to_absolute_r_in",
     "estimate_rheobase",
     "is_subthreshold",
     "run_membrane_test",
