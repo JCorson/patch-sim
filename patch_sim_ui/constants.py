@@ -25,6 +25,9 @@ PARAM_RANGES: dict[str, tuple[float, float, float]] = {
     "Ca_out": (0.1, 20.0, 0.1),
     "Ca_in": (0.00001, 0.01, 0.00001),
     "T": (273.15, 323.15, 0.5),  # 0°C to 50°C
+    # Cell membrane area in cm².  Range covers tiny FS interneurons
+    # (~3e-6 cm²) up to Purkinje cells with full dendritic trees (~3e-4 cm²).
+    "area_cm2": (1e-7, 5e-4, 1e-7),
     # Additional channel conductances — derived from channel registry.
     **{ch.g_max_field: ch.g_max_range for ch in ADDITIONAL_CHANNELS},
 }

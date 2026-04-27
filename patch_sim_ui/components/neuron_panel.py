@@ -269,6 +269,40 @@ def neuron_panel() -> rx.Component:
                         NeuronState.set_T,
                         *PARAM_RANGES["T"],
                     ),
+                    rx.tooltip(
+                        rx.hstack(
+                            rx.checkbox(
+                                checked=NeuronState.has_area_cm2,
+                                on_change=NeuronState.set_has_area_cm2,
+                            ),
+                            rx.text(
+                                "Use cell area (report MΩ, pF)",
+                                size="2",
+                                color="gray",
+                            ),
+                            spacing="2",
+                            align="center",
+                            width="100%",
+                        ),
+                        content=(
+                            "When enabled, passive properties are reported in "
+                            "absolute units (MΩ, pF) using the cell surface "
+                            "area below. Off: per-area density units "
+                            "(kΩ·cm², µF/cm²). Examples: FS interneuron ≈ "
+                            "3e-6 cm², cortical pyramidal ≈ 2e-5 cm², "
+                            "Purkinje ≈ 2.5e-4 cm²."
+                        ),
+                    ),
+                    rx.cond(
+                        NeuronState.has_area_cm2,
+                        _param_row(
+                            "Area (cm²)",
+                            NeuronState.area_cm2,
+                            NeuronState.set_area_cm2,
+                            *PARAM_RANGES["area_cm2"],
+                        ),
+                        rx.box(),
+                    ),
                     spacing="1",
                     width="100%",
                 ),
