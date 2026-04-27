@@ -217,6 +217,8 @@ def test_compute_tau_v_point_handles_constant_current_gracefully():
     i = np.full_like(t, -5.0)
     pt = compute_tau_v_point(t, i, -20.0, 5.0, 95.0)
     # No activation rise, no inactivation drop → both None
+    assert pt.tau_activation_ms is None
+    assert pt.activation_converged is False
     assert pt.tau_inactivation_ms is None
     assert pt.inactivation_converged is False
 

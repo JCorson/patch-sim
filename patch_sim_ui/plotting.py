@@ -1227,8 +1227,10 @@ def build_tau_v_figure(tau_v_data: dict) -> go.Figure:
           step had a double-exponential inactivation fit accepted).
 
     The y-axis uses a logarithmic scale because \u03c4 commonly spans an order
-    of magnitude across voltages.  Plotly drops ``None`` entries from each
-    trace so that sweeps with failed fits do not break the line.
+    of magnitude across voltages.  ``connectgaps=False`` is set on each
+    trace so that sweeps where the fit failed (``None`` \u03c4) appear as gaps
+    rather than being interpolated across, making missing data visible at
+    a glance.
 
     Args:
         tau_v_data: Dict with keys ``voltages``, ``tau_activation``,

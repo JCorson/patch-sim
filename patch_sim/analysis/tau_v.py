@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from collections.abc import Callable
 
 import numpy as np
 from scipy.optimize import curve_fit
@@ -31,8 +32,16 @@ _MIN_FIT_POINTS: int = 5
 # Fraction of the absolute peak current that the post-peak trace must fall
 # below before an inactivation phase is considered present.  When the trace
 # stays above this threshold (e.g. sustained K⁺ currents) the inactivation
-# fit is skipped and τ_inact is reported as None.
-_INACTIVATION_PEAK_FRACTION: float = 0.95
+# fit is skipped and τ_inact is reported as None.  Set to 0.85 so that a
+# trace which decays by less than 15% of its peak is treated as "no
+# meaningful inactivation" rather than producing a τ from near-flat data.
+_INACTIVATION_PEAK_FRACTION: float = 0.85
+
+# Fits whose τ converges within this fraction of either bound are treated
+# as "pinned to the bound" and rejected — typically symptoms of an
+# under-constrained or noise-only window where curve_fit drifts to the
+# corner of the search space rather than locating a real time constant.
+_TAU_BOUND_REJECT_FRACTION: float = 0.05
 
 # Lower bound on τ (ms) for fits.  Protects curve_fit from collapsing onto
 # values that produce numerical underflow in ``exp(-t/tau)``.
@@ -330,7 +339,7 @@ def _peak_index_in_window(current_window: np.ndarray) -> int:
 
 
 def _fit_single_exp(
-    model,  # type: ignore[no-untyped-def]
+    model: Callable[..., float | np.ndarray],
     t: np.ndarray,
     y: np.ndarray,
     p0: list[float],
@@ -490,6 +499,15 @@ def compute_tau_v_point(
     i_inact = i_win[peak_idx:]
 
     tau_max = stim_duration * _TAU_CEILING_FRACTION
+    # τ values that converge near a bound are typically curve_fit hitting
+    # the corner of the search space rather than locating a real time
+    # constant; treat them as failed fits.
+    tau_lo_reject = _TAU_FLOOR_MS * (1.0 + _TAU_BOUND_REJECT_FRACTION)
+    tau_hi_reject = tau_max * (1.0 - _TAU_BOUND_REJECT_FRACTION)
+
+    def _tau_is_bound_pinned(tau: float) -> bool:
+        """Return True when ``tau`` lies near either fitting bound."""
+        return tau <= tau_lo_reject or tau >= tau_hi_reject
 
     # ---- activation fit ------------------------------------------------ #
     tau_act: float | None = None
@@ -510,7 +528,7 @@ def compute_tau_v_point(
         p0 = [amp_seed, tau_seed, offset_seed]
         bounds = ([a_lo, _TAU_FLOOR_MS, c_lo], [a_hi, tau_max, c_hi])
         fit = _fit_single_exp(single_exp_rise, t_act, i_act, p0, bounds)
-        if fit.converged:
+        if fit.converged and not _tau_is_bound_pinned(fit.tau_ms):
             tau_act = fit.tau_ms
             activation_converged = True
 
@@ -539,7 +557,7 @@ def compute_tau_v_point(
             bounds = ([a_lo, _TAU_FLOOR_MS, c_lo], [a_hi, tau_max, c_hi])
             single_fit = _fit_single_exp(single_exp_decay, t_inact, i_inact, p0, bounds)
 
-            if single_fit.converged:
+            if single_fit.converged and not _tau_is_bound_pinned(single_fit.tau_ms):
                 tau_inact = single_fit.tau_ms
                 inactivation_converged = True
 
@@ -567,6 +585,8 @@ def compute_tau_v_point(
                     tau_slow = double_fit.tau_slow_ms
                     if (
                         rss_drop >= _DOUBLE_FIT_IMPROVEMENT
+                        and not _tau_is_bound_pinned(tau_fast)
+                        and not _tau_is_bound_pinned(tau_slow)
                         and tau_fast > 0.0
                         and tau_slow / tau_fast >= _DOUBLE_TAU_RATIO
                     ):
@@ -600,6 +620,17 @@ def analyze_tau_v(
     sorted in ascending order of voltage step.  Failed individual fits do
     not raise; they surface as ``None`` τ values on their respective
     :class:`TauVPoint`.
+
+    Caveat — total-current vs. isolated-channel kinetics:
+        When ``currents`` is the total membrane current (rather than an
+        isolated channel current obtained via, e.g. TTX subtraction), the
+        recovered τ values reflect the dominant channel at each voltage.
+        At strong depolarisations of an HH-style neuron the total current is
+        dominated by the much larger sustained K⁺ outward current, which
+        masks the brief inward Na⁺ inactivation; the τ_inactivation values
+        at those voltages should not be interpreted as the isolated Na⁺
+        inactivation time constant.  For unambiguous channel-specific
+        kinetics, run this analysis on a pharmacologically isolated current.
 
     Args:
         time: Shared time axis in ms (same for all sweeps).
