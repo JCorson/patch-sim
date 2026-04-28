@@ -125,11 +125,7 @@ def test_single_spike_returns_zero_bursts_and_one_unburst_spike() -> None:
 def test_single_spike_with_min_one_returns_one_burst() -> None:
     """A single spike with min_spikes_per_burst=1 forms a single-spike burst."""
     ap = _make_ap_result([100.0])
-    # Pin isi_threshold_ms so the analyser does not short-circuit to zero
-    # bursts on the ``default-fixed`` fallback path (no ISIs available).
-    result = analyze_bursts(
-        ap, total_duration_ms=500.0, isi_threshold_ms=50.0, min_spikes_per_burst=1
-    )
+    result = analyze_bursts(ap, total_duration_ms=500.0, min_spikes_per_burst=1)
     assert result.burst_count == 1
     assert result.bursts[0].spike_count == 1
     assert result.bursts[0].duration == pytest.approx(0.0)
