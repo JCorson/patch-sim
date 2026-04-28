@@ -655,7 +655,10 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 5.0,
             "stimulus_duration": 5.0,
         },
-        # 10 µA/cm² for 180 ms drives complex Ca²⁺-driven spiking.
+        # 10 µA/cm² for 180 ms drives sustained tonic firing with prominent
+        # Ca²⁺ contributions (ICaL/ICaT/IKCa).  This is intrinsic tonic
+        # firing, not the climbing-fibre-driven "complex spike" of in-vivo
+        # Purkinje cells (which is unmodelled here).
         REPETITIVE_FIRING: {
             "min_stimulus": 10.0,
             "max_stimulus": 10.0,
