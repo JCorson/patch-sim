@@ -381,11 +381,12 @@ def _membrane_test_section() -> rx.Component:
     """Render the always-visible passive membrane properties section.
 
     Displays R_in, τₘ, and Cₘ from the dedicated membrane test on a single
-    compact row.  The displayed units depend on whether the active neuron has
-    an ``area_cm2`` set: absolute MΩ / pF when present, per-area kΩ·cm² /
-    µF/cm² otherwise.  τₘ is always in ms and is invariant to the conversion.
+    compact row.  The displayed units depend on whether the active preset
+    declares a cell surface area: absolute MΩ / pF when present, per-area
+    kΩ·cm² / µF/cm² otherwise.  τₘ is always in ms and is invariant to the
+    conversion.
 
-    A tooltip explains the active mode and how to switch.
+    A tooltip explains the active mode.
 
     Returns:
         A single-row hstack of labelled passive property values, or an empty
@@ -396,13 +397,12 @@ def _membrane_test_section() -> rx.Component:
         s.mt_units_mode == "absolute",
         (
             "R_n in megaohms; C in picofarads; τ_m = R_n × C. Computed from "
-            "the cell surface area set in Neuron Parameters → Membrane "
-            "Properties → Cell area."
+            "the active preset's cell surface area."
         ),
         (
-            "Per-area passive properties (kΩ·cm², µF/cm²). Set the cell "
-            "surface area in Neuron Parameters → Membrane Properties to "
-            "convert to absolute R_n (MΩ) and C (pF)."
+            "Per-area passive properties (kΩ·cm², µF/cm²). The active preset "
+            "has no surface area declared, so absolute R_n (MΩ) and C (pF) "
+            "are not available."
         ),
     )
     return rx.cond(

@@ -7,7 +7,6 @@ substates (NeuronState, ProtocolState, VisibilityState, AnalysisState, LogState)
 
 import asyncio
 import dataclasses
-import functools
 import json
 import logging
 import pathlib
@@ -1540,34 +1539,14 @@ class SimulationState(rx.State):
             # values are cached by Reflex and may not yet reflect the latest
             # state when accessed from a background task.
             fingerprint = neuron_st._compute_fingerprint()
-            area_cm2 = (
-                neuron_st.area_cm2
-                if (neuron_st.has_area_cm2 and neuron_st.area_cm2 > 0)
-                else None
-            )
             analysis_st = await self.get_state(AnalysisState)
-            if (
-                analysis_st.mt_neuron_fingerprint == fingerprint
-                and analysis_st.mt_props_available
-            ):
-                # Sim cache hit: re-derive display from cached raw values
-                # against the current area state without re-running the
-                # membrane-test simulation.
-                self._apply_membrane_test_display(analysis_st, area_cm2)
-                logger.debug("run_membrane_test: cache hit, refreshed display only")
+            if analysis_st.mt_neuron_fingerprint == fingerprint:
+                logger.debug("run_membrane_test: cache hit, skipping")
                 return
             neuron = neuron_st._build_neuron()
 
         loop = asyncio.get_running_loop()
-        # Pass area_cm2 through so the returned PassiveProperties carries
-        # absolute MΩ / pF fields when the user has set a cell area.  The
-        # display layer also re-derives these from the cached raw density
-        # values, but forwarding here keeps the analysis-layer contract
-        # consistent for any caller that reads ``props`` directly.
-        props = await loop.run_in_executor(
-            None,
-            functools.partial(patch_sim.run_membrane_test, neuron, area_cm2),
-        )
+        props = await loop.run_in_executor(None, patch_sim.run_membrane_test, neuron)
 
         async with self:
             # Re-read fingerprint: if neuron changed while we were computing,
@@ -1580,25 +1559,43 @@ class SimulationState(rx.State):
                 )
                 return
             analysis_st = await self.get_state(AnalysisState)
+            em_dash = "—"
+            density_r_units = "kΩ·cm²"
+            density_c_units = "µF/cm²"
             if props is None:
-                analysis_st.mt_props_available = False
-                analysis_st.mt_raw_r_in_density = 0.0
-                analysis_st.mt_raw_c_m_density = 0.0
-                analysis_st.mt_raw_has_c_m = False
-                analysis_st.mt_raw_tau_m = 0.0
+                analysis_st.mt_input_resistance = em_dash
+                analysis_st.mt_time_constant = em_dash
+                analysis_st.mt_membrane_capacitance = em_dash
+                analysis_st.mt_r_units = density_r_units
+                analysis_st.mt_c_units = density_c_units
+                analysis_st.mt_units_mode = "density"
                 analysis_st.mt_fit_converged = False
             else:
-                analysis_st.mt_props_available = True
-                analysis_st.mt_raw_r_in_density = float(props.input_resistance)
-                analysis_st.mt_raw_tau_m = float(props.time_constant)
-                if props.membrane_capacitance is not None:
-                    analysis_st.mt_raw_c_m_density = float(props.membrane_capacitance)
-                    analysis_st.mt_raw_has_c_m = True
-                else:
-                    analysis_st.mt_raw_c_m_density = 0.0
-                    analysis_st.mt_raw_has_c_m = False
+                analysis_st.mt_time_constant = f"{props.time_constant:.2f}"
                 analysis_st.mt_fit_converged = props.fit_converged
-            self._apply_membrane_test_display(analysis_st, area_cm2)
+                if props.input_resistance_mohm is not None:
+                    analysis_st.mt_input_resistance = (
+                        f"{props.input_resistance_mohm:.2f}"
+                    )
+                    analysis_st.mt_r_units = "MΩ"
+                    analysis_st.mt_units_mode = "absolute"
+                else:
+                    analysis_st.mt_input_resistance = f"{props.input_resistance:.2f}"
+                    analysis_st.mt_r_units = density_r_units
+                    analysis_st.mt_units_mode = "density"
+                if props.membrane_capacitance_pf is not None:
+                    analysis_st.mt_membrane_capacitance = (
+                        f"{props.membrane_capacitance_pf:.2f}"
+                    )
+                    analysis_st.mt_c_units = "pF"
+                elif props.membrane_capacitance is not None:
+                    analysis_st.mt_membrane_capacitance = (
+                        f"{props.membrane_capacitance:.2f}"
+                    )
+                    analysis_st.mt_c_units = density_c_units
+                else:
+                    analysis_st.mt_membrane_capacitance = em_dash
+                    analysis_st.mt_c_units = density_c_units
             analysis_st.mt_neuron_fingerprint = fingerprint
             logger.info(
                 "run_membrane_test: R_in=%s %s, τ_m=%s ms, C_m=%s %s",
@@ -1608,64 +1605,3 @@ class SimulationState(rx.State):
                 analysis_st.mt_membrane_capacitance,
                 analysis_st.mt_c_units,
             )
-
-    @staticmethod
-    def _apply_membrane_test_display(
-        analysis_st: "AnalysisState", area_cm2: float | None
-    ) -> None:
-        """Populate AnalysisState display strings from cached raw props.
-
-        Reads ``mt_raw_*`` fields and ``area_cm2`` and writes the formatted
-        ``mt_input_resistance`` / ``mt_membrane_capacitance`` /
-        ``mt_time_constant`` strings plus ``mt_r_units`` / ``mt_c_units`` /
-        ``mt_units_mode``.  When the cached props were unavailable, all
-        displays are em-dashes.
-
-        Args:
-            analysis_st: AnalysisState instance to update in place.
-            area_cm2: Membrane area in cm², or ``None`` for density mode.
-        """
-        em_dash = "—"
-        density_r_units = "kΩ·cm²"
-        density_c_units = "µF/cm²"
-        if not analysis_st.mt_props_available:
-            analysis_st.mt_input_resistance = em_dash
-            analysis_st.mt_time_constant = em_dash
-            analysis_st.mt_membrane_capacitance = em_dash
-            analysis_st.mt_r_units = density_r_units
-            analysis_st.mt_c_units = density_c_units
-            analysis_st.mt_units_mode = "density"
-            return
-
-        analysis_st.mt_time_constant = f"{analysis_st.mt_raw_tau_m:.2f}"
-
-        if area_cm2 is not None and area_cm2 > 0:
-            r_mohm = patch_sim.density_to_absolute_r_in(
-                analysis_st.mt_raw_r_in_density, area_cm2
-            )
-            c_pf = (
-                patch_sim.density_to_absolute_c_m(
-                    analysis_st.mt_raw_c_m_density, area_cm2
-                )
-                if analysis_st.mt_raw_has_c_m
-                else None
-            )
-            analysis_st.mt_input_resistance = (
-                f"{r_mohm:.2f}" if r_mohm is not None else em_dash
-            )
-            analysis_st.mt_membrane_capacitance = (
-                f"{c_pf:.2f}" if c_pf is not None else em_dash
-            )
-            analysis_st.mt_r_units = "MΩ"
-            analysis_st.mt_c_units = "pF"
-            analysis_st.mt_units_mode = "absolute"
-        else:
-            analysis_st.mt_input_resistance = f"{analysis_st.mt_raw_r_in_density:.2f}"
-            analysis_st.mt_membrane_capacitance = (
-                f"{analysis_st.mt_raw_c_m_density:.2f}"
-                if analysis_st.mt_raw_has_c_m
-                else em_dash
-            )
-            analysis_st.mt_r_units = density_r_units
-            analysis_st.mt_c_units = density_c_units
-            analysis_st.mt_units_mode = "density"

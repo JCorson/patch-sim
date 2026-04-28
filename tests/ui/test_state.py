@@ -1518,85 +1518,17 @@ def test_analysis_state_clear_results_resets_simulation_fields() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_load_neuron_preset_sets_area_for_cortical_pyramidal() -> None:
-    """Loading the cortical pyramidal preset enables and sets area_cm2."""
+def test_build_neuron_carries_area_for_cortical_pyramidal() -> None:
+    """A built Neuron carries the cortical pyramidal preset's area_cm2."""
     ns = _make_neuron_state()
-    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
-    assert ns.has_area_cm2 is True
-    assert ns.area_cm2 == pytest.approx(20e-6)
+    ns.active_neuron_type = CORTICAL_PYRAMIDAL
+    neuron = ns._build_neuron()
+    assert neuron.area_cm2 == pytest.approx(20e-6)
 
 
-async def test_load_neuron_preset_clears_area_for_squid() -> None:
-    """Loading the squid preset disables area_cm2 (preset value is None)."""
+def test_build_neuron_has_no_area_for_squid() -> None:
+    """The squid preset has no area_cm2 — built Neuron exposes ``None``."""
     ns = _make_neuron_state()
-    # Prime an area as if a previous preset was loaded.
-    ns.has_area_cm2 = True
-    ns.area_cm2 = 20e-6
-    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
-        [_ async for _ in ns.load_neuron_preset(SQUID_GIANT_AXON)]
-    assert ns.has_area_cm2 is False
-    assert ns.area_cm2 == pytest.approx(0.0)
-
-
-def test_apply_membrane_test_display_density_mode() -> None:
-    """Without area_cm2, display strings carry density values and units."""
-    an_st = _make_analysis_state()
-    an_st.mt_props_available = True
-    an_st.mt_raw_r_in_density = 20.0
-    an_st.mt_raw_c_m_density = 1.0
-    an_st.mt_raw_has_c_m = True
-    an_st.mt_raw_tau_m = 20.0
-    SimulationState._apply_membrane_test_display(an_st, area_cm2=None)
-    assert an_st.mt_input_resistance == "20.00"
-    assert an_st.mt_membrane_capacitance == "1.00"
-    assert an_st.mt_time_constant == "20.00"
-    assert an_st.mt_r_units == "kΩ·cm²"
-    assert an_st.mt_c_units == "µF/cm²"
-    assert an_st.mt_units_mode == "density"
-
-
-def test_apply_membrane_test_display_absolute_mode() -> None:
-    """With area_cm2 set, display strings switch to absolute MΩ / pF units."""
-    an_st = _make_analysis_state()
-    an_st.mt_props_available = True
-    an_st.mt_raw_r_in_density = 20.0  # kΩ·cm²
-    an_st.mt_raw_c_m_density = 1.0  # µF/cm²
-    an_st.mt_raw_has_c_m = True
-    an_st.mt_raw_tau_m = 20.0
-    SimulationState._apply_membrane_test_display(an_st, area_cm2=20e-6)
-    # R_n = 20 / 20e-6 / 1000 = 1000 MΩ
-    assert an_st.mt_input_resistance == "1000.00"
-    # C = 1.0 × 20e-6 × 1e6 = 20 pF
-    assert an_st.mt_membrane_capacitance == "20.00"
-    assert an_st.mt_time_constant == "20.00"
-    assert an_st.mt_r_units == "MΩ"
-    assert an_st.mt_c_units == "pF"
-    assert an_st.mt_units_mode == "absolute"
-
-
-def test_apply_membrane_test_display_props_unavailable() -> None:
-    """When no membrane test has succeeded, all displays show em-dashes."""
-    an_st = _make_analysis_state()
-    an_st.mt_props_available = False
-    SimulationState._apply_membrane_test_display(an_st, area_cm2=20e-6)
-    assert an_st.mt_input_resistance == "—"
-    assert an_st.mt_membrane_capacitance == "—"
-    assert an_st.mt_time_constant == "—"
-    assert an_st.mt_units_mode == "density"
-
-
-@pytest.mark.parametrize("area_cm2", [0.0, -1e-6])
-def test_apply_membrane_test_display_non_positive_area_falls_back_to_density(
-    area_cm2: float,
-) -> None:
-    """A zero or negative area falls back to density display rather than error."""
-    an_st = _make_analysis_state()
-    an_st.mt_props_available = True
-    an_st.mt_raw_r_in_density = 5.0
-    an_st.mt_raw_c_m_density = 1.0
-    an_st.mt_raw_has_c_m = True
-    an_st.mt_raw_tau_m = 5.0
-    SimulationState._apply_membrane_test_display(an_st, area_cm2=area_cm2)
-    assert an_st.mt_units_mode == "density"
-    assert an_st.mt_r_units == "kΩ·cm²"
+    ns.active_neuron_type = SQUID_GIANT_AXON
+    neuron = ns._build_neuron()
+    assert neuron.area_cm2 is None

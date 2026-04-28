@@ -43,15 +43,6 @@ class AnalysisState(rx.State):
     mt_neuron_fingerprint: str = ""  # fingerprint used to detect stale cache
     mt_fit_converged: bool = True  # False when exponential fit did not converge
 
-    # Raw cached membrane-test outputs.  Used to re-derive the formatted
-    # display strings when only ``area_cm2`` / ``has_area_cm2`` changes —
-    # avoids a full membrane-test re-simulation in that case.
-    mt_props_available: bool = False  # last run produced finite props
-    mt_raw_r_in_density: float = 0.0  # kΩ·cm²
-    mt_raw_c_m_density: float = 0.0  # µF/cm² (0.0 when not finite)
-    mt_raw_has_c_m: bool = False  # whether mt_raw_c_m_density is meaningful
-    mt_raw_tau_m: float = 0.0  # ms
-
     def clear_results(self) -> None:
         """Clear all analysis result fields to their empty defaults.
 
