@@ -155,7 +155,9 @@ def _burst_row(burst: dict) -> rx.Component:
             rx.cond(
                 burst["sweep_index"].to(int) > 0,
                 rx.text(burst["sweep_index"].to(int), size="1"),
-                rx.text("", size="1"),
+                # Non-breaking space keeps row baseline aligned across the
+                # table grid when this cell would otherwise be empty.
+                rx.text(" ", size="1"),
             ),
         ),
         rx.table.cell(rx.text(burst["start_time"].to(str), size="1")),
