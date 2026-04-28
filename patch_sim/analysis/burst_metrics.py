@@ -342,12 +342,16 @@ def _group_spikes_into_bursts(
 def _empty_result(
     isi_threshold_ms: float,
     threshold_method: str,
+    unburst_spike_count: int = 0,
 ) -> BurstAnalysisResult:
     """Return a result representing a trace with no detected bursts.
 
     Args:
         isi_threshold_ms: Threshold that was applied (ms).
         threshold_method: How the threshold was chosen.
+        unburst_spike_count: Spikes to surface as unburst.  Defaults to 0
+            for the no-spikes call site; the ``default-fixed`` short-circuit
+            in :func:`analyze_bursts` passes the full spike count through.
 
     Returns:
         A :class:`BurstAnalysisResult` with ``burst_count`` of 0 and all
@@ -356,7 +360,7 @@ def _empty_result(
     return BurstAnalysisResult(
         burst_count=0,
         bursts=[],
-        unburst_spike_count=0,
+        unburst_spike_count=unburst_spike_count,
         mean_spikes_per_burst=None,
         mean_intra_burst_frequency=None,
         mean_inter_burst_interval=None,
@@ -382,8 +386,12 @@ def analyze_bursts(
             denominator of :attr:`BurstAnalysisResult.duty_cycle`.  Typically
             ``time[-1] - time[0]``.
         isi_threshold_ms: Optional user-supplied threshold (ms).  When
-            ``None``, the function attempts a histogram-based auto-detect
-            and falls back to a fixed 100 ms default.
+            ``None``, the function attempts a histogram-based auto-detect.
+            If auto-detect cannot find a bimodal split it returns method
+            ``"default-fixed"``; in that case (and only without a user
+            threshold) the analyser short-circuits to zero bursts and
+            surfaces every spike via ``unburst_spike_count``, since a
+            ``default-fixed`` outcome means "no real burst structure here".
         min_spikes_per_burst: Minimum spike count for a group to count as a
             burst.  Defaults to 2; isolated spikes are tracked via
             :attr:`BurstAnalysisResult.unburst_spike_count`.
@@ -399,6 +407,13 @@ def analyze_bursts(
 
     if ap_result.spike_count == 0:
         return _empty_result(threshold, method)
+
+    if method == "default-fixed" and isi_threshold_ms is None:
+        return _empty_result(
+            threshold,
+            method,
+            unburst_spike_count=ap_result.spike_count,
+        )
 
     # 1-spike traces fall through to the grouper so they are correctly
     # routed to ``unburst_spike_count`` under the default
