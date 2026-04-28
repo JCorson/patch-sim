@@ -25,9 +25,19 @@ def test_purkinje_tonic_firing_groups_into_one_or_zero_bursts() -> None:
     """Purkinje under a depolarising step is tonic, not multi-burst.
 
     Purkinje is a tonic pacemaker (Raman & Bean 1999).  Under a moderate
-    depolarising current it produces a regular tonic spike train; the
-    auto-detect ISI histogram is unimodal, so the analyser must report
-    ``burst_count <= 1`` and ``mean_inter_burst_interval is None``.
+    depolarising current it produces a regular tonic spike train with a
+    unimodal ISI distribution, so the analyser cannot place an
+    auto-histogram threshold and falls back to ``"default-fixed"``.
+
+    Conceptually a tonic train has zero bursts.  However, with the
+    current 100 ms default threshold and Purkinje firing >10 Hz, every
+    ISI sits below the threshold and the analyser lumps the whole train
+    into one contiguous "burst" with no inter-burst interval — see
+    https://github.com/JCorson/patch-sim/issues/290.  Once that wart is
+    fixed, ``burst_count <= 1`` will tighten to ``== 0``.  The real
+    "no multi-burst structure" guarantee here is
+    ``mean_inter_burst_interval is None``, which holds either way.
+
     Complex-spike bursts in vivo are climbing-fibre driven and cannot be
     produced by this single-compartment, current-clamp preset.
     """
@@ -52,10 +62,15 @@ def test_classic_hh_tonic_firing_does_not_report_genuine_bursting(
 ) -> None:
     """Tonic-firing HH should not report multi-burst structure.
 
-    A regular tonic spike train either has all ISIs above the threshold
-    (zero bursts, all spikes "unburst") or all ISIs below it (one
-    contiguous "burst" with no inter-burst interval).  In neither case
-    should a real :attr:`mean_inter_burst_interval` appear.
+    Conceptually a tonic spike train has zero bursts.  However, with the
+    current 100 ms default threshold and HH firing well above 10 Hz at
+    +10 µA/cm², every ISI sits below the threshold and the analyser
+    lumps the whole train into one contiguous "burst" with no
+    inter-burst interval — see
+    https://github.com/JCorson/patch-sim/issues/290.  Once that wart is
+    fixed, ``burst_count <= 1`` will tighten to ``== 0``.  The real
+    "no multi-burst structure" guarantee here is
+    ``mean_inter_burst_interval is None``, which holds either way.
 
     Args:
         hh_model: Classic Hodgkin-Huxley neuron fixture.
