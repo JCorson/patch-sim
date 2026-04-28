@@ -388,17 +388,16 @@ def analyze_bursts(
         isi_threshold_ms: Optional user-supplied threshold (ms).  When
             ``None``, the function attempts a histogram-based auto-detect.
             If auto-detect cannot find a bimodal split it returns method
-            ``"default-fixed"``; with the default ``min_spikes_per_burst``
-            (and no user threshold) the analyser then short-circuits to
-            zero bursts and surfaces every spike via
-            ``unburst_spike_count``, since ``default-fixed`` means "no
-            real burst structure here".
+            ``"default-fixed"``; in that case (and only without a user
+            threshold) the analyser short-circuits to zero bursts and
+            surfaces every spike via ``unburst_spike_count``, since a
+            ``default-fixed`` outcome means "no real burst structure here".
+            Callers who want to force grouping (including the
+            ``min_spikes_per_burst=1`` "every spike is a burst" mode)
+            should pin ``isi_threshold_ms`` explicitly.
         min_spikes_per_burst: Minimum spike count for a group to count as a
             burst.  Defaults to 2; isolated spikes are tracked via
-            :attr:`BurstAnalysisResult.unburst_spike_count`.  Callers who
-            lower this to 1 — i.e. who want every spike treated as a
-            single-spike burst — bypass the ``default-fixed`` short-circuit
-            and always exercise the grouper.
+            :attr:`BurstAnalysisResult.unburst_spike_count`.
 
     Returns:
         A :class:`BurstAnalysisResult` with per-burst and aggregate metrics.
@@ -412,11 +411,7 @@ def analyze_bursts(
     if ap_result.spike_count == 0:
         return _empty_result(threshold, method)
 
-    if (
-        method == "default-fixed"
-        and isi_threshold_ms is None
-        and min_spikes_per_burst >= 2
-    ):
+    if method == "default-fixed" and isi_threshold_ms is None:
         return _empty_result(
             threshold,
             method,
