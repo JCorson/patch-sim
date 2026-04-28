@@ -151,8 +151,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         ),
     ),
     PURKINJE: NeuronConfig(
-        # Spontaneous pacemaker: INaP window current destabilises the rest,
-        # Ih drives recovery from AHP back to threshold → autonomous oscillation.
+        # Tonic pacemaker (autonomous, intrinsic): INaP window current destabilises
+        # the rest, Ih drives recovery from AHP back to threshold → autonomous
+        # oscillation producing regular tonic simple spikes.  Complex-spike
+        # "bursts" observed in vivo are climbing-fibre synaptic events (Raman &
+        # Bean 1997 — INaR-supported repriming under climbing-fibre EPSPs); they
+        # are NOT intrinsic and cannot be produced by this single-compartment,
+        # current-clamp preset, which has no climbing-fibre input.
         # Refs: De Schutter & Bower (1994), J. Neurophysiol. 71:375;
         #       Raman & Bean (1997), Neuron 19:881 (NaR);
         #       Raman & Bean (1999), J. Neurosci. 19:4663 (NaP/NaR pacemaking);
@@ -339,12 +344,24 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         calcium_dynamics=CalciumDynamics(alpha_ca=2.1e-5, tau_ca=20.0, ca_rest=1e-4),
     ),
     STN: NeuronConfig(
-        # High-threshold Na⁺ (Otsuka 2004) and fast K⁺ DR replace the default
-        # HH52 kinetics; g_Na/g_K from the original paper sustain autonomous
-        # tonic firing at 5–50 Hz.  Prominent ICaT (g_T = 5 mS/cm²) drives
-        # rebound bursts after hyperpolarization; IKCa limits burst duration;
-        # Ih provides pacemaker depolarization.
+        # Autonomous tonic pacemaker with conditional burst mode.
+        #
+        # PRIMARY MODE — tonic pacemaking: high-threshold Na⁺ (Otsuka 2004) and
+        # fast K⁺ DR replace the default HH52 kinetics; g_Na/g_K from the
+        # original paper sustain autonomous tonic firing at 5–50 Hz in vivo
+        # (~80 Hz here under a 2 µA/cm² depolarising bias).
+        #
+        # CONDITIONAL MODE — burst firing: prominent ICaT (g_T = 5 mS/cm²)
+        # supports post-inhibitory rebound bursts when the cell is sufficiently
+        # hyperpolarised to de-inactivate the ft gate; on release, ICaT and Ih
+        # together drive a high-frequency rebound burst before IKCa repolarises
+        # the cell back to tonic mode.  Burst mode can also be triggered by
+        # NMDA-receptor activation (Beurrier et al. 1999, J. Neurosci. 19:599);
+        # NMDA is not modelled here, so burst mode is reachable in this preset
+        # only via the hyperpolarising-step-and-release protocol.
         # Refs: Otsuka et al. (2004), J. Neurophysiol. 92:255;
+        #       Bevan & Wilson (1999), J. Neurosci. 19:7617;
+        #       Beurrier et al. (1999), J. Neurosci. 19:599 (NMDA burst mode);
         #       Farries & Wilson (2012), J. Neurophysiol.
         #
         # Mammalian Na⁺/K⁺ concentrations give E_Na ≈ +60.6, E_K ≈ −89.1 mV,
