@@ -246,12 +246,25 @@ def test_neuron_config_non_positive_area_raises(area: float) -> None:
         NeuronConfig(area_cm2=area)
 
 
-def test_make_neuron_ignores_area_cm2() -> None:
-    """make_neuron produces functionally identical neurons for any area_cm2.
+def test_make_neuron_propagates_area_cm2() -> None:
+    """make_neuron forwards area_cm2 from NeuronConfig onto the built Neuron."""
+    cfg = NeuronConfig(area_cm2=20e-6)
+    model = make_neuron(cfg)
+    assert model.area_cm2 == pytest.approx(20e-6)
 
-    area_cm2 is analysis-layer metadata; the ODE-side Neuron must not depend
-    on it.  Building two neurons with identical density parameters but
-    different areas should yield identical g_Na, g_K, g_NaL, g_KL, C_m.
+
+def test_make_neuron_default_area_cm2_is_none() -> None:
+    """A default-constructed NeuronConfig produces a Neuron with area_cm2=None."""
+    model = make_neuron(NeuronConfig())
+    assert model.area_cm2 is None
+
+
+def test_make_neuron_area_cm2_does_not_affect_dynamics_inputs() -> None:
+    """area_cm2 is not consumed by the ODE: density parameters are unaffected.
+
+    Two neurons built from identical density parameters but different
+    ``area_cm2`` values should expose identical g_Na, g_K, g_NaL, g_KL, C_m
+    on the built :class:`Neuron`.  Only ``area_cm2`` itself differs.
     """
     cfg_no_area = NeuronConfig(g_Na=120.0, g_K=36.0, C_m=1.0)
     cfg_with_area = NeuronConfig(g_Na=120.0, g_K=36.0, C_m=1.0, area_cm2=20e-6)
@@ -262,7 +275,8 @@ def test_make_neuron_ignores_area_cm2() -> None:
     assert n1.g_NaL == pytest.approx(n2.g_NaL)
     assert n1.g_KL == pytest.approx(n2.g_KL)
     assert n1.C_m == pytest.approx(n2.C_m)
-    assert not hasattr(n1, "area_cm2")
+    assert n1.area_cm2 is None
+    assert n2.area_cm2 == pytest.approx(20e-6)
 
 
 # ---------------------------------------------------------------------------

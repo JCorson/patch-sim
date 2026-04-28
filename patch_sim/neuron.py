@@ -77,6 +77,16 @@ class Neuron:
             the classic Na/K/NaL/KL quartet.  Defaults to an empty tuple so
             that all existing code is unaffected.
         calcium_dynamics: Optional calcium dynamics model.
+        area_cm2: Total membrane surface area in cm².  Optional physical
+            attribute of the cell that is **not** read by the ODE solver —
+            HH dynamics in this single-compartment model are scale-invariant
+            in the per-area units (mS/cm², µF/cm², µA/cm²) used everywhere
+            else.  Surface area is consumed by the analysis layer to convert
+            the per-area passive properties (R_in in kΩ·cm², C_m in µF/cm²)
+            into absolute MΩ / pF for display.  cm² is the unit of choice
+            for consistency with the per-area density units; representative
+            values fall in the ``1e-6`` to ``3e-4`` cm² range.  ``None``
+            means absolute units are not available for this neuron.
 
     Cached properties (built on first access):
         core_channels: Tuple of four IonChannel objects (Na, K, NaL, KL) built
@@ -129,6 +139,11 @@ class Neuron:
     # Calcium dynamics — None by default for backward compatibility
     calcium_dynamics: CalciumDynamics | None = None
 
+    # Total membrane surface area in cm² — analysis-only metadata, not read
+    # by the ODE solver.  Used by the passive-property analysis layer to
+    # report absolute MΩ / pF instead of per-area density units.
+    area_cm2: float | None = None
+
     def __post_init__(self) -> None:
         """Validate parameter values on construction."""
         if self.g_Na < 0:
@@ -147,6 +162,8 @@ class Neuron:
             raise ValueError("Q10 must be positive.")
         if self.T_ref <= 0:
             raise ValueError("T_ref must be positive (in Kelvin).")
+        if self.area_cm2 is not None and self.area_cm2 <= 0:
+            raise ValueError("area_cm2 must be positive when provided.")
         for name, value in [
             ("Na_out", self.Na_out),
             ("Na_in", self.Na_in),

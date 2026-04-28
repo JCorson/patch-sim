@@ -105,13 +105,17 @@ class NeuronConfig:
             channels carry no Ca²⁺.  ``None`` (default) falls back to
             auto-detection: a default ``CalciumDynamics()`` is created whenever
             at least one channel carries Ca²⁺, and ``None`` is passed otherwise.
-        area_cm2: Total membrane surface area in cm².  Analysis-layer metadata
-            only — not consumed by :func:`make_neuron` or the ODE solver, since
-            single-compartment HH dynamics are scale-invariant in per-area
-            units.  When provided, the analysis layer (e.g.
-            :func:`~patch_sim.run_membrane_test`) reports passive properties in
-            absolute units (MΩ, pF) alongside the per-area values.  When
-            ``None`` (default) only per-area density values are reported.
+        area_cm2: Total membrane surface area in cm².  Forwarded onto the
+            built :class:`~patch_sim.Neuron` as a physical attribute.  Not
+            consumed by the ODE solver — single-compartment HH dynamics are
+            scale-invariant in the per-area units used elsewhere — but read
+            by the analysis layer (e.g. :func:`~patch_sim.run_membrane_test`)
+            to report passive properties in absolute units (MΩ, pF) alongside
+            the per-area values.  ``None`` (default) means only per-area
+            density values are reported.  cm² is the natural unit here for
+            consistency with mS/cm², µF/cm², µA/cm² used elsewhere in the
+            model; representative values fall in the ``1e-6`` to ``3e-4``
+            cm² range for typical mammalian neurons.
     """
 
     g_Na: float = DEFAULT_G_NA
@@ -240,4 +244,5 @@ def make_neuron(config: NeuronConfig) -> Neuron:
         k_leak_channel_factory=config.k_leak_channel_factory,
         additional_channels=built_channels,
         calcium_dynamics=calcium_dynamics,
+        area_cm2=config.area_cm2,
     )

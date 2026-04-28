@@ -435,3 +435,24 @@ def test_non_positive_t_ref_raises(T_ref: float) -> None:
     """Non-positive T_ref must raise ValueError."""
     with pytest.raises(ValueError, match="T_ref"):
         Neuron(T_ref=T_ref)
+
+
+def test_default_area_cm2_is_none() -> None:
+    """A default-constructed Neuron has ``area_cm2 is None``.
+
+    Surface area is optional analysis-layer metadata; the ODE solver does
+    not depend on it.
+    """
+    assert Neuron().area_cm2 is None
+
+
+def test_custom_area_cm2_is_preserved() -> None:
+    """A positive area_cm2 supplied at construction is preserved on the Neuron."""
+    assert Neuron(area_cm2=20e-6).area_cm2 == pytest.approx(20e-6)
+
+
+@pytest.mark.parametrize("area", [0.0, -1e-6])
+def test_non_positive_area_cm2_raises(area: float) -> None:
+    """Non-positive area_cm2 must raise ValueError when explicitly supplied."""
+    with pytest.raises(ValueError, match="area_cm2"):
+        Neuron(area_cm2=area)
