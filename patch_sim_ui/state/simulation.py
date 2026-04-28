@@ -270,6 +270,193 @@ def _compute_multi_sweep_ca_transient_data(
     return metrics, summary
 
 
+def _format_burst_dict(index: int, burst: "patch_sim.BurstMetrics") -> dict[str, Any]:
+    """Serialise a single :class:`~patch_sim.BurstMetrics` to a display dict.
+
+    Args:
+        index: Display index to assign.  May differ from ``burst.index`` when
+            multi-sweep results are pooled.
+        burst: The burst to serialise.
+
+    Returns:
+        A dict with pre-formatted string values for each metric column
+        (``index``, ``sweep_index``, ``start_time``, ``end_time``,
+        ``duration``, ``spike_count``, ``intra_burst_frequency``,
+        ``mean_intra_burst_isi``).  ``sweep_index`` is 0 for single-sweep
+        results; multi-sweep callers overwrite it with a 1-based sweep
+        number.
+    """
+    return {
+        "index": index,
+        "sweep_index": 0,
+        "start_time": f"{burst.start_time:.1f}",
+        "end_time": f"{burst.end_time:.1f}",
+        "duration": f"{burst.duration:.1f}",
+        "spike_count": str(burst.spike_count),
+        "intra_burst_frequency": _fmt_optional(burst.intra_burst_frequency, ".1f"),
+        "mean_intra_burst_isi": _fmt_optional(burst.mean_intra_burst_isi, ".2f"),
+    }
+
+
+def _serialise_burst_summary(
+    result: "patch_sim.BurstAnalysisResult",
+) -> dict[str, Any]:
+    """Serialise the aggregate part of a burst-analysis result.
+
+    Args:
+        result: The analysis result to summarise.
+
+    Returns:
+        A dict with pre-formatted string values for the metrics-panel
+        aggregate row.  Frequencies are in Hz, durations and intervals in ms,
+        and ``duty_cycle`` is reported as a fraction with 3 decimals.
+    """
+    return {
+        "burst_count": str(result.burst_count),
+        "unburst_spike_count": str(result.unburst_spike_count),
+        "mean_spikes_per_burst": _fmt_optional(result.mean_spikes_per_burst, ".2f"),
+        "mean_intra_burst_frequency": _fmt_optional(
+            result.mean_intra_burst_frequency, ".1f"
+        ),
+        "mean_inter_burst_interval": _fmt_optional(
+            result.mean_inter_burst_interval, ".1f"
+        ),
+        "duty_cycle": _fmt_optional(result.duty_cycle, ".3f"),
+        "isi_threshold_ms": f"{result.isi_threshold_ms:.1f}",
+        "threshold_method": result.threshold_method,
+    }
+
+
+def _compute_burst_data(
+    ap_result: "patch_sim.APAnalysisResult",
+    time_arr: np.ndarray,
+) -> "tuple[list[dict[str, Any]], dict[str, Any]]":
+    """Compute serialised burst-analysis from a single-sweep AP result.
+
+    Returns ``([], {})`` when the spike train is too short to support any
+    burst analysis (fewer than 2 spikes); otherwise always emits the
+    summary so the UI can surface the threshold and method even when zero
+    bursts were detected.
+
+    Args:
+        ap_result: AP analysis from :func:`patch_sim.analyze_aps_from_result`.
+        time_arr: The recording's time array (ms); used to compute the
+            window length for the duty cycle.
+
+    Returns:
+        A 2-tuple ``(metrics, summary)`` where ``metrics`` is a list of
+        per-burst display dicts (empty when no bursts were detected) and
+        ``summary`` is the aggregate summary dict.
+    """
+    if ap_result.spike_count < 2:
+        return [], {}
+
+    total_duration_ms = float(time_arr[-1] - time_arr[0]) if len(time_arr) > 1 else 0.0
+    analysis = patch_sim.analyze_bursts(ap_result, total_duration_ms=total_duration_ms)
+    metrics = [_format_burst_dict(i, b) for i, b in enumerate(analysis.bursts)]
+    summary = _serialise_burst_summary(analysis)
+    return metrics, summary
+
+
+def _compute_multi_sweep_burst_data(
+    sweeps: "list[Sweep]",
+) -> "tuple[list[dict[str, Any]], dict[str, Any]]":
+    """Pool burst analysis across the current-clamp sweeps of a multi-sweep run.
+
+    Each current-clamp sweep is analysed in isolation; the resulting bursts
+    are pooled with a 1-based ``sweep_index`` so the UI table can identify
+    the source sweep.  Aggregate metrics are computed across the whole pool:
+    ``duty_cycle`` is weighted by sweep duration, and the threshold /
+    method shown in the summary are taken from the first sweep that
+    produced bursts (or the first analysed sweep when none did).
+
+    Args:
+        sweeps: Ordered list of :class:`Sweep` objects.  Voltage-clamp
+            sweeps are ignored — burst analysis is meaningful only for
+            current-clamp recordings.
+
+    Returns:
+        A 2-tuple ``(metrics, summary)`` of pre-formatted display dicts.
+        Both are empty when no current-clamp sweep produced ≥2 spikes.
+    """
+    pooled: list[tuple[int, patch_sim.BurstMetrics]] = []
+    per_sweep_results: list[tuple[int, patch_sim.BurstAnalysisResult]] = []
+    total_window_ms = 0.0
+
+    for sweep_idx, sweep in enumerate(sweeps):
+        if sweep.clamp_mode != CURRENT_CLAMP:
+            continue
+        time_arr = np.array(sweep.time)
+        sweep_duration_ms = (
+            float(time_arr[-1] - time_arr[0]) if len(time_arr) > 1 else 0.0
+        )
+        # Every CC sweep contributes to the duty-cycle denominator, not just
+        # sweeps that fire enough spikes to run the burst analyser.  Otherwise
+        # a 10-sweep run where 2 fire would report a duty cycle as a fraction
+        # of those 2 sweeps' duration, overstating the active-burst time.
+        total_window_ms += sweep_duration_ms
+
+        voltage_arr = np.array(sweep.voltage)
+        ap_result = patch_sim.analyze_aps(time_arr, voltage_arr)
+        if ap_result.spike_count < 2:
+            continue
+        analysis = patch_sim.analyze_bursts(
+            ap_result, total_duration_ms=sweep_duration_ms
+        )
+        per_sweep_results.append((sweep_idx, analysis))
+        pooled.extend((sweep_idx, b) for b in analysis.bursts)
+
+    if not per_sweep_results:
+        return [], {}
+
+    metrics: list[dict[str, Any]] = []
+    for i, (sweep_idx, burst) in enumerate(pooled):
+        entry = _format_burst_dict(i, burst)
+        entry["sweep_index"] = sweep_idx + 1
+        metrics.append(entry)
+
+    burst_count = sum(r.burst_count for _, r in per_sweep_results)
+    unburst = sum(r.unburst_spike_count for _, r in per_sweep_results)
+    spike_counts = [b.spike_count for _, b in pooled]
+    mean_spikes = float(np.mean(spike_counts)) if spike_counts else None
+    freq_values = [
+        b.intra_burst_frequency
+        for _, b in pooled
+        if b.intra_burst_frequency is not None
+    ]
+    mean_freq = float(np.mean(freq_values)) if freq_values else None
+    ibi_values = [
+        r.mean_inter_burst_interval
+        for _, r in per_sweep_results
+        if r.mean_inter_burst_interval is not None
+    ]
+    mean_ibi = float(np.mean(ibi_values)) if ibi_values else None
+    total_burst_ms = sum(b.duration for _, b in pooled)
+    duty_cycle = (
+        float(total_burst_ms / total_window_ms) if total_window_ms > 0 else None
+    )
+
+    # Use the first burst-bearing sweep's threshold/method as the
+    # representative value; fall back to the first analysed sweep's when
+    # no sweep produced bursts.
+    representative = next(
+        (r for _, r in per_sweep_results if r.burst_count > 0),
+        per_sweep_results[0][1],
+    )
+
+    summary: dict[str, Any] = {
+        "burst_count": str(burst_count),
+        "unburst_spike_count": str(unburst),
+        "mean_spikes_per_burst": _fmt_optional(mean_spikes, ".2f"),
+        "mean_intra_burst_frequency": _fmt_optional(mean_freq, ".1f"),
+        "mean_inter_burst_interval": _fmt_optional(mean_ibi, ".1f"),
+        "duty_cycle": _fmt_optional(duty_cycle, ".3f"),
+        "isi_threshold_ms": f"{representative.isi_threshold_ms:.1f}",
+        "threshold_method": representative.threshold_method,
+    }
+    return metrics, summary
+
+
 def _serialise_sfa_curve(curve: "patch_sim.SFACurve") -> dict[str, Any]:
     """Serialise a single :class:`~patch_sim.SFACurve` to a plain dict.
 
@@ -595,6 +782,8 @@ class _SimResult:
     ap_is_multi_sweep: bool = False
     ca_transient_metrics: list[dict[str, Any]] = dataclasses.field(default_factory=list)
     ca_transient_summary: dict[str, Any] = dataclasses.field(default_factory=dict)
+    burst_metrics: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    burst_summary: dict[str, Any] = dataclasses.field(default_factory=dict)
     fi_data: dict[str, Any] = dataclasses.field(default_factory=dict)
     sfa_data: dict[str, Any] = dataclasses.field(default_factory=dict)
     hyperpolarization_data: dict[str, Any] = dataclasses.field(default_factory=dict)
@@ -722,6 +911,7 @@ def _compute_simulation(
         ms_ca_metrics, ms_ca_summary = _compute_multi_sweep_ca_transient_data(
             new_sweeps
         )
+        ms_burst_metrics, ms_burst_summary = _compute_multi_sweep_burst_data(new_sweeps)
         return _SimResult(
             sweeps=new_sweeps,
             sim_token=sim_token,
@@ -730,6 +920,8 @@ def _compute_simulation(
             ap_is_multi_sweep=True,
             ca_transient_metrics=ms_ca_metrics,
             ca_transient_summary=ms_ca_summary,
+            burst_metrics=ms_burst_metrics,
+            burst_summary=ms_burst_summary,
             fi_data=ms_fi,
             sfa_data=ms_sfa,
             hyperpolarization_data=ms_hyp,
@@ -755,6 +947,9 @@ def _compute_simulation(
         ap_result = patch_sim.analyze_aps_from_result(result)
         sfa_curve = patch_sim.compute_sfa(ap_result)
         ca_metrics, ca_summary = _compute_ca_transient_data(result)
+        burst_metrics, burst_summary = _compute_burst_data(
+            ap_result, np.asarray(result["time"])
+        )
         return _SimResult(
             sweeps=[sweep],
             sim_token=sim_token,
@@ -781,6 +976,8 @@ def _compute_simulation(
             },
             ca_transient_metrics=ca_metrics,
             ca_transient_summary=ca_summary,
+            burst_metrics=burst_metrics,
+            burst_summary=burst_summary,
             sfa_data=(
                 {"curves": [_serialise_sfa_curve(sfa_curve)]}
                 if sfa_curve is not None
@@ -1221,6 +1418,8 @@ class SimulationState(rx.State):
         analysis_st.ap_is_multi_sweep = result.ap_is_multi_sweep
         analysis_st.ca_transient_metrics = result.ca_transient_metrics
         analysis_st.ca_transient_summary = result.ca_transient_summary
+        analysis_st.burst_metrics = result.burst_metrics
+        analysis_st.burst_summary = result.burst_summary
         analysis_st.fi_data = result.fi_data
         analysis_st.sfa_data = result.sfa_data
         analysis_st.hyperpolarization_data = result.hyperpolarization_data
