@@ -6,6 +6,8 @@ and verifies the module-level protocol constants.
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 import patch_sim
@@ -99,14 +101,16 @@ def test_run_membrane_test_default_no_area_returns_density_only(
 
 
 def test_run_membrane_test_with_area_returns_absolute(hh_model: Neuron) -> None:
-    """Supplying area_cm2 produces absolute MΩ / pF outputs alongside density values.
+    """A neuron carrying ``area_cm2`` produces absolute MΩ / pF outputs.
 
     For the default HH model (g_NaL+g_KL = 0.3 mS/cm², C_m = 1.0 µF/cm²) and
     area = 10×10⁻⁶ cm²: R_n ≈ 1/0.3 / 10e-6 / 1000 ≈ 333 MΩ and
-    C ≈ 1.0 × 10e-6 × 1e6 ≈ 10 pF.
+    C ≈ 1.0 × 10e-6 × 1e6 ≈ 10 pF.  Surface area is read off the Neuron
+    itself rather than passed as a separate argument.
     """
     area = 10e-6
-    props = run_membrane_test(hh_model, area_cm2=area)
+    neuron_with_area = dataclasses.replace(hh_model, area_cm2=area)
+    props = run_membrane_test(neuron_with_area)
     assert props is not None
     assert props.area_cm2 == pytest.approx(area)
     assert props.input_resistance_mohm == pytest.approx(

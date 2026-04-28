@@ -54,10 +54,7 @@ MEMBRANE_TEST_STEP_MS: float = 250.0
 MEMBRANE_TEST_POST_MS: float = 10.0
 
 
-def run_membrane_test(
-    neuron: Neuron,
-    area_cm2: float | None = None,
-) -> PassiveProperties | None:
+def run_membrane_test(neuron: Neuron) -> PassiveProperties | None:
     """Run a dedicated membrane test on the given neuron and extract passive properties.
 
     Constructs a passive-only copy of the neuron (g_Na = g_K = 0, no auxiliary
@@ -70,13 +67,16 @@ def run_membrane_test(
     temperature from the original neuron so that R_in = 1/(g_NaL+g_KL) and
     C_m match the configured membrane parameters exactly.
 
+    When ``neuron.area_cm2`` is set, the returned :class:`PassiveProperties`
+    carries absolute MΩ / pF counterparts alongside the per-area density
+    values.  When it is ``None``, only density values are populated.
+
     Args:
         neuron: A fully configured :class:`~patch_sim.neuron.Neuron` instance.
             Its g_NaL, g_KL, C_m, ion concentrations, and temperature are used;
             active conductances (g_Na, g_K, auxiliary channels) are blocked.
-        area_cm2: Optional total membrane surface area in cm².  When supplied,
-            the returned :class:`PassiveProperties` carries absolute MΩ / pF
-            counterparts in addition to the per-area density values.
+            ``neuron.area_cm2``, if set, is forwarded to
+            :func:`analyze_passive_properties` to populate absolute units.
 
     Returns:
         A :class:`~patch_sim.analysis.passive_properties.PassiveProperties`
@@ -137,5 +137,5 @@ def run_membrane_test(
         stim_start_ms=MEMBRANE_TEST_PRE_MS,
         stim_end_ms=MEMBRANE_TEST_PRE_MS + MEMBRANE_TEST_STEP_MS,
         max_fit_window_ms=150.0,
-        area_cm2=area_cm2,
+        area_cm2=neuron.area_cm2,
     )

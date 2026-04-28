@@ -608,7 +608,7 @@ def test_preset_with_area_yields_finite_absolute_passive_properties(
     """
     config = NEURON_PRESETS[preset_name]
     neuron = make_neuron(config)
-    props = run_membrane_test(neuron, area_cm2=config.area_cm2)
+    props = run_membrane_test(neuron)
     assert props is not None
     assert props.input_resistance_mohm is not None
     assert props.membrane_capacitance_pf is not None
