@@ -448,8 +448,11 @@ def test_purkinje_has_nap_channel() -> None:
 def test_purkinje_has_nar_channel() -> None:
     """Purkinje preset includes an INaR (resurgent Na⁺) channel.
 
-    INaR enables the fast repriming and high-frequency burst firing that
-    characterises complex spikes in cerebellar Purkinje cells.
+    INaR enables the fast repriming and high-frequency repetitive firing
+    that characterises climbing-fibre-driven complex spikes in cerebellar
+    Purkinje cells.  Climbing-fibre input is not modelled in this
+    single-compartment preset; INaR contributes here only by shaping
+    intrinsic tonic spiking.
     Ref: Raman & Bean (1997), Neuron 19:881.
     """
     config = NEURON_PRESETS[PURKINJE]

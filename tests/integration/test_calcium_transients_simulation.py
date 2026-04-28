@@ -42,11 +42,11 @@ _MOCK_CALCIUM_CHANNEL = IonChannel(
 def test_purkinje_preset_produces_calcium_transients() -> None:
     """Purkinje preset under strong current injection produces ≥1 transient.
 
-    Purkinje is a spontaneous pacemaker with both ICaL and ICaT.  A
-    moderate depolarising step drives bursting and generates clear
-    calcium transients.  We do not pin the exact count (it depends on
-    integration details), only that the analysis recovers at least one
-    transient with a peak above baseline.
+    Purkinje is a tonic pacemaker with both ICaL and ICaT.  A moderate
+    depolarising step drives high-frequency tonic firing and generates
+    clear calcium transients.  We do not pin the exact count (it depends
+    on integration details), only that the analysis recovers at least
+    one transient with a peak above baseline.
     """
     neuron = make_neuron(NEURON_PRESETS[PURKINJE])
     assert neuron.calcium_dynamics is not None

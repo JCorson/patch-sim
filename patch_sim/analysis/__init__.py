@@ -4,6 +4,7 @@ Provides tools for extracting quantitative metrics from simulation results.
 
 Modules:
     ap_metrics: Action potential detection and metric extraction.
+    burst_metrics: Burst detection and burst-metric extraction.
     calcium_transients: Calcium transient detection and decay-τ fitting.
     derivatives: General-purpose derivative utilities (e.g. dV/dt).
     fi_curve: F-I curve construction from current clamp multi-sweep results.
@@ -19,6 +20,12 @@ from .ap_metrics import (
     SpikeMetrics,
     analyze_aps,
     analyze_aps_from_result,
+)
+from .burst_metrics import (
+    BurstAnalysisResult,
+    BurstMetrics,
+    analyze_bursts,
+    analyze_bursts_from_result,
 )
 from .calcium_transients import (
     CalciumTransient,
@@ -67,6 +74,8 @@ from .sfa import SFAAnalysisResult, SFACurve, analyze_sfa, compute_sfa
 __all__ = [
     "analyze_aps",
     "analyze_aps_from_result",
+    "analyze_bursts",
+    "analyze_bursts_from_result",
     "analyze_calcium_transients",
     "analyze_calcium_transients_from_result",
     "analyze_fi",
@@ -88,6 +97,8 @@ __all__ = [
     "run_membrane_test",
     "APAnalysisResult",
     "BoltzmannFit",
+    "BurstAnalysisResult",
+    "BurstMetrics",
     "CalciumTransient",
     "CalciumTransientAnalysisResult",
     "FIAnalysisResult",
