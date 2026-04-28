@@ -38,9 +38,12 @@ class AnalysisState(rx.State):
 
     # Membrane test results — persisted across protocol/simulation changes.
     # Only invalidated when neuron parameters change (neuron_fingerprint mismatch).
-    mt_input_resistance: str = ""  # R_in formatted as string (kΩ·cm²)
+    mt_input_resistance: str = ""  # R_in formatted as string (mode-aware)
     mt_time_constant: str = ""  # τ_m formatted as string (ms)
-    mt_membrane_capacitance: str = ""  # C_m formatted as string (µF/cm²)
+    mt_membrane_capacitance: str = ""  # C_m formatted as string (mode-aware)
+    mt_r_units: str = "kΩ·cm²"  # units suffix for mt_input_resistance
+    mt_c_units: str = "µF/cm²"  # units suffix for mt_membrane_capacitance
+    mt_units_mode: str = "density"  # "density" or "absolute"
     mt_neuron_fingerprint: str = ""  # fingerprint used to detect stale cache
     mt_fit_converged: bool = True  # False when exponential fit did not converge
 

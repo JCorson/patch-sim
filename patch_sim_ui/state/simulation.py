@@ -1778,24 +1778,49 @@ class SimulationState(rx.State):
                 )
                 return
             analysis_st = await self.get_state(AnalysisState)
+            em_dash = "—"
+            density_r_units = "kΩ·cm²"
+            density_c_units = "µF/cm²"
             if props is None:
-                analysis_st.mt_input_resistance = "\u2014"
-                analysis_st.mt_time_constant = "\u2014"
-                analysis_st.mt_membrane_capacitance = "\u2014"
+                analysis_st.mt_input_resistance = em_dash
+                analysis_st.mt_time_constant = em_dash
+                analysis_st.mt_membrane_capacitance = em_dash
+                analysis_st.mt_r_units = density_r_units
+                analysis_st.mt_c_units = density_c_units
+                analysis_st.mt_units_mode = "density"
                 analysis_st.mt_fit_converged = False
             else:
-                analysis_st.mt_input_resistance = f"{props.input_resistance:.2f}"
                 analysis_st.mt_time_constant = f"{props.time_constant:.2f}"
-                analysis_st.mt_membrane_capacitance = (
-                    f"{props.membrane_capacitance:.2f}"
-                    if props.membrane_capacitance is not None
-                    else "\u2014"
-                )
                 analysis_st.mt_fit_converged = props.fit_converged
+                if props.input_resistance_mohm is not None:
+                    analysis_st.mt_input_resistance = (
+                        f"{props.input_resistance_mohm:.2f}"
+                    )
+                    analysis_st.mt_r_units = "MΩ"
+                    analysis_st.mt_units_mode = "absolute"
+                else:
+                    analysis_st.mt_input_resistance = f"{props.input_resistance:.2f}"
+                    analysis_st.mt_r_units = density_r_units
+                    analysis_st.mt_units_mode = "density"
+                if props.membrane_capacitance_pf is not None:
+                    analysis_st.mt_membrane_capacitance = (
+                        f"{props.membrane_capacitance_pf:.2f}"
+                    )
+                    analysis_st.mt_c_units = "pF"
+                elif props.membrane_capacitance is not None:
+                    analysis_st.mt_membrane_capacitance = (
+                        f"{props.membrane_capacitance:.2f}"
+                    )
+                    analysis_st.mt_c_units = density_c_units
+                else:
+                    analysis_st.mt_membrane_capacitance = em_dash
+                    analysis_st.mt_c_units = density_c_units
             analysis_st.mt_neuron_fingerprint = fingerprint
             logger.info(
-                "run_membrane_test: R_in=%s kΩ·cm², τ_m=%s ms, C_m=%s µF/cm²",
+                "run_membrane_test: R_in=%s %s, τ_m=%s ms, C_m=%s %s",
                 analysis_st.mt_input_resistance,
+                analysis_st.mt_r_units,
                 analysis_st.mt_time_constant,
                 analysis_st.mt_membrane_capacitance,
+                analysis_st.mt_c_units,
             )

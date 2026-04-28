@@ -10,6 +10,8 @@ import pytest
 
 from patch_sim.analysis.passive_properties import (
     analyze_passive_properties,
+    density_to_absolute_c_m,
+    density_to_absolute_r_in,
     is_subthreshold,
 )
 
@@ -222,3 +224,119 @@ def test_hyperpolarising_step_gives_positive_rin() -> None:
     )
     assert props is not None
     assert props.input_resistance > 0.0
+
+
+# ---------------------------------------------------------------------------
+# density_to_absolute conversion helpers
+# ---------------------------------------------------------------------------
+
+
+def test_density_to_absolute_r_in_basic() -> None:
+    """R_n [MΩ] = R_in [kΩ·cm²] / area [cm²] / 1000."""
+    # R_in 20 kΩ·cm² ÷ 20×10⁻⁶ cm² ÷ 1000 = 1000 MΩ
+    assert density_to_absolute_r_in(20.0, 20e-6) == pytest.approx(1000.0)
+
+
+def test_density_to_absolute_r_in_none_area_returns_none() -> None:
+    """``area_cm2=None`` returns ``None`` from density_to_absolute_r_in."""
+    assert density_to_absolute_r_in(20.0, None) is None
+
+
+@pytest.mark.parametrize("area", [0.0, -1e-6])
+def test_density_to_absolute_r_in_non_positive_area_returns_none(
+    area: float,
+) -> None:
+    """Zero or negative area returns ``None`` instead of inf / a negative value."""
+    assert density_to_absolute_r_in(20.0, area) is None
+
+
+def test_density_to_absolute_c_m_basic() -> None:
+    """C [pF] = C_m [µF/cm²] × area [cm²] × 1e6."""
+    # 1.0 µF/cm² × 20×10⁻⁶ cm² × 1e6 = 20 pF
+    assert density_to_absolute_c_m(1.0, 20e-6) == pytest.approx(20.0)
+
+
+def test_density_to_absolute_c_m_none_returns_none() -> None:
+    """``c_m_uf_cm2=None`` returns ``None``."""
+    assert density_to_absolute_c_m(None, 20e-6) is None
+
+
+def test_density_to_absolute_c_m_none_area_returns_none() -> None:
+    """``area_cm2=None`` returns ``None``."""
+    assert density_to_absolute_c_m(1.0, None) is None
+
+
+# ---------------------------------------------------------------------------
+# analyze_passive_properties with area_cm2
+# ---------------------------------------------------------------------------
+
+
+def test_analyze_passive_properties_without_area_leaves_absolute_none() -> None:
+    """Without area_cm2, absolute fields stay None and density fields populate."""
+    time, voltage = _synthetic_step_trace(-65.0, -75.0, tau_ms=10.0)
+    props = analyze_passive_properties(
+        time,
+        voltage,
+        current_amplitude=-2.0,
+        stim_start_ms=_PRE_MS,
+        stim_end_ms=_PRE_MS + _STIM_MS,
+    )
+    assert props is not None
+    assert props.input_resistance_mohm is None
+    assert props.membrane_capacitance_pf is None
+    assert props.area_cm2 is None
+    assert props.input_resistance == pytest.approx(5.0, rel=0.05)
+
+
+def test_analyze_passive_properties_with_area_populates_absolute() -> None:
+    """Supplying area_cm2 produces matching absolute MΩ / pF outputs."""
+    area = 20e-6
+    true_tau = 8.0
+    time, voltage = _synthetic_step_trace(-65.0, -75.0, tau_ms=true_tau)
+    props = analyze_passive_properties(
+        time,
+        voltage,
+        current_amplitude=-2.0,
+        stim_start_ms=_PRE_MS,
+        stim_end_ms=_PRE_MS + _STIM_MS,
+        area_cm2=area,
+    )
+    assert props is not None
+    assert props.area_cm2 == pytest.approx(area)
+    assert props.input_resistance_mohm == pytest.approx(
+        props.input_resistance / area / 1000.0
+    )
+    assert props.membrane_capacitance is not None
+    assert props.membrane_capacitance_pf == pytest.approx(
+        props.membrane_capacitance * area * 1e6
+    )
+    # τ_m = R_n × C identity: in absolute units τ_m [ms] = R_n [MΩ] × C [pF] / 1000
+    assert props.input_resistance_mohm is not None
+    assert props.membrane_capacitance_pf is not None
+    tau_from_absolute = (
+        props.input_resistance_mohm * props.membrane_capacitance_pf / 1000.0
+    )
+    assert tau_from_absolute == pytest.approx(props.time_constant, rel=1e-9)
+
+
+def test_analyze_passive_properties_tau_invariant_to_area() -> None:
+    """τ_m is identical whether or not area_cm2 is supplied."""
+    time, voltage = _synthetic_step_trace(-65.0, -75.0, tau_ms=8.0)
+    props_density = analyze_passive_properties(
+        time,
+        voltage,
+        current_amplitude=-2.0,
+        stim_start_ms=_PRE_MS,
+        stim_end_ms=_PRE_MS + _STIM_MS,
+    )
+    props_absolute = analyze_passive_properties(
+        time,
+        voltage,
+        current_amplitude=-2.0,
+        stim_start_ms=_PRE_MS,
+        stim_end_ms=_PRE_MS + _STIM_MS,
+        area_cm2=15e-6,
+    )
+    assert props_density is not None
+    assert props_absolute is not None
+    assert props_density.time_constant == props_absolute.time_constant

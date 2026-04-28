@@ -42,20 +42,84 @@ _TAU_INITIAL_GUESS_MS: float = 5.0
 class PassiveProperties:
     """Passive membrane properties extracted from a subthreshold current clamp step.
 
+    The per-area density values (``input_resistance``, ``membrane_capacitance``)
+    are always populated.  When ``area_cm2`` is supplied to
+    :func:`analyze_passive_properties`, the absolute counterparts
+    (``input_resistance_mohm``, ``membrane_capacitance_pf``) are filled in too.
+    ``time_constant`` is the same numeric value in both modes — τₘ = R · C is
+    invariant to the per-area / absolute conversion.
+
     Attributes:
         input_resistance: Input resistance in kΩ·cm² (R_in = ΔV / ΔI where
             ΔV is in mV and ΔI is in µA/cm²).
         time_constant: Membrane time constant in ms from exponential fit.
+            Numerically identical regardless of whether area is supplied.
         membrane_capacitance: Derived C_m = τ_m / R_in in µF/cm², or ``None``
             when R_in is zero.
         fit_converged: ``True`` when the exponential fit converged successfully;
             ``False`` when a fallback 63.2%-crossing estimate was used instead.
+        input_resistance_mohm: Absolute input resistance in MΩ when
+            ``area_cm2`` is supplied; ``None`` otherwise.
+        membrane_capacitance_pf: Absolute membrane capacitance in pF when
+            ``area_cm2`` is supplied and the per-area capacitance is finite;
+            ``None`` otherwise.
+        area_cm2: Membrane surface area in cm² used to compute the absolute
+            values.  ``None`` when only density values were requested.
     """
 
     input_resistance: float
     time_constant: float
     membrane_capacitance: float | None
     fit_converged: bool
+    input_resistance_mohm: float | None = None
+    membrane_capacitance_pf: float | None = None
+    area_cm2: float | None = None
+
+
+def density_to_absolute_r_in(
+    input_resistance_kohm_cm2: float,
+    area_cm2: float | None,
+) -> float | None:
+    """Convert per-area input resistance (kΩ·cm²) to absolute MΩ.
+
+    Derivation: ``R_in [kΩ·cm²] / area [cm²] = R_n [kΩ] = R_n [MΩ] × 1000``,
+    so ``R_n [MΩ] = R_in / area / 1000``.
+
+    Args:
+        input_resistance_kohm_cm2: Per-area input resistance in kΩ·cm².
+        area_cm2: Total membrane surface area in cm².  ``None`` or
+            non-positive returns ``None``.
+
+    Returns:
+        Absolute input resistance in MΩ, or ``None`` when ``area_cm2`` is
+        ``None`` or not strictly positive.
+    """
+    if area_cm2 is None or area_cm2 <= 0:
+        return None
+    return input_resistance_kohm_cm2 / area_cm2 / 1000.0
+
+
+def density_to_absolute_c_m(
+    c_m_uf_cm2: float | None,
+    area_cm2: float | None,
+) -> float | None:
+    """Convert per-area membrane capacitance (µF/cm²) to absolute pF.
+
+    Derivation: ``C [pF] = C_m [µF/cm²] × area [cm²] × 1e6``.
+
+    Args:
+        c_m_uf_cm2: Per-area membrane capacitance in µF/cm².  ``None`` returns
+            ``None``.
+        area_cm2: Total membrane surface area in cm².  ``None`` or
+            non-positive returns ``None``.
+
+    Returns:
+        Absolute capacitance in pF, or ``None`` when either input is ``None``
+        or ``area_cm2`` is not strictly positive.
+    """
+    if c_m_uf_cm2 is None or area_cm2 is None or area_cm2 <= 0:
+        return None
+    return c_m_uf_cm2 * area_cm2 * 1e6
 
 
 def is_subthreshold(
@@ -153,6 +217,7 @@ def analyze_passive_properties(
     stim_start_ms: float,
     stim_end_ms: float,
     max_fit_window_ms: float = _MAX_FIT_WINDOW_MS,
+    area_cm2: float | None = None,
 ) -> PassiveProperties | None:
     """Extract input resistance and membrane time constant from a CC step response.
 
@@ -186,6 +251,10 @@ def analyze_passive_properties(
             Defaults to :data:`_MAX_FIT_WINDOW_MS` (25 ms).  Pass a larger
             value (e.g. 150 ms) when the trace comes from a passive-only
             simulation where slow gating-variable relaxations are absent.
+        area_cm2: Optional membrane surface area in cm².  When supplied, the
+            returned :class:`PassiveProperties` carries absolute MΩ / pF
+            counterparts in addition to the density values.  When ``None``
+            (default), only density values are populated.
 
     Returns:
         A :class:`PassiveProperties` instance, or ``None`` when analysis is
@@ -257,9 +326,15 @@ def analyze_passive_properties(
     # --- Membrane capacitance ---
     c_m: float | None = tau_m / r_in if r_in != 0.0 else None
 
+    r_in_mohm = density_to_absolute_r_in(r_in, area_cm2)
+    c_m_pf = density_to_absolute_c_m(c_m, area_cm2)
+
     return PassiveProperties(
         input_resistance=r_in,
         time_constant=tau_m,
         membrane_capacitance=c_m,
         fit_converged=fit_converged,
+        input_resistance_mohm=r_in_mohm,
+        membrane_capacitance_pf=c_m_pf,
+        area_cm2=area_cm2,
     )
