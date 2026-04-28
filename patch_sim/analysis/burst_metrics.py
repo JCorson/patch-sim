@@ -185,9 +185,14 @@ def _estimate_isi_threshold(isis: list[float]) -> tuple[float, str]:
 
     hist, edges = np.histogram(log_isi, bins=_HISTOGRAM_BINS)
 
-    # Find local maxima: bins strictly greater than both neighbours and
-    # populated above _MIN_PEAK_COUNT.  The latter rejects single-observation
-    # bumps that arise in narrow unimodal distributions.
+    # Find local maxima: bins strictly greater than the left neighbour and
+    # at least as great as the right, populated above _MIN_PEAK_COUNT.  The
+    # asymmetric ``> left`` / ``>= right`` tie-breaker is intentional: on a
+    # plateau (e.g. ``[2, 3, 3, 2]``) it registers a single peak at the
+    # plateau's left edge instead of two adjacent peaks, which would later
+    # be filtered out by ``_MIN_PEAK_SEPARATION_BINS`` anyway.  The
+    # _MIN_PEAK_COUNT floor rejects single-observation bumps that arise in
+    # narrow unimodal distributions.
     n_bins = len(hist)
     peaks: list[int] = []
     for i in range(n_bins):
@@ -468,7 +473,10 @@ def analyze_bursts_from_result(
     """Extract burst metrics from a :class:`SimulationResult`.
 
     Convenience wrapper that runs :func:`analyze_aps_from_result` to obtain
-    the spike list and then forwards to :func:`analyze_bursts`.
+    the spike list and then forwards to :func:`analyze_bursts`.  Callers
+    that have already run :func:`~patch_sim.analyze_aps` (or
+    :func:`~patch_sim.analyze_aps_from_result`) on the same trace should
+    prefer :func:`analyze_bursts` directly to avoid re-detecting spikes.
 
     Args:
         result: A structured NumPy array returned by

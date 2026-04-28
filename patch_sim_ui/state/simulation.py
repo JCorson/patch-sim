@@ -365,15 +365,25 @@ def _compute_multi_sweep_burst_data(
 
     Each current-clamp sweep is analysed in isolation; the resulting bursts
     are pooled with a 1-based ``sweep_index`` so the UI table can identify
-    the source sweep.  Aggregate metrics are computed across the whole pool:
-    ``duty_cycle`` is weighted by sweep duration, and the threshold /
-    method shown in the summary are taken from the first sweep that
-    produced bursts (or the first analysed sweep when none did).
+    the source sweep.  Aggregate metrics are computed by pooling across all
+    bursts (intra-burst frequency, spikes/burst) or all per-sweep IBIs
+    (inter-burst interval), so each metric is a true mean over its
+    underlying observations rather than a mean of per-sweep means.
+    ``duty_cycle`` is total burst time divided by total CC-sweep duration.
+
+    The ``isi_threshold_ms`` shown in the summary is the median across
+    analysed sweeps; the ``threshold_method`` is a single label when every
+    sweep agreed (``"auto-histogram"`` / ``"default-fixed"``) or
+    ``"mixed: <a> N/M, <b> K/M"`` when sweeps used different methods.
+
+    Sweeps are assumed to be in chronological order in the input list; the
+    pooled per-burst table preserves that order so the UI shows bursts in
+    the same sequence the user produced them.
 
     Args:
-        sweeps: Ordered list of :class:`Sweep` objects.  Voltage-clamp
-            sweeps are ignored — burst analysis is meaningful only for
-            current-clamp recordings.
+        sweeps: Chronologically ordered list of :class:`Sweep` objects.
+            Voltage-clamp sweeps are ignored — burst analysis is meaningful
+            only for current-clamp recordings.
 
     Returns:
         A 2-tuple ``(metrics, summary)`` of pre-formatted display dicts.
@@ -425,24 +435,34 @@ def _compute_multi_sweep_burst_data(
         if b.intra_burst_frequency is not None
     ]
     mean_freq = float(np.mean(freq_values)) if freq_values else None
-    ibi_values = [
-        r.mean_inter_burst_interval
-        for _, r in per_sweep_results
-        if r.mean_inter_burst_interval is not None
-    ]
-    mean_ibi = float(np.mean(ibi_values)) if ibi_values else None
+    # Pool individual IBIs across all sweeps rather than averaging per-sweep
+    # means.  IBIs aren't defined across sweep boundaries (the gap between
+    # sweep N's last burst and sweep N+1's first isn't physiological), so
+    # they're computed within each sweep and then concatenated.
+    pooled_ibis: list[float] = []
+    for _, r in per_sweep_results:
+        for k in range(len(r.bursts) - 1):
+            pooled_ibis.append(r.bursts[k + 1].start_time - r.bursts[k].end_time)
+    mean_ibi = float(np.mean(pooled_ibis)) if pooled_ibis else None
     total_burst_ms = sum(b.duration for _, b in pooled)
     duty_cycle = (
         float(total_burst_ms / total_window_ms) if total_window_ms > 0 else None
     )
 
-    # Use the first burst-bearing sweep's threshold/method as the
-    # representative value; fall back to the first analysed sweep's when
-    # no sweep produced bursts.
-    representative = next(
-        (r for _, r in per_sweep_results if r.burst_count > 0),
-        per_sweep_results[0][1],
-    )
+    # Median threshold across analysed sweeps; method is a single label when
+    # every sweep agreed, otherwise a "mixed: ..." breakdown.  This avoids
+    # silently masking auto/fixed disagreement that would happen if we just
+    # picked one sweep's threshold as representative.
+    thresholds = [r.isi_threshold_ms for _, r in per_sweep_results]
+    methods = [r.threshold_method for _, r in per_sweep_results]
+    median_threshold = float(np.median(thresholds))
+    unique_methods = sorted(set(methods))
+    if len(unique_methods) == 1:
+        method_label = unique_methods[0]
+    else:
+        method_label = "mixed: " + ", ".join(
+            f"{m} {methods.count(m)}/{len(methods)}" for m in unique_methods
+        )
 
     summary: dict[str, Any] = {
         "burst_count": str(burst_count),
@@ -451,8 +471,8 @@ def _compute_multi_sweep_burst_data(
         "mean_intra_burst_frequency": _fmt_optional(mean_freq, ".1f"),
         "mean_inter_burst_interval": _fmt_optional(mean_ibi, ".1f"),
         "duty_cycle": _fmt_optional(duty_cycle, ".3f"),
-        "isi_threshold_ms": f"{representative.isi_threshold_ms:.1f}",
-        "threshold_method": representative.threshold_method,
+        "isi_threshold_ms": f"{median_threshold:.1f}",
+        "threshold_method": method_label,
     }
     return metrics, summary
 
