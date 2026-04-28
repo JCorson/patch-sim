@@ -32,7 +32,7 @@ Patch clamp experiment simulator with a core library (`patch_sim/`) and a Reflex
 
 ## Architecture
 
-- `patch_sim/` — pure Python library, **no Reflex dependency**. All simulation logic lives here.
+- `patch_sim/` — pure Python library, **no Reflex dependency**. All simulation logic lives here. Notable subpackages: `patch_sim/analysis/` (post-hoc metrics: AP metrics, F-I, G-V, I-V, passive properties, burst metrics, etc.) and `patch_sim/protocols/` (current/voltage protocol builders).
 - `patch_sim_ui/` — Reflex application. State is split across `patch_sim_ui/state/` (neuron, protocol, simulation, analysis, visibility, log); components are Python functions returning `rx.Component`.
 
 Keep these layers cleanly separated: do not import Reflex types into `patch_sim/`, and do not import `patch_sim_ui` modules from `patch_sim/`.
@@ -40,6 +40,15 @@ Keep these layers cleanly separated: do not import Reflex types into `patch_sim/
 ## UI framework
 
 The UI uses **Reflex** (v0.8+), a Python framework that compiles to Next.js.
+
+Install UI dependencies and run the dev server:
+
+```bash
+uv sync --frozen --group=ui
+uv run reflex run
+```
+
+The app serves on `http://localhost:3000`.
 
 ## Package manager
 
@@ -53,13 +62,16 @@ Every function and method — public, private, and dunder — must have a Google
 
 ## Testing conventions
 
-Tests are split into three buckets under `tests/`:
+Tests are split into four buckets under `tests/`:
 
 - `tests/unit/` — fast, pure-function tests; no simulation runs. Run alone during development: `uv run --frozen -m pytest tests/unit`
 - `tests/integration/` — end-to-end protocol → simulation pipeline tests. Simulation-calling tests extracted from mixed files are named `*_simulation.py`.
 - `tests/ui/` — Reflex and plotting layer tests; skipped when `reflex` is not installed.
+- `tests/e2e/` — headless full-pipeline tests that drive Reflex state handlers directly (no dev server, no browser). **Not in default `testpaths`** — run explicitly with `uv run --frozen -m pytest tests/e2e`.
 
-The shared `hh_model` fixture lives in `tests/conftest.py` and is discoverable by all three subdirectories.
+The shared `hh_model` fixture lives in `tests/conftest.py` and is discoverable by all four subdirectories. `tests/e2e/conftest.py` adds e2e-specific fixtures.
+
+Pytest is configured with `-n auto --dist=loadscope` (parallel via xdist, tests in the same module pinned to the same worker).
 
 Additional conventions:
 - Use plain functions, not test classes
