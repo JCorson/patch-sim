@@ -10,6 +10,7 @@ import numpy as np
 
 import patch_sim
 from patch_sim.analysis.burst_metrics import (
+    _TIGHT_CLUSTER_MAX_ISIS,
     analyze_bursts,
     analyze_bursts_from_result,
 )
@@ -82,6 +83,9 @@ def test_classic_hh_tonic_firing_reports_zero_bursts(
     assert analysis.threshold_method == "default-fixed"
     assert analysis.burst_count == 0
     assert analysis.bursts == []
+    assert analysis.unburst_spike_count == ap_result.spike_count
+    assert analysis.mean_inter_burst_interval is None
+    assert analysis.duty_cycle is None
 
 
 def test_classic_hh_short_stimulus_tonic_does_not_trip_tight_cluster(
@@ -92,10 +96,13 @@ def test_classic_hh_short_stimulus_tonic_does_not_trip_tight_cluster(
     Regression guard for the tight-cluster carve-out: a brief depolarising
     step that produces only a handful of tonic spikes must still report
     zero bursts.  HH at +10 µA/cm² fires at ~210 Hz in this simulator, so
-    a short stimulus quickly accumulates enough ISIs to exceed the
+    a 50 ms step accumulates enough ISIs to exceed the
     ``_TIGHT_CLUSTER_MAX_ISIS`` cap; this test pins that protection at the
     integration level so a future loosening of the cap can't silently
-    re-introduce the false-positive.
+    re-introduce the false-positive.  Note that HH's per-spike ISI here
+    (~4.8 ms) sits well below ``_TIGHT_CLUSTER_MAX_ISI_MS``, so the count
+    cap — not the ISI cap — is what disqualifies the train; the spike
+    count assertion below makes that protection load-bearing.
 
     Args:
         hh_model: Classic Hodgkin-Huxley neuron fixture.
@@ -112,13 +119,14 @@ def test_classic_hh_short_stimulus_tonic_does_not_trip_tight_cluster(
     ap_result = patch_sim.analyze_aps_from_result(result)
     analysis = analyze_bursts(ap_result, total_duration_ms=total_duration_ms)
 
-    assert ap_result.spike_count >= 5, (
-        "Short HH stimulus should still produce several tonic spikes; "
-        f"got spike_count={ap_result.spike_count}"
+    assert len(ap_result.isis) > _TIGHT_CLUSTER_MAX_ISIS, (
+        "Short HH stimulus must produce more ISIs than the tight-cluster "
+        "count cap, otherwise the carve-out's count protection isn't "
+        "actually exercised; "
+        f"got len(isis)={len(ap_result.isis)}, cap={_TIGHT_CLUSTER_MAX_ISIS}"
     )
     assert analysis.threshold_method == "default-fixed"
     assert analysis.burst_count == 0
-    assert analysis.unburst_spike_count == ap_result.spike_count
     assert analysis.unburst_spike_count == ap_result.spike_count
     assert analysis.mean_inter_burst_interval is None
     assert analysis.duty_cycle is None

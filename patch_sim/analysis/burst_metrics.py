@@ -419,18 +419,20 @@ def analyze_bursts(
             ``None``, the function attempts a histogram-based auto-detect.
             If auto-detect cannot find a bimodal split it returns method
             ``"default-fixed"``.  In the default-fixed case the analyser
-            disambiguates two ISI shapes that the histogram cannot:
-            a tight cluster (every ISI <25 ms with ≤10 ISIs total, or a
-            single-spike trace) falls through to grouping with the 100 ms
-            default — every ISI is below it so the cluster groups into
-            one burst; any other default-fixed outcome (a tonic train
-            with ISIs spread across the tonic range, or a sustained
-            high-frequency train of >10 ISIs) short-circuits to zero
-            bursts and surfaces every spike via ``unburst_spike_count``,
-            so a tonic train is not fabricated into one giant burst.
-            Callers who want to force grouping (including the
-            ``min_spikes_per_burst=1`` "every spike is a burst" mode)
-            should pin ``isi_threshold_ms`` explicitly.
+            disambiguates two ISI shapes that the histogram cannot: a
+            tight cluster (every ISI below
+            :data:`_TIGHT_CLUSTER_MAX_ISI_MS` with at most
+            :data:`_TIGHT_CLUSTER_MAX_ISIS` ISIs total, or a single-spike
+            trace) falls through to grouping with the 100 ms default —
+            every ISI is below it so the cluster groups into one burst;
+            any other default-fixed outcome (a tonic train with ISIs
+            spread across the tonic range, or a sustained high-frequency
+            train with more than :data:`_TIGHT_CLUSTER_MAX_ISIS` ISIs)
+            short-circuits to zero bursts and surfaces every spike via
+            ``unburst_spike_count``, so a tonic train is not fabricated
+            into one giant burst.  Callers who want to force grouping
+            (including the ``min_spikes_per_burst=1`` "every spike is a
+            burst" mode) should pin ``isi_threshold_ms`` explicitly.
         min_spikes_per_burst: Minimum spike count for a group to count as a
             burst.  Defaults to 2; isolated spikes are tracked via
             :attr:`BurstAnalysisResult.unburst_spike_count`.
@@ -452,12 +454,13 @@ def analyze_bursts(
         # tonic firing (many ISIs spread across the tonic range) and a
         # tight cluster (a real LTS-style burst whose ISIs all sit well
         # below the 100 ms default).  Disambiguate by ISI shape: a
-        # single-spike trace, or a short cluster (≤10 ISIs) where every
-        # ISI is below 25 ms (40 Hz), is unambiguously a tight burst —
-        # fall through to the grouper with the 100 ms default (every ISI
-        # is below it, so the cluster groups into one burst).  Anything
-        # else short-circuits to zero bursts (issue #290 — protect
-        # against fabricating a giant burst from a tonic train).
+        # single-spike trace, or a short cluster (at most
+        # ``_TIGHT_CLUSTER_MAX_ISIS`` ISIs) where every ISI is below
+        # ``_TIGHT_CLUSTER_MAX_ISI_MS``, is unambiguously a tight burst
+        # — fall through to the grouper with the 100 ms default (every
+        # ISI is below it, so the cluster groups into one burst).
+        # Anything else short-circuits to zero bursts (issue #290 —
+        # protect against fabricating a giant burst from a tonic train).
         isis = list(ap_result.isis)
         tight_cluster = not isis or (
             max(isis) < _TIGHT_CLUSTER_MAX_ISI_MS
