@@ -15,6 +15,7 @@ from patch_sim.additional_channels import (
     make_ikca_channel,
     make_inap_channel,
     make_inar_channel,
+    make_trn_icat_channel,
 )
 from patch_sim.analysis.membrane_test import run_membrane_test
 from patch_sim.constants import (
@@ -354,8 +355,12 @@ def test_trn_icat_ft_inf_at_vrest_enables_burst_firing() -> None:
     and burst character on depolarising steps that define TRN firing.
     Previously (K_out=7.8 mM, E_K ≈ −77 mV) v_rest settled at −66 mV where
     ft_inf ≈ 0.17 — too inactivated for reliable burst firing.
+
+    The TRN preset uses :func:`make_trn_icat_channel` (issue #295), whose
+    ``ft_inf`` is bit-identical to the Destexhe (1994) default — the
+    sigmoid-tau modification touches only ``tau_ft``.
     """
-    channel = make_icat_channel()
+    channel = make_trn_icat_channel()
     ft_var = next(gv for gv in channel.gating_variables if gv.name == "ft")
     v_rest = NEURON_PRESETS[TRN].v_rest
     alpha = ft_var.alpha(v_rest, 0.0)
@@ -408,11 +413,9 @@ def test_trn_includes_ikca_channel() -> None:
     (Biol. Cybern. 99:427) Table 2 RE column.
 
     This test asserts only that an IKCa channel is wired into the TRN preset
-    with a positive g_max; it does NOT assert the full HP92 rebound-burst
-    phenotype (5–15 spike, 200–600 Hz LTS-driven Na⁺/K⁺ AP burst).  The full
-    rebound-burst phenotype requires sigmoid-shaped ICaT inactivation tau
-    (slow at depolarised V, fast at hyperpolarised V) that is not yet
-    implemented; tracked as follow-up work.
+    with a positive g_max; the full HP92 rebound-burst phenotype (5–15
+    spike, 200–600 Hz) is verified separately in
+    ``test_trn_step_release_produces_hp92_rebound_burst``.
     """
     config = NEURON_PRESETS[TRN]
     ikca_configs = [c for c in config.channels if c.factory is make_ikca_channel]
@@ -421,6 +424,28 @@ def test_trn_includes_ikca_channel() -> None:
     )
     assert ikca_configs[0].g_max > 0.0, (
         f"TRN IKCa g_max must be positive, got {ikca_configs[0].g_max}"
+    )
+
+
+def test_trn_uses_trn_icat_factory() -> None:
+    """TRN preset must wire :func:`make_trn_icat_channel` (sigmoid tau, issue #295).
+
+    The default :func:`make_icat_channel` cosh-shaped tau collapses the LTS
+    plateau in 5–10 ms, which is too fast to fit the 5–15 Na⁺ spikes of the
+    HP92 rebound burst.  The TRN factory replaces only the inactivation
+    time constant with a sigmoid shape; ft_inf is bit-identical.
+    """
+    config = NEURON_PRESETS[TRN]
+    icat_configs = [c for c in config.channels if c.factory is make_trn_icat_channel]
+    assert len(icat_configs) == 1, (
+        f"TRN preset must wire exactly one make_trn_icat_channel; "
+        f"found {len(icat_configs)}"
+    )
+    assert icat_configs[0].g_max > 0.0
+    legacy_icat_configs = [c for c in config.channels if c.factory is make_icat_channel]
+    assert len(legacy_icat_configs) == 0, (
+        "TRN preset must not also wire the default make_icat_channel — the "
+        "sigmoid-tau factory is the sole ICaT source for TRN."
     )
 
 

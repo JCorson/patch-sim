@@ -22,6 +22,7 @@ from .additional_channels import (
     make_inap_channel,
     make_inar_channel,
     make_thalamic_relay_icat_channel,
+    make_trn_icat_channel,
 )
 from .calcium import CalciumDynamics
 from .constants import (
@@ -513,22 +514,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # At v_rest = −80 mV, ICaT's inactivation gate ft_inf = 0.50 —
         # well de-inactivated for post-inhibitory rebound bursting.
         #
-        # KNOWN LIMITATION (tracked in issue #295, follow-up to #286): the
-        # published TRN burst phenotype is a 5–15 spike, 200–600 Hz Na⁺/K⁺ AP
-        # burst riding on the LTS plateau, terminated by IKCa-driven AHP.
-        # Reproducing the full spike count requires ICaT inactivation kinetics
-        # with a larger time constant at depolarised voltages (~100–250 ms at
-        # the LTS plateau) than the cosh-shaped Destexhe (1994) defaults
-        # provide; the cosh tau peaks at the half-inactivation voltage
-        # (−80 mV → 20 ms) and falls off at depolarised V (≈4 ms at −40 mV,
-        # floored at 2 ms by −20 mV), so the LTS plateau decays in ~5–10 ms —
-        # too fast to fit 5+ Na⁺ spikes.  Resolving this requires a TRN-
-        # specific ICaT factory with a sigmoid-shaped tau (small at
-        # hyperpolarised V for stable rest, large at depolarised V for
-        # sustained LTS plateau) — see issue #295.  This preset's IKCa
-        # addition delivers the AHP-shaping mechanism HP92 identify for
-        # tonic-mode firing and is a prerequisite for the burst-mode work;
-        # the full rebound-burst phenotype is deferred.
+        # ICaT factory: ``make_trn_icat_channel`` (issue #295) replaces the
+        # default cosh-shaped Destexhe (1994) tau with a sigmoid-shaped
+        # inactivation tau — small (20 ms) at hyperpolarised V (preserves
+        # rest stability) and large (200 ms) at LTS-plateau V (sustains the
+        # plateau long enough for the 5–15 Na⁺ spike, 200–600 Hz HP92
+        # rebound burst).  ``ft_inf(V)`` is unchanged from Destexhe (1994),
+        # so the ft_inf = 0.50 at v_rest = −80 mV invariant is preserved.
         v_rest=-80.0,
         g_NaL=0.0066,
         g_KL=0.0634,
@@ -536,7 +528,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         na_channel_factory=make_trn_na_channel,
         k_channel_factory=make_trn_k_channel,
         channels=(
-            ChannelConfig(make_icat_channel, g_max=2.3),
+            ChannelConfig(make_trn_icat_channel, g_max=2.3),
             ChannelConfig(make_ikca_channel, g_max=0.3),
         ),
         # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
