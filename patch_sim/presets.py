@@ -446,16 +446,22 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # Channel set: ICaT + IKCa over the HP92/Pospischil RE Na⁺/K⁺ core.
         # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804 (TRN
-        #       low-threshold-spike biophysics, IKCa burst termination);
+        #       low-threshold-spike biophysics, IKCa identified as the burst-
+        #       terminating K⁺ current);
         #       Destexhe et al. (1994), J. Neurophysiol. 72:803 (ICaT kinetics);
         #       Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (RE)
-        #       (g_Na, g_K, g_T, leak values).
+        #       (Pospischil's RE column gives g_Na, g_Kd, leak from which the
+        #       Na⁺/K⁺ kinetics here are derived; g_T is identified as the
+        #       LTS-driving conductance; the published value g_T = 2.3 mS/cm²
+        #       is *not* used in this preset — see KNOWN LIMITATION below).
         #
-        # IKCa (g_KCa = 1.0 mS/cm², HP92): calcium-activated K⁺ current — the
-        # mechanism by which Ca²⁺ entry through ICaT is converted into outward
-        # K⁺ current to repolarise the cell.  IKCa shapes inter-spike intervals
-        # during sustained tonic firing (depolarising-step protocols) by
-        # producing a Ca²⁺-driven AHP after each spike, and contributes to
+        # IKCa (calcium-activated K⁺ — the mechanism HP92 identify for AHP
+        # generation following ICaT-mediated Ca²⁺ entry; this code applies the
+        # patch_sim default g_KCa = 1.0 mS/cm², which is in the same order of
+        # magnitude as HP92's published TRN value of ~0.3 mS/cm².  Final
+        # g_KCa retune is deferred to the burst-phenotype follow-up work since
+        # it must be co-calibrated with the new ICaT kinetics).
+        # IKCa shapes the AHP after Ca²⁺-loaded spikes and contributes to
         # burst termination during the LTS plateau.
         #
         # Huguenard & Prince (1992) / Pospischil (2008) Traub-Miles Na⁺/K⁺
@@ -486,22 +492,25 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # At v_rest = −80 mV, ICaT's inactivation gate ft_inf = 0.50 —
         # well de-inactivated for post-inhibitory rebound bursting.
         #
-        # KNOWN LIMITATION (issue #286 follow-up): the published TRN burst
-        # phenotype is a 5–15 spike, 200–600 Hz Na⁺/K⁺ AP burst riding on the
-        # LTS plateau, terminated by IKCa-driven AHP.  Reproducing the full
-        # spike count requires ICaT inactivation kinetics with a larger time
-        # constant at depolarised voltages (~100–250 ms at the LTS plateau)
-        # than the cosh-shaped Destexhe (1994) defaults provide; the cosh
-        # tau peaks at the half-inactivation voltage (−80 mV) and falls off at
-        # depolarised V, so the LTS plateau decays in ~10 ms — too fast to fit
-        # 5+ Na⁺ spikes.  Increasing g_T to compensate makes the ICaT window
-        # at −80 mV destabilise rest (autonomous bursting) before the LTS
-        # plateau lengthens enough.  Resolving this requires a TRN-specific
-        # ICaT factory with a sigmoid-shaped tau (small at hyperpolarised V,
-        # large at depolarised V) — tracked separately.  This preset's IKCa
-        # addition delivers the AHP/inter-spike-interval shaping required by
-        # HP92's Fig. 2 tonic mode and is a prerequisite for the burst-mode
-        # work; the full rebound-burst phenotype is deferred.
+        # KNOWN LIMITATION (tracked in issue #295, follow-up to #286): the
+        # published TRN burst phenotype is a 5–15 spike, 200–600 Hz Na⁺/K⁺ AP
+        # burst riding on the LTS plateau, terminated by IKCa-driven AHP.
+        # Reproducing the full spike count requires ICaT inactivation kinetics
+        # with a larger time constant at depolarised voltages (~100–250 ms at
+        # the LTS plateau) than the cosh-shaped Destexhe (1994) defaults
+        # provide; the cosh tau peaks at the half-inactivation voltage
+        # (−80 mV → 20 ms) and falls off at depolarised V (≈4 ms at −40 mV,
+        # floored at 2 ms by −20 mV), so the LTS plateau decays in ~5–10 ms —
+        # too fast to fit 5+ Na⁺ spikes.  Increasing g_T to compensate (e.g.
+        # toward Pospischil's published 2.3 mS/cm² or higher) makes the ICaT
+        # window at −80 mV destabilise rest (autonomous bursting) before the
+        # LTS plateau lengthens enough.  Resolving this requires a TRN-specific
+        # ICaT factory with a sigmoid-shaped tau (small at hyperpolarised V
+        # for stable rest, large at depolarised V for sustained LTS plateau)
+        # — see issue #295.  This preset's IKCa addition delivers the
+        # AHP-shaping mechanism HP92 identify for tonic-mode firing and is a
+        # prerequisite for the burst-mode work; the full rebound-burst
+        # phenotype is deferred.
         v_rest=-80.0,
         g_NaL=0.0062,
         g_KL=0.0638,
