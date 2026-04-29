@@ -141,10 +141,12 @@ def test_single_burst_no_inter_burst_interval() -> None:
     """A clean cluster with all ISIs below threshold yields one burst with no IBI."""
     peak_times = [10.0, 15.0, 20.0, 25.0, 30.0]  # 5 spikes, 5 ms ISIs
     ap = _make_ap_result(peak_times)
-    # Uniform ISIs are unimodal, so the auto threshold falls back to
-    # ``default-fixed`` and the analyser short-circuits to zero bursts.
-    # Pin a user threshold to exercise the grouping path this test cares
-    # about.
+    # Pin a user threshold to exercise the explicit grouping path this
+    # test cares about.  Without a pin this input would still group into
+    # one burst via the default-fixed tight-cluster carve-out (covered by
+    # ``test_uniform_short_isis_group_as_one_burst_via_default_fixed``);
+    # pinning here keeps the test focused on threshold-based grouping
+    # rather than the carve-out semantics.
     result = analyze_bursts(ap, total_duration_ms=500.0, isi_threshold_ms=50.0)
     assert result.burst_count == 1
     burst = result.bursts[0]
@@ -205,14 +207,17 @@ def test_duty_cycle_computation() -> None:
 
 
 def test_identical_isis_fall_back_to_default_threshold() -> None:
-    """An ISI distribution with zero spread should fall back to the default."""
+    """Identical ISIs fall back to the default and group as one tight cluster."""
     # All ISIs identical at 5 ms → log10 spread is 0; the np.ptp early
-    # exit must engage and the analyser must fall back to 100 ms.
-    peak_times = list(np.cumsum([10.0, *([5.0] * 8)]))
+    # exit must engage and the analyser must fall back to 100 ms.  Every
+    # ISI is below the tight-cluster maximum and there are ≤7 of them,
+    # so the carve-out groups them into a single burst.
+    peak_times = list(np.cumsum([10.0, *([5.0] * 6)]))
     ap = _make_ap_result(peak_times)
     result = analyze_bursts(ap, total_duration_ms=200.0)
     assert result.threshold_method == "default-fixed"
     assert result.isi_threshold_ms == pytest.approx(_DEFAULT_THRESHOLD_MS)
+    assert result.burst_count == 1
 
 
 def test_exactly_min_isis_for_histogram_attempts_auto() -> None:
@@ -228,12 +233,16 @@ def test_exactly_min_isis_for_histogram_attempts_auto() -> None:
 
 
 def test_default_threshold_used_when_few_isis() -> None:
-    """Fewer than 4 ISIs should fall back to the fixed default threshold."""
-    peak_times = [10.0, 20.0, 30.0]  # 2 ISIs only
+    """Fewer than 4 ISIs fall back to the fixed default and group as one cluster."""
+    # 2 ISIs of 10 ms each — too few for the histogram, but a clean tight
+    # cluster, so the carve-out groups them into a single burst with the
+    # 100 ms default threshold.
+    peak_times = [10.0, 20.0, 30.0]
     ap = _make_ap_result(peak_times)
     result = analyze_bursts(ap, total_duration_ms=200.0)
     assert result.isi_threshold_ms == pytest.approx(_DEFAULT_THRESHOLD_MS)
     assert result.threshold_method == "default-fixed"
+    assert result.burst_count == 1
 
 
 def test_auto_histogram_threshold_detects_bimodal_distribution() -> None:
@@ -249,7 +258,13 @@ def test_auto_histogram_threshold_detects_bimodal_distribution() -> None:
 
 
 def test_unimodal_isis_fall_back_to_default() -> None:
-    """A unimodal ISI distribution should fall back to the fixed default."""
+    """A unimodal tonic-rate ISI distribution short-circuits to zero bursts.
+
+    Regression guard for issue #290 — a tonic train with ISIs around 50 ms
+    must not be regrouped as a single tight cluster.  ``max(isis)`` is well
+    above the 25 ms tight-cluster maximum so the carve-out is bypassed and
+    the analyser short-circuits to zero bursts.
+    """
     rng = np.random.default_rng(seed=0)
     isis = list(50.0 + rng.normal(0.0, 1.0, size=12))  # tightly clustered around 50
     peak_times = list(np.cumsum([10.0, *isis]))
@@ -257,25 +272,93 @@ def test_unimodal_isis_fall_back_to_default() -> None:
     result = analyze_bursts(ap, total_duration_ms=2000.0)
     assert result.threshold_method == "default-fixed"
     assert result.isi_threshold_ms == pytest.approx(_DEFAULT_THRESHOLD_MS)
+    assert result.burst_count == 0
+    assert result.unburst_spike_count == ap.spike_count
 
 
-def test_default_fixed_method_short_circuits_to_zero_bursts() -> None:
-    """``default-fixed`` without a user threshold must report zero bursts.
+def test_uniform_short_isis_group_as_one_burst_via_default_fixed() -> None:
+    """A short uniform tight cluster groups into one burst on the default-fixed path.
 
-    A ``default-fixed`` outcome is the analyser signalling "I cannot detect
-    bursts here".  Propagating that as zero bursts (with every spike
-    surfaced via ``unburst_spike_count``) is more informative than
-    fabricating a single contiguous "burst" with no inter-burst interval.
+    A ``default-fixed`` outcome alone is not enough to declare "no burst
+    here" — it conflates tonic firing (ISIs spread across the tonic range)
+    with a real LTS-style tight cluster (every ISI well below the
+    tight-cluster ISI maximum).  For a short cluster (≤7 ISIs) where every
+    ISI is below the tight-cluster threshold, the analyser falls through
+    to grouping with the 100 ms default and produces one burst.  Tonic
+    protection is exercised by ``test_unimodal_isis_fall_back_to_default``
+    and the integration tests.
     """
     peak_times = [10.0, 15.0, 20.0, 25.0, 30.0]  # uniform 5 ms ISIs → unimodal
     ap = _make_ap_result(peak_times)
     result = analyze_bursts(ap, total_duration_ms=500.0)
     assert result.threshold_method == "default-fixed"
+    assert result.isi_threshold_ms == pytest.approx(_DEFAULT_THRESHOLD_MS)
+    assert result.burst_count == 1
+    assert result.bursts[0].spike_count == 5
+    assert result.unburst_spike_count == 0
+
+
+def test_few_spike_tight_lts_burst_no_user_threshold() -> None:
+    """An LTS-style cluster (4 spikes, 3 ms ISIs) groups into one burst without a pin.
+
+    Regression for issue #287 follow-up: a TC LTS rebound burst has 3–7
+    spikes at 200–500 Hz, giving 2–6 ISIs of 3–5 ms.  The histogram path
+    cannot run (too few ISIs and unimodal), so auto-detect falls to
+    ``default-fixed``; the tight-cluster carve-out must still group the
+    spikes into one burst, otherwise the UI silently drops the rebound
+    burst.
+    """
+    peak_times = [10.0, 13.0, 16.0, 19.0]  # 3 ISIs of 3 ms (≈333 Hz)
+    ap = _make_ap_result(peak_times)
+    result = analyze_bursts(ap, total_duration_ms=500.0)
+    assert result.burst_count == 1
+    assert result.bursts[0].spike_count == 4
+    assert result.bursts[0].intra_burst_frequency == pytest.approx(1000.0 / 3.0)
+    assert result.unburst_spike_count == 0
+
+
+def test_three_spike_tight_burst_no_user_threshold() -> None:
+    """A 3-spike tight cluster (2 short ISIs) groups as one burst without a pin."""
+    peak_times = [100.0, 105.0, 110.0]  # 2 ISIs of 5 ms
+    ap = _make_ap_result(peak_times)
+    result = analyze_bursts(ap, total_duration_ms=500.0)
+    assert result.burst_count == 1
+    assert result.bursts[0].spike_count == 3
+    assert result.unburst_spike_count == 0
+
+
+def test_tight_cluster_isi_count_cap_protects_tonic() -> None:
+    """A long sustained high-frequency train must not be grouped as one mega-burst.
+
+    Regression guard for issue #290: even when every ISI is under the
+    tight-cluster maximum, more than seven consecutive short ISIs is
+    sustained tonic firing, not a single burst.
+    """
+    # 9 spikes at uniform 5 ms ISIs → 8 ISIs > tight-cluster cap of 7.
+    peak_times = [float(10.0 + 5.0 * i) for i in range(9)]
+    ap = _make_ap_result(peak_times)
+    result = analyze_bursts(ap, total_duration_ms=500.0)
+    assert result.threshold_method == "default-fixed"
     assert result.burst_count == 0
-    assert result.bursts == []
-    assert result.unburst_spike_count == ap.spike_count
-    assert result.mean_inter_burst_interval is None
-    assert result.duty_cycle is None
+    assert result.unburst_spike_count == 9
+
+
+def test_just_above_tight_cluster_max_isi_does_not_fall_through() -> None:
+    """A unimodal cluster with ISIs just above the tight-cluster max stays unburst.
+
+    Regression guard against the textbook tonic-firing band: HH at
+    +10 µA/cm² and Purkinje at depolarising step both fire at ~50–60 Hz
+    in the literature (ISIs 17–20 ms; Raman & Bean 1999), well above the
+    12 ms tight-cluster maximum.  A short snippet of textbook-rate tonic
+    firing must therefore still short-circuit to zero bursts even when it
+    happens to fit under the count cap.
+    """
+    peak_times = [float(10.0 + 17.0 * i) for i in range(6)]  # 5 ISIs of 17 ms (~59 Hz)
+    ap = _make_ap_result(peak_times)
+    result = analyze_bursts(ap, total_duration_ms=500.0)
+    assert result.threshold_method == "default-fixed"
+    assert result.burst_count == 0
+    assert result.unburst_spike_count == 6
 
 
 def test_user_supplied_threshold_overrides_auto() -> None:
