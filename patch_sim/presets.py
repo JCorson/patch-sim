@@ -467,7 +467,9 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #   g_T   = 3.0 mS/cm² (within HP92 voltage-clamp recorded range;
         #                       tuned for the 5–15 spike LTS rebound burst)
         #   g_KCa = 0.3 mS/cm² (Huguenard & Prince 1992, TRN)
-        #   g_h   = 0.020 mS/cm² (Bal & McCormick 1993, cat TRN)
+        #   g_h   = 0.020 mS/cm² (slightly below the ≈0.025 reported by
+        #                          Bal & McCormick 1993 for cat TRN; tuned to
+        #                          set tonic firing rate to ~3 Hz)
         #
         # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804 (TRN
         #       low-threshold-spike biophysics; IKCa identified as the burst-

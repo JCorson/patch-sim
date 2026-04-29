@@ -813,6 +813,11 @@ def make_thalamic_relay_icat_channel(
 # preserved.
 _TRN_FT_HALF: float = -80.0  # Half-inactivation voltage for ft in mV
 _TRN_FT_SLOPE: float = -9.0  # Inactivation slope for ft in mV (Destexhe 1994)
+# tau_ft sigmoid parameters.  TAU_MIN matches the Destexhe (1994) cosh-tau
+# value at v_rest, preserving rest dynamics.  TAU_MAX is set so the LTS
+# plateau (V > −56 mV after ICaT activation) can sustain 5+ Na⁺/K⁺ AP cycles
+# (200–600 Hz).  V_HALF and TAU_SLOPE position a smooth transition between
+# the rest and plateau regimes around the ICaT activation knee.
 _TRN_FT_TAU_MIN: float = 20.0  # ft tau at hyperpolarised V in ms
 _TRN_FT_TAU_MAX: float = 200.0  # ft tau at LTS-plateau V in ms
 _TRN_FT_TAU_VHALF: float = -50.0  # Sigmoid midpoint for tau_ft in mV

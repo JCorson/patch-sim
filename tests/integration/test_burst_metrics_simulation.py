@@ -197,9 +197,11 @@ def test_trn_step_release_produces_hp92_rebound_burst() -> None:
     on rebound at all.
 
     The TRN preset is spontaneously active (~3 Hz tonic) so this test
-    pre-hyperpolarises the cell with a brief baseline before the test step
-    and accepts a non-zero ``unburst_spike_count`` from the post-burst
-    return to tonic firing.
+    accepts a non-zero ``unburst_spike_count`` from the pre-step tonic
+    firing and the post-burst return to tonic firing.  The tonic ISIs
+    (~330 ms) are well above the 50 ms threshold so they do not register
+    as additional bursts; ``burst_count == 1`` is asserted for defence in
+    depth.
     """
     neuron = make_neuron(NEURON_PRESETS[TRN])
     pre = 200.0
@@ -207,15 +209,17 @@ def test_trn_step_release_produces_hp92_rebound_burst() -> None:
     post = 200.0
     protocol = step_current(
         duration=pre + stim + post,
-        current_amplitude=-3.0,
+        current_amplitude=-4.0,
         step_start=pre,
         step_duration=stim,
     )
     result = simulate_current_clamp(neuron, protocol)
     analysis = analyze_bursts_from_result(result, isi_threshold_ms=50.0)
-    assert analysis.burst_count >= 1, (
-        f"Expected at least one LTS burst on rebound, "
-        f"got burst_count={analysis.burst_count}"
+    assert analysis.burst_count == 1, (
+        f"Expected exactly one LTS rebound burst, got burst_count="
+        f"{analysis.burst_count} — additional bursts may indicate the "
+        f"pre-step tonic firing has tightened into a cluster, or the "
+        f"rebound has fragmented."
     )
     burst = analysis.bursts[0]
     assert 5 <= burst.spike_count <= 15, (
