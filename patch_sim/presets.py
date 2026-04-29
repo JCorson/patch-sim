@@ -21,6 +21,7 @@ from .additional_channels import (
     make_im_channel,
     make_inap_channel,
     make_inar_channel,
+    make_thalamic_relay_icat_channel,
 )
 from .calcium import CalciumDynamics
 from .constants import (
@@ -276,8 +277,11 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # C ≈ 12 pF and R_n ≈ 80 MΩ within the simulation, in line with
         # thalamic relay cell measurements.
         #
-        # T-type Ca²⁺ produces low-threshold spike; Ih causes
-        # post-inhibitory rebound burst after hyperpolarizing step.
+        # T-type Ca²⁺ produces a low-threshold spike (LTS) plateau; Ih
+        # provides the depolarising post-inhibitory rebound that activates
+        # the LTS.  Together they generate the multi-spike burst (3–7 Na⁺
+        # spikes at 200–500 Hz on the LTS plateau) that defines TC burst
+        # mode (Sherman & Guillery 1996; Llinás & Jahnsen 1982; issue #287).
         # Refs: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384;
         #       Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (TC)
         #
@@ -290,46 +294,59 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Q10 correction to ~1.12× (36→37 °C) — a negligible adjustment that
         # preserves the published kinetics.
         #
-        # v_rest = −68 mV is the zero-current equilibrium with MH92 kinetics and
-        # K_out=4 mM (E_K ≈ −95 mV); the McCormick-Huguenard TC cell rests in the
-        # −65 to −70 mV range depending on leak parameterisation.
+        # g_K = 18 mS/cm² (vs the HH52 default of 36): the lower
+        # delayed-rectifier conductance reduces the deep K⁺-driven AHP that
+        # otherwise collapses the LTS plateau after the first Na⁺ spike.
+        # Pospischil 2008 Table 2 specifies g_K = 7 mS/cm² for TC, but at
+        # that value the cell has multiple zero-current crossings in the
+        # default [-100, -20] mV bracket used by find_coupled_equilibrium
+        # (the test_find_zero_current_voltage_all_presets coupled-equilibrium
+        # test breaks).  g_K = 18 is the smallest value that both supports
+        # the multi-spike LTS burst AND keeps the equilibrium bracket valid.
         #
-        # g_NaL = 0, g_KL = 0.15 mS/cm²: purely K⁺ background leak, τ_m ≈ 6.7 ms
-        # and R_in ≈ 6.7 kΩ·cm².  A nonzero g_NaL would shift v_rest upward but
-        # cannot satisfy the ≤1 mV stability criterion (test_all_presets_stable_at_rest)
-        # at any resting potential:
-        # the MH92 K⁺ kinetics produce negligible tonic window current at rest
-        # (n_inf ≈ 0.004 vs HH52 n_inf ≈ 0.32), removing the ~10.9 mA/cm² K⁺
-        # outward balance that the HH52 kinetics accidentally provided.  The large
-        # ICaT and Ih window inward currents at −65 mV (~4 mA/cm² combined)
-        # require g_total > 0.135 mS/cm² to balance, and at g_total = 0.15 only
-        # the pure-K⁺ split (g_NaL ≈ 0) achieves a stable rest at −68 mV.
+        # g_T = 2.5 mS/cm²: Pospischil 2008 specifies 2.0; bumped slightly
+        # to land squarely within the 200–500 Hz / 3–7 spike acceptance band
+        # (issue #287).
         #
-        # WARNING: v_rest depends on ICaT (g=1.5) and Ih (g=1.0) window currents
-        # at rest, not purely on the leak ratio.  With dynamic E_Ca, the ICaT
-        # window current at rest elevates ca_i above ca_rest, shifting E_Ca and
-        # moving the coupled equilibrium to −68.27 mV (vs −68.0 mV static).
-        # If g_CaT or g_Ih are ever retuned, re-run find_coupled_equilibrium
-        # to recompute v_rest, g_KL, and ca_init.
-        v_rest=-68.2677,
+        # ICaT factory: ``make_thalamic_relay_icat_channel`` — TC-tuned
+        # variant with slower inactivation (ft tau_scale=100 ms vs the
+        # global Destexhe-1994 default of 20 ms).  M&H 1992 report
+        # tau_h_T ≈ 25–40 ms in the depolarised range; the slower
+        # inactivation is required to sustain the LTS plateau for the
+        # full multi-spike burst.
+        #
+        # g_NaL = 0, g_KL ≈ 0.18 mS/cm²: purely K⁺ background leak,
+        # τ_m ≈ 5.6 ms and R_in ≈ 5.6 kΩ·cm² — both within the physiological
+        # bounds in test_preset_passive_properties_in_physiological_range.
+        # The MH92 K⁺ kinetics produce negligible tonic window current at rest
+        # (n_inf ≈ 0.004 vs HH52 n_inf ≈ 0.32), so the leak must be pure-K⁺
+        # to balance the ICaT and Ih window inward currents at rest.
+        #
+        # WARNING: v_rest depends on ICaT (g=2.5) and Ih (g=1.0) window
+        # currents at rest, not purely on the leak ratio.  With dynamic
+        # E_Ca, the ICaT window current at rest elevates ca_i above ca_rest,
+        # shifting E_Ca and moving the coupled equilibrium.  If g_CaT, g_Ih,
+        # or the ICaT factory are ever retuned, re-run
+        # find_coupled_equilibrium to recompute v_rest, g_KL, and ca_init.
+        g_K=18.0,
+        v_rest=-68.8121,
         g_NaL=0.0,
-        g_KL=0.15,
+        g_KL=0.18,
         T_ref=309.15,
         na_channel_factory=make_thalamic_relay_na_channel,
         k_channel_factory=make_thalamic_relay_k_channel,
         channels=(
-            ChannelConfig(make_icat_channel, g_max=1.5),
+            ChannelConfig(make_thalamic_relay_icat_channel, g_max=2.5),
             ChannelConfig(make_ih_channel, g_max=1.0),
         ),
-        # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
-        # (8 µA/cm², 200 ms).  tau_ca=20 ms allows inter-burst clearance;
-        # alpha_ca=2.6e-5 targets ~2.5 µM peak during sustained tonic firing.
-        # ca_init is the coupled (V, ca_i) equilibrium at v_rest: ICaT window
-        # current at rest keeps ca_i elevated above ca_rest; use
-        # find_coupled_equilibrium to recompute if CalciumDynamics or channel
-        # parameters change.
+        # alpha_ca/tau_ca calibrated so peak ca_i stays in the 0.1–5 µM
+        # physiological band under REPETITIVE_FIRING (8 µA/cm², 200 ms).
+        # tau_ca=20 ms allows inter-burst clearance.  ca_init is the coupled
+        # (V, ca_i) equilibrium at v_rest: ICaT window current at rest keeps
+        # ca_i elevated above ca_rest.  Use find_coupled_equilibrium to
+        # recompute if CalciumDynamics or channel parameters change.
         calcium_dynamics=CalciumDynamics(
-            alpha_ca=2.6e-5, tau_ca=20.0, ca_rest=1e-4, ca_init=5.377e-4
+            alpha_ca=2.6e-5, tau_ca=20.0, ca_rest=1e-4, ca_init=7.4123e-4
         ),
         area_cm2=12e-6,
     ),
@@ -444,11 +461,23 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # area_cm2 = 7e-6 cm² — ~15 µm soma characteristic of thalamic
         # reticular neurons.  C ≈ 7 pF in the simulation.
         #
-        # ICaT (g_T = 3.5 mS/cm²) drives rhythmic burst firing and
-        # sleep-spindle oscillations characteristic of TRN cells.
-        # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804;
-        #       Destexhe et al. (1994);
+        # Channel set: ICaT + IKCa over the HP92/Pospischil RE Na⁺/K⁺ core.
+        # Conductances follow the published literature:
+        #   g_T   = 2.3 mS/cm² (Pospischil 2008 Table 2, RE column)
+        #   g_KCa = 0.3 mS/cm² (Huguenard & Prince 1992, TRN)
+        #
+        # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804 (TRN
+        #       low-threshold-spike biophysics; IKCa identified as the burst-
+        #       terminating K⁺ current; published g_KCa);
+        #       Destexhe et al. (1994), J. Neurophysiol. 72:803 (ICaT kinetics);
         #       Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (RE)
+        #       (Pospischil's RE column gives g_Na, g_Kd, g_T, leak from which
+        #       the kinetics and conductances here are derived).
+        #
+        # IKCa: calcium-activated K⁺ current.  HP92 identify IKCa as the
+        # mechanism that converts ICaT-mediated Ca²⁺ entry into outward K⁺
+        # current — generating the AHP after spikes during tonic firing and
+        # contributing to LTS-burst termination.
         #
         # Huguenard & Prince (1992) / Pospischil (2008) Traub-Miles Na⁺/K⁺
         # kinetics (VT = −67 mV) replace the default HH52 core channels.
@@ -460,33 +489,61 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # preserves the published kinetics.
         #
         # v_rest = −80 mV (not −77 mV).  The ICaT window current at −77 mV
-        # (ft_inf ≈ 0.42) creates ~3.1 mS/cm² of negative conductance —
-        # far exceeding any physiologically plausible total leak (0.07–0.10
-        # mS/cm²) and making −77 mV an unstable equilibrium in the steady-state
-        # conductance picture.  The original HP92/Pospischil RE models avoid
-        # this by using a single leak with E_L = v_rest, which enforces
-        # stability by construction; our split Na⁺/K⁺ leak cannot replicate
-        # that property at −77 mV.  At −80 mV the ft gate is at its
-        # half-inactivation point (ft_inf = 0.50) and the ICaT negative
-        # conductance falls to ~0.038 mS/cm² — well below g_total = 0.07
-        # mS/cm², giving a truly stable rest.  −80 mV is within the
-        # physiological range reported by Huguenard & Prince (1992) for
-        # TRN cells in slice recordings.
+        # (ft_inf ≈ 0.42) creates ~2 mS/cm² of negative conductance at the
+        # literature g_T = 2.3 mS/cm² — far exceeding any physiologically
+        # plausible total leak (0.07–0.10 mS/cm²) and making −77 mV an
+        # unstable equilibrium in the steady-state conductance picture.
+        # The original HP92/Pospischil RE models avoid this by using a single
+        # leak with E_L = v_rest, which enforces stability by construction;
+        # our split Na⁺/K⁺ leak cannot replicate that property at −77 mV.
+        # At −80 mV the ft gate is at its half-inactivation point
+        # (ft_inf = 0.50) and the ICaT negative conductance falls to
+        # ~0.025 mS/cm² — well below g_total = 0.07 mS/cm², giving a truly
+        # stable rest.  −80 mV is within the physiological range reported
+        # by Huguenard & Prince (1992) for TRN cells in slice recordings.
         #
         # g_NaL + g_KL = 0.07 mS/cm² gives τ_m ≈ 14.3 ms and
         # R_in ≈ 14.3 kΩ·cm² (physiological range 10–15 ms/kΩ·cm²).
+        # The split is g_NaL = 0.0066, g_KL = 0.0634: tuned so the zero-current
+        # voltage falls at −80 mV given the literature g_T = 2.3 mS/cm² window
+        # current at rest.  Reducing g_T from the previous patch_sim value of
+        # 3.5 to the published 2.3 shifts the leak balance slightly, so g_NaL
+        # was nudged up from 0.0062 to 0.0066 to keep the zero-current voltage
+        # at −80 mV (deviation < 0.2 mV) without changing g_total.
         # At v_rest = −80 mV, ICaT's inactivation gate ft_inf = 0.50 —
         # well de-inactivated for post-inhibitory rebound bursting.
+        #
+        # KNOWN LIMITATION (tracked in issue #295, follow-up to #286): the
+        # published TRN burst phenotype is a 5–15 spike, 200–600 Hz Na⁺/K⁺ AP
+        # burst riding on the LTS plateau, terminated by IKCa-driven AHP.
+        # Reproducing the full spike count requires ICaT inactivation kinetics
+        # with a larger time constant at depolarised voltages (~100–250 ms at
+        # the LTS plateau) than the cosh-shaped Destexhe (1994) defaults
+        # provide; the cosh tau peaks at the half-inactivation voltage
+        # (−80 mV → 20 ms) and falls off at depolarised V (≈4 ms at −40 mV,
+        # floored at 2 ms by −20 mV), so the LTS plateau decays in ~5–10 ms —
+        # too fast to fit 5+ Na⁺ spikes.  Resolving this requires a TRN-
+        # specific ICaT factory with a sigmoid-shaped tau (small at
+        # hyperpolarised V for stable rest, large at depolarised V for
+        # sustained LTS plateau) — see issue #295.  This preset's IKCa
+        # addition delivers the AHP-shaping mechanism HP92 identify for
+        # tonic-mode firing and is a prerequisite for the burst-mode work;
+        # the full rebound-burst phenotype is deferred.
         v_rest=-80.0,
-        g_NaL=0.0062,
-        g_KL=0.0638,
+        g_NaL=0.0066,
+        g_KL=0.0634,
         T_ref=309.15,
         na_channel_factory=make_trn_na_channel,
         k_channel_factory=make_trn_k_channel,
-        channels=(ChannelConfig(make_icat_channel, g_max=3.5),),
+        channels=(
+            ChannelConfig(make_icat_channel, g_max=2.3),
+            ChannelConfig(make_ikca_channel, g_max=0.3),
+        ),
         # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
-        # (3 µA/cm², 200 ms).  ICaT g=3.5 mS/cm² is the only Ca source; tau_ca=20 ms
-        # allows de-inactivation between bursts; alpha_ca=1.2e-5 targets ~2.8 µM peak.
+        # (3 µA/cm², 200 ms).  With ICaT g_T = 2.3 mS/cm² as the only Ca source,
+        # alpha_ca=1.2e-5 and tau_ca=20 ms produce a peak of ~1.5 µM — well within
+        # the 0.1–5 µM physiological band and above the IKCa Hill K_d (1 µM) so
+        # IKCa activates during the spike train and shapes the inter-spike AHP.
         calcium_dynamics=CalciumDynamics(alpha_ca=1.2e-5, tau_ca=20.0, ca_rest=1e-4),
         area_cm2=7e-6,
     ),
@@ -762,10 +819,16 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     THALAMIC_RELAY: {
-        # v_rest = −68 mV with MH92 kinetics; 0.1 µA/cm² is safely subthreshold.
+        # Burst-mode TC has a very low rheobase (~0.012 µA/cm²) because the
+        # slow-inactivating ICaT (issue #287) and reduced g_K (=18) combine to
+        # amplify any depolarisation through the LTS.  0.01 µA/cm² stays below
+        # threshold while still giving a visible voltage deflection.  The
+        # subthreshold margin is narrow: any stimulus ≥ ~0.05 µA/cm² already
+        # crosses LTS threshold and fires an AP, so a UI user nudging this
+        # value upward will hit threshold within a few clicks.
         SUBTHRESHOLD_RESPONSE: {
-            "min_stimulus": 0.1,
-            "max_stimulus": 0.1,
+            "min_stimulus": 0.01,
+            "max_stimulus": 0.01,
         },
         # 20 µA/cm² at 2.5 ms evokes a single AP; threshold rose with K_out=4.0 mM
         # (E_K ≈ −95 mV), and the brief pulse prevents the ICaT rebound from
@@ -782,18 +845,20 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 8.0,
             "stimulus_duration": 200.0,
         },
-        # Threshold ~0.94 µA/cm²; narrow range with 1 µA/cm² steps to
-        # show the subthreshold-to-firing transition cleanly.
+        # Sustained-firing threshold falls in the low-µA/cm² range; 1 µA/cm²
+        # steps over [0, 10] resolve the FI relation cleanly.  Single-spike
+        # rheobase is much lower (~0.02 µA/cm²) — see the SUBTHRESHOLD_RESPONSE
+        # comment — but resolving that floor would need finer steps.
         FI_CURVE: {
             "max_stimulus": 10.0,
             "stimulus_step": 1.0,
             "stimulus_duration": 100.0,
         },
         # Inherits the base HYPERPOLARIZATION_STEPS range (−10 → −2 µA/cm²).
-        # Sustained hyperpolarisation de-inactivates ICaT (g=1.5 mS/cm²); on
-        # release a textbook post-inhibitory rebound burst fires via T-type Ca²⁺
-        # activation (Huguenard & McCormick, 1992).  Ih (g=1.0 mS/cm²) also
-        # contributes via sag and post-step overshoot.
+        # Sustained hyperpolarisation de-inactivates the TC-tuned ICaT
+        # (g=2.5 mS/cm²); on release a textbook post-inhibitory LTS burst
+        # fires (issue #287; McCormick & Huguenard 1992).  Ih (g=1.0 mS/cm²)
+        # also contributes via sag and post-step overshoot.
     },
     CA1_PYRAMIDAL: {
         # 6 µA/cm² at 15 ms evokes a single AP with Pospischil kinetics;

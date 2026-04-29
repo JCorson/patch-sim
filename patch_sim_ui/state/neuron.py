@@ -314,16 +314,31 @@ class NeuronState(rx.State):
             A :class:`patch_sim.Neuron` configured with the current conductances,
             ion concentrations, and any enabled auxiliary channels.
         """
-        channels = tuple(
-            patch_sim.ChannelConfig(factory, g_max=getattr(self, f"{name}_g_max"))
-            for name, factory in patch_sim.CHANNEL_REGISTRY.items()
-            if getattr(self, f"{name}_enabled")
-        )
-
         # Use the core Na⁺/K⁺ channel factories from the active preset so
         # that presets with non-default kinetics (e.g. Pospischil, STN) are
         # honoured.  Fall back to HH52 defaults for unknown preset names.
         preset_cfg = patch_sim.NEURON_PRESETS.get(self.active_neuron_type)
+
+        # Map channel-name → preset-specific factory variant, so presets that
+        # use a non-canonical factory (e.g. Thalamic Relay's slow-inactivating
+        # ICaT) keep their kinetics through UI round-trip.  Channels not in
+        # the preset fall back to the canonical CHANNEL_REGISTRY factory.
+        preset_factory_overrides: dict[str, Any] = {}
+        if preset_cfg is not None:
+            for cc in preset_cfg.channels:
+                name = presets._FACTORY_TO_NAME.get(cc.factory)
+                if name is not None:
+                    preset_factory_overrides[name] = cc.factory
+
+        channels = tuple(
+            patch_sim.ChannelConfig(
+                preset_factory_overrides.get(name, factory),
+                g_max=getattr(self, f"{name}_g_max"),
+            )
+            for name, factory in patch_sim.CHANNEL_REGISTRY.items()
+            if getattr(self, f"{name}_enabled")
+        )
+
         na_factory = (
             preset_cfg.na_channel_factory if preset_cfg else patch_sim.make_na_channel
         )

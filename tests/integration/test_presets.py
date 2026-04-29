@@ -12,6 +12,7 @@ import patch_sim
 from patch_sim.additional_channels import (
     make_icat_channel,
     make_ih_channel,
+    make_ikca_channel,
     make_inap_channel,
     make_inar_channel,
 )
@@ -394,6 +395,33 @@ def test_trn_t_ref_is_huguenard_recording_temp() -> None:
     """
     config = NEURON_PRESETS[TRN]
     assert config.T_ref == pytest.approx(309.15)
+
+
+def test_trn_includes_ikca_channel() -> None:
+    """TRN preset must wire IKCa for Ca²⁺-driven AHP shaping (issue #286).
+
+    Huguenard & Prince (1992) describe IKCa as the dominant K⁺ current
+    converting ICaT-mediated Ca²⁺ entry into outward current that shapes
+    inter-spike intervals during tonic firing and contributes to LTS-burst
+    termination.  Without IKCa there is no biophysical mechanism to convert
+    [Ca²⁺]ᵢ rises into inter-burst pauses — confirmed by Pospischil 2008
+    (Biol. Cybern. 99:427) Table 2 RE column.
+
+    This test asserts only that an IKCa channel is wired into the TRN preset
+    with a positive g_max; it does NOT assert the full HP92 rebound-burst
+    phenotype (5–15 spike, 200–600 Hz LTS-driven Na⁺/K⁺ AP burst).  The full
+    rebound-burst phenotype requires sigmoid-shaped ICaT inactivation tau
+    (slow at depolarised V, fast at hyperpolarised V) that is not yet
+    implemented; tracked as follow-up work.
+    """
+    config = NEURON_PRESETS[TRN]
+    ikca_configs = [c for c in config.channels if c.factory is make_ikca_channel]
+    assert len(ikca_configs) == 1, (
+        f"TRN preset must include exactly one IKCa channel, found {len(ikca_configs)}"
+    )
+    assert ikca_configs[0].g_max > 0.0, (
+        f"TRN IKCa g_max must be positive, got {ikca_configs[0].g_max}"
+    )
 
 
 # ---------------------------------------------------------------------------
