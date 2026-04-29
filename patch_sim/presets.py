@@ -952,12 +952,19 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_step": 0.5,
             "stimulus_duration": 100.0,
         },
-        # High R_in (≈14.3 kΩ·cm²); −1 → −0.25 µA/cm² in 0.25 steps gives
-        # −79 to −95 mV — enough to de-inactivate ICaT (ft_inf → 0.84).
+        # Sweep −5 → −1 µA/cm² (in 1.0 µA steps) for 500 ms with 100 ms pre
+        # and 300 ms post.  At ≤ −2 µA/cm² the cell de-inactivates ICaT and
+        # activates Ih enough to fire the HP92 rebound burst on release;
+        # the −1 µA step is included as a reference subthreshold sweep so
+        # the burst is visible by contrast.  Step duration is 500 ms (vs
+        # the 300 ms default) so Ih has time to fully activate.
         HYPERPOLARIZATION_STEPS: {
-            "min_stimulus": -1.0,
-            "max_stimulus": -0.25,
-            "stimulus_step": 0.25,
+            "pre_stimulus_duration": 100.0,
+            "stimulus_duration": 500.0,
+            "post_stimulus_duration": 300.0,
+            "min_stimulus": -5.0,
+            "max_stimulus": -1.0,
+            "stimulus_step": 1.0,
         },
     },
 }
