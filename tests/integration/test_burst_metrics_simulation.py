@@ -130,6 +130,11 @@ def test_thalamic_relay_step_release_produces_multi_spike_lts_burst() -> None:
         f"Expected intra-burst frequency 200–500 Hz, "
         f"got {burst.intra_burst_frequency:.1f} Hz"
     )
+    assert analysis.unburst_spike_count == 0, (
+        "Unexpected isolated spikes outside the LTS burst — the rebound "
+        "should be a single clean burst, not a burst plus stragglers; "
+        f"got unburst_spike_count={analysis.unburst_spike_count}"
+    )
 
 
 def test_no_spikes_returns_empty_burst_result_on_simulation(

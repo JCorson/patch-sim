@@ -782,7 +782,10 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         # Burst-mode TC has a very low rheobase (~0.012 µA/cm²) because the
         # slow-inactivating ICaT (issue #287) and reduced g_K (=18) combine to
         # amplify any depolarisation through the LTS.  0.01 µA/cm² stays below
-        # threshold while still giving a visible voltage deflection.
+        # threshold while still giving a visible voltage deflection.  The
+        # subthreshold margin is narrow: any stimulus ≥ ~0.05 µA/cm² already
+        # crosses LTS threshold and fires an AP, so a UI user nudging this
+        # value upward will hit threshold within a few clicks.
         SUBTHRESHOLD_RESPONSE: {
             "min_stimulus": 0.01,
             "max_stimulus": 0.01,
@@ -802,18 +805,20 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 8.0,
             "stimulus_duration": 200.0,
         },
-        # Threshold ~0.94 µA/cm²; narrow range with 1 µA/cm² steps to
-        # show the subthreshold-to-firing transition cleanly.
+        # Sustained-firing threshold falls in the low-µA/cm² range; 1 µA/cm²
+        # steps over [0, 10] resolve the FI relation cleanly.  Single-spike
+        # rheobase is much lower (~0.02 µA/cm²) — see the SUBTHRESHOLD_RESPONSE
+        # comment — but resolving that floor would need finer steps.
         FI_CURVE: {
             "max_stimulus": 10.0,
             "stimulus_step": 1.0,
             "stimulus_duration": 100.0,
         },
         # Inherits the base HYPERPOLARIZATION_STEPS range (−10 → −2 µA/cm²).
-        # Sustained hyperpolarisation de-inactivates ICaT (g=1.5 mS/cm²); on
-        # release a textbook post-inhibitory rebound burst fires via T-type Ca²⁺
-        # activation (Huguenard & McCormick, 1992).  Ih (g=1.0 mS/cm²) also
-        # contributes via sag and post-step overshoot.
+        # Sustained hyperpolarisation de-inactivates the TC-tuned ICaT
+        # (g=2.5 mS/cm²); on release a textbook post-inhibitory LTS burst
+        # fires (issue #287; McCormick & Huguenard 1992).  Ih (g=1.0 mS/cm²)
+        # also contributes via sag and post-step overshoot.
     },
     CA1_PYRAMIDAL: {
         # 6 µA/cm² at 15 ms evokes a single AP with Pospischil kinetics;
