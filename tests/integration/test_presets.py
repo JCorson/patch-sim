@@ -557,3 +557,74 @@ def test_dopaminergic_t_ref_is_komendantov_recording_temp() -> None:
     Komendantov (2004) recorded at 35 °C = 308.15 K.
     """
     assert NEURON_PRESETS[DOPAMINERGIC].T_ref == pytest.approx(308.15)
+
+
+# ---------------------------------------------------------------------------
+# Cell surface area metadata
+# ---------------------------------------------------------------------------
+
+
+# Representative areas from the issue table (cm²).  Squid axon is intentionally
+# left as None because the HH52 preparation is reported per-area.
+_EXPECTED_AREAS_CM2: dict[str, float | None] = {
+    SQUID_GIANT_AXON: None,
+    FAST_SPIKING_INTERNEURON: 3e-6,
+    CORTICAL_PYRAMIDAL: 20e-6,
+    PURKINJE: 250e-6,
+    DOPAMINERGIC: 7e-6,
+    THALAMIC_RELAY: 12e-6,
+    CA1_PYRAMIDAL: 25e-6,
+    STN: 7e-6,
+    TRN: 7e-6,
+}
+
+
+@pytest.mark.parametrize(
+    ("preset_name", "expected_area"),
+    list(_EXPECTED_AREAS_CM2.items()),
+)
+def test_presets_have_expected_area_cm2(
+    preset_name: str, expected_area: float | None
+) -> None:
+    """Each preset carries the area_cm2 listed in the issue table."""
+    config = NEURON_PRESETS[preset_name]
+    if expected_area is None:
+        assert config.area_cm2 is None
+    else:
+        assert config.area_cm2 == pytest.approx(expected_area)
+
+
+@pytest.mark.parametrize(
+    "preset_name",
+    [name for name, area in _EXPECTED_AREAS_CM2.items() if area is not None],
+)
+def test_preset_with_area_yields_finite_absolute_passive_properties(
+    preset_name: str,
+) -> None:
+    """Each preset with area_cm2 set produces finite absolute MΩ / pF outputs.
+
+    The membrane test should return well-defined R_n in MΩ and C in pF for
+    every preset that opts into the absolute-units pathway.  Hard physiological
+    bounds are intentionally lax (presets vary by orders of magnitude) — this
+    test guards against silent regressions where the conversion returns
+    None / inf / negative values.
+    """
+    config = NEURON_PRESETS[preset_name]
+    neuron = make_neuron(config)
+    props = run_membrane_test(neuron)
+    assert props is not None
+    assert props.input_resistance_mohm is not None
+    assert props.membrane_capacitance_pf is not None
+    assert props.input_resistance_mohm > 0
+    assert props.membrane_capacitance_pf > 0
+    # 0.5–10000 MΩ and 0.1–1000 pF cover every plausible single-compartment
+    # preparation; tighter bands would break on legitimate preset edits.
+    assert 0.5 < props.input_resistance_mohm < 10000.0
+    assert 0.1 < props.membrane_capacitance_pf < 1000.0
+    # τ_m identity: τ [ms] = R_n [MΩ] × C [pF] / 1000.  This is exact (the
+    # absolute values are derived from the same density values via the same
+    # area), so this is a tight regression guard with biological meaning.
+    tau_from_absolute = (
+        props.input_resistance_mohm * props.membrane_capacitance_pf / 1000.0
+    )
+    assert tau_from_absolute == pytest.approx(props.time_constant, rel=1e-9)

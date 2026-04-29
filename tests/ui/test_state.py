@@ -1515,3 +1515,24 @@ def test_analysis_state_clear_results_resets_simulation_fields() -> None:
     _assert_analysis_cleared(an_st)
     assert an_st.mt_input_resistance == "50 kΩ·cm²"
     assert an_st.mt_neuron_fingerprint == "xyz"
+
+
+# ---------------------------------------------------------------------------
+# Cell-area metadata flowing through NeuronState (#222)
+# ---------------------------------------------------------------------------
+
+
+def test_build_neuron_carries_area_for_cortical_pyramidal() -> None:
+    """A built Neuron carries the cortical pyramidal preset's area_cm2."""
+    ns = _make_neuron_state()
+    ns.active_neuron_type = CORTICAL_PYRAMIDAL
+    neuron = ns._build_neuron()
+    assert neuron.area_cm2 == pytest.approx(20e-6)
+
+
+def test_build_neuron_has_no_area_for_squid() -> None:
+    """The squid preset has no area_cm2 — built Neuron exposes ``None``."""
+    ns = _make_neuron_state()
+    ns.active_neuron_type = SQUID_GIANT_AXON
+    neuron = ns._build_neuron()
+    assert neuron.area_cm2 is None

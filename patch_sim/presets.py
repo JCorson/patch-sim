@@ -66,6 +66,11 @@ from .neuron_factory import ChannelConfig, NeuronConfig
 
 NEURON_PRESETS: dict[str, NeuronConfig] = {
     SQUID_GIANT_AXON: NeuronConfig(
+        # area_cm2 left as None: HH52 was characterised on a giant axon segment
+        # rather than a whole somatic cell, so absolute MΩ/pF values are not
+        # the conventional way to report squid passive properties.  Per-area
+        # density units (kΩ·cm², µF/cm²) remain the meaningful display.
+        #
         # Original Hodgkin-Huxley (1952) parameters — all defaults.
         # Default ion concentrations produce HH52 reversal potentials
         # (E_Na ≈ +50, E_K ≈ −77, E_L ≈ −54 mV) so no overrides needed.
@@ -82,6 +87,10 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         Q10=1.0,
     ),
     FAST_SPIKING_INTERNEURON: NeuronConfig(
+        # area_cm2 = 3e-6 cm² — compact ~10 µm soma, minimal dendrites.
+        # With g_total ≈ 1.5 mS/cm², gives R_n ≈ 220 MΩ and C ≈ 3 pF
+        # (matching reported FS interneuron values; Erisir et al. 1999).
+        #
         # High g_Na drives rapid depolarization; IKv31 (Kv3.1-type, high
         # threshold, fast deactivation) repolarizes quickly and enables
         # non-adapting high-frequency firing.  The HH delayed-rectifier is
@@ -111,8 +120,14 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         na_channel_factory=make_pospischil_na_channel,
         k_channel_factory=make_pospischil_k_channel,
         channels=(ChannelConfig(make_ikv31_channel, g_max=40.0),),
+        area_cm2=3e-6,
     ),
     CORTICAL_PYRAMIDAL: NeuronConfig(
+        # area_cm2 = 20e-6 cm² — ~20 µm soma plus dendrites for an RS pyramidal cell.
+        # With g_total ≈ 0.05 mS/cm², gives R_n ≈ 1 GΩ in the simulation; in vivo
+        # values run 150–400 MΩ once dendritic filtering and additional leaks are
+        # included.  Capacitance ≈ 200 pF, matching the textbook range.
+        #
         # Pospischil et al. (2008) Traub-Miles Na⁺/K⁺ kinetics (VT = −56.2 mV)
         # replace the default HH52 core channels to match the RS neuron model.
         # Ih produces voltage sag on hyperpolarization; INaP amplifies
@@ -149,8 +164,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_inap_channel, g_max=0.1),
             ChannelConfig(make_im_channel, g_max=0.5),
         ),
+        area_cm2=20e-6,
     ),
     PURKINJE: NeuronConfig(
+        # area_cm2 = 250e-6 cm² — ~25 µm soma with the massive dendritic tree
+        # characteristic of cerebellar Purkinje cells.  C ≈ 250 pF aligns with
+        # somatic recordings (Roth & Häusser 2001).
+        #
         # Tonic pacemaker (autonomous, intrinsic): INaP window current destabilises
         # the rest, Ih drives recovery from AHP back to threshold → autonomous
         # oscillation producing regular tonic simple spikes.  Complex-spike
@@ -207,8 +227,12 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # tau_ca=20 ms (vs default 200 ms) prevents inter-spike accumulation at 10 Hz
         # pacemaking; alpha_ca=1.5e-5 gives a ~2.6 µM peak at 10 µA/cm² for 180 ms.
         calcium_dynamics=CalciumDynamics(alpha_ca=1.5e-5, tau_ca=20.0, ca_rest=1e-4),
+        area_cm2=250e-6,
     ),
     DOPAMINERGIC: NeuronConfig(
+        # area_cm2 = 7e-6 cm² — ~15 µm soma typical of midbrain SNc DA neurons.
+        # Yields C ≈ 7 pF and R_n ≈ 25–50 MΩ in the simulation.
+        #
         # Ih drives pacemaker sag and rebound; IM provides slow
         # oscillatory hyperpolarization.
         # Refs: Wilson & Callaway (2000), J. Neurophysiol. 83:3084;
@@ -245,8 +269,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ih_channel, g_max=2.0),
             ChannelConfig(make_im_channel, g_max=1.0),
         ),
+        area_cm2=7e-6,
     ),
     THALAMIC_RELAY: NeuronConfig(
+        # area_cm2 = 12e-6 cm² — ~20 µm soma with modest dendrites.
+        # C ≈ 12 pF and R_n ≈ 80 MΩ within the simulation, in line with
+        # thalamic relay cell measurements.
+        #
         # T-type Ca²⁺ produces low-threshold spike; Ih causes
         # post-inhibitory rebound burst after hyperpolarizing step.
         # Refs: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384;
@@ -302,8 +331,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         calcium_dynamics=CalciumDynamics(
             alpha_ca=2.6e-5, tau_ca=20.0, ca_rest=1e-4, ca_init=5.377e-4
         ),
+        area_cm2=12e-6,
     ),
     CA1_PYRAMIDAL: NeuronConfig(
+        # area_cm2 = 25e-6 cm² — ~20 µm soma with the extensive 1.5 mm dendritic
+        # arbor of CA1 pyramidal cells.  C ≈ 25 pF in the simulation; in vivo
+        # whole-cell capacitance runs higher once dendrites are fully sampled.
+        #
         # Reduced g_Na/g_K vs squid axon; IKa shortens ISI; IM provides
         # spike-frequency adaptation; small Ih produces modest voltage sag;
         # Ca²⁺ channels (L, N, T) and IKCa together produce the pronounced
@@ -342,8 +376,12 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # (12 µA/cm², 300 ms).  Three Ca channel types (ICaL + ICaN + ICaT) combined
         # with IKCa require lower alpha_ca than single-channel presets to stay in band.
         calcium_dynamics=CalciumDynamics(alpha_ca=2.1e-5, tau_ca=20.0, ca_rest=1e-4),
+        area_cm2=25e-6,
     ),
     STN: NeuronConfig(
+        # area_cm2 = 7e-6 cm² — ~15 µm soma typical of subthalamic projection
+        # neurons.  C ≈ 7 pF in the simulation.
+        #
         # Autonomous tonic pacemaker with conditional burst mode.
         #
         # PRIMARY MODE — tonic pacemaking: high-threshold Na⁺ (Otsuka 2004) and
@@ -400,8 +438,12 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         calcium_dynamics=CalciumDynamics(
             alpha_ca=1.1e-5, tau_ca=20.0, ca_rest=1e-4, ca_init=7.325e-4
         ),
+        area_cm2=7e-6,
     ),
     TRN: NeuronConfig(
+        # area_cm2 = 7e-6 cm² — ~15 µm soma characteristic of thalamic
+        # reticular neurons.  C ≈ 7 pF in the simulation.
+        #
         # ICaT (g_T = 3.5 mS/cm²) drives rhythmic burst firing and
         # sleep-spindle oscillations characteristic of TRN cells.
         # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804;
@@ -446,6 +488,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # (3 µA/cm², 200 ms).  ICaT g=3.5 mS/cm² is the only Ca source; tau_ca=20 ms
         # allows de-inactivation between bursts; alpha_ca=1.2e-5 targets ~2.8 µM peak.
         calcium_dynamics=CalciumDynamics(alpha_ca=1.2e-5, tau_ca=20.0, ca_rest=1e-4),
+        area_cm2=7e-6,
     ),
 }
 

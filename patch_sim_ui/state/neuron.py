@@ -79,10 +79,10 @@ def _make_neuron_float_setter(field_name: str):
     """Factory returning an async generator setter that chains a membrane test.
 
     Wraps :func:`~patch_sim_ui.state._common._set_float` and then yields
-    ``SimulationState.run_membrane_test`` so that any change to a neuron
-    parameter automatically refreshes the displayed passive properties.  Uses
-    ``yield`` (not ``return``) because Reflex only chains events yielded from
-    generators; returning an event from a sync handler has no effect.
+    ``SimulationState.run_membrane_test_debounced`` so that any change to a
+    neuron parameter automatically refreshes the displayed passive properties.
+    Uses ``yield`` (not ``return``) because Reflex only chains events yielded
+    from generators; returning an event from a sync handler has no effect.
 
     The fingerprint-based cache inside ``run_membrane_test`` ensures the
     simulation only re-runs when passive-relevant parameters (g_NaL, g_KL,
@@ -92,8 +92,9 @@ def _make_neuron_float_setter(field_name: str):
         field_name: Name of the ``NeuronState`` attribute to update.
 
     Returns:
-        An async generator event handler that accepts ``str | list[float] | float``,
-        updates the field, and yields ``run_membrane_test``.
+        An async generator event handler that accepts
+        ``str | list[float] | float``, updates the field, and yields
+        ``run_membrane_test_debounced``.
     """
 
     async def setter(self, value: "str | list[float] | float"):
@@ -333,11 +334,15 @@ class NeuronState(rx.State):
         scalar_kwargs = {
             name: getattr(self, name) for name in presets.NEURON_CONFIG_SCALAR_FIELDS
         }
+        # area_cm2 is sourced from the active preset's NeuronConfig — it is a
+        # static physical attribute of the cell, not a user-editable value.
+        area_cm2 = preset_cfg.area_cm2 if preset_cfg else None
         config = patch_sim.NeuronConfig(
             **scalar_kwargs,
             channels=channels,
             na_channel_factory=na_factory,
             k_channel_factory=k_factory,
+            area_cm2=area_cm2,
         )
         return patch_sim.make_neuron(config=config)
 

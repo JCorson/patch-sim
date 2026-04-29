@@ -6,6 +6,8 @@ and verifies the module-level protocol constants.
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 import patch_sim
@@ -85,3 +87,34 @@ def test_membrane_test_protocol_constants() -> None:
     assert MEMBRANE_TEST_PRE_MS > 0, "Pre-stimulus duration must be positive"
     assert MEMBRANE_TEST_STEP_MS > 2.0, "Step must be > 2 ms for reliable fitting"
     assert MEMBRANE_TEST_POST_MS > 0, "Post-stimulus duration must be positive"
+
+
+def test_run_membrane_test_default_no_area_returns_density_only(
+    hh_model: Neuron,
+) -> None:
+    """Default call (no area_cm2) leaves absolute MΩ / pF fields ``None``."""
+    props = run_membrane_test(hh_model)
+    assert props is not None
+    assert props.input_resistance_mohm is None
+    assert props.membrane_capacitance_pf is None
+    assert props.area_cm2 is None
+
+
+def test_run_membrane_test_with_area_returns_absolute(hh_model: Neuron) -> None:
+    """A neuron carrying ``area_cm2`` produces absolute MΩ / pF outputs.
+
+    For the default HH model (g_NaL+g_KL = 0.3 mS/cm², C_m = 1.0 µF/cm²) and
+    area = 10×10⁻⁶ cm²: R_n ≈ 1/0.3 / 10e-6 / 1000 ≈ 333 MΩ and
+    C ≈ 1.0 × 10e-6 × 1e6 ≈ 10 pF.  Surface area is read off the Neuron
+    itself rather than passed as a separate argument.
+    """
+    area = 10e-6
+    neuron_with_area = dataclasses.replace(hh_model, area_cm2=area)
+    props = run_membrane_test(neuron_with_area)
+    assert props is not None
+    assert props.area_cm2 == pytest.approx(area)
+    assert props.input_resistance_mohm == pytest.approx(
+        1.0 / 0.3 / area / 1000.0, abs=10.0
+    )
+    assert props.membrane_capacitance_pf is not None
+    assert props.membrane_capacitance_pf == pytest.approx(1.0 * area * 1e6, abs=0.1)

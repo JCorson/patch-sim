@@ -499,30 +499,49 @@ def _ap_analysis_tab() -> rx.Component:
 def _membrane_test_section() -> rx.Component:
     """Render the always-visible passive membrane properties section.
 
-    Displays R_in (kΩ·cm²), τₘ (ms), and Cₘ (µF/cm²) from the dedicated
-    membrane test run on a single compact row.  Shown in both current clamp
-    and voltage clamp modes whenever membrane test results are available.
+    Displays R_in, τₘ, and Cₘ from the dedicated membrane test on a single
+    compact row.  The displayed units depend on whether the active preset
+    declares a cell surface area: absolute MΩ / pF when present, per-area
+    kΩ·cm² / µF/cm² otherwise.  τₘ is always in ms and is invariant to the
+    conversion.
+
+    A tooltip explains the active mode.
 
     Returns:
         A single-row hstack of labelled passive property values, or an empty
         box when no membrane test results are available.
     """
     s = AnalysisState
+    tooltip_text = rx.cond(
+        s.mt_units_mode == "absolute",
+        (
+            "R_n in megaohms; C in picofarads; τ_m = R_n × C. Computed from "
+            "the active preset's cell surface area."
+        ),
+        (
+            "Per-area passive properties (kΩ·cm², µF/cm²). The active preset "
+            "has no surface area declared, so absolute R_n (MΩ) and C (pF) "
+            "are not available."
+        ),
+    )
     return rx.cond(
         AnalysisState.has_membrane_test,
-        rx.hstack(
-            rx.text("R_in", size="1", color="gray"),
-            rx.text(s.mt_input_resistance + " kΩ·cm²", size="1"),
-            rx.text("τ_m", size="1", color="gray", padding_left="2"),
-            rx.text(s.mt_time_constant + " ms", size="1"),
-            rx.text("C_m", size="1", color="gray", padding_left="2"),
-            rx.text(s.mt_membrane_capacitance + " µF/cm²", size="1"),
-            padding_x="3",
-            padding_y="2",
-            border_bottom="1px solid var(--gray-4)",
-            width="100%",
-            align="center",
-            wrap="nowrap",
+        rx.tooltip(
+            rx.hstack(
+                rx.text("R_in", size="1", color="gray"),
+                rx.text(s.mt_input_resistance + " " + s.mt_r_units, size="1"),
+                rx.text("τ_m", size="1", color="gray", padding_left="2"),
+                rx.text(s.mt_time_constant + " ms", size="1"),
+                rx.text("C_m", size="1", color="gray", padding_left="2"),
+                rx.text(s.mt_membrane_capacitance + " " + s.mt_c_units, size="1"),
+                padding_x="3",
+                padding_y="2",
+                border_bottom="1px solid var(--gray-4)",
+                width="100%",
+                align="center",
+                wrap="nowrap",
+            ),
+            content=tooltip_text,
         ),
         rx.box(),
     )
