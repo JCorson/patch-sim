@@ -14,10 +14,15 @@ strictly exceeds the threshold.
 The threshold can be supplied by the caller, or auto-detected from a
 log-spaced histogram of the inter-spike intervals.  When too few intervals
 exist or the distribution is unimodal, a fixed default of 100 ms is used.
+The default-fixed path then disambiguates two ISI shapes the histogram
+cannot: a tight cluster (every ISI below ~12 ms with ≤7 ISIs) groups into
+one burst, while everything else (tonic trains spread across the tonic
+range, or sustained high-frequency trains beyond the count cap)
+short-circuits to zero bursts.
 
-For non-bursting neurons (sub-threshold protocols, tonic firing with all
-intervals above the threshold, etc.) the analysis degrades gracefully:
-``burst_count`` is 0 and aggregate metrics are ``None``.
+For non-bursting neurons (sub-threshold protocols, tonic firing) the
+analysis degrades gracefully: ``burst_count`` is 0 and aggregate metrics
+are ``None``.
 
 Data classes:
     BurstMetrics: Per-burst measurement record.
@@ -91,18 +96,24 @@ _VALLEY_DEPTH_FRACTION: float = 0.5
 _MIN_PEAK_LOG_RATIO: float = 0.48
 
 #: Maximum ISI (ms) for a default-fixed cluster to be treated as a single
-#: tight burst rather than a non-burst tonic train.  25 ms = 40 Hz sits in
-#: the empirically empty band between tonic firing (Purkinje ~50 Hz, HH at
-#: 10 µA/cm² ~60 Hz, ISIs typically >15 ms) and burst-mode firing (TC LTS
-#: 200–500 Hz, STN rebound >100 Hz, ISIs <10 ms).  Refs: McCormick &
-#: Huguenard 1992 J. Neurophysiol. 68:1384; Beurrier et al. 1999
-#: J. Neurosci. 19:599.
-_TIGHT_CLUSTER_MAX_ISI_MS: float = 25.0
+#: tight burst rather than a non-burst tonic train.  12 ms ≈ 83 Hz sits
+#: below the textbook tonic-firing range (Purkinje ~50 Hz, HH at 10 µA/cm²
+#: ~60 Hz, ISIs 17–20 ms; Raman & Bean 1999) and well above burst-mode
+#: ISIs (TC LTS 200–500 Hz / 2–5 ms; STN rebound >100 Hz / <10 ms;
+#: McCormick & Huguenard 1992 J. Neurophysiol. 68:1384; Beurrier et al.
+#: 1999 J. Neurosci. 19:599).  In this simulator the protected tonic
+#: presets actually fire faster than the textbook rates (HH and Purkinje
+#: both ~210 Hz at 10 µA/cm²), so the count cap below provides the
+#: primary protection against fast sustained trains; the ISI cap guards
+#: against slower textbook-rate tonic firing that future presets or
+#: parameter sweeps may produce.
+_TIGHT_CLUSTER_MAX_ISI_MS: float = 12.0
 
 #: Maximum ISI count for the tight-cluster carve-out.  Real LTS-style
-#: bursts have 2–6 ISIs; longer tight runs are sustained high-frequency
-#: tonic firing, not a single burst.
-_TIGHT_CLUSTER_MAX_ISIS: int = 10
+#: bursts top out at 7–8 spikes (TC LTS 3–7 spikes; STN rebound 3–8
+#: spikes), i.e. ≤7 ISIs; any longer cluster is a sustained
+#: high-frequency tonic train, not a single burst.
+_TIGHT_CLUSTER_MAX_ISIS: int = 7
 
 
 @dataclasses.dataclass
@@ -156,6 +167,9 @@ class BurstAnalysisResult:
             display the threshold that was applied.
         threshold_method: How :attr:`isi_threshold_ms` was determined.  One
             of ``"auto-histogram"``, ``"default-fixed"``, or ``"user"``.
+            ``"default-fixed"`` does not by itself imply zero bursts —
+            see :func:`analyze_bursts` for the tight-cluster carve-out
+            that can produce a burst on the default-fixed path.
     """
 
     burst_count: int
@@ -364,8 +378,10 @@ def _empty_result(
         isi_threshold_ms: Threshold that was applied (ms).
         threshold_method: How the threshold was chosen.
         unburst_spike_count: Spikes to surface as unburst.  Defaults to 0
-            for the no-spikes call site; the ``default-fixed`` short-circuit
-            in :func:`analyze_bursts` passes the full spike count through.
+            for the no-spikes call site; the default-fixed tonic
+            short-circuit in :func:`analyze_bursts` (when the
+            tight-cluster carve-out does not apply) passes the full spike
+            count through.
 
     Returns:
         A :class:`BurstAnalysisResult` with ``burst_count`` of 0 and all
