@@ -790,6 +790,154 @@ def make_thalamic_relay_icat_channel(
 
 
 # ---------------------------------------------------------------------------
+# TRN-specific ICaT — sigmoid-shaped inactivation tau
+# ---------------------------------------------------------------------------
+# Huguenard & Prince (1992), J. Neurosci. 12:3804 record TRN low-threshold
+# spike (LTS) bursts of 5–15 Na⁺ spikes at 200–600 Hz on hyperpolarising-step
+# release.  Reproducing that spike count requires the LTS plateau to last
+# long enough to fit 5+ Na⁺/K⁺ AP cycles, which means an ICaT inactivation
+# tau in the 100–250 ms range at LTS-plateau voltages (V > −56 mV).
+#
+# The default Destexhe (1994) cosh-shaped tau peaks at the half-inactivation
+# voltage (−80 mV → 20 ms) and decays at depolarised V (≈4 ms at −40 mV,
+# floored at 2 ms by −20 mV), so the LTS plateau collapses in 5–10 ms — too
+# fast.  Increasing g_T to compensate is not viable: the window-current slope
+# conductance grows linearly and beyond g_T ≈ 4 mS/cm² the cell autonomously
+# bursts at rest.
+#
+# This factory replaces the cosh tau with a sigmoid tau that is small at
+# hyperpolarised V (rest stability — fast equilibration of ft prevents
+# positive-feedback runaway from the window current) and large at LTS-plateau
+# V (sustained plateau for 5+ Na⁺ spikes).  ``ft_inf(V)`` is bit-identical to
+# the Destexhe default so the existing ft_inf-at-rest invariants are
+# preserved.
+_TRN_FT_HALF: float = -80.0  # Half-inactivation voltage for ft in mV
+_TRN_FT_SLOPE: float = -9.0  # Inactivation slope for ft in mV (Destexhe 1994)
+_TRN_FT_TAU_MIN: float = 20.0  # ft tau at hyperpolarised V in ms
+_TRN_FT_TAU_MAX: float = 200.0  # ft tau at LTS-plateau V in ms
+_TRN_FT_TAU_VHALF: float = -50.0  # Sigmoid midpoint for tau_ft in mV
+_TRN_FT_TAU_SLOPE: float = 5.0  # Sigmoid slope for tau_ft in mV
+
+
+def _trn_ft_inf(V: float) -> float:
+    """Steady-state inactivation of the TRN ICaT ``ft`` gate at voltage V.
+
+    Bit-identical to the Destexhe (1994) default used by
+    :func:`make_icat_channel`: half-point −80 mV, slope −9 mV.  At V = −80 mV
+    (TRN v_rest), ``ft_inf = 0.50`` — half de-inactivated, enabling the
+    post-inhibitory rebound burst.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Steady-state inactivation probability in [0, 1].
+    """
+    return 1.0 / (1.0 + safe_exp(-(V - _TRN_FT_HALF) / _TRN_FT_SLOPE))
+
+
+def _trn_tau_ft(V: float) -> float:
+    """Sigmoid voltage-dependent time constant for the TRN ICaT ``ft`` gate.
+
+    Small at hyperpolarised V (≈ ``_TRN_FT_TAU_MIN`` = 20 ms) and large at
+    depolarised V (≈ ``_TRN_FT_TAU_MAX`` = 200 ms), with a smooth sigmoid
+    transition centred at V = −50 mV (slope 5 mV).  This shape preserves
+    rest stability at −80 mV (fast ft equilibration) while sustaining the
+    LTS plateau long enough for 5+ Na⁺ spikes (slow ft inactivation at
+    plateau voltages of −30 to −10 mV).
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Time constant in ms.
+    """
+    sigmoid = 1.0 / (1.0 + safe_exp(-(V - _TRN_FT_TAU_VHALF) / _TRN_FT_TAU_SLOPE))
+    return _TRN_FT_TAU_MIN + (_TRN_FT_TAU_MAX - _TRN_FT_TAU_MIN) * sigmoid
+
+
+def _alpha_ft_trn_impl(V: float, ca_i: float) -> float:
+    """Forward rate for the TRN ICaT inactivation gate ft.
+
+    Derived as ``alpha_ft = ft_inf / tau_ft``.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (ignored).
+
+    Returns:
+        Forward rate alpha_ft in 1/ms.
+    """
+    return _trn_ft_inf(V) / _trn_tau_ft(V)
+
+
+_alpha_ft_trn = VoltageOnlyFn(_alpha_ft_trn_impl)
+
+
+def _beta_ft_trn_impl(V: float, ca_i: float) -> float:
+    """Backward rate for the TRN ICaT inactivation gate ft.
+
+    Derived as ``beta_ft = (1 - ft_inf) / tau_ft``.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (ignored).
+
+    Returns:
+        Backward rate beta_ft in 1/ms.
+    """
+    return (1.0 - _trn_ft_inf(V)) / _trn_tau_ft(V)
+
+
+_beta_ft_trn = VoltageOnlyFn(_beta_ft_trn_impl)
+
+
+def make_trn_icat_channel(
+    g_max: float = DEFAULT_G_ICAT,
+) -> IonChannel:
+    """Create the TRN-tuned ICaT (T-type Ca²⁺) channel.
+
+    Variant of :func:`make_icat_channel` whose inactivation time constant
+    ``tau_ft(V)`` is sigmoid-shaped rather than cosh-shaped: small (20 ms) at
+    hyperpolarised V and large (200 ms) at LTS-plateau V, with a smooth
+    transition centred at −50 mV.  This sustains the low-threshold spike
+    plateau long enough to support the 5–15 Na⁺ spike, 200–600 Hz rebound
+    burst that defines TRN burst mode (Huguenard & Prince 1992) while
+    preserving rest stability at −80 mV.
+
+    Activation half-point and slope are unchanged from the global ICaT
+    (−56 mV / 6.2 mV).  Inactivation half-point and slope are unchanged
+    (−80 mV / −9 mV), so ``ft_inf(V)`` is bit-identical to the Destexhe
+    (1994) default — the existing ft_inf-at-rest invariants for the TRN
+    preset continue to hold.
+
+    The reversal potential is computed dynamically from the neuron's Ca²⁺
+    concentrations using the Nernst equation.
+
+    Reference: Huguenard & Prince (1992), J. Neurosci. 12:3804;
+    Destexhe et al. (1994), J. Neurophysiol. 72:803;
+    Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (RE).
+
+    Args:
+        g_max: Maximum conductance in mS/cm². Must be non-negative.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_ICAT`.
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the
+        TRN ICaT current.
+    """
+    dt_var = GatingVariable(name="dt", power=2, alpha=_alpha_dt, beta=_beta_dt)
+    ft_var = GatingVariable(name="ft", power=1, alpha=_alpha_ft_trn, beta=_beta_ft_trn)
+    return IonChannel(
+        name="CaT",
+        g_max=g_max,
+        gating_variables=(dt_var, ft_var),
+        reversal_spec=NernstSpec(IonSpecies.CALCIUM),
+        carries_calcium=True,
+    )
+
+
+# ---------------------------------------------------------------------------
 # ICaN — N-type Ca²⁺ channel (high-voltage activated)
 # ---------------------------------------------------------------------------
 

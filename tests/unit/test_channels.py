@@ -51,6 +51,7 @@ from patch_sim.additional_channels import (
     make_im_channel,
     make_inap_channel,
     make_inar_channel,
+    make_trn_icat_channel,
 )
 from patch_sim.calcium import CalciumDynamics
 from patch_sim.channels import (
@@ -1817,6 +1818,93 @@ def test_voltage_clamp_with_icat_extra_columns():
 def test_public_api_exports_icat():
     """make_icat_channel is exported from the patch_sim public API."""
     assert hasattr(patch_sim, "make_icat_channel")
+
+
+def test_make_trn_icat_channel_defaults():
+    """make_trn_icat_channel() produces a channel with the expected defaults."""
+    from patch_sim.constants import DEFAULT_G_ICAT
+
+    ch = make_trn_icat_channel()
+    assert ch.name == "CaT"
+    assert ch.g_max == pytest.approx(DEFAULT_G_ICAT)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.CALCIUM
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "dt"
+    assert ch.gating_variables[0].power == 2
+    assert ch.gating_variables[1].name == "ft"
+    assert ch.gating_variables[1].power == 1
+    assert ch.carries_calcium
+
+
+def _trn_icat_ft_inf_at(V: float) -> float:
+    """Compute the TRN ICaT ft_inf at voltage V from the channel rate functions.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Steady-state inactivation probability ft_inf = alpha / (alpha + beta).
+    """
+    ch = make_trn_icat_channel()
+    ft_var = next(gv for gv in ch.gating_variables if gv.name == "ft")
+    alpha = ft_var.alpha(V, 0.0)
+    beta = ft_var.beta(V, 0.0)
+    return alpha / (alpha + beta)
+
+
+def _trn_icat_tau_ft_at(V: float) -> float:
+    """Compute the TRN ICaT tau_ft at voltage V from the channel rate functions.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Time constant tau_ft = 1 / (alpha + beta) in ms.
+    """
+    ch = make_trn_icat_channel()
+    ft_var = next(gv for gv in ch.gating_variables if gv.name == "ft")
+    alpha = ft_var.alpha(V, 0.0)
+    beta = ft_var.beta(V, 0.0)
+    return 1.0 / (alpha + beta)
+
+
+def test_trn_icat_ft_inf_matches_destexhe_at_key_voltages():
+    """TRN ICaT ft_inf preserves the Destexhe (1994) shape (half=-80, slope=-9).
+
+    The TRN factory changes only tau_ft; ft_inf is bit-identical to the
+    global ICaT default to keep ft_inf-at-rest invariants for the TRN preset
+    (issue #295).
+    """
+    assert _trn_icat_ft_inf_at(-80.0) == pytest.approx(0.50, abs=0.02)
+    assert _trn_icat_ft_inf_at(-90.0) == pytest.approx(0.75, abs=0.02)
+    assert _trn_icat_ft_inf_at(-60.0) == pytest.approx(0.10, abs=0.02)
+
+
+def test_trn_icat_tau_ft_is_sigmoid_in_voltage():
+    """TRN ICaT tau_ft increases monotonically from ~20 ms to ~200 ms.
+
+    Sigmoid-shaped tau is the core invariant that distinguishes the TRN
+    factory from the cosh-shaped Destexhe (1994) default: small at
+    hyperpolarised V (rest stability) and large at LTS-plateau V (sustained
+    plateau for 5–15 Na⁺ spikes per Huguenard & Prince 1992).
+    """
+    tau_at_minus_90 = _trn_icat_tau_ft_at(-90.0)
+    tau_at_0 = _trn_icat_tau_ft_at(0.0)
+    assert tau_at_minus_90 == pytest.approx(20.0, abs=2.0)
+    assert tau_at_0 == pytest.approx(200.0, abs=2.0)
+
+    voltages = np.linspace(-90.0, 0.0, 19)
+    taus = np.array([_trn_icat_tau_ft_at(float(v)) for v in voltages])
+    assert np.all(np.diff(taus) > 0.0), (
+        f"tau_ft must be strictly increasing in V across [-90, 0] mV; "
+        f"got non-monotonic samples taus={taus}"
+    )
+
+
+def test_public_api_exports_trn_icat():
+    """make_trn_icat_channel is exported from the patch_sim public API."""
+    assert hasattr(patch_sim, "make_trn_icat_channel")
 
 
 # ---------------------------------------------------------------------------
