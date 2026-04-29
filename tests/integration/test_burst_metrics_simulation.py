@@ -90,14 +90,19 @@ def test_classic_hh_tonic_firing_does_not_report_genuine_bursting(
     assert analysis.burst_count <= 1
 
 
-def test_thalamic_relay_step_release_does_not_falsely_report_burst() -> None:
-    """A single rebound spike on Thalamic Relay must not be reported as a burst.
+def test_thalamic_relay_step_release_produces_multi_spike_lts_burst() -> None:
+    """Thalamic Relay fires a multi-spike LTS burst after hyperpolarising release.
 
-    With the default hyperpolarising step the Thalamic Relay preset
-    produces a single ICaT-driven rebound spike, not a multi-spike burst.
-    With the default ``min_spikes_per_burst`` of 2 the burst analyser
-    must therefore report zero bursts and surface the lone spike via
-    :attr:`unburst_spike_count`.
+    McCormick & Huguenard (1992), J. Neurophysiol. 68:1384 describe the TC
+    low-threshold-spike (LTS) burst as 3–7 Na⁺ spikes at 200–500 Hz riding on
+    the ICaT-driven calcium plateau.  Sustained hyperpolarisation
+    de-inactivates the ICaT ``ft`` gate; on release the LTS depolarises the
+    membrane and the TC-tuned slow ICaT inactivation
+    (:func:`~patch_sim.additional_channels.make_thalamic_relay_icat_channel`)
+    sustains the plateau long enough for several Na⁺ spikes to fire.
+
+    Verifies issue #287: prior to the fix, the TC preset produced only a
+    single rebound spike.
     """
     neuron = make_neuron(NEURON_PRESETS[THALAMIC_RELAY])
     pre = 50.0
@@ -111,8 +116,20 @@ def test_thalamic_relay_step_release_does_not_falsely_report_burst() -> None:
     )
     result = simulate_current_clamp(neuron, protocol)
     analysis = analyze_bursts_from_result(result, isi_threshold_ms=50.0)
-    assert analysis.burst_count == 0
-    assert analysis.duty_cycle is None
+    assert analysis.burst_count >= 1, (
+        f"Expected at least one LTS burst on rebound, "
+        f"got burst_count={analysis.burst_count}"
+    )
+    burst = analysis.bursts[0]
+    assert 3 <= burst.spike_count <= 7, (
+        f"Expected 3–7 Na⁺ spikes per LTS burst (McCormick & Huguenard 1992), "
+        f"got {burst.spike_count}"
+    )
+    assert burst.intra_burst_frequency is not None
+    assert 200.0 <= burst.intra_burst_frequency <= 500.0, (
+        f"Expected intra-burst frequency 200–500 Hz, "
+        f"got {burst.intra_burst_frequency:.1f} Hz"
+    )
 
 
 def test_no_spikes_returns_empty_burst_result_on_simulation(
