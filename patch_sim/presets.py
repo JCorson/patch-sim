@@ -444,11 +444,19 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # area_cm2 = 7e-6 cm² — ~15 µm soma characteristic of thalamic
         # reticular neurons.  C ≈ 7 pF in the simulation.
         #
-        # ICaT (g_T = 3.5 mS/cm²) drives rhythmic burst firing and
-        # sleep-spindle oscillations characteristic of TRN cells.
-        # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804;
-        #       Destexhe et al. (1994);
+        # Channel set: ICaT + IKCa over the HP92/Pospischil RE Na⁺/K⁺ core.
+        # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804 (TRN
+        #       low-threshold-spike biophysics, IKCa burst termination);
+        #       Destexhe et al. (1994), J. Neurophysiol. 72:803 (ICaT kinetics);
         #       Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (RE)
+        #       (g_Na, g_K, g_T, leak values).
+        #
+        # IKCa (g_KCa = 1.0 mS/cm², HP92): calcium-activated K⁺ current — the
+        # mechanism by which Ca²⁺ entry through ICaT is converted into outward
+        # K⁺ current to repolarise the cell.  IKCa shapes inter-spike intervals
+        # during sustained tonic firing (depolarising-step protocols) by
+        # producing a Ca²⁺-driven AHP after each spike, and contributes to
+        # burst termination during the LTS plateau.
         #
         # Huguenard & Prince (1992) / Pospischil (2008) Traub-Miles Na⁺/K⁺
         # kinetics (VT = −67 mV) replace the default HH52 core channels.
@@ -477,16 +485,38 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # R_in ≈ 14.3 kΩ·cm² (physiological range 10–15 ms/kΩ·cm²).
         # At v_rest = −80 mV, ICaT's inactivation gate ft_inf = 0.50 —
         # well de-inactivated for post-inhibitory rebound bursting.
+        #
+        # KNOWN LIMITATION (issue #286 follow-up): the published TRN burst
+        # phenotype is a 5–15 spike, 200–600 Hz Na⁺/K⁺ AP burst riding on the
+        # LTS plateau, terminated by IKCa-driven AHP.  Reproducing the full
+        # spike count requires ICaT inactivation kinetics with a larger time
+        # constant at depolarised voltages (~100–250 ms at the LTS plateau)
+        # than the cosh-shaped Destexhe (1994) defaults provide; the cosh
+        # tau peaks at the half-inactivation voltage (−80 mV) and falls off at
+        # depolarised V, so the LTS plateau decays in ~10 ms — too fast to fit
+        # 5+ Na⁺ spikes.  Increasing g_T to compensate makes the ICaT window
+        # at −80 mV destabilise rest (autonomous bursting) before the LTS
+        # plateau lengthens enough.  Resolving this requires a TRN-specific
+        # ICaT factory with a sigmoid-shaped tau (small at hyperpolarised V,
+        # large at depolarised V) — tracked separately.  This preset's IKCa
+        # addition delivers the AHP/inter-spike-interval shaping required by
+        # HP92's Fig. 2 tonic mode and is a prerequisite for the burst-mode
+        # work; the full rebound-burst phenotype is deferred.
         v_rest=-80.0,
         g_NaL=0.0062,
         g_KL=0.0638,
         T_ref=309.15,
         na_channel_factory=make_trn_na_channel,
         k_channel_factory=make_trn_k_channel,
-        channels=(ChannelConfig(make_icat_channel, g_max=3.5),),
+        channels=(
+            ChannelConfig(make_icat_channel, g_max=3.5),
+            ChannelConfig(make_ikca_channel, g_max=1.0),
+        ),
         # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
         # (3 µA/cm², 200 ms).  ICaT g=3.5 mS/cm² is the only Ca source; tau_ca=20 ms
         # allows de-inactivation between bursts; alpha_ca=1.2e-5 targets ~2.8 µM peak.
+        # IKCa (Hill K_d = 1 µM) activates strongly when ca_i exceeds ~1 µM during
+        # repetitive firing, providing AHP shaping between Na⁺/K⁺ spikes.
         calcium_dynamics=CalciumDynamics(alpha_ca=1.2e-5, tau_ca=20.0, ca_rest=1e-4),
         area_cm2=7e-6,
     ),
