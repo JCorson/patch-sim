@@ -191,11 +191,11 @@ def test_stn_conditional_burst_mode_under_hyperpolarising_step_release() -> None
         step_duration=stim,
     )
     result = simulate_current_clamp(neuron, protocol)
-    # Pin a threshold so the rebound spikes — too few ISIs (<4) to drive
-    # the auto-histogram path — are not swallowed by the default-fixed
-    # short-circuit (issue #290).  Rebound spikes are >100 Hz so 50 ms
-    # comfortably groups them while keeping any pre-stim tonic ISIs out.
-    analysis = analyze_bursts_from_result(result, isi_threshold_ms=50.0)
+    # The STN rebound is a tight cluster (3–8 spikes >100 Hz, ISIs <10 ms)
+    # — too few ISIs (<4) for the histogram, but the tight-cluster
+    # carve-out in ``analyze_bursts`` groups it into a single burst on the
+    # default-fixed path.  No threshold pin needed.
+    analysis = analyze_bursts_from_result(result)
     assert analysis.burst_count >= 1, (
         "STN: expected ≥1 rebound burst after −10 µA/cm² × 300 ms "
         f"hyperpolarisation, got burst_count={analysis.burst_count}"
