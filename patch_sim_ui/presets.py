@@ -10,6 +10,7 @@ from dataclasses import Field
 from dataclasses import fields as dc_fields
 from typing import Any
 
+from patch_sim.additional_channels import make_thalamic_relay_icat_channel
 from patch_sim.constants import (
     ACTION_POTENTIAL,
     DEFAULT_G_ICAL,
@@ -63,8 +64,13 @@ _DEFAULT_G_MAX: dict[str, float] = {
     "ican": DEFAULT_G_ICAN,
 }
 
-# Reverse map: factory function → channel name.
+# Reverse map: factory function → channel name.  Variant factories that
+# represent the same conceptual channel (e.g. the TC-specific ICaT) are
+# explicitly mapped to the same name as the canonical factory so that the UI
+# treats them as a single toggle.  ``_build_neuron`` recovers the correct
+# variant by re-looking up the preset's own channels tuple.
 _FACTORY_TO_NAME: dict[Any, str] = {v: k for k, v in CHANNEL_REGISTRY.items()}
+_FACTORY_TO_NAME[make_thalamic_relay_icat_channel] = "icat"
 
 
 def neuron_config_to_ui_state(config: NeuronConfig) -> dict[str, Any]:

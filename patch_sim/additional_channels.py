@@ -736,6 +736,59 @@ def make_icat_channel(
     )
 
 
+# Thalamic-relay-specific ICaT inactivation: 5× slower than the Destexhe
+# (1994) global default (tau_scale=20 ms).  McCormick & Huguenard (1992) report
+# tau_h_T ≈ 25–40 ms in the depolarised range used during the LTS plateau,
+# which is necessary to sustain the plateau long enough for 3–7 Na⁺ spikes
+# (issue #287).  Activation kinetics (dt half-point, slope, and tau) are
+# unchanged from the global ICaT.
+_alpha_ft_tc, _beta_ft_tc = boltzmann_cosh_rates(
+    half=-80.0, slope=-9.0, tau_scale=100.0, tau_floor=2.0
+)
+
+
+def make_thalamic_relay_icat_channel(
+    g_max: float = DEFAULT_G_ICAT,
+) -> IonChannel:
+    """Create the Thalamic-Relay-tuned ICaT (T-type Ca²⁺) channel.
+
+    Variant of :func:`make_icat_channel` with slower inactivation kinetics
+    (``ft`` tau_scale = 100 ms vs the global default 20 ms) that match the
+    McCormick & Huguenard (1992) recordings of guinea-pig dorsal LGN relay
+    neurons.  The slower inactivation sustains the low-threshold spike (LTS)
+    plateau long enough to support a multi-spike burst (3–7 Na⁺ spikes at
+    200–500 Hz) on hyperpolarising-step release — the defining feature of
+    TC burst mode (Sherman & Guillery 1996; Llinás & Jahnsen 1982).
+
+    Activation half-point and slope are unchanged from the global ICaT
+    (-56 mV / 6.2 mV).  Inactivation half-point also unchanged (-80 mV /
+    -9 mV slope).
+
+    The reversal potential is computed dynamically from the neuron's Ca²⁺
+    concentrations using the Nernst equation.
+
+    Reference: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384;
+    Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (TC).
+
+    Args:
+        g_max: Maximum conductance in mS/cm². Must be non-negative.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_ICAT`.
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the
+        Thalamic-Relay ICaT current.
+    """
+    dt_var = GatingVariable(name="dt", power=2, alpha=_alpha_dt, beta=_beta_dt)
+    ft_var = GatingVariable(name="ft", power=1, alpha=_alpha_ft_tc, beta=_beta_ft_tc)
+    return IonChannel(
+        name="CaT",
+        g_max=g_max,
+        gating_variables=(dt_var, ft_var),
+        reversal_spec=NernstSpec(IonSpecies.CALCIUM),
+        carries_calcium=True,
+    )
+
+
 # ---------------------------------------------------------------------------
 # ICaN — N-type Ca²⁺ channel (high-voltage activated)
 # ---------------------------------------------------------------------------
