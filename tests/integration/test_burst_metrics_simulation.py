@@ -15,7 +15,7 @@ from patch_sim.analysis.burst_metrics import (
     analyze_bursts_from_result,
 )
 from patch_sim.clamp_simulations import simulate_current_clamp
-from patch_sim.constants import PURKINJE, STN, THALAMIC_RELAY
+from patch_sim.constants import PURKINJE, STN, THALAMIC_RELAY, TRN
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESETS
@@ -176,6 +176,56 @@ def test_thalamic_relay_step_release_produces_multi_spike_lts_burst() -> None:
         "Unexpected isolated spikes outside the LTS burst — the rebound "
         "should be a single clean burst, not a burst plus stragglers; "
         f"got unburst_spike_count={analysis.unburst_spike_count}"
+    )
+
+
+def test_trn_step_release_produces_hp92_rebound_burst() -> None:
+    """TRN fires a 5–15 spike LTS rebound burst on hyperpolarising step release.
+
+    Huguenard & Prince (1992), J. Neurosci. 12:3804 describe the TRN burst
+    phenotype as 5–15 Na⁺ spikes at 200–600 Hz riding on the ICaT-driven
+    LTS plateau, terminated by IKCa-driven AHP.  The rebound mechanism
+    requires both Ih (activates during hyperpolarisation, provides
+    depolarising drive on release — Bal & McCormick 1993) and the
+    sigmoid-shaped ICaT inactivation tau (sustains the LTS plateau long
+    enough to fit 5+ spikes —
+    :func:`~patch_sim.additional_channels.make_trn_icat_channel`).
+
+    Verifies issue #295: prior to the fix, the cosh-shaped Destexhe (1994)
+    ICaT inactivation tau collapsed the LTS plateau in ~5–10 ms (too fast
+    to fit 5+ spikes), and the absence of Ih meant the LTS did not trigger
+    on rebound at all.
+
+    The TRN preset is spontaneously active (~3 Hz tonic) so this test
+    pre-hyperpolarises the cell with a brief baseline before the test step
+    and accepts a non-zero ``unburst_spike_count`` from the post-burst
+    return to tonic firing.
+    """
+    neuron = make_neuron(NEURON_PRESETS[TRN])
+    pre = 200.0
+    stim = 500.0
+    post = 200.0
+    protocol = step_current(
+        duration=pre + stim + post,
+        current_amplitude=-3.0,
+        step_start=pre,
+        step_duration=stim,
+    )
+    result = simulate_current_clamp(neuron, protocol)
+    analysis = analyze_bursts_from_result(result, isi_threshold_ms=50.0)
+    assert analysis.burst_count >= 1, (
+        f"Expected at least one LTS burst on rebound, "
+        f"got burst_count={analysis.burst_count}"
+    )
+    burst = analysis.bursts[0]
+    assert 5 <= burst.spike_count <= 15, (
+        f"Expected 5–15 Na⁺ spikes per LTS burst (Huguenard & Prince 1992), "
+        f"got {burst.spike_count}"
+    )
+    assert burst.intra_burst_frequency is not None
+    assert 200.0 <= burst.intra_burst_frequency <= 600.0, (
+        f"Expected intra-burst frequency 200–600 Hz (Huguenard & Prince 1992), "
+        f"got {burst.intra_burst_frequency:.1f} Hz"
     )
 
 
