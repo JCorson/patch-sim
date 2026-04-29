@@ -125,7 +125,11 @@ def test_single_spike_returns_zero_bursts_and_one_unburst_spike() -> None:
 def test_single_spike_with_min_one_returns_one_burst() -> None:
     """A single spike with min_spikes_per_burst=1 forms a single-spike burst."""
     ap = _make_ap_result([100.0])
-    result = analyze_bursts(ap, total_duration_ms=500.0, min_spikes_per_burst=1)
+    # Pin isi_threshold_ms so the analyser does not short-circuit to zero
+    # bursts on the ``default-fixed`` fallback (no ISIs to bisect).
+    result = analyze_bursts(
+        ap, total_duration_ms=500.0, isi_threshold_ms=50.0, min_spikes_per_burst=1
+    )
     assert result.burst_count == 1
     assert result.bursts[0].spike_count == 1
     assert result.bursts[0].duration == pytest.approx(0.0)
@@ -137,7 +141,11 @@ def test_single_burst_no_inter_burst_interval() -> None:
     """A clean cluster with all ISIs below threshold yields one burst with no IBI."""
     peak_times = [10.0, 15.0, 20.0, 25.0, 30.0]  # 5 spikes, 5 ms ISIs
     ap = _make_ap_result(peak_times)
-    result = analyze_bursts(ap, total_duration_ms=500.0)
+    # Uniform ISIs are unimodal, so the auto threshold falls back to
+    # ``default-fixed`` and the analyser short-circuits to zero bursts.
+    # Pin a user threshold to exercise the grouping path this test cares
+    # about.
+    result = analyze_bursts(ap, total_duration_ms=500.0, isi_threshold_ms=50.0)
     assert result.burst_count == 1
     burst = result.bursts[0]
     assert burst.spike_count == 5
@@ -249,6 +257,25 @@ def test_unimodal_isis_fall_back_to_default() -> None:
     result = analyze_bursts(ap, total_duration_ms=2000.0)
     assert result.threshold_method == "default-fixed"
     assert result.isi_threshold_ms == pytest.approx(_DEFAULT_THRESHOLD_MS)
+
+
+def test_default_fixed_method_short_circuits_to_zero_bursts() -> None:
+    """``default-fixed`` without a user threshold must report zero bursts.
+
+    A ``default-fixed`` outcome is the analyser signalling "I cannot detect
+    bursts here".  Propagating that as zero bursts (with every spike
+    surfaced via ``unburst_spike_count``) is more informative than
+    fabricating a single contiguous "burst" with no inter-burst interval.
+    """
+    peak_times = [10.0, 15.0, 20.0, 25.0, 30.0]  # uniform 5 ms ISIs → unimodal
+    ap = _make_ap_result(peak_times)
+    result = analyze_bursts(ap, total_duration_ms=500.0)
+    assert result.threshold_method == "default-fixed"
+    assert result.burst_count == 0
+    assert result.bursts == []
+    assert result.unburst_spike_count == ap.spike_count
+    assert result.mean_inter_burst_interval is None
+    assert result.duty_cycle is None
 
 
 def test_user_supplied_threshold_overrides_auto() -> None:

@@ -21,22 +21,15 @@ from patch_sim.presets import NEURON_PRESETS
 from patch_sim.protocols import step_current
 
 
-def test_purkinje_tonic_firing_groups_into_one_or_zero_bursts() -> None:
-    """Purkinje under a depolarising step is tonic, not multi-burst.
+def test_purkinje_tonic_firing_reports_zero_bursts() -> None:
+    """Purkinje under a depolarising step is tonic — zero bursts, all unburst.
 
     Purkinje is a tonic pacemaker (Raman & Bean 1999).  Under a moderate
     depolarising current it produces a regular tonic spike train with a
     unimodal ISI distribution, so the analyser cannot place an
-    auto-histogram threshold and falls back to ``"default-fixed"``.
-
-    Conceptually a tonic train has zero bursts.  However, with the
-    current 100 ms default threshold and Purkinje firing >10 Hz, every
-    ISI sits below the threshold and the analyser lumps the whole train
-    into one contiguous "burst" with no inter-burst interval — see
-    https://github.com/JCorson/patch-sim/issues/290.  Once that wart is
-    fixed, ``burst_count <= 1`` will tighten to ``== 0``.  The real
-    "no multi-burst structure" guarantee here is
-    ``mean_inter_burst_interval is None``, which holds either way.
+    auto-histogram threshold and falls back to ``"default-fixed"``.  In
+    that case the burst analyser short-circuits to zero bursts and
+    surfaces every spike via ``unburst_spike_count`` (issue #290).
 
     Complex-spike bursts in vivo are climbing-fibre driven and cannot be
     produced by this single-compartment, current-clamp preset.
@@ -49,28 +42,27 @@ def test_purkinje_tonic_firing_groups_into_one_or_zero_bursts() -> None:
         step_duration=580.0,
     )
     result = simulate_current_clamp(neuron, protocol)
+    time = np.asarray(result["time"])
+    total_duration_ms = float(time[-1] - time[0])
+    ap_result = patch_sim.analyze_aps_from_result(result)
+    analysis = analyze_bursts(ap_result, total_duration_ms=total_duration_ms)
 
-    analysis = analyze_bursts_from_result(result)
-    assert analysis.burst_count <= 1
+    assert analysis.threshold_method == "default-fixed"
+    assert analysis.burst_count == 0
+    assert analysis.bursts == []
+    assert analysis.unburst_spike_count == ap_result.spike_count
     assert analysis.mean_inter_burst_interval is None
-    assert analysis.isi_threshold_ms > 0.0
-    assert analysis.threshold_method in {"auto-histogram", "default-fixed"}
+    assert analysis.duty_cycle is None
 
 
-def test_classic_hh_tonic_firing_does_not_report_genuine_bursting(
+def test_classic_hh_tonic_firing_reports_zero_bursts(
     hh_model: Neuron,
 ) -> None:
-    """Tonic-firing HH should not report multi-burst structure.
+    """Tonic-firing HH reports zero bursts with all spikes surfaced as unburst.
 
-    Conceptually a tonic spike train has zero bursts.  However, with the
-    current 100 ms default threshold and HH firing well above 10 Hz at
-    +10 µA/cm², every ISI sits below the threshold and the analyser
-    lumps the whole train into one contiguous "burst" with no
-    inter-burst interval — see
-    https://github.com/JCorson/patch-sim/issues/290.  Once that wart is
-    fixed, ``burst_count <= 1`` will tighten to ``== 0``.  The real
-    "no multi-burst structure" guarantee here is
-    ``mean_inter_burst_interval is None``, which holds either way.
+    HH at +10 µA/cm² fires a regular tonic train with a unimodal ISI
+    distribution; the analyser falls back to ``"default-fixed"`` and the
+    short-circuit reports zero bursts (issue #290).
 
     Args:
         hh_model: Classic Hodgkin-Huxley neuron fixture.
@@ -82,12 +74,17 @@ def test_classic_hh_tonic_firing_does_not_report_genuine_bursting(
         step_duration=180.0,
     )
     result = simulate_current_clamp(hh_model, protocol)
-    analysis = analyze_bursts_from_result(result)
-    assert analysis.mean_inter_burst_interval is None, (
-        "Tonic firing must not report a multi-burst inter-burst interval; "
-        f"got burst_count={analysis.burst_count}"
-    )
-    assert analysis.burst_count <= 1
+    time = np.asarray(result["time"])
+    total_duration_ms = float(time[-1] - time[0])
+    ap_result = patch_sim.analyze_aps_from_result(result)
+    analysis = analyze_bursts(ap_result, total_duration_ms=total_duration_ms)
+
+    assert analysis.threshold_method == "default-fixed"
+    assert analysis.burst_count == 0
+    assert analysis.bursts == []
+    assert analysis.unburst_spike_count == ap_result.spike_count
+    assert analysis.mean_inter_burst_interval is None
+    assert analysis.duty_cycle is None
 
 
 def test_thalamic_relay_step_release_produces_multi_spike_lts_burst() -> None:
@@ -216,7 +213,11 @@ def test_stn_conditional_burst_mode_under_hyperpolarising_step_release() -> None
         step_duration=stim,
     )
     result = simulate_current_clamp(neuron, protocol)
-    analysis = analyze_bursts_from_result(result)
+    # Pin a threshold so the rebound spikes — too few ISIs (<4) to drive
+    # the auto-histogram path — are not swallowed by the default-fixed
+    # short-circuit (issue #290).  Rebound spikes are >100 Hz so 50 ms
+    # comfortably groups them while keeping any pre-stim tonic ISIs out.
+    analysis = analyze_bursts_from_result(result, isi_threshold_ms=50.0)
     assert analysis.burst_count >= 1, (
         "STN: expected ≥1 rebound burst after −10 µA/cm² × 300 ms "
         f"hyperpolarisation, got burst_count={analysis.burst_count}"
