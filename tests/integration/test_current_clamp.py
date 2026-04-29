@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
-from patch_sim.constants import PURKINJE
+from patch_sim.constants import PURKINJE, TRN
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
@@ -13,7 +13,14 @@ from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
 # Starting from v_rest = −65 mV it drifts below threshold — the stability
 # criterion does not apply.  See test_fires_spontaneously in
 # tests/integration/test_purkinje.py for the pacemaking behaviour check.
-_STABLE_PRESET_NAMES = [p for p in NEURON_PRESET_NAMES if p != PURKINJE]
+#
+# TRN is excluded for the same reason after issue #295 added Ih: the cell is
+# spontaneously active at ~3 Hz (consistent with the tonic firing reported in
+# HP92 and B&M93 slice recordings) and has no stable zero-current
+# equilibrium.  The HP92 rebound-burst phenotype (the key TRN behaviour) is
+# exercised by ``test_trn_step_release_produces_hp92_rebound_burst`` in
+# tests/integration/test_burst_metrics_simulation.py.
+_STABLE_PRESET_NAMES = [p for p in NEURON_PRESET_NAMES if p not in (PURKINJE, TRN)]
 
 
 def test_simulate_current_clamp_returns_structured_array(hh_model):
