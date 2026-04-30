@@ -571,18 +571,6 @@ def _compute_cc_multi_sweep_analysis(
     per_sweep_ap = [
         patch_sim.analyze_aps(time_arr, np.array(s.voltage)) for s in sweeps
     ]
-    # TEMPORARY DIAGNOSTIC (issue #295 follow-up): log per-sweep spike counts
-    # so we can verify the UI runtime sees the same results as the CLI tests.
-    for _idx, _ap in enumerate(per_sweep_ap):
-        _v_arr = np.array(sweeps[_idx].voltage)
-        logger.info(
-            "DIAG sweep %d: v_min=%.2f v_max=%.2f spike_count=%d peaks=%s",
-            _idx,
-            float(_v_arr.min()),
-            float(_v_arr.max()),
-            _ap.spike_count,
-            [round(s.peak_time, 1) for s in _ap.spikes],
-        )
 
     # --- AP metrics (pooled across all sweeps) ---
     all_spikes = [spike for ap in per_sweep_ap for spike in ap.spikes]
