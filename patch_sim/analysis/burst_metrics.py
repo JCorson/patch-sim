@@ -449,29 +449,20 @@ def analyze_bursts(
     if ap_result.spike_count == 0:
         return _empty_result(threshold, method)
 
+    # In the default-fixed path, group on ``_TIGHT_CLUSTER_MAX_ISI_MS``
+    # rather than the 100 ms displayed default so that contiguous runs of
+    # burst-territory ISIs (≤ 12 ms) are isolated from tonic-territory
+    # ISIs (> 12 ms) on traces that mix the two.  A size cap prevents
+    # sustained high-frequency tonic firing from being fabricated as one
+    # giant burst (issue #290).  The displayed ``isi_threshold_ms`` keeps
+    # the 100 ms default for backwards compatibility — it expresses the
+    # conceptual cap, not the grouper's runtime threshold.
     if method == "default-fixed" and isi_threshold_ms is None:
-        # ``default-fixed`` conflates two genuinely different shapes:
-        # tonic firing (many ISIs spread across the tonic range) and a
-        # tight cluster (a real LTS-style burst whose ISIs all sit well
-        # below the 100 ms default).  Disambiguate by ISI shape: a
-        # single-spike trace, or a short cluster (at most
-        # ``_TIGHT_CLUSTER_MAX_ISIS`` ISIs) where every ISI is below
-        # ``_TIGHT_CLUSTER_MAX_ISI_MS``, is unambiguously a tight burst
-        # — fall through to the grouper with the 100 ms default (every
-        # ISI is below it, so the cluster groups into one burst).
-        # Anything else short-circuits to zero bursts (issue #290 —
-        # protect against fabricating a giant burst from a tonic train).
-        isis = list(ap_result.isis)
-        tight_cluster = not isis or (
-            max(isis) < _TIGHT_CLUSTER_MAX_ISI_MS
-            and len(isis) <= _TIGHT_CLUSTER_MAX_ISIS
-        )
-        if not tight_cluster:
-            return _empty_result(
-                threshold,
-                method,
-                unburst_spike_count=ap_result.spike_count,
-            )
+        grouping_threshold = _TIGHT_CLUSTER_MAX_ISI_MS
+        burst_size_cap: int | None = _TIGHT_CLUSTER_MAX_ISIS + 1
+    else:
+        grouping_threshold = threshold
+        burst_size_cap = None
 
     # 1-spike traces fall through to the grouper so they are correctly
     # routed to ``unburst_spike_count`` under the default
@@ -481,9 +472,32 @@ def analyze_bursts(
     bursts, unburst = _group_spikes_into_bursts(
         peak_times,
         list(ap_result.isis),
-        threshold,
+        grouping_threshold,
         min_spikes_per_burst,
     )
+
+    # Apply the size cap (default-fixed only): bursts whose spike count
+    # exceeds ``_TIGHT_CLUSTER_MAX_ISIS + 1`` are sustained tonic trains
+    # and must be filtered back into ``unburst``.  Re-index the survivors
+    # so :attr:`BurstMetrics.index` runs 0..N-1 contiguously.
+    if burst_size_cap is not None and bursts:
+        survivors = [b for b in bursts if b.spike_count <= burst_size_cap]
+        rejected_spike_count = sum(
+            b.spike_count for b in bursts if b.spike_count > burst_size_cap
+        )
+        unburst += rejected_spike_count
+        bursts = [
+            BurstMetrics(
+                index=i,
+                start_time=b.start_time,
+                end_time=b.end_time,
+                duration=b.duration,
+                spike_count=b.spike_count,
+                intra_burst_frequency=b.intra_burst_frequency,
+                mean_intra_burst_isi=b.mean_intra_burst_isi,
+            )
+            for i, b in enumerate(survivors)
+        ]
 
     if not bursts:
         return BurstAnalysisResult(

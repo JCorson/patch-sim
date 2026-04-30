@@ -198,10 +198,12 @@ def test_trn_step_release_produces_hp92_rebound_burst() -> None:
 
     The TRN preset is spontaneously active (~3 Hz tonic) so this test
     accepts a non-zero ``unburst_spike_count`` from the pre-step tonic
-    firing and the post-burst return to tonic firing.  The tonic ISIs
-    (~330 ms) are well above the 50 ms threshold so they do not register
-    as additional bursts; ``burst_count == 1`` is asserted for defence in
-    depth.
+    firing and the post-burst return to tonic firing.  Calls
+    :func:`analyze_bursts_from_result` *without* a user-supplied
+    ``isi_threshold_ms`` so that this regression-tests the same path the
+    Reflex UI takes when the user runs the protocol — the default-fixed
+    embedded-burst carve-out must successfully isolate the rebound burst
+    from the surrounding tonic spikes.
     """
     neuron = make_neuron(NEURON_PRESETS[TRN])
     pre = 200.0
@@ -214,7 +216,7 @@ def test_trn_step_release_produces_hp92_rebound_burst() -> None:
         step_duration=stim,
     )
     result = simulate_current_clamp(neuron, protocol)
-    analysis = analyze_bursts_from_result(result, isi_threshold_ms=50.0)
+    analysis = analyze_bursts_from_result(result)
     assert analysis.burst_count == 1, (
         f"Expected exactly one LTS rebound burst, got burst_count="
         f"{analysis.burst_count} — additional bursts may indicate the "
