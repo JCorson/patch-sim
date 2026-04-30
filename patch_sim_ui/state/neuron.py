@@ -349,15 +349,23 @@ class NeuronState(rx.State):
         scalar_kwargs = {
             name: getattr(self, name) for name in presets.NEURON_CONFIG_SCALAR_FIELDS
         }
-        # area_cm2 is sourced from the active preset's NeuronConfig — it is a
-        # static physical attribute of the cell, not a user-editable value.
+        # area_cm2 and calcium_dynamics are sourced from the active preset's
+        # NeuronConfig.  area_cm2 is a static physical attribute of the cell,
+        # not user-editable.  calcium_dynamics carries the preset's tuned
+        # alpha_ca/tau_ca/ca_init — without forwarding them every preset
+        # would silently use NeuronConfig's auto-instantiated default
+        # (alpha_ca=1e-4, tau_ca=200 ms), which is dramatically off for
+        # presets that tune these for fast Ca clearance (e.g. TRN at
+        # tau_ca=20 ms — 10× faster than default).
         area_cm2 = preset_cfg.area_cm2 if preset_cfg else None
+        calcium_dynamics = preset_cfg.calcium_dynamics if preset_cfg else None
         config = patch_sim.NeuronConfig(
             **scalar_kwargs,
             channels=channels,
             na_channel_factory=na_factory,
             k_channel_factory=k_factory,
             area_cm2=area_cm2,
+            calcium_dynamics=calcium_dynamics,
         )
         return patch_sim.make_neuron(config=config)
 
