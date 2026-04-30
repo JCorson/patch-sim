@@ -23,7 +23,10 @@ from patch_sim.clamp_simulations import SimulationResult
 # Helpers
 # ---------------------------------------------------------------------------
 
-_DEFAULT_THRESHOLD_MS = 100.0
+# Mirrors patch_sim.analysis.burst_metrics._TIGHT_CLUSTER_MAX_ISI_MS — the
+# threshold the default-fixed path returns and applies to grouping when no
+# auto-histogram bimodality is detected.
+_DEFAULT_THRESHOLD_MS = 12.0
 
 
 def _make_ap_result(peak_times: list[float]) -> APAnalysisResult:
