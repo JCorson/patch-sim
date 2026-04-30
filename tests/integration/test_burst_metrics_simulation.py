@@ -14,11 +14,17 @@ from patch_sim.analysis.burst_metrics import (
     analyze_bursts,
     analyze_bursts_from_result,
 )
-from patch_sim.clamp_simulations import simulate_current_clamp
-from patch_sim.constants import PURKINJE, STN, THALAMIC_RELAY, TRN
+from patch_sim.clamp_simulations import simulate_batch, simulate_current_clamp
+from patch_sim.constants import (
+    HYPERPOLARIZATION_STEPS,
+    PURKINJE,
+    STN,
+    THALAMIC_RELAY,
+    TRN,
+)
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
-from patch_sim.presets import NEURON_PRESETS
+from patch_sim.presets import NEURON_PRESETS, build_protocol_from_preset
 from patch_sim.protocols import step_current
 
 
@@ -233,6 +239,65 @@ def test_trn_step_release_produces_hp92_rebound_burst() -> None:
         f"Expected intra-burst frequency 200–600 Hz (Huguenard & Prince 1992), "
         f"got {burst.intra_burst_frequency:.1f} Hz"
     )
+
+
+def test_trn_hyperpolarization_steps_protocol_produces_burst_per_sweep() -> None:
+    """The HYPERPOLARIZATION_STEPS protocol on TRN produces 5-spike+ bursts.
+
+    Exercises the exact code path the Reflex UI uses to run a multi-sweep
+    protocol:
+    - Build the protocol via :func:`build_protocol_from_preset` with the
+      TRN-specific overrides
+    - Simulate every sweep through :func:`simulate_batch` (the multi-sweep
+      executor used by the UI's run handler)
+    - Analyse APs per sweep with :func:`analyze_aps`
+
+    For each sweep at -3 to -5 µA/cm², asserts the burst-detection result
+    finds a burst with spike_count in [5, 15] and intra-burst frequency in
+    [200, 600] Hz (the HP92 phenotype).  This guards against regressions in
+    the multi-sweep UI scenario, which the single-sweep test
+    :func:`test_trn_step_release_produces_hp92_rebound_burst` does not
+    cover.
+    """
+    neuron = make_neuron(NEURON_PRESETS[TRN])
+    protocol = build_protocol_from_preset(HYPERPOLARIZATION_STEPS, neuron_preset=TRN)
+    assert protocol.shape[0] == 5, (
+        f"Expected 5 sweeps for TRN HYPERPOLARIZATION_STEPS, got {protocol.shape[0]}"
+    )
+
+    results = list(
+        simulate_batch(neuron, [sweep for sweep in protocol], simulate_current_clamp)
+    )
+
+    # Sweeps are min-to-max in current amplitude: index 0 is deepest (-5).
+    # Verify deeper sweeps (-5, -4, -3) all produce HP92-shape bursts.
+    for sweep_idx in (0, 1, 2):
+        result = results[sweep_idx]
+        time_arr = np.asarray(result["time"])
+        v_arr = np.asarray(result["voltage"])
+        ap_result = patch_sim.analyze_aps(time_arr, v_arr)
+        analysis = analyze_bursts(
+            ap_result, total_duration_ms=float(time_arr[-1] - time_arr[0])
+        )
+
+        assert analysis.burst_count >= 1, (
+            f"Sweep {sweep_idx} (deeper hyperpolarisation): expected ≥1 LTS "
+            f"rebound burst, got burst_count={analysis.burst_count}.  Total "
+            f"APs in sweep: {ap_result.spike_count}.  This indicates the TRN "
+            f"preset is not delivering the HP92 rebound phenotype on the "
+            f"multi-sweep UI path."
+        )
+        burst = analysis.bursts[0]
+        assert 5 <= burst.spike_count <= 15, (
+            f"Sweep {sweep_idx}: expected 5–15 Na⁺ spikes per burst "
+            f"(Huguenard & Prince 1992), got {burst.spike_count}"
+        )
+        assert burst.intra_burst_frequency is not None
+        assert 200.0 <= burst.intra_burst_frequency <= 600.0, (
+            f"Sweep {sweep_idx}: expected intra-burst frequency 200–600 Hz "
+            f"(Huguenard & Prince 1992), got "
+            f"{burst.intra_burst_frequency:.1f} Hz"
+        )
 
 
 def test_no_spikes_returns_empty_burst_result_on_simulation(
