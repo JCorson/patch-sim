@@ -7,8 +7,7 @@ threshold, and INaR is tracked in the simulation output.
 
 Also pins the pacemaker AP shape (half-width, peak, threshold, AHP, rate)
 against literature-cited tolerance bands from Häusser & Clark (1997) and
-Raman & Bean (1999).  All five metrics fit their bands following the
-g_Na/g_K calibration in #299.
+Raman & Bean (1999).
 """
 
 import numpy as np
