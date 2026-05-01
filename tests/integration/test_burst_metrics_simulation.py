@@ -40,6 +40,12 @@ def test_purkinje_tonic_firing_reports_zero_bursts() -> None:
 
     Complex-spike bursts in vivo are climbing-fibre driven and cannot be
     produced by this single-compartment, current-clamp preset.
+
+    The first ~50 ms of the trace is discarded so the autonomous
+    oscillator can settle onto its limit cycle: starting from ``v_rest``
+    (not a point on the cycle) produces a brief onset spike doublet that
+    the analyser would correctly classify as a 2-spike burst, masking
+    the steady-state tonic phenotype this test is pinning.
     """
     neuron = make_neuron(NEURON_PRESETS[PURKINJE])
     protocol = step_current(
@@ -50,8 +56,13 @@ def test_purkinje_tonic_firing_reports_zero_bursts() -> None:
     )
     result = simulate_current_clamp(neuron, protocol)
     time = np.asarray(result["time"])
-    total_duration_ms = float(time[-1] - time[0])
-    ap_result = patch_sim.analyze_aps_from_result(result)
+    voltage = np.asarray(result["voltage"])
+    settle_ms = 50.0
+    settle_mask = time >= settle_ms
+    steady_time = time[settle_mask]
+    steady_voltage = voltage[settle_mask]
+    total_duration_ms = float(steady_time[-1] - steady_time[0])
+    ap_result = patch_sim.analyze_aps(steady_time, steady_voltage)
     analysis = analyze_bursts(ap_result, total_duration_ms=total_duration_ms)
 
     assert analysis.threshold_method == "default-fixed"
