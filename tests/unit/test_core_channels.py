@@ -7,6 +7,8 @@ import pytest
 from patch_sim.channels import IonChannel, IonSpecies, NernstSpec
 from patch_sim.core_channels import (
     DOPAMINERGIC_VT,
+    MAINEN_SEJNOWSKI_KV_PRESCALE,
+    MAINEN_SEJNOWSKI_KV_VHALF,
     POSPISCHIL_VT,
     PURKINJE_VT,
     _stn_alpha_h,
@@ -27,10 +29,18 @@ from patch_sim.core_channels import (
     dopaminergic_beta_h,
     dopaminergic_beta_m,
     dopaminergic_beta_n,
+    mainen_sejnowski_alpha_h,
+    mainen_sejnowski_alpha_m,
+    mainen_sejnowski_alpha_n,
+    mainen_sejnowski_beta_h,
+    mainen_sejnowski_beta_m,
+    mainen_sejnowski_beta_n,
     make_dopaminergic_k_channel,
     make_dopaminergic_na_channel,
     make_k_channel,
     make_k_leak_channel,
+    make_mainen_sejnowski_kv_channel,
+    make_mainen_sejnowski_na_channel,
     make_na_channel,
     make_na_leak_channel,
     make_pospischil_k_channel,
@@ -517,6 +527,269 @@ def test_pospischil_k_channel_current_matches_inline(V: float) -> None:
     E_K = ch.reversal_potential(neuron)
     expected = neuron.g_K * (n**4) * (V - E_K)
     assert result == pytest.approx(expected)
+
+
+# ===========================================================================
+# Mainen & Sejnowski (1996) cortical pyramidal Kv kinetics
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Rate function positivity
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, 0.0, 25.0, 40.0])
+def test_mainen_sejnowski_alpha_n_positive(V: float) -> None:
+    """mainen_sejnowski_alpha_n is positive at physiological voltages."""
+    assert mainen_sejnowski_alpha_n(V, 0.0) > 0
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, 0.0, 25.0, 40.0])
+def test_mainen_sejnowski_beta_n_positive(V: float) -> None:
+    """mainen_sejnowski_beta_n is positive at physiological voltages."""
+    assert mainen_sejnowski_beta_n(V, 0.0) > 0
+
+
+# ---------------------------------------------------------------------------
+# Singularity guards at V = V_½ = +25 mV
+# ---------------------------------------------------------------------------
+
+# Expected L'Hôpital limits with the 23 → 34 °C Q10 = 2.3 pre-scale baked in:
+#   alpha_n(25) = 0.02 * 2.55 * 9 = 0.459 / ms
+#   beta_n(25)  = 0.002 * 2.55 * 9 = 0.0459 / ms
+_MS_ALPHA_N_LIMIT = 0.02 * MAINEN_SEJNOWSKI_KV_PRESCALE * 9.0
+_MS_BETA_N_LIMIT = 0.002 * MAINEN_SEJNOWSKI_KV_PRESCALE * 9.0
+
+
+def test_mainen_sejnowski_alpha_n_singularity_guard() -> None:
+    """mainen_sejnowski_alpha_n returns the L'Hôpital limit at V = 25 mV."""
+    assert mainen_sejnowski_alpha_n(MAINEN_SEJNOWSKI_KV_VHALF, 0.0) == pytest.approx(
+        _MS_ALPHA_N_LIMIT
+    )
+
+
+def test_mainen_sejnowski_alpha_n_continuous_above() -> None:
+    """mainen_sejnowski_alpha_n is continuous approaching the singularity from above."""
+    assert mainen_sejnowski_alpha_n(
+        MAINEN_SEJNOWSKI_KV_VHALF + 1e-5, 0.0
+    ) == pytest.approx(_MS_ALPHA_N_LIMIT, rel=1e-3)
+
+
+def test_mainen_sejnowski_alpha_n_continuous_below() -> None:
+    """mainen_sejnowski_alpha_n is continuous approaching the singularity from below."""
+    assert mainen_sejnowski_alpha_n(
+        MAINEN_SEJNOWSKI_KV_VHALF - 1e-5, 0.0
+    ) == pytest.approx(_MS_ALPHA_N_LIMIT, rel=1e-3)
+
+
+def test_mainen_sejnowski_beta_n_singularity_guard() -> None:
+    """mainen_sejnowski_beta_n returns the L'Hôpital limit at V = 25 mV."""
+    assert mainen_sejnowski_beta_n(MAINEN_SEJNOWSKI_KV_VHALF, 0.0) == pytest.approx(
+        _MS_BETA_N_LIMIT
+    )
+
+
+def test_mainen_sejnowski_beta_n_continuous_above() -> None:
+    """mainen_sejnowski_beta_n is continuous approaching the singularity from above."""
+    assert mainen_sejnowski_beta_n(
+        MAINEN_SEJNOWSKI_KV_VHALF + 1e-5, 0.0
+    ) == pytest.approx(_MS_BETA_N_LIMIT, rel=1e-3)
+
+
+def test_mainen_sejnowski_beta_n_continuous_below() -> None:
+    """mainen_sejnowski_beta_n is continuous approaching the singularity from below."""
+    assert mainen_sejnowski_beta_n(
+        MAINEN_SEJNOWSKI_KV_VHALF - 1e-5, 0.0
+    ) == pytest.approx(_MS_BETA_N_LIMIT, rel=1e-3)
+
+
+# ---------------------------------------------------------------------------
+# Steady-state shape: high-threshold, mostly closed at rest
+# ---------------------------------------------------------------------------
+
+
+def test_mainen_sejnowski_n_inf_closed_at_rest() -> None:
+    """n_inf is < 0.05 at v_rest = -70 mV (channel almost fully closed)."""
+    a = mainen_sejnowski_alpha_n(-70.0, 0.0)
+    b = mainen_sejnowski_beta_n(-70.0, 0.0)
+    n_inf = a / (a + b)
+    assert n_inf < 0.05
+
+
+def test_mainen_sejnowski_n_inf_strongly_open_at_peak() -> None:
+    """n_inf > 0.9 above the AP peak voltage so K⁺ repolarises after the spike.
+
+    The published M-S Kv has α/β = 10 at V = ``MAINEN_SEJNOWSKI_KV_VHALF`` (the
+    rate-function singularity), so n_inf ≈ 0.91 there.  This is intentional —
+    the channel is essentially fully open above ~+10 mV, providing strong
+    repolarising drive once the AP threshold is crossed.
+    """
+    a = mainen_sejnowski_alpha_n(MAINEN_SEJNOWSKI_KV_VHALF, 0.0)
+    b = mainen_sejnowski_beta_n(MAINEN_SEJNOWSKI_KV_VHALF, 0.0)
+    n_inf = a / (a + b)
+    assert n_inf > 0.9
+
+
+def test_mainen_sejnowski_n_inf_half_activated_near_zero() -> None:
+    """n_inf passes through 0.5 between -5 and +10 mV (true activation V_½).
+
+    Solving α(V) = β(V) for the published prefactors gives V_½ ≈ +4.3 mV.
+    The activation V_½ is *not* the same as MAINEN_SEJNOWSKI_KV_VHALF — that
+    constant marks the rate-function singularity at V = +25 mV.
+    """
+    n_inf_minus5 = mainen_sejnowski_alpha_n(-5.0, 0.0) / (
+        mainen_sejnowski_alpha_n(-5.0, 0.0) + mainen_sejnowski_beta_n(-5.0, 0.0)
+    )
+    n_inf_plus10 = mainen_sejnowski_alpha_n(10.0, 0.0) / (
+        mainen_sejnowski_alpha_n(10.0, 0.0) + mainen_sejnowski_beta_n(10.0, 0.0)
+    )
+    assert n_inf_minus5 < 0.5 < n_inf_plus10
+
+
+# ---------------------------------------------------------------------------
+# ca_i independence
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("V", [-65.0, 0.0, 30.0])
+@pytest.mark.parametrize(
+    "fn",
+    [mainen_sejnowski_alpha_n, mainen_sejnowski_beta_n],
+)
+def test_mainen_sejnowski_rate_functions_ignore_ca_i(V: float, fn: Rate) -> None:
+    """Mainen-Sejnowski Kv rates return the same value regardless of ca_i."""
+    assert fn(V, 0.0) == pytest.approx(fn(V, 1.0))
+
+
+# ---------------------------------------------------------------------------
+# Factory function structure
+# ---------------------------------------------------------------------------
+
+
+def test_make_mainen_sejnowski_kv_channel_structure() -> None:
+    """make_mainen_sejnowski_kv_channel returns a channel with correct structure.
+
+    Uses channel name ``"Kv"`` (not ``"K"``) and gating-variable name ``"nKv"``
+    so it can coexist with a Pospischil delayed rectifier in the same neuron
+    if a future preset wants a dual-K architecture.
+    """
+    ch = make_mainen_sejnowski_kv_channel(g_max=30.0)
+    assert isinstance(ch, IonChannel)
+    assert ch.name == "Kv"
+    assert ch.g_max == pytest.approx(30.0)
+    assert len(ch.gating_variables) == 1
+    assert ch.gating_variables[0].name == "nKv"
+    assert ch.gating_variables[0].power == 1
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
+    assert not ch.carries_calcium
+
+
+# ---------------------------------------------------------------------------
+# Mainen-Sejnowski Na rate functions and factory
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, -35.0, 0.0, 40.0])
+def test_mainen_sejnowski_na_rates_positive(V: float) -> None:
+    """All M-S Na rate functions are positive at physiological voltages."""
+    assert mainen_sejnowski_alpha_m(V, 0.0) > 0
+    assert mainen_sejnowski_beta_m(V, 0.0) > 0
+    assert mainen_sejnowski_alpha_h(V, 0.0) > 0
+    assert mainen_sejnowski_beta_h(V, 0.0) > 0
+
+
+def test_mainen_sejnowski_alpha_m_singularity_guard() -> None:
+    """alpha_m returns the trap0 L'Hôpital limit at V = tha = -35 mV."""
+    expected = 0.182 * MAINEN_SEJNOWSKI_KV_PRESCALE * 9.0
+    assert mainen_sejnowski_alpha_m(-35.0, 0.0) == pytest.approx(expected)
+
+
+def test_mainen_sejnowski_beta_m_singularity_guard() -> None:
+    """beta_m hits its singularity at the same V = -35 mV (-V = -tha branch).
+
+    The na.mod ``trap0(-v, -tha, Rb, qa)`` form has its removable singularity
+    at -V = -tha = +35 mV, i.e. V = -35 mV — the same physical voltage as
+    the α_m singularity.
+    """
+    expected = 0.124 * MAINEN_SEJNOWSKI_KV_PRESCALE * 9.0
+    assert mainen_sejnowski_beta_m(-35.0, 0.0) == pytest.approx(expected)
+
+
+def test_mainen_sejnowski_alpha_m_continuous_around_singularity() -> None:
+    """alpha_m is continuous approaching the singularity from either side."""
+    expected = 0.182 * MAINEN_SEJNOWSKI_KV_PRESCALE * 9.0
+    above = mainen_sejnowski_alpha_m(-35.0 + 1e-5, 0.0)
+    below = mainen_sejnowski_alpha_m(-35.0 - 1e-5, 0.0)
+    assert above == pytest.approx(expected, rel=1e-3)
+    assert below == pytest.approx(expected, rel=1e-3)
+
+
+def test_mainen_sejnowski_h_inf_open_at_rest() -> None:
+    """h_inf > 0.5 at v_rest = -70 mV (Na channels mostly available for the next AP).
+
+    Boltzmann form gives h_inf(-70) = 1/(1 + exp(-5/6.2)) ≈ 0.69 — just
+    above half-availability, consistent with most Na channels being open
+    and ready to fire.
+    """
+    a = mainen_sejnowski_alpha_h(-70.0, 0.0)
+    b = mainen_sejnowski_beta_h(-70.0, 0.0)
+    h_inf = a / (a + b)
+    assert h_inf > 0.5
+
+
+def test_mainen_sejnowski_h_inf_strongly_inactivated_at_minus_20() -> None:
+    """h_inf < 0.001 at V = -20 mV (steady-state Na window current is tiny).
+
+    Critical for the cortical pyramidal preset's equilibrium analysis:
+    Pospischil Na has h_inf ≈ 0.034 at -20 mV, producing a large Na window
+    current that prevents the bracket [-100, -20] from finding a unique
+    zero crossing once Kv kinetics are slowed.  M-S Na's stronger
+    inactivation (h_inf ≈ 7e-4 at -20 mV) eliminates that current.
+    """
+    a = mainen_sejnowski_alpha_h(-20.0, 0.0)
+    b = mainen_sejnowski_beta_h(-20.0, 0.0)
+    h_inf = a / (a + b)
+    assert h_inf < 0.001
+
+
+def test_mainen_sejnowski_m_inf_strongly_open_at_peak() -> None:
+    """m_inf > 0.95 at V = +30 mV (full activation during AP peak)."""
+    a = mainen_sejnowski_alpha_m(30.0, 0.0)
+    b = mainen_sejnowski_beta_m(30.0, 0.0)
+    m_inf = a / (a + b)
+    assert m_inf > 0.95
+
+
+@pytest.mark.parametrize("V", [-65.0, 0.0, 30.0])
+@pytest.mark.parametrize(
+    "fn",
+    [
+        mainen_sejnowski_alpha_m,
+        mainen_sejnowski_beta_m,
+        mainen_sejnowski_alpha_h,
+        mainen_sejnowski_beta_h,
+    ],
+)
+def test_mainen_sejnowski_na_rates_ignore_ca_i(V: float, fn: Rate) -> None:
+    """M-S Na rate functions return the same value regardless of ca_i."""
+    assert fn(V, 0.0) == pytest.approx(fn(V, 1.0))
+
+
+def test_make_mainen_sejnowski_na_channel_structure() -> None:
+    """make_mainen_sejnowski_na_channel returns a channel with correct structure."""
+    ch = make_mainen_sejnowski_na_channel(g_max=50.0)
+    assert isinstance(ch, IonChannel)
+    assert ch.name == "Na"
+    assert ch.g_max == pytest.approx(50.0)
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "m"
+    assert ch.gating_variables[0].power == 3
+    assert ch.gating_variables[1].name == "h"
+    assert ch.gating_variables[1].power == 1
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.SODIUM
+    assert not ch.carries_calcium
 
 
 # ---------------------------------------------------------------------------

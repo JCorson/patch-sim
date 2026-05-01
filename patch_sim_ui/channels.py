@@ -125,6 +125,15 @@ ADDITIONAL_CHANNELS: tuple[ChannelMeta, ...] = (
         gating_var_colors={"nk": "#DAA520"},
     ),
     ChannelMeta(
+        id="mskv",
+        current_key="Kv",
+        label="Kv (Mainen-Sejnowski K\u207a)",
+        gating_vars=("nKv",),
+        g_max_range=(0.0, 50.0, 0.1),
+        current_color="#1f77b4",
+        gating_var_colors={"nKv": "#aec7e8"},
+    ),
+    ChannelMeta(
         id="inap",
         current_key="INaP",
         label="INaP (Persistent Na\u207a)",

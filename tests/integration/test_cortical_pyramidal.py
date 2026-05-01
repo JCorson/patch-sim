@@ -7,10 +7,10 @@ reduced conductances prevent spontaneous tonic firing.
 
 Also pins the regular-spiking AP shape (half-width, peak, threshold, AHP)
 against literature-cited tolerance bands from McCormick et al. (1985) and
-Connors & Gutnick (1990).  Several of these are currently ``xfail`` because
-the Pospischil kinetics produce APs that are narrower and have a deeper AHP
-than reported for L5 RS pyramidal cells; they are pending biology-fix
-issues.
+Connors & Gutnick (1990).  All four shape bands are now satisfied with the
+Pospischil Na + Mainen-Sejnowski Kv kinetic pair adopted in #311 (the
+slower M-S Kv broadens the AP into the 1.0–2.5 ms half-width band that the
+Pospischil Traub-Miles n^4 form alone could not reach).
 """
 
 import numpy as np
@@ -299,26 +299,15 @@ def test_cp_ap_threshold_in_rs_range(cp_ap_shape_result) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Traub-Miles n-gate kinetics adopted by Pospischil (2008) repolarise "
-        "faster than the 1.0–2.5 ms RS half-width reported by McCormick et al. "
-        "(1985).  At mammalian temperature the n-gate time constant near the "
-        "AP peak is ~0.3 ms, capping achievable half-width at ~0.5 ms even "
-        "with the published Pospischil RS conductances and Q10=1.  Reaching "
-        "the literature band requires a slower delayed-rectifier (e.g. "
-        "Mainen-Sejnowski Kv) — tracked in #311."
-    ),
-)
 def test_cp_ap_half_width_in_rs_range(cp_ap_shape_result) -> None:
     """Mean AP half-width matches the regular-spiking phenotype (1.0–2.5 ms).
 
     RS pyramidal APs at ~32–37 °C are markedly broader than fast-spiking
-    interneuron APs.  The current model's half-width is ~0.5 ms — closer to
-    FS-interneuron values — because the Traub-Miles n-gate kinetics built
-    into Pospischil 2008 repolarise too quickly; conductance scaling alone
-    cannot bridge the gap to the 1.0+ ms RS band.
+    interneuron APs.  Reaching the McCormick et al. (1985) band of 1.0+ ms
+    required swapping the Pospischil Traub-Miles n^4 delayed rectifier for
+    the high-threshold, slow-deactivation Mainen-Sejnowski (1996) Kv
+    channel as the sole K conductance, with Q10 = 1.0 to match the slice
+    recording temperatures used by McCormick (issue #311).
     """
     assert_ap_shape(
         cp_ap_shape_result,
