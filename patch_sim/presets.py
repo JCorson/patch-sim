@@ -732,8 +732,10 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 1.0,
             "stimulus_duration": 15.0,
         },
-        # 800 ms at 5 µA/cm² is long enough for IM to accumulate and produce
-        # clearly increasing inter-spike intervals (spike-frequency adaptation).
+        # 800 ms at 5 µA/cm² is long enough for the (now reduced) IM to
+        # accumulate and produce a measurable increase in inter-spike intervals
+        # (spike-frequency adaptation); under Pospischil g_M=0.075 the effect
+        # is modest (~10% ISI growth) but reliably present.
         REPETITIVE_FIRING: {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
