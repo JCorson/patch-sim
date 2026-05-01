@@ -103,7 +103,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # ~+44 mV and AHP ~−81 mV — both Na and K drive were larger than
         # needed, pulling V toward E_Na on the upstroke and E_K on the
         # undershoot.  Halving each conductance preserves the high firing rate
-        # (~240 Hz at 30 µA/cm², well inside the 100–500 Hz FS band) and keeps
+        # (~237 Hz at 30 µA/cm², well inside the 100–500 Hz FS band) and keeps
         # half-width ~0.30 ms (band 0.25–0.7 ms), while bringing peak and AHP
         # into band (issue #301).
         #
@@ -125,11 +125,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # g_NaL + g_KL = 1.5 mS/cm² gives τ_m ≈ 0.67 ms — highly leaky membrane
         # that narrows the synaptic integration window, a hallmark of FS cells.
-        # Values tuned so that I_NaL + I_KL + I_channels = 0 at v_rest = −65 mV
-        # with K_out=4 mM (E_K ≈ −95 mV) and Pospischil channel steady-state
-        # currents; the leak split is unchanged from the earlier high-conductance
-        # setting because Pospischil m³h ≈ 1e-6 and n⁴ ≈ 0.001 at V=−65 mV, so
-        # the active channel rest currents are negligible.
+        # Values originally tuned so that I_NaL + I_KL + I_channels = 0 at
+        # v_rest = −65 mV with K_out=4 mM (E_K ≈ −95 mV) and the previous
+        # higher-conductance setting.  At rest the Pospischil m³h ≈ 1.1e-8 and
+        # n⁴ ≈ 4.4e-9, and IKv3.1 nk² ≈ 1.3e-4 — small enough that halving
+        # each active conductance does not perturb v_rest measurably; the leak
+        # split is therefore kept identical, and `test_fs_no_spontaneous_firing`
+        # confirms the cell still rests stably below threshold.
         g_Na=80.0,
         g_K=30.0,
         g_NaL=0.3115,
