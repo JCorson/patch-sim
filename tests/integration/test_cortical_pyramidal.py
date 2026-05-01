@@ -308,7 +308,7 @@ def test_cp_ap_threshold_in_rs_range(cp_ap_shape_result) -> None:
         "AP peak is ~0.3 ms, capping achievable half-width at ~0.5 ms even "
         "with the published Pospischil RS conductances and Q10=1.  Reaching "
         "the literature band requires a slower delayed-rectifier (e.g. "
-        "Mainen-Sejnowski Kv) which is out of scope for #298 — tracked there."
+        "Mainen-Sejnowski Kv) — tracked in #311."
     ),
 )
 def test_cp_ap_half_width_in_rs_range(cp_ap_shape_result) -> None:
