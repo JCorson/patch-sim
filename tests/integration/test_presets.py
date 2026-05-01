@@ -34,6 +34,7 @@ from patch_sim.constants import (
 from patch_sim.core_channels import (
     make_dopaminergic_k_channel,
     make_dopaminergic_na_channel,
+    make_mainen_sejnowski_kv_channel,
     make_pospischil_k_channel,
     make_pospischil_na_channel,
     make_purkinje_k_channel,
@@ -219,10 +220,14 @@ def test_cortical_pyramidal_uses_pospischil_na_factory() -> None:
     assert config.na_channel_factory is make_pospischil_na_channel
 
 
-def test_cortical_pyramidal_uses_pospischil_k_factory() -> None:
-    """Cortical Pyramidal preset wires the Pospischil K⁺ channel factory."""
+def test_cortical_pyramidal_uses_mainen_sejnowski_kv_via_channels() -> None:
+    """Cortical Pyramidal includes Mainen-Sejnowski Kv via channels list (#311)."""
     config = NEURON_PRESETS[CORTICAL_PYRAMIDAL]
-    assert config.k_channel_factory is make_pospischil_k_channel
+    factories = {ch.factory for ch in config.channels}
+    assert make_mainen_sejnowski_kv_channel in factories
+    # Pospischil K is no longer the primary K channel — replaced by M-S Kv as
+    # the sole delayed rectifier (g_K=0).
+    assert config.g_K == 0.0
 
 
 def test_fsi_uses_pospischil_na_factory() -> None:
