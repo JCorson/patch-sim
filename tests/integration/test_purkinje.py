@@ -7,8 +7,7 @@ threshold, and INaR is tracked in the simulation output.
 
 Also pins the pacemaker AP shape (half-width, peak, threshold, AHP, rate)
 against literature-cited tolerance bands from Häusser & Clark (1997) and
-Raman & Bean (1999).  The peak voltage and AHP depth currently fall outside
-the literature range and are marked ``xfail`` pending biology fixes.
+Raman & Bean (1999).
 """
 
 import numpy as np
@@ -247,14 +246,6 @@ def test_pk_ap_threshold_in_pacemaker_range(pk_pacemaker_ap_result) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Mean peak voltage ~+47 mV slightly exceeds the +10 to +40 mV range "
-        "reported for Purkinje pacemaker APs (Häusser & Clark 1997). Likely "
-        "g_Na too high relative to leak; tracked in #299."
-    ),
-)
 def test_pk_ap_peak_voltage_in_pacemaker_range(pk_pacemaker_ap_result) -> None:
     """Mean AP peak voltage falls within the Purkinje range (+10 to +40 mV)."""
     assert_ap_shape(
@@ -264,15 +255,6 @@ def test_pk_ap_peak_voltage_in_pacemaker_range(pk_pacemaker_ap_result) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Mean AHP depth ~−82 mV is deeper than the −55 to −72 mV range "
-        "reported for Purkinje pacemaker AHPs (Raman & Bean 1999). Suggests "
-        "g_K(D) or g_KCa over-tuned for stability rather than physiology; "
-        "tracked in #299."
-    ),
-)
 def test_pk_ap_ahp_depth_in_pacemaker_range(pk_pacemaker_ap_result) -> None:
     """Mean AHP depth falls within the Purkinje range (−55 to −72 mV)."""
     assert_ap_shape(

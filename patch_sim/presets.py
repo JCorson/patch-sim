@@ -260,7 +260,19 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # g_NaL = 0 / g_KL = 0.044 mS/cm²: pure K⁺ background leak.
         # τ_m = C_m / g_KL ≈ 22.7 ms and R_in ≈ 22.7 kΩ·cm², consistent with
         # somatic recordings in cerebellar slice (Roth & Häusser 2001).
+        #
+        # g_Na = 30 mS/cm² and g_K = 10 mS/cm² are explicit somatic densities
+        # for the single-compartment reduction.  g_Na sits at the lower end of
+        # the somatic NaF range reported by Khaliq et al. (2003) (~30–50
+        # mS/cm²); g_K bundles delayed-rectifier and other K⁺ currents that
+        # exist as separate compartments in the original DSB94 multi-
+        # compartment model (somatic g_Kdr = 4.5 alone).  These values place
+        # the AP peak in the +10 to +40 mV band of Häusser & Clark (1997) and
+        # the AHP near −68 mV, inside the −55 to −72 mV band of Raman & Bean
+        # (1999).
         v_rest=-65.0,
+        g_Na=30.0,
+        g_K=10.0,
         g_NaL=0.0,
         g_KL=0.044,
         T_ref=305.15,
