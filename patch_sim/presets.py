@@ -49,7 +49,6 @@ from .constants import (
 from .core_channels import (
     make_dopaminergic_k_channel,
     make_dopaminergic_na_channel,
-    make_k_channel,
     make_mainen_sejnowski_kv_channel,
     make_pospischil_k_channel,
     make_pospischil_na_channel,
@@ -164,10 +163,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # bands (half-width, peak, threshold, AHP) are simultaneously
         # satisfied.
         #
-        # g_K (Pospischil) = 0; M-S Kv g = 1.8 mS/cm² is the sole delayed
-        # rectifier.  Adding any Pospischil K back in (even at g_K = 1) is
-        # enough to drive fast repolarisation that narrows the spike below
-        # 1 ms again — the slow vs fast K balance is what actually controls
+        # k_channel_factory remains pinned to make_pospischil_k_channel for
+        # symmetry with the rest of the Pospischil-Na family (FSI, CA1) but
+        # is configured to ``g_K=0`` so it contributes no current.  All
+        # active K conductance comes from M-S Kv (g_max=1.8 mS/cm²) wired
+        # via the channels list.  Reintroducing any Pospischil K (even
+        # g_K=1) drives fast early repolarisation that narrows the spike
+        # below 1 ms — the slow vs fast K balance is what actually controls
         # half-width here, not the absolute K conductance.
         #
         # Trade-off: with the slow M-S Kv as the sole K channel,
@@ -206,7 +208,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         Q10=1.0,
         T_ref=307.15,
         na_channel_factory=make_pospischil_na_channel,
-        k_channel_factory=make_k_channel,
+        k_channel_factory=make_pospischil_k_channel,
         channels=(
             ChannelConfig(make_ih_channel, g_max=0.3),
             ChannelConfig(make_inap_channel, g_max=0.1),

@@ -623,18 +623,21 @@ def make_pospischil_k_channel(g_max: float) -> IonChannel:
 # singularity at V = +25 mV; n_inf 50% point at V ≈ +4 mV) widely used in
 # cortical pyramidal cell models.
 #
-# Used by ``CORTICAL_PYRAMIDAL`` to broaden the AP half-width into the
-# literature 1.0–2.5 ms band (McCormick et al. 1985), where the Pospischil
-# Traub-Miles n^4 form alone caps half-width at ~0.5 ms because τ_n ≈ 0.3 ms
-# near AP peak (issue #311).  Mainen-Sejnowski Kv is closed at rest, opens
-# rapidly only on the upstroke, and deactivates on a τ ~1–2 ms scale.
+# Used by ``CORTICAL_PYRAMIDAL`` as the sole delayed rectifier (replacing
+# Pospischil Kd) to broaden the AP half-width into the literature 1.0–2.5 ms
+# band (McCormick et al. 1985), where the Pospischil Traub-Miles n^4 form
+# alone caps half-width at ~0.5 ms because τ_n ≈ 0.3 ms near AP peak
+# (issue #311).  Mainen-Sejnowski Kv is closed at rest, opens rapidly only
+# on the upstroke, and deactivates on a τ ~1–2 ms scale.
 #
-# This channel is named ``"Kv"`` (not ``"K"``) and is added as an auxiliary
-# channel alongside Pospischil's primary delayed rectifier ``"K"`` — a
-# dual-K architecture.  Pospischil K provides outward current at depolarised
-# voltages (V ≈ -40 to -20 mV), which keeps the equilibrium analysis
-# bracket [-100, -20] working; M-S Kv provides the slow K component that
-# broadens the AP.
+# This channel is named ``"Kv"`` (not ``"K"``) and is wired in via the
+# preset's ``channels`` list rather than its ``k_channel_factory``.  The
+# ``k_channel_factory`` remains pointed at ``make_pospischil_k_channel``
+# but with ``g_K=0`` so the Pospischil delayed rectifier is structurally
+# present (consistent with FSI / CA1 / other Pospischil-Na presets) but
+# contributes no current — keeping the cortical preset's na/k factory
+# pair conceptually aligned with the rest of the family while the active
+# K conductance comes entirely from M-S Kv.
 #
 # Temperature pre-scale: Mainen & Sejnowski measured at 23 °C with Q10 = 2.3.
 # The cortical pyramidal preset uses T_ref = 307.15 K (34 °C, Pospischil
@@ -733,12 +736,12 @@ def make_mainen_sejnowski_kv_channel(g_max: float = DEFAULT_G_MSKV) -> IonChanne
     1.0–2.5 ms half-width band that the Pospischil n^4 form cannot reach on
     its own at any g_K (issue #311).
 
-    The channel name is ``"Kv"`` (not ``"K"``) so that this can coexist with
-    a Pospischil ``"K"`` delayed rectifier in the same neuron — the dual-K
-    architecture used by ``CORTICAL_PYRAMIDAL``.  Pospischil K stays as the
-    fast component (provides outward current at depolarised voltages, so
-    the equilibrium analysis bracket [-100, -20] still works); M-S Kv adds
-    the slow component that broadens the AP.
+    The channel name is ``"Kv"`` (not ``"K"``) and the gating-variable name
+    is ``"nKv"`` so the channel can be added via a preset's ``channels``
+    list without colliding with a primary delayed-rectifier produced by
+    ``k_channel_factory``.  In ``CORTICAL_PYRAMIDAL`` this M-S Kv is the
+    only active K conductance — Pospischil's K factory is kept wired up
+    for structural symmetry but pinned to ``g_K=0``.
 
     Rate constants are pre-scaled from the published 23 °C kinetics to 34 °C
     using Q10 = 2.3, so the channel matches the ``CORTICAL_PYRAMIDAL``
@@ -798,14 +801,11 @@ _MAINEN_SEJNOWSKI_NA_RD: float = 0.024 * MAINEN_SEJNOWSKI_KV_PRESCALE
 #: Pre-scaled h-gate τ beta-branch prefactor at 34 °C (= 0.0091 / ms × 2.55).
 _MAINEN_SEJNOWSKI_NA_RG: float = 0.0091 * MAINEN_SEJNOWSKI_KV_PRESCALE
 
-#: h-gate steady-state Boltzmann V_½ (mV) (na.mod ``thinf``).  Combined with
-#: ``qinf=6.2`` gives h_inf ≈ 7e-4 at V = -20 mV — far smaller than the
-#: Pospischil h_inf ≈ 0.034 at the same voltage, which means M-S Na carries
-#: only a tiny window current at sustained depolarised V.  This is what
-#: lets the cortical pyramidal preset's static-gating equilibrium analysis
-#: (find_zero_current_voltage with bracket [-100, -20]) still find a unique
-#: zero crossing near v_rest with the slow Kv kinetics needed for the
-#: 1.0–2.5 ms half-width band (issue #311).
+#: h-gate steady-state Boltzmann V_½ (mV) (na.mod ``thinf``).  Combined
+#: with ``qinf=6.2`` gives h_inf ≈ 7×10⁻⁴ at V = -20 mV — far smaller
+#: than the Pospischil h_inf ≈ 0.034 at the same voltage.  M-S Na
+#: therefore carries only a tiny window current at sustained depolarised
+#: V relative to Pospischil Na.
 _MAINEN_SEJNOWSKI_NA_THINF: float = -65.0
 
 #: h-gate steady-state Boltzmann slope (mV) (na.mod ``qinf``).
@@ -968,22 +968,21 @@ def make_mainen_sejnowski_na_channel(g_max: float) -> IonChannel:
 
     Implements the fast Na⁺ kinetics from Mainen & Sejnowski (1996) via
     activation gate ``m`` (power 3) and inactivation gate ``h`` (power 1).
-    Two properties make this preferable to Pospischil Na for the cortical
-    pyramidal preset (issue #311):
+    Distinctive features relative to the Pospischil Na channel:
 
-    1. **Stronger steady-state inactivation at depolarised V** — h_inf
-       passes through 0.5 at V = -65 mV (vs -56 for Pospischil) and
-       collapses to ~7×10⁻⁴ at V = -20 mV.  This eliminates the large
-       Na window current at -20 mV that prevented the equilibrium-analysis
-       bracket [-100, -20] from finding a unique zero crossing once Kv
-       was switched to a slow (Mainen-Sejnowski) form.
-    2. **Slower h-gate τ at peak voltages** — τ_h ≈ 0.4 ms at +30 mV
-       (vs ≈0.18 ms for Pospischil), letting the AP repolarise on a ~1 ms
-       timescale rather than ~0.5 ms — the co-design needed for the L5
-       RS half-width band.
+    * **Stronger steady-state inactivation at depolarised V** — h_inf
+      passes through 0.5 at V = -65 mV (vs -56 for Pospischil) and
+      collapses to ~7×10⁻⁴ at V = -20 mV (vs ~0.034 for Pospischil), so
+      the steady-state Na window current at sustained depolarised V is
+      ~50× smaller than Pospischil's.
+
+    Currently no preset wires this Na factory in — it is provided as a
+    building block alongside :func:`make_mainen_sejnowski_kv_channel`
+    (issue #311) for any future cortical-style preset that needs the
+    weaker depolarised-V window current.
 
     Rate constants are pre-scaled from the published 23 °C kinetics to
-    34 °C using Q10 = 2.3, matching the ``CORTICAL_PYRAMIDAL`` preset's
+    34 °C using Q10 = 2.3, matching the cortical pyramidal preset's
     ``T_ref = 307.15 K``.  Reversal potential is computed dynamically via
     the Nernst equation for Na⁺.
 
