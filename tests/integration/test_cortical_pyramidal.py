@@ -304,8 +304,8 @@ def test_cp_ap_threshold_in_rs_range(cp_ap_shape_result) -> None:
     reason=(
         "Pospischil Na⁺/K⁺ kinetics produce mean half-width ~0.35 ms, well "
         "below the 1.0–2.5 ms range reported for L5 RS pyramidal cells "
-        "(McCormick et al. 1985).  Likely too-fast K⁺ deactivation; pending "
-        "biology fix — TODO: link GitHub issue once filed."
+        "(McCormick et al. 1985).  Likely too-fast K⁺ deactivation; tracked "
+        "in #298."
     ),
 )
 def test_cp_ap_half_width_in_rs_range(cp_ap_shape_result) -> None:
@@ -327,8 +327,7 @@ def test_cp_ap_half_width_in_rs_range(cp_ap_shape_result) -> None:
     reason=(
         "Mean peak voltage ~+47 mV slightly exceeds the +20 to +45 mV range "
         "typically reported for L5 RS pyramidal cells (McCormick et al. 1985). "
-        "Likely g_Na too high relative to leak; pending biology fix — TODO: "
-        "link GitHub issue once filed."
+        "Likely g_Na too high relative to leak; tracked in #298."
     ),
 )
 def test_cp_ap_peak_voltage_in_rs_range(cp_ap_shape_result) -> None:
@@ -346,7 +345,7 @@ def test_cp_ap_peak_voltage_in_rs_range(cp_ap_shape_result) -> None:
         "Mean AHP depth ~−85 mV is far deeper than the −50 to −70 mV range "
         "reported for fast-AHP after a single AP in L5 RS pyramidal cells "
         "(McCormick et al. 1985).  Suggests g_K(D) or leak K too dominant; "
-        "pending biology fix — TODO: link GitHub issue once filed."
+        "tracked in #298."
     ),
 )
 def test_cp_ap_ahp_depth_in_rs_range(cp_ap_shape_result) -> None:

@@ -252,8 +252,7 @@ def test_pk_ap_threshold_in_pacemaker_range(pk_pacemaker_ap_result) -> None:
     reason=(
         "Mean peak voltage ~+47 mV slightly exceeds the +10 to +40 mV range "
         "reported for Purkinje pacemaker APs (Häusser & Clark 1997). Likely "
-        "g_Na too high relative to leak; pending biology fix — TODO: link "
-        "GitHub issue once filed."
+        "g_Na too high relative to leak; tracked in #299."
     ),
 )
 def test_pk_ap_peak_voltage_in_pacemaker_range(pk_pacemaker_ap_result) -> None:
@@ -271,7 +270,7 @@ def test_pk_ap_peak_voltage_in_pacemaker_range(pk_pacemaker_ap_result) -> None:
         "Mean AHP depth ~−82 mV is deeper than the −55 to −72 mV range "
         "reported for Purkinje pacemaker AHPs (Raman & Bean 1999). Suggests "
         "g_K(D) or g_KCa over-tuned for stability rather than physiology; "
-        "pending biology fix — TODO: link GitHub issue once filed."
+        "tracked in #299."
     ),
 )
 def test_pk_ap_ahp_depth_in_pacemaker_range(pk_pacemaker_ap_result) -> None:
