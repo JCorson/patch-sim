@@ -29,13 +29,18 @@ from patch_sim.core_channels import (
     dopaminergic_beta_h,
     dopaminergic_beta_m,
     dopaminergic_beta_n,
+    mainen_sejnowski_alpha_h,
+    mainen_sejnowski_alpha_m,
     mainen_sejnowski_alpha_n,
+    mainen_sejnowski_beta_h,
+    mainen_sejnowski_beta_m,
     mainen_sejnowski_beta_n,
     make_dopaminergic_k_channel,
     make_dopaminergic_na_channel,
     make_k_channel,
     make_k_leak_channel,
-    make_mainen_sejnowski_k_channel,
+    make_mainen_sejnowski_kv_channel,
+    make_mainen_sejnowski_na_channel,
     make_na_channel,
     make_na_leak_channel,
     make_pospischil_k_channel,
@@ -661,17 +666,129 @@ def test_mainen_sejnowski_rate_functions_ignore_ca_i(V: float, fn: Rate) -> None
 # ---------------------------------------------------------------------------
 
 
-def test_make_mainen_sejnowski_k_channel_structure() -> None:
-    """make_mainen_sejnowski_k_channel returns a channel with correct structure."""
-    ch = make_mainen_sejnowski_k_channel(g_max=30.0)
+def test_make_mainen_sejnowski_kv_channel_structure() -> None:
+    """make_mainen_sejnowski_kv_channel returns a channel with correct structure.
+
+    Uses channel name ``"Kv"`` (not ``"K"``) and gating-variable name ``"nKv"``
+    so it can coexist with a Pospischil delayed rectifier in the same neuron
+    if a future preset wants a dual-K architecture.
+    """
+    ch = make_mainen_sejnowski_kv_channel(g_max=30.0)
     assert isinstance(ch, IonChannel)
-    assert ch.name == "K"
+    assert ch.name == "Kv"
     assert ch.g_max == pytest.approx(30.0)
     assert len(ch.gating_variables) == 1
-    assert ch.gating_variables[0].name == "n"
+    assert ch.gating_variables[0].name == "nKv"
     assert ch.gating_variables[0].power == 1
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.POTASSIUM
+    assert not ch.carries_calcium
+
+
+# ---------------------------------------------------------------------------
+# Mainen-Sejnowski Na rate functions and factory
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("V", [-100.0, -65.0, -35.0, 0.0, 40.0])
+def test_mainen_sejnowski_na_rates_positive(V: float) -> None:
+    """All M-S Na rate functions are positive at physiological voltages."""
+    assert mainen_sejnowski_alpha_m(V, 0.0) > 0
+    assert mainen_sejnowski_beta_m(V, 0.0) > 0
+    assert mainen_sejnowski_alpha_h(V, 0.0) > 0
+    assert mainen_sejnowski_beta_h(V, 0.0) > 0
+
+
+def test_mainen_sejnowski_alpha_m_singularity_guard() -> None:
+    """alpha_m returns the trap0 L'Hôpital limit at V = tha = -35 mV."""
+    expected = 0.182 * MAINEN_SEJNOWSKI_KV_PRESCALE * 9.0
+    assert mainen_sejnowski_alpha_m(-35.0, 0.0) == pytest.approx(expected)
+
+
+def test_mainen_sejnowski_beta_m_singularity_guard() -> None:
+    """beta_m hits its singularity at the same V = -35 mV (-V = -tha branch).
+
+    The na.mod ``trap0(-v, -tha, Rb, qa)`` form has its removable singularity
+    at -V = -tha = +35 mV, i.e. V = -35 mV — the same physical voltage as
+    the α_m singularity.
+    """
+    expected = 0.124 * MAINEN_SEJNOWSKI_KV_PRESCALE * 9.0
+    assert mainen_sejnowski_beta_m(-35.0, 0.0) == pytest.approx(expected)
+
+
+def test_mainen_sejnowski_alpha_m_continuous_around_singularity() -> None:
+    """alpha_m is continuous approaching the singularity from either side."""
+    expected = 0.182 * MAINEN_SEJNOWSKI_KV_PRESCALE * 9.0
+    above = mainen_sejnowski_alpha_m(-35.0 + 1e-5, 0.0)
+    below = mainen_sejnowski_alpha_m(-35.0 - 1e-5, 0.0)
+    assert above == pytest.approx(expected, rel=1e-3)
+    assert below == pytest.approx(expected, rel=1e-3)
+
+
+def test_mainen_sejnowski_h_inf_open_at_rest() -> None:
+    """h_inf > 0.5 at v_rest = -70 mV (Na channels mostly available for the next AP).
+
+    Boltzmann form gives h_inf(-70) = 1/(1 + exp(-5/6.2)) ≈ 0.69 — just
+    above half-availability, consistent with most Na channels being open
+    and ready to fire.
+    """
+    a = mainen_sejnowski_alpha_h(-70.0, 0.0)
+    b = mainen_sejnowski_beta_h(-70.0, 0.0)
+    h_inf = a / (a + b)
+    assert h_inf > 0.5
+
+
+def test_mainen_sejnowski_h_inf_strongly_inactivated_at_minus_20() -> None:
+    """h_inf < 0.001 at V = -20 mV (steady-state Na window current is tiny).
+
+    Critical for the cortical pyramidal preset's equilibrium analysis:
+    Pospischil Na has h_inf ≈ 0.034 at -20 mV, producing a large Na window
+    current that prevents the bracket [-100, -20] from finding a unique
+    zero crossing once Kv kinetics are slowed.  M-S Na's stronger
+    inactivation (h_inf ≈ 7e-4 at -20 mV) eliminates that current.
+    """
+    a = mainen_sejnowski_alpha_h(-20.0, 0.0)
+    b = mainen_sejnowski_beta_h(-20.0, 0.0)
+    h_inf = a / (a + b)
+    assert h_inf < 0.001
+
+
+def test_mainen_sejnowski_m_inf_strongly_open_at_peak() -> None:
+    """m_inf > 0.95 at V = +30 mV (full activation during AP peak)."""
+    a = mainen_sejnowski_alpha_m(30.0, 0.0)
+    b = mainen_sejnowski_beta_m(30.0, 0.0)
+    m_inf = a / (a + b)
+    assert m_inf > 0.95
+
+
+@pytest.mark.parametrize("V", [-65.0, 0.0, 30.0])
+@pytest.mark.parametrize(
+    "fn",
+    [
+        mainen_sejnowski_alpha_m,
+        mainen_sejnowski_beta_m,
+        mainen_sejnowski_alpha_h,
+        mainen_sejnowski_beta_h,
+    ],
+)
+def test_mainen_sejnowski_na_rates_ignore_ca_i(V: float, fn: Rate) -> None:
+    """M-S Na rate functions return the same value regardless of ca_i."""
+    assert fn(V, 0.0) == pytest.approx(fn(V, 1.0))
+
+
+def test_make_mainen_sejnowski_na_channel_structure() -> None:
+    """make_mainen_sejnowski_na_channel returns a channel with correct structure."""
+    ch = make_mainen_sejnowski_na_channel(g_max=50.0)
+    assert isinstance(ch, IonChannel)
+    assert ch.name == "Na"
+    assert ch.g_max == pytest.approx(50.0)
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "m"
+    assert ch.gating_variables[0].power == 3
+    assert ch.gating_variables[1].name == "h"
+    assert ch.gating_variables[1].power == 1
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.SODIUM
     assert not ch.carries_calcium
 
 

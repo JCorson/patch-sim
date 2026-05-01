@@ -44,6 +44,7 @@ from .constants import (
 from .core_channels import (
     make_k_channel,
     make_k_leak_channel,
+    make_mainen_sejnowski_kv_channel,
     make_na_channel,
     make_na_leak_channel,
 )
@@ -165,6 +166,7 @@ CHANNEL_REGISTRY: dict[str, Callable[..., IonChannel]] = {
     "ih": make_ih_channel,
     "ika": make_ika_channel,
     "ikv31": make_ikv31_channel,
+    "mskv": make_mainen_sejnowski_kv_channel,
     "inap": make_inap_channel,
     "inar": make_inar_channel,
     "im": make_im_channel,

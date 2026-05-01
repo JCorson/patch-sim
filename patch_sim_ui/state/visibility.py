@@ -100,6 +100,8 @@ class VisibilityState(rx.State):
     show_ika_gating: bool = True
     show_ikv31_current: bool = True
     show_ikv31_gating: bool = True
+    show_mskv_current: bool = True
+    show_mskv_gating: bool = True
     show_inap_current: bool = True
     show_inap_gating: bool = True
     show_inar_current: bool = True
