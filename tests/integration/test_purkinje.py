@@ -4,17 +4,24 @@ Verifies spontaneous pacemaking driven by Ih (hyperpolarization-activated
 current) and the NaP/NaR window-current complex: the cell fires autonomously
 without external current, INaP provides persistent inward current near
 threshold, and INaR is tracked in the simulation output.
+
+Also pins the pacemaker AP shape (half-width, peak, threshold, AHP, rate)
+against literature-cited tolerance bands from Häusser & Clark (1997) and
+Raman & Bean (1999).  The peak voltage and AHP depth currently fall outside
+the literature range and are marked ``xfail`` pending biology fixes.
 """
 
 import numpy as np
 import pytest
 
+from patch_sim.analysis.ap_metrics import analyze_aps_from_result
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
 from patch_sim.constants import PURKINJE
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESETS
 from patch_sim.protocols import step_current
+from tests.integration._ap_shape import assert_ap_shape
 
 # ---------------------------------------------------------------------------
 # Shared fixture and helpers
@@ -177,3 +184,99 @@ def test_complex_spiking_with_strong_stimulus(pk_neuron: Neuron) -> None:
     result = simulate_current_clamp(pk_neuron, current_external=protocol)
     n_aps = _count_action_potentials(result["voltage"])
     assert n_aps >= 6, f"Expected at least 6 complex spikes with 10 µA/cm², got {n_aps}"
+
+
+# ---------------------------------------------------------------------------
+# AP shape — pacemaker phenotype, Häusser & Clark (1997);
+# Raman & Bean (1999).  Each metric has its own test so future biology fixes
+# can flip xfail markers one at a time.  Shape is measured under spontaneous
+# (zero-current) pacemaking, the canonical Purkinje protocol.
+# ---------------------------------------------------------------------------
+
+_PK_REFERENCE = "Häusser & Clark 1997 / Raman & Bean 1999"
+_PK_SPONTANEOUS_DURATION_MS = 500.0
+
+
+@pytest.fixture
+def pk_pacemaker_ap_result(pk_neuron: Neuron):
+    """AP analysis of Purkinje under zero-current spontaneous pacemaking.
+
+    Mirrors the protocol used by ``test_fires_spontaneously`` so the shape
+    bands and the qualitative pacemaking assertion live on the same trace.
+    """
+    zero_current = np.zeros(_ms_to_samples(_PK_SPONTANEOUS_DURATION_MS) + 1)
+    result = simulate_current_clamp(pk_neuron, current_external=zero_current)
+    return analyze_aps_from_result(result)
+
+
+def test_pk_spontaneous_firing_rate_in_pacemaker_range(pk_pacemaker_ap_result) -> None:
+    """Spontaneous firing rate falls within the pacemaker range (10–50 Hz).
+
+    Häusser & Clark (1997) report rat Purkinje cells firing autonomously
+    around 30–90 Hz at 32–37 °C in slice; rates drop closer to 10–30 Hz at
+    room temperature.  Tolerance band 10–50 Hz covers both regimes.
+    """
+    assert_ap_shape(
+        pk_pacemaker_ap_result,
+        reference=_PK_REFERENCE,
+        firing_rate_hz=(10.0, 50.0),
+        min_spike_count=5,
+    )
+
+
+def test_pk_ap_half_width_in_pacemaker_range(pk_pacemaker_ap_result) -> None:
+    """Mean AP half-width matches the narrow Purkinje phenotype (0.2–0.6 ms).
+
+    Raman & Bean (1999) report half-widths in the 0.2–0.5 ms range for
+    Purkinje cells in slice; 0.6 ms upper bound allows for room-temperature
+    broadening.
+    """
+    assert_ap_shape(
+        pk_pacemaker_ap_result,
+        reference=_PK_REFERENCE,
+        half_width_ms=(0.2, 0.6),
+    )
+
+
+def test_pk_ap_threshold_in_pacemaker_range(pk_pacemaker_ap_result) -> None:
+    """Mean AP threshold falls in the literature Purkinje range (−55 to −40 mV)."""
+    assert_ap_shape(
+        pk_pacemaker_ap_result,
+        reference=_PK_REFERENCE,
+        threshold_mv=(-55.0, -40.0),
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Mean peak voltage ~+47 mV slightly exceeds the +10 to +40 mV range "
+        "reported for Purkinje pacemaker APs (Häusser & Clark 1997). Likely "
+        "g_Na too high relative to leak; tracked in #299."
+    ),
+)
+def test_pk_ap_peak_voltage_in_pacemaker_range(pk_pacemaker_ap_result) -> None:
+    """Mean AP peak voltage falls within the Purkinje range (+10 to +40 mV)."""
+    assert_ap_shape(
+        pk_pacemaker_ap_result,
+        reference=_PK_REFERENCE,
+        peak_mv=(10.0, 40.0),
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Mean AHP depth ~−82 mV is deeper than the −55 to −72 mV range "
+        "reported for Purkinje pacemaker AHPs (Raman & Bean 1999). Suggests "
+        "g_K(D) or g_KCa over-tuned for stability rather than physiology; "
+        "tracked in #299."
+    ),
+)
+def test_pk_ap_ahp_depth_in_pacemaker_range(pk_pacemaker_ap_result) -> None:
+    """Mean AHP depth falls within the Purkinje range (−55 to −72 mV)."""
+    assert_ap_shape(
+        pk_pacemaker_ap_result,
+        reference=_PK_REFERENCE,
+        ahp_mv=(-72.0, -55.0),
+    )
