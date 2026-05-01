@@ -235,9 +235,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # compartment model (somatic g_Kdr = 4.5 alone).  These values place
         # the AP peak in the +10 to +40 mV band of Häusser & Clark (1997) and
         # the AHP near −68 mV, inside the −55 to −72 mV band of Raman & Bean
-        # (1999).  Issue #299: the previous configuration silently inherited
-        # NeuronConfig's HH52 squid-axon defaults (g_Na = 120, g_K = 36),
-        # which drove the AP peak to ~+47 mV and AHP to ~−82 mV.
+        # (1999).
         v_rest=-65.0,
         g_Na=30.0,
         g_K=10.0,
