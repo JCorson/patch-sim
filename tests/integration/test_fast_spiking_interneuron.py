@@ -130,14 +130,6 @@ def test_fs_ap_threshold_in_fs_range(fs_ap_shape_result) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Mean peak voltage ~+44 mV exceeds the +10 to +40 mV range reported "
-        "for cortical FS interneurons (Erisir et al. 1999). Likely g_Na too "
-        "high relative to leak; tracked in #301."
-    ),
-)
 def test_fs_ap_peak_voltage_in_fs_range(fs_ap_shape_result) -> None:
     """Mean AP peak voltage falls within the FS range (+10 to +40 mV)."""
     assert_ap_shape(
@@ -147,15 +139,6 @@ def test_fs_ap_peak_voltage_in_fs_range(fs_ap_shape_result) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Mean AHP depth ~−81 mV is deeper than the −60 to −78 mV range "
-        "reported for cortical FS interneurons (Erisir et al. 1999; "
-        "Kawaguchi 1995). Suggests g_KL or Kv3.1 conductance over-tuned; "
-        "tracked in #301."
-    ),
-)
 def test_fs_ap_ahp_depth_in_fs_range(fs_ap_shape_result) -> None:
     """Mean AHP depth falls within the FS range (−78 to −60 mV)."""
     assert_ap_shape(
