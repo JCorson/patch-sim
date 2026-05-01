@@ -4,17 +4,26 @@ Verifies that the three auxiliary channel behaviors — voltage sag (Ih),
 subthreshold amplification (INaP), and spike-frequency adaptation (IM) —
 are present after the conductance reductions in PR #206, and that the
 reduced conductances prevent spontaneous tonic firing.
+
+Also pins the regular-spiking AP shape (half-width, peak, threshold, AHP)
+against literature-cited tolerance bands from McCormick et al. (1985) and
+Connors & Gutnick (1990).  Several of these are currently ``xfail`` because
+the Pospischil kinetics produce APs that are narrower and have a deeper AHP
+than reported for L5 RS pyramidal cells; they are pending biology-fix
+issues.
 """
 
 import numpy as np
 import pytest
 
+from patch_sim.analysis.ap_metrics import analyze_aps_from_result
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
 from patch_sim.constants import CORTICAL_PYRAMIDAL
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESETS
 from patch_sim.protocols import step_current
+from tests.integration._ap_shape import assert_ap_shape
 
 # ---------------------------------------------------------------------------
 # Shared fixture and helpers
@@ -243,3 +252,107 @@ def test_suprathreshold_fires_action_potentials(cp_neuron: Neuron) -> None:
     # At least one AP must be detected.
     n_aps = _count_action_potentials(voltage)
     assert n_aps >= 1, f"Expected at least 1 AP, detected {n_aps}"
+
+
+# ---------------------------------------------------------------------------
+# AP shape — regular-spiking phenotype, McCormick et al. (1985);
+# Connors & Gutnick (1990).  Each metric has its own test so future biology
+# fixes can flip xfail markers one at a time without rewriting a single
+# multi-assertion test.
+# ---------------------------------------------------------------------------
+
+# Suprathreshold step shared by the AP-shape battery: 5 µA/cm² for 800 ms,
+# matching the existing test_spike_frequency_adaptation stimulus.  This
+# stimulus reliably produces tens of APs across the step, giving a stable
+# mean for half-width / peak / threshold / AHP without being so strong that
+# it pins voltage at the Na⁺ reversal.
+_AP_SHAPE_STEP_DURATION_MS = 800.0
+_AP_SHAPE_STEP_CURRENT = 5.0
+_RS_REFERENCE = "McCormick et al. 1985 / Connors & Gutnick 1990"
+
+
+@pytest.fixture
+def cp_ap_shape_result(cp_neuron: Neuron):
+    """AP-shape analysis of cortical pyramidal under the standard suprathreshold step.
+
+    Cached per-test via the ``cp_neuron`` fixture so that each shape-band
+    test does not re-run the simulation.
+    """
+    protocol = step_current(
+        duration=_AP_SHAPE_STEP_DURATION_MS,
+        current_amplitude=_AP_SHAPE_STEP_CURRENT,
+    )
+    result = simulate_current_clamp(cp_neuron, current_external=protocol)
+    return analyze_aps_from_result(result)
+
+
+def test_cp_ap_threshold_in_rs_range(cp_ap_shape_result) -> None:
+    """Mean AP threshold falls in the literature RS-pyramidal range.
+
+    McCormick et al. (1985) report threshold around −55 to −40 mV for L5
+    regular-spiking pyramidal cells in slice.
+    """
+    assert_ap_shape(
+        cp_ap_shape_result,
+        reference=_RS_REFERENCE,
+        threshold_mv=(-55.0, -40.0),
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Pospischil Na⁺/K⁺ kinetics produce mean half-width ~0.35 ms, well "
+        "below the 1.0–2.5 ms range reported for L5 RS pyramidal cells "
+        "(McCormick et al. 1985).  Likely too-fast K⁺ deactivation; pending "
+        "biology fix — TODO: link GitHub issue once filed."
+    ),
+)
+def test_cp_ap_half_width_in_rs_range(cp_ap_shape_result) -> None:
+    """Mean AP half-width matches the regular-spiking phenotype (1.0–2.5 ms).
+
+    RS pyramidal APs at ~32–37 °C are markedly broader than fast-spiking
+    interneuron APs.  The current model's half-width hovers around 0.35 ms,
+    closer to FS-interneuron values, indicating a kinetic mismatch.
+    """
+    assert_ap_shape(
+        cp_ap_shape_result,
+        reference=_RS_REFERENCE,
+        half_width_ms=(1.0, 2.5),
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Mean peak voltage ~+47 mV slightly exceeds the +20 to +45 mV range "
+        "typically reported for L5 RS pyramidal cells (McCormick et al. 1985). "
+        "Likely g_Na too high relative to leak; pending biology fix — TODO: "
+        "link GitHub issue once filed."
+    ),
+)
+def test_cp_ap_peak_voltage_in_rs_range(cp_ap_shape_result) -> None:
+    """Mean AP peak voltage falls within the RS-pyramidal range (+20 to +45 mV)."""
+    assert_ap_shape(
+        cp_ap_shape_result,
+        reference=_RS_REFERENCE,
+        peak_mv=(20.0, 45.0),
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Mean AHP depth ~−85 mV is far deeper than the −50 to −70 mV range "
+        "reported for fast-AHP after a single AP in L5 RS pyramidal cells "
+        "(McCormick et al. 1985).  Suggests g_K(D) or leak K too dominant; "
+        "pending biology fix — TODO: link GitHub issue once filed."
+    ),
+)
+def test_cp_ap_ahp_depth_in_rs_range(cp_ap_shape_result) -> None:
+    """Mean AHP depth falls within the RS-pyramidal range (−50 to −70 mV)."""
+    assert_ap_shape(
+        cp_ap_shape_result,
+        reference=_RS_REFERENCE,
+        ahp_mv=(-70.0, -50.0),
+    )
