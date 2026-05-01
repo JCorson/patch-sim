@@ -302,18 +302,23 @@ def test_cp_ap_threshold_in_rs_range(cp_ap_shape_result) -> None:
 @pytest.mark.xfail(
     strict=True,
     reason=(
-        "Pospischil Na⁺/K⁺ kinetics produce mean half-width ~0.35 ms, well "
-        "below the 1.0–2.5 ms range reported for L5 RS pyramidal cells "
-        "(McCormick et al. 1985).  Likely too-fast K⁺ deactivation; tracked "
-        "in #298."
+        "Traub-Miles n-gate kinetics adopted by Pospischil (2008) repolarise "
+        "faster than the 1.0–2.5 ms RS half-width reported by McCormick et al. "
+        "(1985).  At mammalian temperature the n-gate time constant near the "
+        "AP peak is ~0.3 ms, capping achievable half-width at ~0.5 ms even "
+        "with the published Pospischil RS conductances and Q10=1.  Reaching "
+        "the literature band requires a slower delayed-rectifier (e.g. "
+        "Mainen-Sejnowski Kv) which is out of scope for #298 — tracked there."
     ),
 )
 def test_cp_ap_half_width_in_rs_range(cp_ap_shape_result) -> None:
     """Mean AP half-width matches the regular-spiking phenotype (1.0–2.5 ms).
 
     RS pyramidal APs at ~32–37 °C are markedly broader than fast-spiking
-    interneuron APs.  The current model's half-width hovers around 0.35 ms,
-    closer to FS-interneuron values, indicating a kinetic mismatch.
+    interneuron APs.  The current model's half-width is ~0.5 ms — closer to
+    FS-interneuron values — because the Traub-Miles n-gate kinetics built
+    into Pospischil 2008 repolarise too quickly; conductance scaling alone
+    cannot bridge the gap to the 1.0+ ms RS band.
     """
     assert_ap_shape(
         cp_ap_shape_result,
@@ -322,14 +327,6 @@ def test_cp_ap_half_width_in_rs_range(cp_ap_shape_result) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Mean peak voltage ~+47 mV slightly exceeds the +20 to +45 mV range "
-        "typically reported for L5 RS pyramidal cells (McCormick et al. 1985). "
-        "Likely g_Na too high relative to leak; tracked in #298."
-    ),
-)
 def test_cp_ap_peak_voltage_in_rs_range(cp_ap_shape_result) -> None:
     """Mean AP peak voltage falls within the RS-pyramidal range (+20 to +45 mV)."""
     assert_ap_shape(
@@ -339,15 +336,6 @@ def test_cp_ap_peak_voltage_in_rs_range(cp_ap_shape_result) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Mean AHP depth ~−85 mV is far deeper than the −50 to −70 mV range "
-        "reported for fast-AHP after a single AP in L5 RS pyramidal cells "
-        "(McCormick et al. 1985).  Suggests g_K(D) or leak K too dominant; "
-        "tracked in #298."
-    ),
-)
 def test_cp_ap_ahp_depth_in_rs_range(cp_ap_shape_result) -> None:
     """Mean AHP depth falls within the RS-pyramidal range (−50 to −70 mV)."""
     assert_ap_shape(

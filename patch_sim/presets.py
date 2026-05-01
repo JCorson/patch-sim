@@ -132,39 +132,54 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # Pospischil et al. (2008) Traub-Miles Na⁺/K⁺ kinetics (VT = −56.2 mV)
         # replace the default HH52 core channels to match the RS neuron model.
-        # Ih produces voltage sag on hyperpolarization; INaP amplifies
-        # subthreshold inputs; IM provides spike-frequency adaptation.
-        # Ref: Pospischil et al. (2008), Biol. Cybern. 99:427
+        # Conductances follow Pospischil 2008 Table 2 (cortical RS column):
+        # g_Na=56, g_Kd=6, g_M=0.075 mS/cm² — the previous defaults (g_Na=120,
+        # g_K=36) carried over from HH52 and produced AP peaks (~+47 mV) and
+        # AHPs (~−85 mV) outside the L5 RS literature ranges (McCormick et al.
+        # 1985; Connors & Gutnick 1990) because the K⁺ side was ~6× over-spec
+        # relative to Pospischil's published values.  Ih produces voltage sag
+        # on hyperpolarization; INaP amplifies subthreshold inputs; IM
+        # provides spike-frequency adaptation.
+        # Ref: Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2.
+        #
+        # Known limitation: AP half-width remains ~0.5 ms vs the 1.0–2.5 ms
+        # literature band.  The Traub-Miles n-gate has a tau ~0.3 ms near
+        # spike peak at mammalian temperature, intrinsically capping the
+        # achievable half-width.  Resolving this requires a slower
+        # delayed-rectifier kinetic family (e.g. Mainen-Sejnowski Kv) and is
+        # out of scope for the conductance-rebalance fix tracked in #298.
         #
         # K_out=3.32 produces E_K ≈ −100 mV (Pospischil target).
         #
         # g_NaL + g_KL = 0.05 mS/cm² gives τ_m ≈ 20 ms and R_in ≈ 20 kΩ·cm²,
         # reflecting the high input resistance (200–400 MΩ) of RS cortical
-        # pyramidal cells.  With K_out=3.32, E_K ≈ −100 mV (Pospischil target),
-        # so K leak is outward at v_rest = −70 mV and absorbs most of the total
-        # leak conductance.  g_NaL is very small (0.0026 mS/cm²) because the Na
-        # leak inward current at −70 mV would otherwise require a large outward
-        # K component to compensate.
+        # pyramidal cells.  Split recomputed via find_zero_current_voltage for
+        # v_rest = −70 mV with the new g_K=6: the much weaker delayed-rectifier
+        # outward current at rest pushes nearly all leak onto the K⁺ side
+        # (g_KL ≈ 0.0497) so g_NaL collapses to ~0.0003 mS/cm².
         #
-        # g_h reduced from 1.5 → 0.3 mS/cm² and g_NaP from 0.5 → 0.1 mS/cm²
-        # so that combined inward current at rest does not exceed the outward
-        # leak + IM current; the original values caused spontaneous tonic firing.
+        # Ih (g_h=0.3) and INaP (g_NaP=0.1) are project-specific additions not
+        # present in Pospischil 2008; values tuned in PR #206 so combined
+        # inward current at rest does not exceed the outward leak + IM current
+        # (the original g_h=1.5, g_NaP=0.5 caused spontaneous tonic firing).
         #
         # T_ref = 307.15 K (34 °C): Pospischil channels were recorded and fitted
         # at 34 °C, so Q10 scaling from that reference to 37 °C (T = 310.15 K)
         # gives a factor of ~1.39× rather than the default ~5.2×.  Using the
         # HH52 reference of 22 °C causes numerical instability in this model.
+        g_Na=56.0,
+        g_K=6.0,
         v_rest=-70.0,
         K_out=3.32,
-        g_NaL=0.0026,
-        g_KL=0.0474,
+        g_NaL=0.000298,
+        g_KL=0.049702,
         T_ref=307.15,
         na_channel_factory=make_pospischil_na_channel,
         k_channel_factory=make_pospischil_k_channel,
         channels=(
             ChannelConfig(make_ih_channel, g_max=0.3),
             ChannelConfig(make_inap_channel, g_max=0.1),
-            ChannelConfig(make_im_channel, g_max=0.5),
+            ChannelConfig(make_im_channel, g_max=0.075),
         ),
         area_cm2=20e-6,
     ),
@@ -703,16 +718,18 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     CORTICAL_PYRAMIDAL: {
-        # Higher R_in (g_NaL+g_KL=0.05 → R_in=20 kΩ·cm²) raises excitability; 0.5
-        # µA/cm² is subthreshold where 1.5 µA/cm² (default) would spike.
+        # With Pospischil 2008 RS conductances (g_K=6) the cell is more
+        # excitable than under the previous HH52 defaults; 0.3 µA/cm² peaks
+        # near −63 mV (strongly subthreshold) while 0.5 already triggers an AP.
         SUBTHRESHOLD_RESPONSE: {
-            "min_stimulus": 0.5,
-            "max_stimulus": 0.5,
+            "min_stimulus": 0.3,
+            "max_stimulus": 0.3,
         },
-        # 5 µA/cm² at 15 ms evokes a single AP; 30 ms default produces 2.
+        # 1 µA/cm² at 15 ms evokes a single AP under the Pospischil RS
+        # conductances; the previous 5 µA/cm² stimulus now produces 4 APs.
         ACTION_POTENTIAL: {
-            "min_stimulus": 5.0,
-            "max_stimulus": 5.0,
+            "min_stimulus": 1.0,
+            "max_stimulus": 1.0,
             "stimulus_duration": 15.0,
         },
         # 800 ms at 5 µA/cm² is long enough for IM to accumulate and produce
