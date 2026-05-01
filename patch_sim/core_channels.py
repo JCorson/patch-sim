@@ -45,6 +45,12 @@ __all__ = [
     "pospischil_beta_n",
     "make_pospischil_na_channel",
     "make_pospischil_k_channel",
+    # Mainen & Sejnowski (1996) cortical pyramidal Kv
+    "MAINEN_SEJNOWSKI_KV_VHALF",
+    "MAINEN_SEJNOWSKI_KV_PRESCALE",
+    "mainen_sejnowski_alpha_n",
+    "mainen_sejnowski_beta_n",
+    "make_mainen_sejnowski_k_channel",
     # McCormick & Huguenard (1992) thalamic relay
     "THALAMIC_RELAY_VT",
     "thalamic_relay_alpha_m",
@@ -594,6 +600,154 @@ def make_pospischil_k_channel(g_max: float) -> IonChannel:
         gating_variables=(
             GatingVariable(
                 name="n", power=4, alpha=pospischil_alpha_n, beta=pospischil_beta_n
+            ),
+        ),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Mainen & Sejnowski (1996) cortical pyramidal Kv delayed rectifier
+#
+# Source: Mainen, Z.F. & Sejnowski, T.J. (1996) Influence of dendritic structure
+# on firing pattern in model neocortical neurons.  Nature 382:363–366.
+# Canonical kinetic parameters from the kv.mod ModelDB entry (e.g. accession
+# 2488), which expresses a high-threshold (V_½ ≈ +25 mV), single-state n^1
+# delayed-rectifier widely used in cortical pyramidal cell models.
+#
+# Replaces the Traub-Miles n^4 form for ``CORTICAL_PYRAMIDAL`` (issue #311):
+# Traub-Miles τ_n ≈ 0.3 ms near AP peak at mammalian temperature caps the AP
+# half-width at ~0.5 ms, well below the 1.0–2.5 ms band reported for L5 RS
+# pyramidal cells (McCormick et al. 1985).  Mainen-Sejnowski Kv is closed at
+# rest, opens rapidly only on the upstroke, and deactivates on a τ ~1–2 ms
+# scale, broadening the spike into the literature band.
+#
+# Temperature pre-scale: Mainen & Sejnowski measured at 23 °C (T_ref of the
+# original kv.mod entry) with Q10 = 2.3.  The cortical pyramidal preset uses
+# T_ref = 307.15 K (34 °C, Pospischil reference) so that the Pospischil Na
+# kinetics scale correctly under the simulator's per-neuron Q10 = 3.0.  To
+# allow Pospischil Na (34 °C ref) and Mainen-Sejnowski Kv (originally 23 °C
+# ref) to coexist under a single Q10/T_ref, the M-S Kv rate constants are
+# pre-scaled from 23 °C to 34 °C with Mainen-Sejnowski's own Q10 = 2.3
+# (factor 2.3^((34-23)/10) = 2.3^1.1 ≈ 2.55).  The simulator's own Q10 = 3.0
+# then scales 34 → T_sim further at run time (1.39× to body 37 °C).
+# ---------------------------------------------------------------------------
+
+#: Voltage parameter (mV) for the Mainen-Sejnowski Kv channel — the location
+#: of the removable singularity in the α_n / β_n rate functions, taken from
+#: the canonical kv.mod ``tha`` parameter.  The rate-function prefactors
+#: differ by 10× (α: 0.02, β: 0.002), so n_inf passes through 0.5 at
+#: V ≈ +4 mV, *not* at this constant; this is still a high-threshold
+#: delayed rectifier (essentially closed below 0 mV).
+MAINEN_SEJNOWSKI_KV_VHALF: float = 25.0
+
+#: Temperature pre-scale factor applied to the published 23 °C M-S Kv rate
+#: constants so that they represent the channel at 34 °C, the
+#: ``CORTICAL_PYRAMIDAL`` preset's ``T_ref``.  Computed as
+#: ``2.3 ** ((34 - 23) / 10) = 2.3 ** 1.1 ≈ 2.55`` using the published
+#: Q10 = 2.3 from Mainen & Sejnowski (1996).
+MAINEN_SEJNOWSKI_KV_PRESCALE: float = 2.55
+
+#: Pre-scaled forward-rate prefactor at 34 °C (= 0.02 / ms × 2.55).
+_MAINEN_SEJNOWSKI_ALPHA_PREFACTOR: float = 0.02 * MAINEN_SEJNOWSKI_KV_PRESCALE
+
+#: Pre-scaled backward-rate prefactor at 34 °C (= 0.002 / ms × 2.55).
+_MAINEN_SEJNOWSKI_BETA_PREFACTOR: float = 0.002 * MAINEN_SEJNOWSKI_KV_PRESCALE
+
+#: Slope parameter (mV) shared by α_n and β_n.
+_MAINEN_SEJNOWSKI_KV_SLOPE: float = 9.0
+
+
+def _mainen_sejnowski_alpha_n_impl(V: float, ca_i: float) -> float:
+    """Forward rate for Mainen-Sejnowski Kv activation gate n.
+
+    Implements ``α_n(V) = A · (V - 25) / (1 - exp(-(V - 25) / 9))`` where
+    ``A = 0.02 / ms × 2.55`` bakes in the 23 → 34 °C Q10 = 2.3 pre-scale.
+    Has a removable singularity at V = 25 mV; the L'Hôpital limit
+    ``A · 9 ≈ 0.459 / ms`` is returned when
+    ``|V - 25| < SINGULARITY_THRESHOLD``.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    x = V - MAINEN_SEJNOWSKI_KV_VHALF
+    if abs(x) < SINGULARITY_THRESHOLD:
+        return _MAINEN_SEJNOWSKI_ALPHA_PREFACTOR * _MAINEN_SEJNOWSKI_KV_SLOPE
+    denom = 1.0 - safe_exp(-x / _MAINEN_SEJNOWSKI_KV_SLOPE)
+    return _MAINEN_SEJNOWSKI_ALPHA_PREFACTOR * x / denom
+
+
+mainen_sejnowski_alpha_n = VoltageOnlyFn(_mainen_sejnowski_alpha_n_impl)
+
+
+def _mainen_sejnowski_beta_n_impl(V: float, ca_i: float) -> float:
+    """Backward rate for Mainen-Sejnowski Kv activation gate n.
+
+    Implements ``β_n(V) = -B · (V - 25) / (1 - exp((V - 25) / 9))`` where
+    ``B = 0.002 / ms × 2.55`` bakes in the 23 → 34 °C Q10 = 2.3 pre-scale.
+    The leading minus combines with the ``(V - 25)`` factor and the
+    denominator sign so β_n is positive for all V.  Has a removable
+    singularity at V = 25 mV; the L'Hôpital limit
+    ``B · 9 ≈ 0.0459 / ms`` is returned when
+    ``|V - 25| < SINGULARITY_THRESHOLD``.
+
+    Args:
+        V: Membrane voltage in mV.
+        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    x = V - MAINEN_SEJNOWSKI_KV_VHALF
+    if abs(x) < SINGULARITY_THRESHOLD:
+        return _MAINEN_SEJNOWSKI_BETA_PREFACTOR * _MAINEN_SEJNOWSKI_KV_SLOPE
+    denom = 1.0 - safe_exp(x / _MAINEN_SEJNOWSKI_KV_SLOPE)
+    return -_MAINEN_SEJNOWSKI_BETA_PREFACTOR * x / denom
+
+
+mainen_sejnowski_beta_n = VoltageOnlyFn(_mainen_sejnowski_beta_n_impl)
+
+
+def make_mainen_sejnowski_k_channel(g_max: float) -> IonChannel:
+    """Create the Mainen-Sejnowski cortical pyramidal Kv delayed-rectifier.
+
+    Implements the high-threshold delayed-rectifier K⁺ channel from Mainen &
+    Sejnowski (1996) — single activation gate ``n`` with power 1, essentially
+    closed at rest (n_inf passes through 0.5 at V ≈ +4 mV), opens rapidly
+    only above ~0 mV during the AP upstroke, and deactivates on a τ ~1–2 ms
+    scale.  Designed to broaden the cortical pyramidal AP into the literature
+    1.0–2.5 ms half-width band that the Traub-Miles / Pospischil n^4 form
+    cannot reach (issue #311).
+
+    Rate constants are pre-scaled from the published 23 °C kinetics to 34 °C
+    using Q10 = 2.3, so the channel matches the ``CORTICAL_PYRAMIDAL``
+    preset's ``T_ref = 307.15 K``.  Callers using a different ``T_ref``
+    must renormalise.  The reversal potential is computed dynamically via
+    the Nernst equation for K⁺.
+
+    Refs: Mainen, Z.F. & Sejnowski, T.J. (1996) Nature 382:363; canonical
+    kv.mod ModelDB kinetics.
+
+    Args:
+        g_max: Maximum conductance in mS/cm².
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the
+        Mainen-Sejnowski Kv delayed-rectifier K⁺ channel.
+    """
+    return IonChannel(
+        name="K",
+        g_max=g_max,
+        gating_variables=(
+            GatingVariable(
+                name="n",
+                power=1,
+                alpha=mainen_sejnowski_alpha_n,
+                beta=mainen_sejnowski_beta_n,
             ),
         ),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
