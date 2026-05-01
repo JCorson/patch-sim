@@ -24,13 +24,17 @@ pytest.importorskip("reflex")
 from patch_sim import NEURON_PRESETS  # noqa: E402
 from patch_sim.constants import (
     ACTION_POTENTIAL,
+    CA1_PYRAMIDAL,
     CORTICAL_PYRAMIDAL,
     DOPAMINERGIC,
     FAST_SPIKING_INTERNEURON,
+    HYPERPOLARIZATION_STEPS,
     PURKINJE,
     REPETITIVE_FIRING,
     SQUID_GIANT_AXON,
+    STN,
     THALAMIC_RELAY,
+    TRN,
 )
 from patch_sim_ui import constants  # noqa: E402
 from patch_sim_ui.log_handler import UILogRecord  # noqa: E402
@@ -410,6 +414,125 @@ async def test_load_neuron_preset_thalamic_relay() -> None:
         [_ async for _ in ns.load_neuron_preset(THALAMIC_RELAY)]
     assert ns.icat_enabled is True
     assert ns.ih_enabled is True
+
+
+# ---------------------------------------------------------------------------
+# _build_neuron forwards preset.calcium_dynamics
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "preset_name",
+    [TRN, THALAMIC_RELAY, STN, PURKINJE, CA1_PYRAMIDAL],
+)
+async def test_build_neuron_forwards_preset_calcium_dynamics(preset_name: str) -> None:
+    """_build_neuron must propagate the preset's CalciumDynamics to the Neuron.
+
+    Without this, every preset would silently use NeuronConfig's default
+    auto-instantiated CalciumDynamics (alpha_ca=1e-4, tau_ca=200 ms),
+    masking each preset's tuned values.  For TRN this collapses the HP92
+    rebound burst (preset wants alpha_ca=1.2e-5 / tau_ca=20 ms — 8.3× and
+    10× different from defaults).  This test asserts the bug class is
+    fixed at the build-neuron level rather than only verifying the
+    downstream simulation behaviour.
+
+    Args:
+        preset_name: Name of a preset that overrides calcium_dynamics.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(preset_name)]
+    neuron = ns._build_neuron()
+
+    expected = NEURON_PRESETS[preset_name].calcium_dynamics
+    assert expected is not None, (
+        f"Test fixture mismatch: {preset_name} preset must have "
+        f"calcium_dynamics set for this regression test to apply"
+    )
+    actual = neuron.calcium_dynamics
+    assert actual is not None, (
+        f"{preset_name}: built neuron has no calcium_dynamics — "
+        f"_build_neuron is dropping the preset's tuned values."
+    )
+    assert actual.alpha_ca == pytest.approx(expected.alpha_ca), (
+        f"{preset_name}: built neuron alpha_ca={actual.alpha_ca} but "
+        f"preset alpha_ca={expected.alpha_ca}"
+    )
+    assert actual.tau_ca == pytest.approx(expected.tau_ca), (
+        f"{preset_name}: built neuron tau_ca={actual.tau_ca} but "
+        f"preset tau_ca={expected.tau_ca}"
+    )
+
+
+async def test_trn_hyperpolarization_burst_via_ui_build_neuron() -> None:
+    """End-to-end TRN HP92 rebound burst exercised via the UI's _build_neuron path.
+
+    Loads the TRN preset into a NeuronState, builds a neuron via the UI's
+    own ``_build_neuron`` method (the same code the live Reflex app uses
+    when the user clicks Run), then runs the HYPERPOLARIZATION_STEPS
+    protocol via :func:`simulate_batch` and asserts each deeper sweep
+    (-3 to -5 µA/cm²) produces a 5+ spike rebound burst at 200–600 Hz.
+
+    This covers the regression discovered when the user reported only ~2
+    visible spikes per sweep in the UI: the previous version of
+    ``_build_neuron`` silently dropped the preset's calcium_dynamics and
+    used the auto-instantiated default (alpha_ca=1e-4, tau_ca=200 ms),
+    which collapsed the burst after the first spike.  An assertion-only
+    fix in the simulation domain is insufficient — the UI build path must
+    be exercised end-to-end.
+    """
+    import patch_sim
+    from patch_sim.clamp_simulations import simulate_batch, simulate_current_clamp
+    from patch_sim.presets import build_protocol_from_preset
+
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(TRN)]
+    neuron = ns._build_neuron()
+
+    # Sanity: assert the preset's tuned calcium dynamics survived the
+    # build-neuron step (this is what the parametrised regression test
+    # above exercises in isolation).
+    assert neuron.calcium_dynamics is not None
+    assert neuron.calcium_dynamics.alpha_ca == pytest.approx(1.2e-5)
+    assert neuron.calcium_dynamics.tau_ca == pytest.approx(20.0)
+
+    # Run the multi-sweep protocol via simulate_batch (the same call site
+    # the UI uses for multi-sweep current-clamp runs).
+    protocol = build_protocol_from_preset(HYPERPOLARIZATION_STEPS, neuron_preset=TRN)
+    results = list(
+        simulate_batch(neuron, [sweep for sweep in protocol], simulate_current_clamp)
+    )
+
+    # The deeper sweeps (indices 0, 1, 2 — currents -5, -4, -3 µA/cm²)
+    # must each produce a 5–15 spike, 200–600 Hz rebound burst.
+    for sweep_idx in (0, 1, 2):
+        result = results[sweep_idx]
+        time_arr = np.asarray(result["time"])
+        v_arr = np.asarray(result["voltage"])
+        ap_result = patch_sim.analyze_aps(time_arr, v_arr)
+        analysis = patch_sim.analyze_bursts(
+            ap_result, total_duration_ms=float(time_arr[-1] - time_arr[0])
+        )
+
+        assert analysis.burst_count >= 1, (
+            f"UI-build-path sweep {sweep_idx}: expected ≥1 LTS rebound "
+            f"burst, got burst_count={analysis.burst_count}, "
+            f"total APs={ap_result.spike_count}.  This regression points "
+            f"at _build_neuron — most likely a preset attribute "
+            f"(calcium_dynamics, channel factory, etc.) is not being "
+            f"propagated to the built Neuron."
+        )
+        burst = analysis.bursts[0]
+        assert 5 <= burst.spike_count <= 15, (
+            f"UI-build-path sweep {sweep_idx}: expected 5–15 spikes "
+            f"(Huguenard & Prince 1992), got {burst.spike_count}"
+        )
+        assert burst.intra_burst_frequency is not None
+        assert 200.0 <= burst.intra_burst_frequency <= 600.0, (
+            f"UI-build-path sweep {sweep_idx}: expected 200–600 Hz "
+            f"intra-burst, got {burst.intra_burst_frequency:.1f} Hz"
+        )
 
 
 async def test_load_neuron_preset_unknown_name_is_ignored() -> None:

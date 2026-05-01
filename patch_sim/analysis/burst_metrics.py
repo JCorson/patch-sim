@@ -13,12 +13,11 @@ threshold; bursts are separated by gaps where the inter-spike interval
 strictly exceeds the threshold.
 The threshold can be supplied by the caller, or auto-detected from a
 log-spaced histogram of the inter-spike intervals.  When too few intervals
-exist or the distribution is unimodal, a fixed default of 100 ms is used.
-The default-fixed path then disambiguates two ISI shapes the histogram
-cannot: a tight cluster (every ISI below ~12 ms with ≤7 ISIs) groups into
-one burst, while everything else (tonic trains spread across the tonic
-range, or sustained high-frequency trains beyond the count cap)
-short-circuits to zero bursts.
+exist or the distribution is unimodal, the default-fixed path falls back
+to the tight-cluster intra-burst cap (~12 ms): contiguous runs of ISIs at
+or below this group into bursts; longer ISIs end them.  A size cap on the
+default-fixed path (≤8 spikes per burst) prevents sustained high-frequency
+tonic firing from being fabricated as one giant burst (issue #290).
 
 For non-bursting neurons (sub-threshold protocols, tonic firing) the
 analysis degrades gracefully: ``burst_count`` is 0 and aggregate metrics
@@ -49,13 +48,6 @@ if TYPE_CHECKING:
     from patch_sim.clamp_simulations import SimulationResult
 
 logger = logging.getLogger(__name__)
-
-#: Fallback inter-spike interval threshold (ms) used when fewer than
-#: :data:`_MIN_ISIS_FOR_HISTOGRAM` ISIs are available, or when the ISI
-#: distribution is unimodal and bimodality detection cannot place a threshold.
-#: 100 ms corresponds to 10 Hz, which sits comfortably between typical
-#: intra-burst frequencies (>50 Hz) and typical inter-burst gaps (>200 ms).
-_DEFAULT_ISI_THRESHOLD_MS: float = 100.0
 
 #: Minimum number of ISIs required to attempt a histogram-based threshold.
 _MIN_ISIS_FOR_HISTOGRAM: int = 4
@@ -167,9 +159,11 @@ class BurstAnalysisResult:
             display the threshold that was applied.
         threshold_method: How :attr:`isi_threshold_ms` was determined.  One
             of ``"auto-histogram"``, ``"default-fixed"``, or ``"user"``.
-            ``"default-fixed"`` does not by itself imply zero bursts —
-            see :func:`analyze_bursts` for the tight-cluster carve-out
-            that can produce a burst on the default-fixed path.
+            ``"default-fixed"`` carries the tight-cluster intra-burst cap
+            (12 ms): the grouper still finds bursts on this path whenever
+            a contiguous run of ISIs falls inside that cap.  See
+            :func:`analyze_bursts` for the size-cap rule that prevents
+            sustained tonic trains from being fabricated as bursts.
     """
 
     burst_count: int
@@ -190,7 +184,11 @@ def _estimate_isi_threshold(isis: list[float]) -> tuple[float, str]:
     bimodal distribution.  When two non-adjacent peaks separated by a
     strictly lower minimum are present, the threshold is placed at the bin
     minimum (in linear ms).  Otherwise the function falls back to
-    :data:`_DEFAULT_ISI_THRESHOLD_MS`.
+    :data:`_TIGHT_CLUSTER_MAX_ISI_MS` and reports method
+    ``"default-fixed"``: this is the same threshold the grouper applies
+    when no histogram-derived threshold is available, so a contiguous run
+    of intra-burst-territory ISIs (each ≤ 12 ms) groups into a burst while
+    longer ISIs end it.
 
     Args:
         isis: Inter-spike intervals (ms).  Values must be positive.
@@ -200,16 +198,16 @@ def _estimate_isi_threshold(isis: list[float]) -> tuple[float, str]:
         ``"auto-histogram"`` or ``"default-fixed"``.
     """
     if len(isis) < _MIN_ISIS_FOR_HISTOGRAM:
-        return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
+        return _TIGHT_CLUSTER_MAX_ISI_MS, "default-fixed"
 
     isi_arr = np.asarray(isis, dtype=float)
     if np.any(isi_arr <= 0.0) or not np.all(np.isfinite(isi_arr)):
-        return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
+        return _TIGHT_CLUSTER_MAX_ISI_MS, "default-fixed"
 
     log_isi = np.log10(isi_arr)
     if float(np.ptp(log_isi)) < 1e-6:
         # All ISIs are essentially identical → no meaningful split possible.
-        return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
+        return _TIGHT_CLUSTER_MAX_ISI_MS, "default-fixed"
 
     hist, edges = np.histogram(log_isi, bins=_HISTOGRAM_BINS)
 
@@ -232,7 +230,7 @@ def _estimate_isi_threshold(isis: list[float]) -> tuple[float, str]:
             peaks.append(i)
 
     if len(peaks) < 2:
-        return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
+        return _TIGHT_CLUSTER_MAX_ISI_MS, "default-fixed"
 
     # Pick the two largest peaks that are both well-separated in bin index
     # and in log10 ISI space.  The latter ensures genuine order-of-magnitude
@@ -252,19 +250,19 @@ def _estimate_isi_threshold(isis: list[float]) -> tuple[float, str]:
             break
 
     if left_peak == -1:
-        return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
+        return _TIGHT_CLUSTER_MAX_ISI_MS, "default-fixed"
 
     # Locate the minimum-count bin between the two peaks.  Require the
     # valley to be substantially lower than the smaller peak — shallow dips
     # are a hallmark of noisy unimodal data, not true bimodality.
     between = hist[left_peak + 1 : right_peak]
     if len(between) == 0:
-        return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
+        return _TIGHT_CLUSTER_MAX_ISI_MS, "default-fixed"
     min_offset = int(np.argmin(between))
     min_bin = left_peak + 1 + min_offset
     smaller_peak_count = min(hist[left_peak], hist[right_peak])
     if hist[min_bin] >= smaller_peak_count * _VALLEY_DEPTH_FRACTION:
-        return _DEFAULT_ISI_THRESHOLD_MS, "default-fixed"
+        return _TIGHT_CLUSTER_MAX_ISI_MS, "default-fixed"
 
     # Threshold = midpoint of the chosen bin in log space, converted back to ms.
     log_threshold = 0.5 * (edges[min_bin] + edges[min_bin + 1])
@@ -418,21 +416,15 @@ def analyze_bursts(
         isi_threshold_ms: Optional user-supplied threshold (ms).  When
             ``None``, the function attempts a histogram-based auto-detect.
             If auto-detect cannot find a bimodal split it returns method
-            ``"default-fixed"``.  In the default-fixed case the analyser
-            disambiguates two ISI shapes that the histogram cannot: a
-            tight cluster (every ISI below
-            :data:`_TIGHT_CLUSTER_MAX_ISI_MS` with at most
-            :data:`_TIGHT_CLUSTER_MAX_ISIS` ISIs total, or a single-spike
-            trace) falls through to grouping with the 100 ms default —
-            every ISI is below it so the cluster groups into one burst;
-            any other default-fixed outcome (a tonic train with ISIs
-            spread across the tonic range, or a sustained high-frequency
-            train with more than :data:`_TIGHT_CLUSTER_MAX_ISIS` ISIs)
-            short-circuits to zero bursts and surfaces every spike via
-            ``unburst_spike_count``, so a tonic train is not fabricated
-            into one giant burst.  Callers who want to force grouping
-            (including the ``min_spikes_per_burst=1`` "every spike is a
-            burst" mode) should pin ``isi_threshold_ms`` explicitly.
+            ``"default-fixed"`` with threshold
+            :data:`_TIGHT_CLUSTER_MAX_ISI_MS` (12 ms): contiguous runs of
+            ISIs at or below this group into bursts, longer ISIs end
+            them.  In the default-fixed path a size cap of
+            :data:`_TIGHT_CLUSTER_MAX_ISIS` + 1 spikes per burst applies,
+            so sustained high-frequency tonic firing is not fabricated
+            into one giant burst (issue #290).  Caller-supplied
+            (``"user"``) and histogram-derived (``"auto-histogram"``)
+            thresholds bypass the size cap.
         min_spikes_per_burst: Minimum spike count for a group to count as a
             burst.  Defaults to 2; isolated spikes are tracked via
             :attr:`BurstAnalysisResult.unburst_spike_count`.
@@ -449,30 +441,6 @@ def analyze_bursts(
     if ap_result.spike_count == 0:
         return _empty_result(threshold, method)
 
-    if method == "default-fixed" and isi_threshold_ms is None:
-        # ``default-fixed`` conflates two genuinely different shapes:
-        # tonic firing (many ISIs spread across the tonic range) and a
-        # tight cluster (a real LTS-style burst whose ISIs all sit well
-        # below the 100 ms default).  Disambiguate by ISI shape: a
-        # single-spike trace, or a short cluster (at most
-        # ``_TIGHT_CLUSTER_MAX_ISIS`` ISIs) where every ISI is below
-        # ``_TIGHT_CLUSTER_MAX_ISI_MS``, is unambiguously a tight burst
-        # — fall through to the grouper with the 100 ms default (every
-        # ISI is below it, so the cluster groups into one burst).
-        # Anything else short-circuits to zero bursts (issue #290 —
-        # protect against fabricating a giant burst from a tonic train).
-        isis = list(ap_result.isis)
-        tight_cluster = not isis or (
-            max(isis) < _TIGHT_CLUSTER_MAX_ISI_MS
-            and len(isis) <= _TIGHT_CLUSTER_MAX_ISIS
-        )
-        if not tight_cluster:
-            return _empty_result(
-                threshold,
-                method,
-                unburst_spike_count=ap_result.spike_count,
-            )
-
     # 1-spike traces fall through to the grouper so they are correctly
     # routed to ``unburst_spike_count`` under the default
     # ``min_spikes_per_burst=2`` (or to a single 1-spike burst when the
@@ -484,6 +452,32 @@ def analyze_bursts(
         threshold,
         min_spikes_per_burst,
     )
+
+    # In the default-fixed path, apply a size cap so sustained
+    # high-frequency tonic firing (issue #290) is not fabricated into one
+    # giant burst.  Real LTS-style bursts top out at 7–8 spikes (TC LTS
+    # 3–7; STN rebound 3–8); anything longer with all-short ISIs is
+    # tonic.  Caller-supplied (``"user"``) and histogram-derived
+    # (``"auto-histogram"``) thresholds bypass the cap — those callers
+    # have explicit knowledge of the trace shape.
+    if method == "default-fixed" and isi_threshold_ms is None and bursts:
+        survivors = [b for b in bursts if b.spike_count <= _TIGHT_CLUSTER_MAX_ISIS + 1]
+        rejected_spike_count = sum(
+            b.spike_count for b in bursts if b.spike_count > _TIGHT_CLUSTER_MAX_ISIS + 1
+        )
+        unburst += rejected_spike_count
+        bursts = [
+            BurstMetrics(
+                index=i,
+                start_time=b.start_time,
+                end_time=b.end_time,
+                duration=b.duration,
+                spike_count=b.spike_count,
+                intra_burst_frequency=b.intra_burst_frequency,
+                mean_intra_burst_isi=b.mean_intra_burst_isi,
+            )
+            for i, b in enumerate(survivors)
+        ]
 
     if not bursts:
         return BurstAnalysisResult(

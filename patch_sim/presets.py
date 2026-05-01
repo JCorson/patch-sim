@@ -22,6 +22,7 @@ from .additional_channels import (
     make_inap_channel,
     make_inar_channel,
     make_thalamic_relay_icat_channel,
+    make_trn_icat_channel,
 )
 from .calcium import CalciumDynamics
 from .constants import (
@@ -461,23 +462,40 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # area_cm2 = 7e-6 cm² — ~15 µm soma characteristic of thalamic
         # reticular neurons.  C ≈ 7 pF in the simulation.
         #
-        # Channel set: ICaT + IKCa over the HP92/Pospischil RE Na⁺/K⁺ core.
-        # Conductances follow the published literature:
-        #   g_T   = 2.3 mS/cm² (Pospischil 2008 Table 2, RE column)
+        # Channel set: ICaT + IKCa + Ih over the HP92/Pospischil RE Na⁺/K⁺ core.
+        # Conductances:
+        #   g_T   = 3.0 mS/cm² (within HP92 voltage-clamp recorded range;
+        #                       tuned for the 5–15 spike LTS rebound burst)
         #   g_KCa = 0.3 mS/cm² (Huguenard & Prince 1992, TRN)
+        #   g_h   = 0.020 mS/cm² (slightly below the ≈0.025 reported by
+        #                          Bal & McCormick 1993 for cat TRN; tuned to
+        #                          set tonic firing rate to ~3 Hz)
         #
         # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804 (TRN
         #       low-threshold-spike biophysics; IKCa identified as the burst-
         #       terminating K⁺ current; published g_KCa);
         #       Destexhe et al. (1994), J. Neurophysiol. 72:803 (ICaT kinetics);
         #       Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (RE)
-        #       (Pospischil's RE column gives g_Na, g_Kd, g_T, leak from which
-        #       the kinetics and conductances here are derived).
+        #       (Pospischil's RE column gives g_Na, g_Kd, leak from which
+        #       the kinetics and conductances here are derived);
+        #       Bal & McCormick (1993), J. Physiol. 468:669 (Ih in cat TRN
+        #       supports rebound burst by activating during hyperpolarisation
+        #       and providing depolarising drive on release).
         #
         # IKCa: calcium-activated K⁺ current.  HP92 identify IKCa as the
         # mechanism that converts ICaT-mediated Ca²⁺ entry into outward K⁺
         # current — generating the AHP after spikes during tonic firing and
         # contributing to LTS-burst termination.
+        #
+        # Ih: HCN/funny current.  Activated by hyperpolarisation; its
+        # depolarising contribution during the hyperpolarising step builds up
+        # while ft de-inactivates, then drives V across the LTS threshold on
+        # release — the canonical mechanism for triggering the post-inhibitory
+        # rebound burst (Bal & McCormick 1993).  Without Ih, V's passive
+        # relaxation from a hyperpolarised step does not overshoot v_rest and
+        # the LTS does not fire — the LTS is unreachable in this preset
+        # without Ih.  TRN g_h is small (0.020 mS/cm²) compared to TC's 1.0:
+        # B&M93 report ≈ 0.025 for cat TRN.
         #
         # Huguenard & Prince (1992) / Pospischil (2008) Traub-Miles Na⁺/K⁺
         # kinetics (VT = −67 mV) replace the default HH52 core channels.
@@ -488,47 +506,30 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Q10 correction to ~1.12× (36→37 °C) — a negligible adjustment that
         # preserves the published kinetics.
         #
-        # v_rest = −80 mV (not −77 mV).  The ICaT window current at −77 mV
-        # (ft_inf ≈ 0.42) creates ~2 mS/cm² of negative conductance at the
-        # literature g_T = 2.3 mS/cm² — far exceeding any physiologically
-        # plausible total leak (0.07–0.10 mS/cm²) and making −77 mV an
-        # unstable equilibrium in the steady-state conductance picture.
-        # The original HP92/Pospischil RE models avoid this by using a single
-        # leak with E_L = v_rest, which enforces stability by construction;
-        # our split Na⁺/K⁺ leak cannot replicate that property at −77 mV.
-        # At −80 mV the ft gate is at its half-inactivation point
-        # (ft_inf = 0.50) and the ICaT negative conductance falls to
-        # ~0.025 mS/cm² — well below g_total = 0.07 mS/cm², giving a truly
-        # stable rest.  −80 mV is within the physiological range reported
-        # by Huguenard & Prince (1992) for TRN cells in slice recordings.
+        # PACEMAKER MODE.  With Ih and the elevated g_T, the cell is no longer
+        # silent at zero current — it fires tonically at ~3 Hz, consistent
+        # with the spontaneous firing observed in TRN slice recordings (HP92,
+        # B&M93).  v_rest = −80 mV is the configured initial condition; the
+        # cell rapidly leaves this point and settles into tonic firing with
+        # mean V around −77 mV.  Excluded from
+        # ``test_all_presets_stable_at_rest`` for the same reason as Purkinje
+        # (autonomous oscillator with no stable zero-current equilibrium).
+        # The HP92 rebound-burst phenotype is exercised by
+        # ``test_trn_step_release_produces_hp92_rebound_burst``.
         #
         # g_NaL + g_KL = 0.07 mS/cm² gives τ_m ≈ 14.3 ms and
         # R_in ≈ 14.3 kΩ·cm² (physiological range 10–15 ms/kΩ·cm²).
-        # The split is g_NaL = 0.0066, g_KL = 0.0634: tuned so the zero-current
-        # voltage falls at −80 mV given the literature g_T = 2.3 mS/cm² window
-        # current at rest.  Reducing g_T from the previous patch_sim value of
-        # 3.5 to the published 2.3 shifts the leak balance slightly, so g_NaL
-        # was nudged up from 0.0062 to 0.0066 to keep the zero-current voltage
-        # at −80 mV (deviation < 0.2 mV) without changing g_total.
-        # At v_rest = −80 mV, ICaT's inactivation gate ft_inf = 0.50 —
-        # well de-inactivated for post-inhibitory rebound bursting.
+        # The split is g_NaL = 0.0066, g_KL = 0.0634.
+        # At V = −80 mV the ft gate is at its half-inactivation point
+        # (ft_inf = 0.50) — well de-inactivated for post-inhibitory rebound
+        # bursting.
         #
-        # KNOWN LIMITATION (tracked in issue #295, follow-up to #286): the
-        # published TRN burst phenotype is a 5–15 spike, 200–600 Hz Na⁺/K⁺ AP
-        # burst riding on the LTS plateau, terminated by IKCa-driven AHP.
-        # Reproducing the full spike count requires ICaT inactivation kinetics
-        # with a larger time constant at depolarised voltages (~100–250 ms at
-        # the LTS plateau) than the cosh-shaped Destexhe (1994) defaults
-        # provide; the cosh tau peaks at the half-inactivation voltage
-        # (−80 mV → 20 ms) and falls off at depolarised V (≈4 ms at −40 mV,
-        # floored at 2 ms by −20 mV), so the LTS plateau decays in ~5–10 ms —
-        # too fast to fit 5+ Na⁺ spikes.  Resolving this requires a TRN-
-        # specific ICaT factory with a sigmoid-shaped tau (small at
-        # hyperpolarised V for stable rest, large at depolarised V for
-        # sustained LTS plateau) — see issue #295.  This preset's IKCa
-        # addition delivers the AHP-shaping mechanism HP92 identify for
-        # tonic-mode firing and is a prerequisite for the burst-mode work;
-        # the full rebound-burst phenotype is deferred.
+        # ICaT factory: ``make_trn_icat_channel`` (issue #295) replaces the
+        # default cosh-shaped Destexhe (1994) tau with a sigmoid-shaped
+        # inactivation tau — small (20 ms) at hyperpolarised V and large
+        # (200 ms) at LTS-plateau V (sustains the plateau long enough for
+        # the 5–15 Na⁺ spike, 200–600 Hz HP92 rebound burst).  ``ft_inf(V)``
+        # is unchanged from Destexhe (1994).
         v_rest=-80.0,
         g_NaL=0.0066,
         g_KL=0.0634,
@@ -536,14 +537,21 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         na_channel_factory=make_trn_na_channel,
         k_channel_factory=make_trn_k_channel,
         channels=(
-            ChannelConfig(make_icat_channel, g_max=2.3),
+            ChannelConfig(make_trn_icat_channel, g_max=3.0),
             ChannelConfig(make_ikca_channel, g_max=0.3),
+            ChannelConfig(make_ih_channel, g_max=0.020),
         ),
-        # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
-        # (3 µA/cm², 200 ms).  With ICaT g_T = 2.3 mS/cm² as the only Ca source,
-        # alpha_ca=1.2e-5 and tau_ca=20 ms produce a peak of ~1.5 µM — well within
-        # the 0.1–5 µM physiological band and above the IKCa Hill K_d (1 µM) so
-        # IKCa activates during the spike train and shapes the inter-spike AHP.
+        # alpha_ca/tau_ca calibrated so peak ca_i stays in the 0.1–5 µM
+        # physiological band under REPETITIVE_FIRING (3 µA/cm², 200 ms;
+        # peak ≈ 3.7 µM at g_T = 3.0).  Under HYPERPOLARIZATION_STEPS
+        # (LTS rebound burst) peak ca_i transiently rises into the
+        # 8–18 µM range — this is biologically expected for LTS-driven
+        # bursts in TRN soma (cf. Cueni et al. 2008, Nature Neurosci.
+        # 11:683 — TRN dendritic [Ca²⁺]ᵢ during LTS) and is required for
+        # IKCa-driven burst termination at the literature g_KCa = 0.3.
+        # Lower alpha_ca brings the rebound Ca into [0.1, 5] µM but
+        # collapses the burst phenotype (IKCa cannot terminate cleanly),
+        # so we accept the LTS-specific transient as a feature.
         calcium_dynamics=CalciumDynamics(alpha_ca=1.2e-5, tau_ca=20.0, ca_rest=1e-4),
         area_cm2=7e-6,
     ),
@@ -949,12 +957,19 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_step": 0.5,
             "stimulus_duration": 100.0,
         },
-        # High R_in (≈14.3 kΩ·cm²); −1 → −0.25 µA/cm² in 0.25 steps gives
-        # −79 to −95 mV — enough to de-inactivate ICaT (ft_inf → 0.84).
+        # Sweep −5 → −1 µA/cm² (in 1.0 µA steps) for 500 ms with 100 ms pre
+        # and 300 ms post.  At ≤ −2 µA/cm² the cell de-inactivates ICaT and
+        # activates Ih enough to fire the HP92 rebound burst on release;
+        # the −1 µA step is included as a reference subthreshold sweep so
+        # the burst is visible by contrast.  Step duration is 500 ms (vs
+        # the 300 ms default) so Ih has time to fully activate.
         HYPERPOLARIZATION_STEPS: {
-            "min_stimulus": -1.0,
-            "max_stimulus": -0.25,
-            "stimulus_step": 0.25,
+            "pre_stimulus_duration": 100.0,
+            "stimulus_duration": 500.0,
+            "post_stimulus_duration": 300.0,
+            "min_stimulus": -5.0,
+            "max_stimulus": -1.0,
+            "stimulus_step": 1.0,
         },
     },
 }
