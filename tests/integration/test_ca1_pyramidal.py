@@ -4,8 +4,7 @@ Pins the regular-spiking hippocampal phenotype: moderate firing rate with
 spike-frequency adaptation driven by IM and IKCa, deep AHP from the Ca²⁺ /
 IKCa interaction, and AP shape consistent with CA1 pyramidal recordings.
 Bands cite Spruston & Johnston (2008), Migliore et al. (1999), and Storm
-(1990).  AP half-width currently falls outside the literature range and is
-marked ``xfail`` pending a biology fix.
+(1990).
 
 Replaces the previous coverage gap: before this file the CA1 preset had
 no suprathreshold-firing tests at all, only sag and stability checks.
@@ -102,15 +101,6 @@ def test_ca1_suprathreshold_step_drives_repetitive_firing(ca1_ap_shape_result) -
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Pospischil Na⁺/K⁺ kinetics produce mean half-width ~0.42 ms, well "
-        "below the 0.7–1.5 ms range reported for CA1 pyramidal cells "
-        "(Spruston & Johnston 2008). Likely too-fast K⁺ deactivation; "
-        "tracked in #302."
-    ),
-)
 def test_ca1_ap_half_width_in_rs_range(ca1_ap_shape_result) -> None:
     """Mean AP half-width matches CA1 pyramidal recordings (0.7–1.5 ms)."""
     assert_ap_shape(
@@ -157,16 +147,6 @@ def test_ca1_ap_ahp_depth_in_rs_range(ca1_ap_shape_result) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Model shows ISI acceleration (mean early ISI ~220 ms, mean late "
-        "ISI ~15 ms), the OPPOSITE of CA1 spike-frequency adaptation "
-        "reported by Storm (1990) and Madison & Nicoll (1984). Likely "
-        "Ca²⁺ buildup is overwhelming IKCa, or IM is too weak to drive "
-        "adaptation; tracked in #302."
-    ),
-)
 def test_ca1_spike_frequency_adaptation(ca1_ap_shape_result) -> None:
     """Inter-spike intervals lengthen during a sustained step — RS adaptation.
 
