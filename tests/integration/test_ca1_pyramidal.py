@@ -26,9 +26,10 @@ from tests.integration._ap_shape import assert_ap_shape
 # Shared fixtures
 # ---------------------------------------------------------------------------
 
-# Standard suprathreshold step: 7 µA/cm² is ~1.4× the model's rheobase
-# (~5 µA/cm²), giving a stable mid-rate trace (~28 Hz) suitable for shape
-# averaging without saturating into depolarization block.
+# Standard suprathreshold step: after the issue #302 retune (which adds
+# INaP), rheobase drops to ~1.3 µA/cm² so 7 µA/cm² is ~5× rheobase.  The
+# stim still produces a stable mid-rate trace (~27 Hz with adaptation)
+# suitable for shape averaging without saturating into depolarization block.
 _CA1_STEP_DURATION_MS = 500.0
 _CA1_STEP_CURRENT = 7.0
 _CA1_REFERENCE = "Spruston & Johnston 2008 / Migliore et al. 1999 / Storm 1990"

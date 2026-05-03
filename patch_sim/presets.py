@@ -1019,8 +1019,10 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 2.0,
             "stimulus_duration": 15.0,
         },
-        # Long moderate-amplitude step reveals adaptation and pronounced AHP.
-        # 12 µA/cm² produces 2 spikes; strong IKCa limits further firing.
+        # Long moderate-amplitude step reveals progressive SFA driven by IM
+        # accumulation and gradual IKCa activation.  12 µA/cm² × 300 ms
+        # produces ~38 spikes with growing ISIs; peak [Ca²⁺]ᵢ stays well
+        # within the 0.1–5 µM physiological band (issue #302 retune).
         REPETITIVE_FIRING: {
             "min_stimulus": 12.0,
             "max_stimulus": 12.0,
