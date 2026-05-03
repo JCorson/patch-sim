@@ -434,44 +434,93 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # arbor of CA1 pyramidal cells.  C ≈ 25 pF in the simulation; in vivo
         # whole-cell capacitance runs higher once dendrites are fully sampled.
         #
-        # Reduced g_Na/g_K vs squid axon; IKa shortens ISI; IM provides
-        # spike-frequency adaptation; small Ih produces modest voltage sag;
-        # Ca²⁺ channels (L, N, T) and IKCa together produce the pronounced
-        # after-hyperpolarization (AHP) characteristic of CA1 cells.
-        # Refs: Warman et al. (1994); Migliore et al. (1999), ModelDB #2796
+        # IKa shortens ISI; IM accumulates over the train to drive
+        # spike-frequency adaptation (Storm 1990; Madison & Nicoll 1984); small
+        # Ih produces modest voltage sag; Ca²⁺ channels (L, N, T) feed [Ca²⁺]ᵢ,
+        # which slowly activates IKCa over the train and contributes to SFA;
+        # INaP eliminates the ~500 ms post-AP latency that otherwise stalls
+        # repetitive firing while IKCa decays.
+        # Refs: Warman et al. (1994); Migliore et al. (1999), ModelDB #2796;
+        #       Storm (1990); Madison & Nicoll (1984)
         #
         # Pospischil et al. (2008) Traub-Miles Na⁺/K⁺ kinetics replace the
-        # default HH52 core channels.  HH52 kinetics over-accelerate Na⁺
-        # inactivation under default Q10=3.0 scaling (factor ~5.2×), causing
-        # depolarization block after the first AP.  Pospischil kinetics were
-        # characterized at 34 °C, so T_ref=307.15 K reduces the Q10 factor
-        # to ~1.4× and the cell sustains repetitive firing as expected.
+        # default HH52 core channels.  Q10=1.0 (matching cortical pyramidal,
+        # Pospischil 2008's own no-scaling convention): the published kinetics
+        # already represent slice recording temperature, and applying the
+        # default 1.4× T_ref factor narrows AP half-width below the 0.7–1.5 ms
+        # CA1 RS band (Spruston & Johnston 2008).  The K kinetics are slow
+        # enough at Q10=1.0 to land half-width inside the band without
+        # switching K families (issue #302, #311 cortical precedent).
+        #
+        # g_K = 3 mS/cm² (down from 10): under Q10=1.0 the slowed K kinetics
+        # produce a wider AP, but at the original g_K=10 the K conductance is
+        # large enough that the AP narrows back below 0.7 ms.  Lowering g_K to
+        # 3 leaves enough delayed-rectifier current for orderly repolarisation
+        # while keeping half-width ≈ 0.76 ms (mid-band) and AHP shallower.
+        #
+        # INaP (g_NaP = 0.1 mS/cm², Magistretti & Alonso 1999 kinetics): the
+        # original CA1 preset (no INaP) showed a ~500 ms latency between the
+        # first and second APs because IKCa stayed near saturation while
+        # [Ca²⁺]ᵢ slowly decayed (issue #302).  INaP provides a small,
+        # persistent inward Na⁺ window current that overcomes the post-AP
+        # IKCa hyperpolarisation, restoring prompt second-AP recovery and
+        # thereby allowing IM and IKCa to drive proper monotonic
+        # spike-frequency adaptation rather than the inverted ramp pattern.
+        #
+        # IM g_max raised 0.5 → 1.0 mS/cm²: at 0.5 the slow IM accumulation
+        # produced by the muscarinic K current was too small (relative to
+        # the combined Ca-channel inward conductance of 1.1 mS/cm²) to
+        # generate visible adaptation across the test 500 ms train.  At 1.0
+        # the late-train ISI grows from ~22 ms to ~35 ms — the SFA signature
+        # reported by Storm (1990).
+        #
+        # alpha_ca = 5e-6, tau_ca = 100 ms: original (alpha_ca=2.1e-5,
+        # tau_ca=20 ms) saturated IKCa via the Hill function (K_d = 1 µM)
+        # within the first AP and pinned the cell hyperpolarised for ~500 ms
+        # while [Ca²⁺]ᵢ decayed.  Reducing alpha_ca by ~4× per-AP rise plus
+        # extending tau_ca to 100 ms keeps [Ca²⁺]ᵢ well below K_d initially
+        # and lets it accumulate gradually over the train, so IKCa progresses
+        # smoothly from low to moderate activation as a SFA driver rather than
+        # saturating at AP 1.  Note this changes the calibration target: peak
+        # [Ca²⁺]ᵢ under sustained 7 µA/cm² firing is now ~1 µM rather than the
+        # earlier 5 µM band.
         #
         # g_NaL + g_KL = 0.05 mS/cm² gives τ_m ≈ 20 ms and R_in ≈ 20 kΩ·cm²,
-        # matching the high input resistance measured in CA1 pyramidal cells in
-        # slice recordings.  Values tuned for K_out=4 mM (E_K ≈ −95 mV) with
-        # Pospischil channel steady-state currents to preserve v_rest = −65 mV;
-        # g_total unchanged (τ_m preserved).
-        g_Na=35.0,
-        g_K=10.0,
-        g_NaL=0.0232,
-        g_KL=0.0268,
+        # matching the high input resistance measured in CA1 pyramidal cells
+        # in slice recordings.  Values tuned for K_out=4 mM (E_K ≈ −95 mV)
+        # via brentq on the steady-state current at v_rest = −65 mV with the
+        # new active conductances (INaP shifts the inward/outward balance).
+        g_Na=38.0,
+        g_K=3.0,
+        g_NaL=0.022994,
+        g_KL=0.027006,
+        Q10=1.0,
         T_ref=307.15,
         na_channel_factory=make_pospischil_na_channel,
         k_channel_factory=make_pospischil_k_channel,
         channels=(
             ChannelConfig(make_ika_channel, g_max=0.5),
-            ChannelConfig(make_im_channel, g_max=0.5),
+            ChannelConfig(make_im_channel, g_max=1.0),
             ChannelConfig(make_ih_channel, g_max=0.05),
             ChannelConfig(make_ical_channel, g_max=0.5),
             ChannelConfig(make_ican_channel, g_max=0.3),
             ChannelConfig(make_icat_channel, g_max=0.3),
             ChannelConfig(make_ikca_channel, g_max=2.0),
+            ChannelConfig(make_inap_channel, g_max=0.1),
         ),
-        # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
-        # (12 µA/cm², 300 ms).  Three Ca channel types (ICaL + ICaN + ICaT) combined
-        # with IKCa require lower alpha_ca than single-channel presets to stay in band.
-        calcium_dynamics=CalciumDynamics(alpha_ca=2.1e-5, tau_ca=20.0, ca_rest=1e-4),
+        # alpha_ca/tau_ca rebalanced so [Ca²⁺]ᵢ accumulates gradually over the
+        # 500 ms test train rather than saturating IKCa within the first AP
+        # (issue #302).  Three Ca channel types (ICaL + ICaN + ICaT) feed the
+        # pool; with the smaller alpha_ca the per-AP rise is below K_d=1 µM,
+        # and IKCa progressively activates as the cell continues to fire.
+        # ca_init is the coupled (V, ca_i) equilibrium at v_rest=−65 mV: ICaT
+        # window current at rest keeps ca_i elevated above ca_rest, so the
+        # simulation needs to start at the actual coupled rest rather than
+        # ca_rest.  Use find_coupled_equilibrium to recompute if any channel
+        # parameters change.
+        calcium_dynamics=CalciumDynamics(
+            alpha_ca=5e-6, tau_ca=100.0, ca_rest=1e-4, ca_init=2.5766e-4
+        ),
         area_cm2=25e-6,
     ),
     STN: NeuronConfig(
@@ -955,15 +1004,25 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         # also contributes via sag and post-step overshoot.
     },
     CA1_PYRAMIDAL: {
-        # 6 µA/cm² at 15 ms evokes a single AP with Pospischil kinetics;
-        # 5 µA/cm² falls below threshold with the retuned leak conductances.
+        # 1.0 µA/cm² peaks near −50 mV (subthreshold) under the retuned preset
+        # (issue #302); the default 1.5 µA/cm² is now suprathreshold because
+        # INaP lowers rheobase to ~1.1 µA/cm².
+        SUBTHRESHOLD_RESPONSE: {
+            "min_stimulus": 1.0,
+            "max_stimulus": 1.0,
+        },
+        # 2 µA/cm² at 15 ms evokes a single AP with the retuned preset (INaP
+        # lowers rheobase from ~5 to ~1.1 µA/cm² so the previous 6 µA/cm²
+        # stimulus now produces multiple spikes).
         ACTION_POTENTIAL: {
-            "min_stimulus": 6.0,
-            "max_stimulus": 6.0,
+            "min_stimulus": 2.0,
+            "max_stimulus": 2.0,
             "stimulus_duration": 15.0,
         },
-        # Long moderate-amplitude step reveals adaptation and pronounced AHP.
-        # 12 µA/cm² produces 2 spikes; strong IKCa limits further firing.
+        # Long moderate-amplitude step reveals progressive SFA driven by IM
+        # accumulation and gradual IKCa activation.  12 µA/cm² × 300 ms
+        # produces ~38 spikes with growing ISIs; peak [Ca²⁺]ᵢ stays well
+        # within the 0.1–5 µM physiological band (issue #302 retune).
         REPETITIVE_FIRING: {
             "min_stimulus": 12.0,
             "max_stimulus": 12.0,
