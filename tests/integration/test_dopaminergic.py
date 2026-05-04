@@ -1,13 +1,10 @@
 """Behavioral tests for the Dopaminergic (SNc) neuron preset.
 
 Pins the SNc DA pacemaker phenotype: slow autonomous firing (1–5 Hz)
-sustained by Ih + INaP, broad APs, post-spike hyperpolarisation,
-post-inhibitory rebound.  Bands cite Grace & Bunney (1984) and
-Komendantov et al. (2004).
-
-Replaces the previous coverage gap: before this file the DA preset had
-no suprathreshold-firing test and no spontaneous-firing test, only sag
-and rebound.
+sustained by the Cav1.3 ↔ SK loop (Putzier et al. 2009), with INaP and
+Ih playing supporting roles; broad APs, post-spike hyperpolarisation,
+post-inhibitory rebound.  Bands cite Grace & Bunney (1984), Lacey et al.
+(1989), and Putzier et al. (2009).
 """
 
 import numpy as np
@@ -71,8 +68,9 @@ def test_da_spontaneous_pacemaking(da_neuron: Neuron) -> None:
     """SNc DA neurons fire autonomously at 1–5 Hz without injected current.
 
     Grace & Bunney (1984) report regular autonomous firing in slice; the
-    rate is set by the interplay of Ih (HCN), INaP (persistent Na), and
-    intrinsic K⁺ conductances (Wilson & Callaway 2000).
+    rate is set by the Cav1.3 ↔ SK loop (Putzier et al. 2009) — Cav1.3
+    drives the slow inter-spike depolarisation, SK shapes the medium AHP —
+    with Ih and INaP providing supporting depolarisation.
     """
     duration_ms = 2000.0
     zero_current = np.zeros(_ms_to_samples(duration_ms) + 1)

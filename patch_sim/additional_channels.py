@@ -13,6 +13,7 @@ from .channels import (
     NernstSpec,
 )
 from .constants import (
+    DEFAULT_G_CAV13,
     DEFAULT_G_ICAL,
     DEFAULT_G_ICAN,
     DEFAULT_G_ICAT,
@@ -24,6 +25,7 @@ from .constants import (
     DEFAULT_G_IM,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
+    DEFAULT_G_SK,
     DEFAULT_IH_P_NA,
 )
 from .electrochemistry import boltzmann_cosh_rates
@@ -691,6 +693,78 @@ def make_ical_channel(
 
 
 # ---------------------------------------------------------------------------
+# Cav1.3 — LVA L-type Ca²⁺ channel (Putzier 2009 SNc pacemaker driver)
+# ---------------------------------------------------------------------------
+# Cav1.3 (α1D) is the low-voltage-activated isoform of the L-type Ca²⁺ family.
+# Activation midpoint is shifted ~25 mV negative of the canonical Cav1.2 ICaL
+# (half ≈ −45 mV vs −10 mV), so a small persistent window current flows at
+# sub-threshold voltages near the SNc DA resting potential (−60 to −50 mV).
+# This window current is the slow inward driver of the inter-spike "pacemaker
+# potential" that ramps from the post-AP AHP back to threshold (Putzier et
+# al. 2009, fig 5).  Inactivation is slow (τ ≈ 200 ms) and incomplete, so the
+# residual window persists through the inter-spike interval.
+#
+# References:
+#   Putzier, Kullmann, Roeper (2009), J. Neurosci. 29:15531 — Cav1.3 is
+#       the dominant pacemaker driver in SNc DA neurons
+#   Xu & Lipscombe (2001), J. Neurosci. 21:5944 — Cav1.3 vs Cav1.2 kinetics
+#   Wolfart et al. (2001), J. Neurosci. 21:3443 — SNc Cav1.3/SK pairing
+_alpha_dL13, _beta_dL13 = boltzmann_cosh_rates(
+    half=-33.0, slope=4.0, tau_scale=2.0, tau_floor=0.5
+)
+_alpha_fL13, _beta_fL13 = boltzmann_cosh_rates(
+    half=-50.0, slope=-8.0, tau_scale=200.0, tau_floor=20.0
+)
+
+
+def make_cav13_channel(
+    g_max: float = DEFAULT_G_CAV13,
+) -> IonChannel:
+    """Create a Cav1.3 (LVA L-type Ca²⁺) ion channel.
+
+    Cav1.3 is the low-voltage-activated isoform of the neuronal L-type Ca²⁺
+    family.  Its activation midpoint is shifted ~25 mV negative of the
+    canonical Cav1.2 (half ≈ −45 mV, slope 5 mV) so a persistent sub-threshold
+    window current flows near the SNc DA resting potential.  This window
+    current drives the slow inter-spike depolarisation that defines SNc
+    autonomous pacemaking (Putzier et al. 2009).
+
+    Inactivation is slow (τ ≈ 200 ms) and incomplete (half ≈ −50 mV, slope
+    −8 mV), so the residual window persists through the full inter-spike
+    interval.  Two gating variables: ``dL13`` (activation, power 1) and
+    ``fL13`` (inactivation, power 1).  Activation power is 1 (not 2 as in
+    HVA Cav1.2) — Putzier-class models treat the LVA L-type as a single-gate
+    activator since the steepness is set by the Boltzmann slope, not gate
+    multiplication.
+
+    Because Cav1.3 carries Ca²⁺, ``carries_calcium=True`` is set so the
+    simulation loop accumulates its contribution for the Ca²⁺ ODE and
+    :meth:`~patch_sim.channels.IonChannel.compute_current` uses live ``ca_i``
+    for a dynamic E_Ca.
+
+    The reversal potential is computed dynamically from the neuron's Ca²⁺
+    concentrations using the Nernst equation.
+
+    Args:
+        g_max: Maximum conductance in mS/cm². Must be non-negative.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_CAV13`.
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the Cav1.3
+        current.
+    """
+    d_var = GatingVariable(name="dL13", power=1, alpha=_alpha_dL13, beta=_beta_dL13)
+    f_var = GatingVariable(name="fL13", power=1, alpha=_alpha_fL13, beta=_beta_fL13)
+    return IonChannel(
+        name="Cav1.3",
+        g_max=g_max,
+        gating_variables=(d_var, f_var),
+        reversal_spec=NernstSpec(IonSpecies.CALCIUM),
+        carries_calcium=True,
+    )
+
+
+# ---------------------------------------------------------------------------
 # ICaT — T-type Ca²⁺ channel (low-voltage activated, transient)
 # ---------------------------------------------------------------------------
 
@@ -986,4 +1060,120 @@ def make_ican_channel(
         gating_variables=(dn_var, fn_var),
         reversal_spec=NernstSpec(IonSpecies.CALCIUM),
         carries_calcium=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# I_SK — Small-conductance Ca²⁺-activated K⁺ channel (apamin-sensitive)
+# ---------------------------------------------------------------------------
+# SK channels are Ca²⁺-gated with no voltage dependence: a Hill function on
+# intracellular [Ca²⁺] sets the open probability.  In SNc DA neurons SK
+# (mainly SK3) couples to Cav1.3 Ca²⁺ entry and shapes the medium AHP that
+# follows each pacemaker spike — gating the inter-spike interval and pinning
+# the firing regularity that distinguishes tonic SNc DA pacemaking from the
+# bursting seen when SK is blocked with apamin (Wolfart et al. 2001).
+#
+# Half-activation [Ca²⁺]_i = 0.5 µM (5e-4 mM) with Hill coefficient n = 4
+# matches the steady-state Ca²⁺ sensitivity reported for SK2/SK3 in expression
+# systems (Bond et al. 2004) and used in the Putzier 2009 SNc model.  The
+# kinetics are fast (τ ≈ 10 ms) — fast enough to follow each AP's Ca²⁺
+# transient and shape the medium AHP that immediately follows.
+#
+# References:
+#   Wolfart et al. (2001), J. Neurosci. 21:3443 — SK gates SNc tonic firing
+#   Bond et al. (2004), J. Neurosci. 24:5301 — SK2 Ca²⁺ sensitivity
+#   Putzier, Kullmann, Roeper (2009), J. Neurosci. 29:15531 — SNc model
+_SK_HILL_KD: float = 5e-4  # Half-activation [Ca²⁺]_i in mM (= 0.5 µM)
+_SK_HILL_N: int = 4
+_SK_TAU: float = 10.0  # Time constant in ms
+
+
+def _sk_q_inf(ca_i: float) -> float:
+    """Steady-state activation of the SK gating variable at [Ca²⁺]_i.
+
+    Hill function with K_d = 0.5 µM and Hill coefficient n = 4.  No voltage
+    dependence — SK is purely Ca²⁺-gated.
+
+    Args:
+        ca_i: Intracellular Ca²⁺ concentration in mM.
+
+    Returns:
+        Steady-state open probability in [0, 1].
+    """
+    ca_n = ca_i**_SK_HILL_N
+    kd_n = _SK_HILL_KD**_SK_HILL_N
+    return ca_n / (ca_n + kd_n)
+
+
+def _alpha_qSK_impl(V: float, ca_i: float) -> float:
+    """Forward rate for the SK gating variable.
+
+    Derived as ``alpha = q_inf(ca_i) / tau``.  Voltage independent.
+
+    Args:
+        V: Membrane voltage in mV (ignored).
+        ca_i: Intracellular Ca²⁺ concentration in mM.
+
+    Returns:
+        Forward rate in 1/ms.
+    """
+    return _sk_q_inf(ca_i) / _SK_TAU
+
+
+_alpha_qSK = CalciumDependentFn(_alpha_qSK_impl)
+
+
+def _beta_qSK_impl(V: float, ca_i: float) -> float:
+    """Backward rate for the SK gating variable.
+
+    Derived as ``beta = (1 - q_inf(ca_i)) / tau``.  Voltage independent.
+
+    Args:
+        V: Membrane voltage in mV (ignored).
+        ca_i: Intracellular Ca²⁺ concentration in mM.
+
+    Returns:
+        Backward rate in 1/ms.
+    """
+    return (1.0 - _sk_q_inf(ca_i)) / _SK_TAU
+
+
+_beta_qSK = CalciumDependentFn(_beta_qSK_impl)
+
+
+def make_sk_channel(
+    g_max: float = DEFAULT_G_SK,
+) -> IonChannel:
+    """Create an SK (small-conductance Ca²⁺-activated K⁺) ion channel.
+
+    SK is gated purely by intracellular Ca²⁺ (no voltage dependence) via a
+    Hill function (K_d = 0.5 µM, Hill coefficient n = 4).  The kinetics are
+    fast (τ ≈ 10 ms), so the channel follows each AP's Ca²⁺ transient and
+    shapes the medium afterhyperpolarisation.
+
+    In SNc DA neurons SK couples tightly to Cav1.3 Ca²⁺ entry: each spike
+    loads Ca²⁺, SK opens to produce the medium AHP, the AHP closes Cav1.3,
+    Ca²⁺ is buffered and SK closes — and the Cav1.3 sub-threshold window
+    current then ramps the cell back to threshold.  This Cav1.3↔SK loop is
+    the Putzier 2009 mechanism for tonic SNc pacemaking.
+
+    Note: SK is calcium-*activated* but carries K⁺, not Ca²⁺;
+    ``carries_calcium`` is therefore ``False``.
+
+    The reversal potential is computed dynamically from the neuron's K⁺
+    concentrations using the Nernst equation.
+
+    Args:
+        g_max: Maximum conductance in mS/cm². Must be non-negative.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_SK`.
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the SK current.
+    """
+    qSK_var = GatingVariable(name="qSK", power=1, alpha=_alpha_qSK, beta=_beta_qSK)
+    return IonChannel(
+        name="SK",
+        g_max=g_max,
+        gating_variables=(qSK_var,),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )

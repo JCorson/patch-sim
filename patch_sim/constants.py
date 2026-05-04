@@ -43,8 +43,10 @@ DEFAULT_G_IM: float = 0.5  # Muscarinic K+ maximum conductance in mS/cm²
 DEFAULT_G_IKIR: float = 0.2  # Inward rectifier K+ maximum conductance in mS/cm²
 DEFAULT_G_IKCA: float = 1.0  # Calcium-activated K+ maximum conductance in mS/cm²
 DEFAULT_G_ICAL: float = 0.5  # L-type Ca2+ maximum conductance in mS/cm²
+DEFAULT_G_CAV13: float = 0.1  # Cav1.3 LVA L-type Ca2+ maximum conductance in mS/cm²
 DEFAULT_G_ICAT: float = 0.3  # T-type Ca2+ maximum conductance in mS/cm²
 DEFAULT_G_ICAN: float = 0.3  # N-type Ca2+ maximum conductance in mS/cm²
+DEFAULT_G_SK: float = 1.0  # Small-conductance Ca2+-activated K+ in mS/cm²
 
 # Calcium dynamics defaults
 DEFAULT_ALPHA_CA: float = 1e-4  # mM / (µA/cm² · ms)

@@ -188,6 +188,15 @@ ADDITIONAL_CHANNELS: tuple[ChannelMeta, ...] = (
         gating_var_colors={"d": "#98df8a", "f": "#ff9896"},
     ),
     ChannelMeta(
+        id="cav13",
+        current_key="Cav1.3",
+        label="Cav1.3 (LVA L-type Ca\u00b2\u207a)",
+        gating_vars=("dL13", "fL13"),
+        g_max_range=(0.0, 1.0, 0.01),
+        current_color="#5fb3d8",
+        gating_var_colors={"dL13": "#3a86a3", "fL13": "#9ed8eb"},
+    ),
+    ChannelMeta(
         id="icat",
         current_key="ICaT",
         label="ICaT (T-type Ca\u00b2\u207a)",
@@ -204,6 +213,15 @@ ADDITIONAL_CHANNELS: tuple[ChannelMeta, ...] = (
         g_max_range=(0.0, 5.0, 0.01),
         current_color="#c5b0d5",
         gating_var_colors={"dn": "#f7b6d2", "fn": "#dbdb8d"},
+    ),
+    ChannelMeta(
+        id="sk",
+        current_key="SK",
+        label="SK (Ca\u00b2\u207a-activated K\u207a)",
+        gating_vars=("qSK",),
+        g_max_range=(0.0, 5.0, 0.01),
+        current_color="#ff7f50",
+        gating_var_colors={"qSK": "#ffa07a"},
     ),
 )
 

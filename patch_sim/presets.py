@@ -11,6 +11,7 @@ from typing import Any
 import numpy as np
 
 from .additional_channels import (
+    make_cav13_channel,
     make_ical_channel,
     make_ican_channel,
     make_icat_channel,
@@ -21,6 +22,7 @@ from .additional_channels import (
     make_im_channel,
     make_inap_channel,
     make_inar_channel,
+    make_sk_channel,
     make_thalamic_relay_icat_channel,
     make_trn_icat_channel,
 )
@@ -313,80 +315,116 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # area_cm2 = 7e-6 cm² — ~15 µm soma typical of midbrain SNc DA neurons.
         # Yields C ≈ 7 pF and R_n ≈ 25–50 MΩ in the simulation.
         #
-        # Tonic pacemaker (autonomous, intrinsic): INaP window current and Ih
-        # together destabilise any rest near −60 mV — the cell fires
-        # spontaneously at ~1.5–2 Hz without external input, in line with the
-        # Grace & Bunney (1984) 1–5 Hz in-vitro band.  IM provides slow
-        # oscillatory hyperpolarisation; Mainen-Sejnowski Kv (slow deactivation)
+        # Tonic pacemaker (autonomous, intrinsic).  Pacemaking is driven by
+        # the Cav1.3 ↔ SK loop (Putzier et al. 2009): a small sub-threshold
+        # Cav1.3 window current ramps the cell from the medium AHP back to
+        # threshold; each spike loads Ca²⁺, SK opens to produce the medium
+        # AHP, the AHP closes Cav1.3, Ca²⁺ buffers, SK closes — and the cycle
+        # repeats at ~1.5–3 Hz (Grace & Bunney 1984: 1–5 Hz in vitro).
+        # Ih and IM remain in the preset as supporting modulators (Putzier
+        # shows ZD7288 has only a minor rate effect; this matches the
+        # Wilson & Callaway 2000 hypothesis as a secondary mechanism rather
+        # than the primary driver).  Mainen-Sejnowski Kv (slow deactivation)
         # broadens the AP into the SNc 1.5–3.5 ms half-width band that the
-        # Canavier/Komendantov n-gate cannot reach (issue #304).
-        # Refs: Grace & Bunney (1984), J. Neurosci. 4:2877 — SNc pacemaking;
-        #       Wilson & Callaway (2000), J. Neurophysiol. 83:3084 — Ih+NaP loop;
-        #       Komendantov et al. (2004), J. Neurophysiol. 91:346 — SNc DA model;
+        # Canavier/Komendantov n-gate cannot reach on its own.
+        # Refs: Putzier, Kullmann, Roeper (2009), J. Neurosci. 29:15531 —
+        #         primary mechanism (Cav1.3 + SK);
+        #       Wolfart et al. (2001), J. Neurosci. 21:3443 — SK gates SNc
+        #         tonic firing; apamin block produces irregular bursting;
+        #       Xu & Lipscombe (2001), J. Neurosci. 21:5944 — Cav1.3 LVA
+        #         kinetics (vs HVA Cav1.2);
+        #       Bond et al. (2004), J. Neurosci. 24:5301 — SK2 Ca²⁺ sensitivity;
+        #       Grace & Bunney (1984), J. Neurosci. 4:2877 — 1–5 Hz in vitro;
+        #       Wilson & Callaway (2000), J. Neurophysiol. 83:3084 — earlier
+        #         Ih+INaP hypothesis (now demoted to supporting role);
+        #       Komendantov et al. (2004), J. Neurophysiol. 91:346 — SNc DA
+        #         model and Na/K kinetics reference;
         #       Canavier (1999), J. Comput. Neurosci. 6:49 — Na/K kinetics;
         #       Mainen & Sejnowski (1996), Nature 382:363 — slow Kv;
         #       Lacey et al. (1989), J. Physiol. 415:55 — −60 to −65 mV rest.
         #
-        # Canavier (1999) / Komendantov (2004) Traub-Miles Na⁺ kinetics
+        # Canavier (1999) / Komendantov (2004) Traub-Miles Na⁺/K⁺ kinetics
         # (VT = −67 mV) replace the default HH52 core channels.  HH52 kinetics
-        # (fitted to room-temperature squid axon) over-accelerate Na⁺ inactivation
-        # under the default Q10=3.0 scaling (22→37 °C, factor ~5.2×), biologically
-        # wrong for a mammalian midbrain DA cell.  The Canavier/Komendantov Na
-        # produces m_inf ≈ 5.6% at rest — the Na⁺ window current that supports
-        # Ih-driven post-hyperpolarisation rebound spiking (Wilson & Callaway 2000).
-        # Q10 = 1.0 (combined with T_ref = 308.15 K, 35 °C) holds the kinetics
-        # exactly at the published Komendantov reference temperature, mirroring
-        # the CA1 (#302) and Cortical Pyramidal (#311) fixes — a Q10 = 3.0 scaling
-        # to 37 °C made APs ~25 % too narrow.
+        # (fitted to room-temperature squid axon) over-accelerate inactivation
+        # under the default Q10=3.0 scaling (22→37 °C, factor ~5.2×),
+        # biologically wrong for a mammalian midbrain DA cell.  The
+        # Canavier/Komendantov Na produces m_inf ≈ 5.6% at rest — the Na⁺
+        # window current that maintains the cell near threshold between Cav1.3
+        # ramps.  Q10 = 1.0 (combined with T_ref = 308.15 K, 35 °C) holds the
+        # kinetics exactly at the published Komendantov reference temperature,
+        # mirroring the CA1 (#302) and Cortical Pyramidal (#311) fixes —
+        # Q10 = 3.0 scaling to 37 °C makes APs ~25 % too narrow.
         #
-        # Pacemaking mechanism (post-#304):
-        #   1. INaP (Magistretti & Alonso 1999, half = −52.6 mV, g = 0.03 mS/cm²)
-        #      provides a small persistent inward Na⁺ current that destabilises
-        #      any rest near −60 mV — the cell fires without external drive.
-        #   2. After each AP the cell hyperpolarises near E_K (≈ −95 mV).
-        #   3. Ih (Destexhe et al. 1993, g = 2.0 mS/cm²) activates during the
-        #      AHP and drives slow depolarisation back to threshold, producing
-        #      tonic firing at ~2 Hz in this single-compartment model
-        #      (Grace & Bunney 1984: 1–5 Hz in-vitro).
+        # Pacemaking mechanism (post-#318 review):
+        #   1. Cav1.3 (g = 0.1 mS/cm², half = −45 mV, slope 5 mV) carries a
+        #      small persistent Ca²⁺ window current at sub-threshold V; this
+        #      current depolarises the cell from the AHP back to threshold.
+        #   2. AP fires; Ca²⁺ enters via Cav1.3 (and a small contribution from
+        #      the M-S Kv-coupled spike).  ca_i transient peaks at ~0.5–1 µM.
+        #   3. SK (g = 1.0 mS/cm², K_d = 0.5 µM, Hill n = 4) opens, drawing the
+        #      cell to the SK-shaped medium AHP near −65 mV.
+        #   4. The AHP closes Cav1.3 (deactivation) and the Cav1.3 inactivation
+        #      gate has time to recover (τ ≈ 200 ms); SK closes as ca_i decays
+        #      (τ_ca ≈ 80 ms).  Cav1.3 window current resumes — back to step 1.
         #
-        # v_rest = −62.5 mV is the simulation starting point, near the INaP
-        # activation threshold; this cell has NO stable zero-current rest — it
-        # is an autonomous oscillator.  Listed in the
-        # ``test_find_zero_current_voltage_all_presets`` exclusion.
+        # v_rest is a kinematic starting point — this cell is an autonomous
+        # oscillator with NO stable zero-current resting potential, exactly
+        # like Purkinje and the previous DA preset.  The fixed-point search
+        # (find_coupled_equilibrium) returns a depolarised root near −31 mV
+        # which is the depol-block-locked equilibrium, NOT the relevant
+        # operating point: the cell oscillates *around* that point at ~2.5–3 Hz
+        # because INaP+Cav1.3 destabilise it past the bifurcation boundary.
+        # Listed in the test_current_clamp STABLE/QUIESCENT exclusion lists
+        # and in the test_find_zero_current_voltage_all_presets exclusion.
+        # Starting V = −55 mV places the cell mid-way between threshold
+        # (≈ −45 mV) and the AHP trough (≈ −70 mV); the integrator settles
+        # onto the limit cycle within one inter-spike interval (~400 ms).
         #
-        # K kinetics: ``k_channel_factory`` is left wired to
-        # ``make_dopaminergic_k_channel`` for structural symmetry but pinned to
-        # ``g_K = 0`` — the only delayed-rectifier K is Mainen-Sejnowski Kv
-        # (g = 0.4 mS/cm²).  M-S Kv has slow deactivation (τ ~1–2 ms, n_inf
-        # passes 0.5 at +4 mV) which broadens the AP into the literature
-        # 1.5–3.5 ms half-width band; the Canavier n-gate caps half-width at
-        # ~0.5 ms regardless of g_K.  This mirrors the Cortical Pyramidal fix
-        # (#311) which substituted M-S Kv for the same reason.
+        # K kinetics: ``k_channel_factory`` is wired to
+        # ``make_dopaminergic_k_channel`` (Canavier/Komendantov n-gate) at
+        # a small g_K = 0.1 mS/cm² — a real but minor fast Kdr component
+        # cooperating with the dominant Mainen-Sejnowski Kv (g = 0.4 mS/cm²)
+        # for AP repolarisation.  Higher g_K narrows the AP below the SNc
+        # 1.5–3.5 ms half-width band (Lacey et al. 1989; Canavier kinetics
+        # are fast at the AP peak), so g_K is held small while M-S Kv's slow
+        # deactivation (τ ~1–2 ms, n_inf passes 0.5 at +4 mV) carries the
+        # bulk of the repolarisation.  Reviewer concern from PR #318 about
+        # ``make_dopaminergic_k_channel`` being wired with g_K = 0 was
+        # addressed by giving it this small but non-zero conductance.
         #
-        # g_NaL = 0 / g_KL = 0.01 mS/cm²: pure K⁺ background leak (Purkinje
-        # pattern).  τ_m = C_m / g_KL ≈ 100 ms and R_in ≈ 100 kΩ·cm².  A
-        # rebalanced Na+K leak that fixes I_total = 0 at v_rest pins the cell
-        # too stably to pacemake; the autonomous-oscillator regime requires
-        # the leak NOT to bracket a zero-current root.
+        # g_NaL = 0 / g_KL = 0.02 mS/cm²: pure K⁺ background leak (Purkinje
+        # pattern).  τ_m = C_m / g_KL ≈ 50 ms and R_in ≈ 50 kΩ·cm².
         #
         # g_Na = 25 mS/cm²: somatic density that places the AP peak in the
-        # +10 to +40 mV band (Komendantov et al. 2004) under M-S Kv
-        # repolarisation.  The previous preset silently inherited HH52 g_Na = 120
-        # which produced peaks of ~+47 mV (issue #304).
-        v_rest=-62.5,
+        # +10 to +40 mV band (Komendantov et al. 2004) under combined M-S Kv
+        # + Kdr repolarisation.
+        v_rest=-55.0,
         g_Na=25.0,
-        g_K=0.0,
+        g_K=0.1,
         g_NaL=0.0,
-        g_KL=0.01,
+        g_KL=0.02,
         Q10=1.0,
         T_ref=308.15,
         na_channel_factory=make_dopaminergic_na_channel,
         k_channel_factory=make_dopaminergic_k_channel,
         channels=(
-            ChannelConfig(make_ih_channel, g_max=2.0),
-            ChannelConfig(make_im_channel, g_max=1.0),
-            ChannelConfig(make_inap_channel, g_max=0.03),
+            ChannelConfig(make_cav13_channel, g_max=0.1),
+            ChannelConfig(make_sk_channel, g_max=0.3),
+            ChannelConfig(make_ih_channel, g_max=2.5),
+            ChannelConfig(make_im_channel, g_max=0.5),
+            ChannelConfig(make_inap_channel, g_max=0.02),
             ChannelConfig(make_mainen_sejnowski_kv_channel, g_max=0.4),
+        ),
+        # alpha_ca / tau_ca calibrated so that one AP raises ca_i to ~0.6 µM
+        # — sufficient to half-saturate SK (K_d = 0.5 µM) — and ca_i decays
+        # with τ ≈ 30 ms between spikes (fast enough that SK fully closes
+        # before the next spike at 2.5–3 Hz, allowing Cav1.3+Ih to ramp the
+        # cell back to threshold).  ca_init = 1e-4 mM = ca_rest is fine
+        # because the cell never sits at static rest — every simulation
+        # starts ~mid-cycle and converges onto the limit cycle within the
+        # first ISI.
+        calcium_dynamics=CalciumDynamics(
+            alpha_ca=2.5e-5, tau_ca=30.0, ca_rest=1e-4, ca_init=1.0e-4
         ),
         area_cm2=7e-6,
     ),
@@ -970,17 +1008,23 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 4.0,
             "stimulus_duration": 5.0,
         },
-        # Long pacemaking window: post-#304 the cell is a tonic pacemaker
-        # (~1.5 Hz at zero current) with a narrow operating range — currents
-        # ≳1 µA/cm² tip it into depolarisation block.  0.5 µA/cm² × 5000 ms
-        # produces ~7 APs at the modestly-enhanced rate, satisfying the
-        # ≥5-AP regression bar without entering block.  Duration must stay
-        # > 180 ms (the base REPETITIVE_FIRING preset) — see
-        # test_neuron_protocol_adjustments_change_stimulus_duration.
+        # SNc DA pacemaker: ~2.6 Hz tonic at zero current, modestly enhanced
+        # to ~3 Hz under sub-block depolarising drive.  The cell tips into
+        # depolarisation block above ~1 µA/cm² (a known limitation of the
+        # single-compartment somatic model — real DA neurons distribute Na/K
+        # across dendrites and shift into bursting at higher drive in vivo;
+        # the bursting phase is out of scope for this preset).  The
+        # REPETITIVE_FIRING protocol uses 0.3 µA/cm² × 3000 ms, producing
+        # ≥5 full APs at the modestly-enhanced rate.  Mid-range drive
+        # (0.4–0.7 µA/cm²) produces an alternating full/abortive doublet
+        # pattern from incomplete inter-spike recovery; staying at 0.3 µA
+        # keeps the cell in clean tonic mode for the regression test.
+        # Duration must stay > 180 ms (the base REPETITIVE_FIRING preset)
+        # — see test_neuron_protocol_adjustments_change_stimulus_duration.
         REPETITIVE_FIRING: {
-            "min_stimulus": 0.5,
-            "max_stimulus": 0.5,
-            "stimulus_duration": 5000.0,
+            "min_stimulus": 0.3,
+            "max_stimulus": 0.3,
+            "stimulus_duration": 3000.0,
         },
         # Threshold ~1 µA/cm²; 0 → 12 µA/cm² in 1.5 µA steps spans the
         # subthreshold zone through repetitive firing.  200 ms duration shows

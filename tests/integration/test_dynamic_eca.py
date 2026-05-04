@@ -18,7 +18,7 @@ import numpy as np
 from patch_sim import simulate_current_clamp
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ
 from patch_sim.neuron_factory import make_neuron
-from patch_sim.presets import DOPAMINERGIC, NEURON_PRESETS, PURKINJE
+from patch_sim.presets import CORTICAL_PYRAMIDAL, NEURON_PRESETS, PURKINJE
 
 
 def _n_steps(duration_ms: float) -> int:
@@ -34,21 +34,21 @@ def _n_steps(duration_ms: float) -> int:
 
 
 def test_non_ca_preset_invariant_to_ca_in() -> None:
-    """Dopaminergic V trace is byte-identical under a 100× Ca_in perturbation.
+    """Cortical Pyramidal V trace is byte-identical under a 100× Ca_in perturbation.
 
-    Dopaminergic carries no Ca²⁺ channels and has ``calcium_dynamics=None``,
+    Cortical Pyramidal carries no Ca²⁺ channels and has ``calcium_dynamics=None``,
     so ``Neuron.Ca_in`` should never enter any ``compute_current`` call.
     Running the simulation with ``Ca_in`` scaled by 100 must yield a
     byte-identical voltage trace; otherwise the dynamic E_Ca plumbing has
     accidentally exposed ``Ca_in`` to a channel that should ignore it.
     """
-    config = NEURON_PRESETS[DOPAMINERGIC]
+    config = NEURON_PRESETS[CORTICAL_PYRAMIDAL]
     neuron_default = make_neuron(config)
     neuron_perturbed = make_neuron(
         dataclasses.replace(config, Ca_in=config.Ca_in * 100)
     )
     assert neuron_default.calcium_dynamics is None, (
-        "Dopaminergic must have no Ca dynamics for this invariance to hold"
+        "Cortical Pyramidal must have no Ca dynamics for this invariance to hold"
     )
 
     n = _n_steps(50)

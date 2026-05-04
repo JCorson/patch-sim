@@ -16,6 +16,7 @@ from patch_sim.additional_channels import (
 )
 from patch_sim.constants import (
     ACTION_POTENTIAL,
+    DEFAULT_G_CAV13,
     DEFAULT_G_ICAL,
     DEFAULT_G_ICAN,
     DEFAULT_G_ICAT,
@@ -28,6 +29,7 @@ from patch_sim.constants import (
     DEFAULT_G_MSKV,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
+    DEFAULT_G_SK,
     NA_CHANNEL_ACTIVATION,
     SQUID_GIANT_AXON,
 )
@@ -65,8 +67,10 @@ _DEFAULT_G_MAX: dict[str, float] = {
     "ikir": DEFAULT_G_IKIR,
     "ikca": DEFAULT_G_IKCA,
     "ical": DEFAULT_G_ICAL,
+    "cav13": DEFAULT_G_CAV13,
     "icat": DEFAULT_G_ICAT,
     "ican": DEFAULT_G_ICAN,
+    "sk": DEFAULT_G_SK,
 }
 
 # Reverse map: factory function → channel name.  Variant factories that

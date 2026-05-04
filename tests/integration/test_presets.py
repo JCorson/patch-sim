@@ -131,7 +131,7 @@ def _protocol_total_samples(preset_name: str, neuron_name: str | None) -> int:
 def test_neuron_protocol_adjustments_change_stimulus_duration() -> None:
     """Neuron adjustments that change stimulus_duration produce a different length.
 
-    The SNc Dopaminergic Neuron adjusts Repetitive Firing from 180 ms to 480 ms —
+    The SNc Dopaminergic Neuron adjusts Repetitive Firing from 180 ms to 3000 ms —
     the longer duration must result in a longer stimulus array.
     """
     base_samples = _protocol_total_samples(REPETITIVE_FIRING, None)
@@ -174,7 +174,7 @@ def test_repetitive_firing_adjusted_for_all_configured_neurons(
 def test_caller_overrides_take_precedence_over_neuron_adjustments() -> None:
     """Caller-supplied overrides win over both the base preset and neuron adjustments.
 
-    Dopaminergic Neuron sets stimulus_duration=480; override to 50 ms.
+    Dopaminergic Neuron sets stimulus_duration=3000; override to 50 ms.
     The resulting array should match a plain 50 ms stimulus.
     """
     base_50 = build_protocol_from_preset(
@@ -290,10 +290,12 @@ def test_thalamic_relay_t_ref_is_mccormick_huguenard_recording_temp() -> None:
         (FAST_SPIKING_INTERNEURON, 0.4, 1.0, 0.4, 1.0),  # g_total=1.5  τ_m≈0.67 ms
         (CORTICAL_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
         (PURKINJE, 18.0, 28.0, 18.0, 28.0),  # g_total=0.044 τ_m≈22.7 ms
-        # DOPAMINERGIC post-#304: g_NaL=0, g_KL=0.01 (Purkinje-style oscillator
-        # leak; needs to NOT bracket a zero-current root for autonomous firing).
-        # g_total = 0.01 → τ_m = R_in = 100 ms / 100 kΩ·cm².
-        (DOPAMINERGIC, 80.0, 120.0, 80.0, 120.0),
+        # DOPAMINERGIC post-#318 review: g_NaL=0, g_KL=0.02 (Cav1.3+SK
+        # mechanism trades a slightly lower input resistance for the SK-shaped
+        # AHP — an SNc DA neuron's mAHP target cannot be hit with the previous
+        # g_KL=0.01 once SK is added).
+        # g_total = 0.02 → τ_m = R_in ≈ 50 ms / 50 kΩ·cm².
+        (DOPAMINERGIC, 40.0, 60.0, 40.0, 60.0),
         (THALAMIC_RELAY, 5.0, 9.0, 5.0, 9.0),  # g_total=0.15  τ_m≈6.7 ms
         (CA1_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
         (STN, 2.5, 5.5, 2.5, 5.5),  # g_total=0.25 τ_m≈4 ms
