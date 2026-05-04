@@ -1,16 +1,10 @@
 """Behavioral tests for the Subthalamic Nucleus (STN) neuron preset.
 
-Pins the STN tonic-pacemaker phenotype: 5–50 Hz autonomous firing, AP
-shape consistent with Bevan & Wilson (1999), and the conditional burst
-mode (already covered by ``test_stn_conditional_burst_mode_under_…`` in
-``test_burst_metrics_simulation.py``).  Bands cite Beurrier et al.
-(1999) and Bevan & Wilson (1999).  Several metrics — most notably the
-absence of spontaneous pacemaking and an excessive tonic rate under the
-documented bias — currently fall outside literature ranges and are
-marked ``xfail`` pending biology fixes.
-
-Replaces the previous coverage gap: before this file the STN preset had
-only sag and conditional-burst tests.
+Pins the STN tonic-pacemaker phenotype: 5–50 Hz autonomous firing and AP
+shape consistent with Bevan & Wilson (1999); the conditional burst mode
+is covered by ``test_stn_conditional_burst_mode_under_…`` in
+``test_burst_metrics_simulation.py``.  Bands cite Beurrier et al. (1999)
+and Bevan & Wilson (1999).
 """
 
 import numpy as np
@@ -22,18 +16,16 @@ from patch_sim.constants import STN
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESETS
-from patch_sim.protocols import step_current
 from tests.integration._ap_shape import assert_ap_shape
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
 
-# Tonic bias documented in the preset comment ("~80 Hz here under a 2 µA/cm²
-# depolarising bias").  Use the documented stim so that future biology-fix
-# work can compare against the same reference operating point.
-_STN_STEP_DURATION_MS = 200.0
-_STN_STEP_CURRENT = 2.0
+# 1 s of zero-current simulation captures the STN's autonomous tonic
+# pacemaker phenotype directly: at the 5–50 Hz Bevan & Wilson (1999) rate
+# this yields 5–50 spikes — sufficient for both rate and AP-shape stats.
+_STN_SIMULATION_MS = 1000.0
 _STN_REFERENCE = "Beurrier et al. 1999 / Bevan & Wilson 1999"
 
 
@@ -45,12 +37,9 @@ def stn_neuron() -> Neuron:
 
 @pytest.fixture
 def stn_ap_shape_result(stn_neuron: Neuron):
-    """AP analysis under the documented 2 µA/cm² tonic bias."""
-    protocol = step_current(
-        duration=_STN_STEP_DURATION_MS,
-        current_amplitude=_STN_STEP_CURRENT,
-    )
-    result = simulate_current_clamp(stn_neuron, current_external=protocol)
+    """AP analysis from a zero-current spontaneous-firing trace."""
+    zero_current = np.zeros(_ms_to_samples(_STN_SIMULATION_MS) + 1)
+    result = simulate_current_clamp(stn_neuron, current_external=zero_current)
     return analyze_aps_from_result(result)
 
 
@@ -64,29 +53,14 @@ def _ms_to_samples(ms: float) -> int:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "STN preset is labelled an autonomous tonic pacemaker but produces "
-        "ZERO spikes in 1 s of zero-current simulation (preset documents "
-        "needing a 2 µA/cm² bias to fire). Bevan & Wilson 1999 report 5–50 "
-        "Hz autonomous firing in slice without external bias. Likely the "
-        "Otsuka kinetics' steady-state currents at v_rest = −68 mV do not "
-        "drive spontaneous depolarisation; tracked in #305."
-    ),
-)
-def test_stn_spontaneous_pacemaking(stn_neuron: Neuron) -> None:
+def test_stn_spontaneous_pacemaking(stn_ap_shape_result) -> None:
     """STN fires autonomously at 5–50 Hz without injected current.
 
     Bevan & Wilson (1999) characterise the STN as a tonic pacemaker
-    sustained intrinsically by Na⁺/K⁺ window currents and Ih.
+    sustained intrinsically by INaP and Ih.
     """
-    duration_ms = 1000.0
-    zero_current = np.zeros(_ms_to_samples(duration_ms) + 1)
-    result = simulate_current_clamp(stn_neuron, current_external=zero_current)
-    ap = analyze_aps_from_result(result)
     assert_ap_shape(
-        ap,
+        stn_ap_shape_result,
         reference=_STN_REFERENCE,
         firing_rate_hz=(5.0, 50.0),
         min_spike_count=5,
@@ -94,21 +68,12 @@ def test_stn_spontaneous_pacemaking(stn_neuron: Neuron) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tonic mode under the documented depolarising bias.
+# Autonomous firing rate — Bevan & Wilson (1999), 5–50 Hz in vitro.
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "STN fires at ~134 Hz under the documented 2 µA/cm² bias, well "
-        "above the 5–50 Hz tonic range reported by Bevan & Wilson (1999). "
-        "Either g_Na is too high or the leak balance pushes the cell into "
-        "an over-excited regime; tracked in #305."
-    ),
-)
 def test_stn_tonic_firing_rate_in_stn_range(stn_ap_shape_result) -> None:
-    """Tonic firing rate falls within the STN range (5–50 Hz)."""
+    """Autonomous firing rate falls within the STN range (5–50 Hz)."""
     assert_ap_shape(
         stn_ap_shape_result,
         reference=_STN_REFERENCE,
@@ -145,15 +110,6 @@ def test_stn_ap_peak_voltage_in_stn_range(stn_ap_shape_result) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Mean AP half-width ~0.12 ms is far below the 0.4–1.2 ms range "
-        "reported for STN tonic spikes (Bevan & Wilson 1999). The Otsuka "
-        "kinetics under this preset's parameters produce excessively narrow "
-        "APs; tracked in #305."
-    ),
-)
 def test_stn_ap_half_width_in_stn_range(stn_ap_shape_result) -> None:
     """Mean AP half-width matches the STN tonic phenotype (0.4–1.2 ms)."""
     assert_ap_shape(

@@ -293,7 +293,7 @@ def test_thalamic_relay_t_ref_is_mccormick_huguenard_recording_temp() -> None:
         (DOPAMINERGIC, 2.5, 4.5, 2.5, 4.5),  # g_total=0.3  τ_m≈3.3 ms
         (THALAMIC_RELAY, 5.0, 9.0, 5.0, 9.0),  # g_total=0.15  τ_m≈6.7 ms
         (CA1_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
-        (STN, 2.5, 5.5, 2.5, 5.5),  # g_total=0.25 τ_m≈4 ms
+        (STN, 22.0, 28.0, 22.0, 28.0),  # g_total=0.04 τ_m≈25 ms
         (TRN, 10.0, 15.0, 10.0, 15.0),  # g_total=0.07 τ_m≈14.3 ms
     ],
 )

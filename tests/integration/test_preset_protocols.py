@@ -21,6 +21,7 @@ from patch_sim.constants import (
     ACTION_POTENTIAL,
     PURKINJE,
     REPETITIVE_FIRING,
+    STN,
     TRN,
 )
 from patch_sim.neuron_factory import make_neuron
@@ -41,7 +42,15 @@ from patch_sim.presets import (
 # fires tonically at ~3 Hz at zero current (consistent with HP92/B&M93 slice
 # recordings).  The HP92 rebound-burst phenotype is exercised by
 # ``test_trn_step_release_produces_hp92_rebound_burst``.
-_QUIESCENT_PRESET_NAMES = [p for p in NEURON_PRESET_NAMES if p not in (PURKINJE, TRN)]
+#
+# STN is excluded post-#305: the autonomous-pacemaker preset fires
+# spontaneously at ~20 Hz from v_rest = −60 mV (Bevan & Wilson 1999).  The
+# tonic-pacemaker phenotype and conditional rebound-burst phenotype are
+# exercised by tests/integration/test_stn.py and
+# ``test_stn_conditional_burst_mode_under_hyperpolarising_step_release``.
+_QUIESCENT_PRESET_NAMES = [
+    p for p in NEURON_PRESET_NAMES if p not in (PURKINJE, TRN, STN)
+]
 
 # ---------------------------------------------------------------------------
 # Shared helpers
