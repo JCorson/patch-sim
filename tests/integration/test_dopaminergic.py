@@ -1,11 +1,9 @@
 """Behavioral tests for the Dopaminergic (SNc) neuron preset.
 
 Pins the SNc DA pacemaker phenotype: slow autonomous firing (1–5 Hz)
-sustained by Ih, broad APs, deep AHP, post-inhibitory rebound.  Bands
-cite Grace & Bunney (1984) and Komendantov et al. (2004).  Several
-metrics — most notably the absence of spontaneous pacemaking — currently
-fall outside literature ranges and are marked ``xfail`` pending biology
-fixes.
+sustained by Ih + INaP, broad APs, post-spike hyperpolarisation,
+post-inhibitory rebound.  Bands cite Grace & Bunney (1984) and
+Komendantov et al. (2004).
 
 Replaces the previous coverage gap: before this file the DA preset had
 no suprathreshold-firing test and no spontaneous-firing test, only sag
@@ -28,11 +26,14 @@ from tests.integration._ap_shape import assert_ap_shape
 # Shared fixtures
 # ---------------------------------------------------------------------------
 
-# Standard suprathreshold step: 1.5 µA/cm² (~1.5× rheobase for the model)
-# gives a stable ~10 Hz trace under the Komendantov kinetics, suitable for
-# averaging AP shape across spikes.
-_DA_STEP_DURATION_MS = 1000.0
-_DA_STEP_CURRENT = 1.5
+# Spontaneous firing duration: 5 s of zero current produces ~10 spikes at the
+# preset's ~2 Hz pacing rate, enough to average AP shape across spikes.
+_DA_SPONT_DURATION_MS = 5000.0
+# Modest depolarising step used to verify the cell sustains repetitive firing
+# without entering depolarisation block; 0.5 µA/cm² was chosen empirically as
+# the largest current the post-#304 preset can take before block.
+_DA_STEP_DURATION_MS = 2000.0
+_DA_STEP_CURRENT = 0.5
 _DA_REFERENCE = "Grace & Bunney 1984 / Komendantov et al. 2004"
 
 
@@ -44,12 +45,15 @@ def da_neuron() -> Neuron:
 
 @pytest.fixture
 def da_ap_shape_result(da_neuron: Neuron):
-    """AP analysis under the standard suprathreshold step."""
-    protocol = step_current(
-        duration=_DA_STEP_DURATION_MS,
-        current_amplitude=_DA_STEP_CURRENT,
-    )
-    result = simulate_current_clamp(da_neuron, current_external=protocol)
+    """AP analysis under the autonomous (zero-current) pacing protocol.
+
+    The DA preset is a tonic pacemaker — autonomous firing at ~2 Hz — so AP
+    shape is averaged over the spontaneous train rather than a driven step.
+    A 5 s window gives ~10 spikes for stable shape statistics.
+    """
+    duration_samples = int(_DA_SPONT_DURATION_MS * SIM_SAMPLING_FREQ / 1000.0)
+    zero_current = np.zeros(duration_samples + 1)
+    result = simulate_current_clamp(da_neuron, current_external=zero_current)
     return analyze_aps_from_result(result)
 
 
@@ -63,23 +67,12 @@ def _ms_to_samples(ms: float) -> int:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "DA preset is labelled an SNc pacemaker but produces ZERO spikes in "
-        "2 s of zero-current simulation. Likely Ih is not strong enough at "
-        "v_rest = -62.5 mV to drive spontaneous depolarisation to threshold, "
-        "or g_NaP / Na window current is missing to support the pacemaker "
-        "loop (Grace & Bunney 1984 report 1–5 Hz autonomous firing in "
-        "vitro). Tracked in #304."
-    ),
-)
 def test_da_spontaneous_pacemaking(da_neuron: Neuron) -> None:
     """SNc DA neurons fire autonomously at 1–5 Hz without injected current.
 
     Grace & Bunney (1984) report regular autonomous firing in slice; the
-    rate is set by the interplay of Ih (HCN), Ca²⁺-activated K⁺, and
-    intrinsic Na⁺ conductances.
+    rate is set by the interplay of Ih (HCN), INaP (persistent Na), and
+    intrinsic K⁺ conductances (Wilson & Callaway 2000).
     """
     duration_ms = 2000.0
     zero_current = np.zeros(_ms_to_samples(duration_ms) + 1)
@@ -94,27 +87,30 @@ def test_da_spontaneous_pacemaking(da_neuron: Neuron) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Driven firing under depolarising step — pinned even though the preset
-# is supposed to pace at zero current. This makes the AP-shape battery
-# meaningful while #pacemaking-issue is still open.
+# Modest depolarisation sustains firing (no depolarisation block).
 # ---------------------------------------------------------------------------
 
 
-def test_da_suprathreshold_step_produces_repetitive_firing(
-    da_ap_shape_result,
-) -> None:
-    """Mild depolarising step drives slow regular firing in the DA range.
+def test_da_modest_step_sustains_firing(da_neuron: Neuron) -> None:
+    """A small depolarising step keeps the cell firing without block.
 
-    With the preset's current pacemaking gap, a small bias is required to
-    elicit firing.  At 1.5 µA/cm², the model fires at ~10 Hz — within the
-    range reported for SNc DA cells under modest depolarisation
-    (Komendantov et al. 2004).
+    The DA preset is a tonic pacemaker with a narrow operating range —
+    aggressive drive (≳1 µA/cm²) tips it into depolarisation block.  This
+    test verifies that a modest 0.5 µA/cm² × 2 s step still produces
+    sustained firing (≥4 APs, rate in 1–5 Hz), confirming the cell remains
+    in the regular-firing regime under physiological synaptic-like drive.
     """
+    protocol = step_current(
+        duration=_DA_STEP_DURATION_MS,
+        current_amplitude=_DA_STEP_CURRENT,
+    )
+    result = simulate_current_clamp(da_neuron, current_external=protocol)
+    ap = analyze_aps_from_result(result)
     assert_ap_shape(
-        da_ap_shape_result,
+        ap,
         reference=_DA_REFERENCE,
-        firing_rate_hz=(4.0, 20.0),
-        min_spike_count=10,
+        firing_rate_hz=(1.0, 5.0),
+        min_spike_count=4,
     )
 
 
@@ -133,15 +129,6 @@ def test_da_ap_threshold_in_da_range(da_ap_shape_result) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Mean AP half-width ~0.38 ms is dramatically below the 1.5–3.5 ms "
-        "range reported for SNc DA cells (Grace & Bunney 1984). The "
-        "Canavier/Komendantov Na⁺/K⁺ kinetics produce APs much narrower "
-        "than DA recordings; tracked in #304."
-    ),
-)
 def test_da_ap_half_width_in_da_range(da_ap_shape_result) -> None:
     """Mean AP half-width matches the broad DA phenotype (1.5–3.5 ms)."""
     assert_ap_shape(
@@ -151,14 +138,6 @@ def test_da_ap_half_width_in_da_range(da_ap_shape_result) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Mean peak voltage ~+47 mV exceeds the +10 to +40 mV range reported "
-        "for SNc DA cells (Komendantov et al. 2004). Likely g_Na too high; "
-        "tracked in #304."
-    ),
-)
 def test_da_ap_peak_voltage_in_da_range(da_ap_shape_result) -> None:
     """Mean AP peak voltage falls within the DA range (+10 to +40 mV)."""
     assert_ap_shape(
@@ -168,14 +147,6 @@ def test_da_ap_peak_voltage_in_da_range(da_ap_shape_result) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Mean AHP depth ~−88 mV is far deeper than the −55 to −72 mV range "
-        "reported for SNc DA cells (Grace & Bunney 1984). Suggests g_KL or "
-        "K⁺ DR conductance over-tuned; tracked in #304."
-    ),
-)
 def test_da_ap_ahp_depth_in_da_range(da_ap_shape_result) -> None:
     """Mean AHP depth falls within the DA range (−72 to −55 mV)."""
     assert_ap_shape(

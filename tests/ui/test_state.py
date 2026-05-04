@@ -651,7 +651,7 @@ async def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> No
 
 
 async def test_protocol_preset_dopaminergic_repetitive_firing_long_duration() -> None:
-    """Dopaminergic Neuron + Repetitive Firing sets stimulus_duration to 480 ms."""
+    """Dopaminergic Neuron + Repetitive Firing sets stimulus_duration to 5000 ms."""
     ps = _make_protocol_state()
     mock_neuron = MagicMock()
     mock_neuron.active_neuron_type = DOPAMINERGIC
@@ -659,7 +659,7 @@ async def test_protocol_preset_dopaminergic_repetitive_firing_long_duration() ->
         ProtocolState, "get_state", new=_make_get_state_fn({NeuronState: mock_neuron})
     ):
         [_ async for _ in ps.load_protocol_preset(REPETITIVE_FIRING)]
-    assert ps.stimulus_duration == pytest.approx(480.0)
+    assert ps.stimulus_duration == pytest.approx(5000.0)
 
 
 # ---------------------------------------------------------------------------
@@ -1202,9 +1202,10 @@ async def test_load_neuron_preset_reapplies_active_protocol_overrides() -> None:
     """Switching neuron type re-applies the active protocol preset with new overrides.
 
     Load 'Repetitive Firing' (Squid defaults: duration=180 ms), then switch to
-    SNc Dopaminergic which has a longer 480 ms duration override and lower
-    2.0 µA/cm² stimulus (Canavier/Komendantov threshold is ~1 µA/cm²).
-    The protocol params should update automatically.
+    SNc Dopaminergic which has a longer 5000 ms duration override and lower
+    0.5 µA/cm² stimulus (post-#304 the cell is a tonic pacemaker; ≳1 µA/cm²
+    drives depolarisation block).  The protocol params should update
+    automatically.
     """
     ns = _make_neuron_state()
     ps = _make_protocol_state()
@@ -1217,8 +1218,8 @@ async def test_load_neuron_preset_reapplies_active_protocol_overrides() -> None:
         new=_make_get_state_fn({ProtocolState: ps, SimulationState: sim_st}),
     ):
         [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
-    assert ps.stimulus_duration == pytest.approx(480.0)
-    assert ps.min_stimulus == pytest.approx(2.0)
+    assert ps.stimulus_duration == pytest.approx(5000.0)
+    assert ps.min_stimulus == pytest.approx(0.5)
 
 
 async def test_load_neuron_preset_no_active_protocol_skips_override() -> None:
