@@ -540,7 +540,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # M-S Kv broadens the spike into the literature 0.4–1.2 ms band.
         # The Otsuka K factory is retained for structural symmetry but
         # pinned to ``g_K=0``; this mirrors the cortical pyramidal (#311)
-        # and DA SNc (#304) fixes which used the same M-S Kv substitution.
+        # fix which used the same M-S Kv substitution.
         #
         # CONDITIONAL MODE — burst firing: prominent ICaT (g_T = 5 mS/cm²)
         # supports post-inhibitory rebound bursts when the cell is sufficiently
@@ -580,8 +580,8 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # Pacemaking conductances:
         #   g_NaP = 0.10 mS/cm²: persistent Na⁺ window current that destabilises
-        #     rest.  Higher than DA SNc's 0.03 because STN target firing rate
-        #     (5–50 Hz) is ~10× faster than DA SNc's 1–5 Hz.
+        #     rest.  Matches the Cortical Pyramidal value; the STN target
+        #     firing rate (5–50 Hz) sits in the same window-current regime.
         #   g_Ih  = 1.0 mS/cm² (was 0.5): post-AHP depolarising drive.  Doubled
         #     to provide faster recovery from AHP and meet the STN rate band.
         #   g_MSKv = 0.5 mS/cm²: sole delayed rectifier; broadens AP half-width.
@@ -1099,7 +1099,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_duration": 5.0,
         },
         # Depolarising bias on top of the autonomous tonic train.  At
-        # 2 µA/cm² the cell fires at ~155 Hz (well above the 5–50 Hz
+        # 2 µA/cm² the cell fires at ~105 Hz (well above the 5–50 Hz
         # autonomous rate); 200 ms is long enough to comfortably exceed
         # the ≥5 spike requirement of test_repetitive_firing_preset.
         REPETITIVE_FIRING: {
@@ -1116,7 +1116,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
         # Inherits the base HYPERPOLARIZATION_STEPS range (−10 → −2 µA/cm²).
         # Very high ICaT conductance (g=5.0 mS/cm²) produces a prominent
-        # post-inhibitory rebound burst on step release; Ih (g=0.5 mS/cm²)
+        # post-inhibitory rebound burst on step release; Ih (g=1.0 mS/cm²)
         # adds a depolarising overshoot that can trigger additional spikes.
     },
     TRN: {

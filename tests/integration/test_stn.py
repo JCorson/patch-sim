@@ -37,7 +37,13 @@ def stn_neuron() -> Neuron:
 
 @pytest.fixture
 def stn_ap_shape_result(stn_neuron: Neuron):
-    """AP analysis from a zero-current spontaneous-firing trace."""
+    """AP analysis from a zero-current spontaneous-firing trace.
+
+    All AP-shape assertions in this module run against the autonomous
+    trace (the cell's intrinsic operating point per Bevan & Wilson 1999).
+    The driven 2 µA/cm² operating point is exercised by
+    ``test_repetitive_firing_preset`` in ``test_preset_protocols.py``.
+    """
     zero_current = np.zeros(_ms_to_samples(_STN_SIMULATION_MS) + 1)
     result = simulate_current_clamp(stn_neuron, current_external=zero_current)
     return analyze_aps_from_result(result)
