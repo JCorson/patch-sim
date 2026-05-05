@@ -399,12 +399,21 @@ async def test_load_neuron_preset_purkinje_cell() -> None:
 
 
 async def test_load_neuron_preset_dopaminergic_neuron() -> None:
-    """load_neuron_preset enables Ih and IM channels for Dopaminergic Neuron."""
+    """load_neuron_preset enables the SNc DA pacemaker channel set.
+
+    The Putzier+Drion minimal SNc DA preset uses Cav1.3, SK, INaP and Ih.
+    IM and Mainen-Sejnowski Kv are not characteristic of SNc DA neurons and
+    are not enabled by this preset.
+    """
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
     assert ns.ih_enabled is True
-    assert ns.im_enabled is True
+    assert ns.cav13_enabled is True
+    assert ns.sk_enabled is True
+    assert ns.inap_enabled is True
+    assert ns.im_enabled is False
+    assert ns.mskv_enabled is False
 
 
 async def test_load_neuron_preset_thalamic_relay() -> None:

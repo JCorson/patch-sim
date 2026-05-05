@@ -11,6 +11,7 @@ from dataclasses import fields as dc_fields
 from typing import Any
 
 from patch_sim.additional_channels import (
+    make_snc_inap_channel,
     make_thalamic_relay_icat_channel,
     make_trn_icat_channel,
 )
@@ -81,6 +82,7 @@ _DEFAULT_G_MAX: dict[str, float] = {
 _FACTORY_TO_NAME: dict[Any, str] = {v: k for k, v in CHANNEL_REGISTRY.items()}
 _FACTORY_TO_NAME[make_thalamic_relay_icat_channel] = "icat"
 _FACTORY_TO_NAME[make_trn_icat_channel] = "icat"
+_FACTORY_TO_NAME[make_snc_inap_channel] = "inap"
 
 
 def neuron_config_to_ui_state(config: NeuronConfig) -> dict[str, Any]:
