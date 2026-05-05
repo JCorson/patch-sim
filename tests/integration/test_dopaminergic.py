@@ -113,6 +113,69 @@ def test_da_modest_step_sustains_firing(da_neuron: Neuron) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Depolarisation block — the cell must not park at depolarised V at zero
+# current.  The previous Cav1.3+SK tuning had a depol-block fixed point near
+# −31 mV that the cell drifted to within the first 200 ms (issue #304).
+# ---------------------------------------------------------------------------
+
+
+def test_da_no_depolarisation_block_at_zero_current(da_neuron: Neuron) -> None:
+    """At zero current the membrane never sits depolarised for 500 ms.
+
+    Depolarisation block is the failure mode where the cell parks at a
+    depolarised V (e.g. −25 to −31 mV) instead of cycling through AHPs.
+    A 500 ms rolling-mean V above −40 mV indicates the cell is stuck above
+    the AHP trough — i.e. not pacemaking properly.  Real SNc DA neurons
+    spend most of each ISI hyperpolarised below −60 mV (Grace & Bunney 1984).
+    """
+    duration_ms = 2000.0
+    zero_current = np.zeros(_ms_to_samples(duration_ms) + 1)
+    result = simulate_current_clamp(da_neuron, current_external=zero_current)
+    voltage = np.asarray(result["voltage"])
+    window = _ms_to_samples(500.0)
+    kernel = np.ones(window) / window
+    rolling_mean = np.convolve(voltage, kernel, mode="valid")
+    assert np.max(rolling_mean) < -40.0, (
+        f"500 ms rolling-mean V reached {np.max(rolling_mean):.1f} mV; "
+        f"the cell is in depolarisation block (Grace & Bunney 1984)."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Short-window F-I sanity — the cell must keep firing under modest drive
+# without dropping to a single-spike-then-block phenotype.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("amplitude", [0.0, 1.0, 2.0, 3.0])
+def test_da_short_window_keeps_firing(da_neuron: Neuron, amplitude: float) -> None:
+    """500 ms steps at 0–3 µA/cm² produce repetitive firing, no block.
+
+    The user-visible UI symptom of issue #304 was a single spike at the start
+    of every F-I sweep followed by sustained depolarisation at ~−25 mV.  This
+    parametrised test runs the same short-window sweeps the F-I curve uses
+    and asserts the cell produces ≥2 spikes and never enters depol block
+    (per the rolling-mean check above).
+    """
+    duration_ms = 500.0
+    protocol = step_current(duration=duration_ms, current_amplitude=amplitude)
+    result = simulate_current_clamp(da_neuron, current_external=protocol)
+    ap = analyze_aps_from_result(result)
+    assert ap.spike_count >= 2, (
+        f"At I = {amplitude} µA/cm², cell fired only {ap.spike_count} spike(s) "
+        f"— consistent with depolarisation block (issue #304)."
+    )
+    voltage = np.asarray(result["voltage"])
+    window = _ms_to_samples(300.0)
+    kernel = np.ones(window) / window
+    rolling_mean = np.convolve(voltage, kernel, mode="valid")
+    assert np.max(rolling_mean) < -40.0, (
+        f"At I = {amplitude} µA/cm², 300 ms rolling-mean V reached "
+        f"{np.max(rolling_mean):.1f} mV — depolarisation block."
+    )
+
+
+# ---------------------------------------------------------------------------
 # AP shape — DA pacemaker phenotype, Grace & Bunney (1984);
 # Komendantov et al. (2004).
 # ---------------------------------------------------------------------------
@@ -146,9 +209,21 @@ def test_da_ap_peak_voltage_in_da_range(da_ap_shape_result) -> None:
 
 
 def test_da_ap_ahp_depth_in_da_range(da_ap_shape_result) -> None:
-    """Mean AHP depth falls within the DA range (−72 to −55 mV)."""
+    """Mean AHP trough falls within the SK-overshoot range (−95 to −55 mV).
+
+    ``analyze_aps`` measures ``ahp_depth`` as the *minimum* V between the AP
+    peak and the next threshold crossing — i.e. the brief K⁺ overshoot
+    immediately after the spike (fast AHP / fAHP).  The literature −65 mV
+    figure for SNc DA cells refers to the medium AHP that the cell holds
+    *between* the fAHP and the ramp to the next spike.  In the Cav1.3+SK
+    model the post-spike SK transient draws V close to E_K (≈ −95 mV) before
+    Cav1.3 reactivates, so the measured trough is deeper than the literature
+    mAHP.  The lower bound here permits the SK overshoot toward E_K; the
+    upper bound (−55 mV) still excludes a depol-block phenotype where there
+    is effectively no AHP at all.
+    """
     assert_ap_shape(
         da_ap_shape_result,
         reference=_DA_REFERENCE,
-        ahp_mv=(-72.0, -55.0),
+        ahp_mv=(-95.0, -55.0),
     )
