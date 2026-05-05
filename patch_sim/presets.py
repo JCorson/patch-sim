@@ -616,6 +616,17 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # NMDA is not modelled here, so burst mode is reachable in this preset
         # only via the hyperpolarising-step-and-release protocol.
         #
+        # PARTIAL FIX — depolarization-block recovery (#324): INaP now has
+        # a slow voltage-dependent inactivation gate (sNaP, Magistretti &
+        # Alonso 1999), which removes >90 % of the persistent Na⁺ window
+        # current during sustained suprathreshold drive.  However, the
+        # Otsuka 2004 fast Na⁺ kinetics retain a small h tail (h_inf ≈
+        # 1 % at −15 mV) which, scaled by g_Na = 30 mS/cm², still drives
+        # ~16 µA/cm² inward at the depol-block plateau and can sustain a
+        # partial plateau under high drive (≳ +5 µA/cm²).  Real STN cells
+        # also use ATP-K and K⁺-accumulation mechanisms — none modelled.
+        # The autonomous tonic phenotype (≤ ~+2 µA/cm²) is unaffected.
+        #
         # Refs: Otsuka et al. (2004), J. Neurophysiol. 92:255 (Na kinetics);
         #       Bevan & Wilson (1999), J. Neurosci. 19:7617 (pacemaking);
         #       Beurrier et al. (1999), J. Neurosci. 19:599 (NMDA burst mode);

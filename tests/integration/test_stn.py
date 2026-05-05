@@ -119,3 +119,48 @@ def test_stn_ap_ahp_depth_in_stn_range(stn_ap_shape_result) -> None:
         reference=_STN_REFERENCE,
         ahp_mv=(-85.0, -55.0),
     )
+
+
+# ---------------------------------------------------------------------------
+# Slow INaP inactivation engages during sustained drive — issue #324.
+# ---------------------------------------------------------------------------
+
+
+def test_stn_inap_slow_inactivation_engages_during_drive(
+    stn_neuron: Neuron,
+) -> None:
+    """The sNaP gate closes during +5 µA/cm² × 200 ms, removing INaP from the plateau.
+
+    Direct mechanism check for #324: the Magistretti & Alonso 1999 slow
+    inactivation gate added to ``make_inap_channel`` must be doing real
+    work during sustained suprathreshold drive — by the end of the step,
+    sNaP should be below 0.1 (>90 % inactivation), so the persistent Na⁺
+    contribution to any depol-block plateau is essentially abolished.
+
+    Note: the STN preset can still settle on a residual depol-block
+    plateau at ≈ −15 mV under this drive because the Otsuka 2004 fast
+    Na⁺ model has a small h tail at depolarised voltages.  That residual
+    plateau is held by I_Na, not I_NaP — see the STN preset comment in
+    ``patch_sim/presets.py``.  Recovery tests for the cortical, CA1, and
+    Purkinje presets confirm the slow-inactivation fix on cells that
+    use a fully-inactivating fast Na⁺ kinetics.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(200.0)
+    n_post = _ms_to_samples(50.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, 5.0),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(stn_neuron, current_external=current)
+    sNaP_at_rest = float(result["sNaP"][n_pre - 1])
+    sNaP_at_step_end = float(result["sNaP"][n_pre + n_step - 1])
+    fraction_inactivated = 1.0 - sNaP_at_step_end / sNaP_at_rest
+    assert fraction_inactivated > 0.7, (
+        f"sNaP did not meaningfully inactivate: rest={sNaP_at_rest:.3f}, "
+        f"step end={sNaP_at_step_end:.3f}, "
+        f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.7)"
+    )
