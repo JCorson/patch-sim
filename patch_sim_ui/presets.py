@@ -11,11 +11,13 @@ from dataclasses import fields as dc_fields
 from typing import Any
 
 from patch_sim.additional_channels import (
+    make_snc_inap_channel,
     make_thalamic_relay_icat_channel,
     make_trn_icat_channel,
 )
 from patch_sim.constants import (
     ACTION_POTENTIAL,
+    DEFAULT_G_CAV13,
     DEFAULT_G_ICAL,
     DEFAULT_G_ICAN,
     DEFAULT_G_ICAT,
@@ -28,6 +30,7 @@ from patch_sim.constants import (
     DEFAULT_G_MSKV,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
+    DEFAULT_G_SK,
     NA_CHANNEL_ACTIVATION,
     SQUID_GIANT_AXON,
 )
@@ -65,8 +68,10 @@ _DEFAULT_G_MAX: dict[str, float] = {
     "ikir": DEFAULT_G_IKIR,
     "ikca": DEFAULT_G_IKCA,
     "ical": DEFAULT_G_ICAL,
+    "cav13": DEFAULT_G_CAV13,
     "icat": DEFAULT_G_ICAT,
     "ican": DEFAULT_G_ICAN,
+    "sk": DEFAULT_G_SK,
 }
 
 # Reverse map: factory function → channel name.  Variant factories that
@@ -77,6 +82,7 @@ _DEFAULT_G_MAX: dict[str, float] = {
 _FACTORY_TO_NAME: dict[Any, str] = {v: k for k, v in CHANNEL_REGISTRY.items()}
 _FACTORY_TO_NAME[make_thalamic_relay_icat_channel] = "icat"
 _FACTORY_TO_NAME[make_trn_icat_channel] = "icat"
+_FACTORY_TO_NAME[make_snc_inap_channel] = "inap"
 
 
 def neuron_config_to_ui_state(config: NeuronConfig) -> dict[str, Any]:

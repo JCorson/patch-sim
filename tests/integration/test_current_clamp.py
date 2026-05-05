@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
-from patch_sim.constants import PURKINJE, STN, TRN
+from patch_sim.constants import DOPAMINERGIC, PURKINJE, STN, TRN
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
@@ -21,11 +21,19 @@ from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
 # exercised by ``test_trn_step_release_produces_hp92_rebound_burst`` in
 # tests/integration/test_burst_metrics_simulation.py.
 #
+# DOPAMINERGIC is excluded after issue #304 — the post-fix preset is a tonic
+# pacemaker (~4 Hz at zero current driven by the Cav1.3 + INaP_SNc subthreshold
+# ramp and SK-shaped AHP) with no stable zero-current equilibrium.  Pacemaking
+# and AP shape are pinned by ``test_da_spontaneous_pacemaking`` in
+# tests/integration/test_dopaminergic.py.
+#
 # STN is excluded post-#305: the autonomous-pacemaker preset uses INaP and
 # Ih to destabilise rest near −60 mV and fires spontaneously at ~20 Hz from
 # v_rest = −60 mV (Bevan & Wilson 1999: 5–50 Hz autonomous firing in slice).
 # See test_stn_spontaneous_pacemaking in tests/integration/test_stn.py.
-_STABLE_PRESET_NAMES = [p for p in NEURON_PRESET_NAMES if p not in (PURKINJE, TRN, STN)]
+_STABLE_PRESET_NAMES = [
+    p for p in NEURON_PRESET_NAMES if p not in (PURKINJE, TRN, DOPAMINERGIC, STN)
+]
 
 
 def test_simulate_current_clamp_returns_structured_array(hh_model):

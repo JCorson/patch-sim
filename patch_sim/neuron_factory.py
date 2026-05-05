@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from .additional_channels import (
+    make_cav13_channel,
     make_ical_channel,
     make_ican_channel,
     make_icat_channel,
@@ -21,6 +22,7 @@ from .additional_channels import (
     make_im_channel,
     make_inap_channel,
     make_inar_channel,
+    make_sk_channel,
 )
 from .calcium import CalciumDynamics
 from .channels import GoldmanSpec, IonChannel, IonSpecies, NernstSpec
@@ -173,8 +175,10 @@ CHANNEL_REGISTRY: dict[str, Callable[..., IonChannel]] = {
     "ikir": make_ikir_channel,
     "ikca": make_ikca_channel,
     "ical": make_ical_channel,
+    "cav13": make_cav13_channel,
     "icat": make_icat_channel,
     "ican": make_ican_channel,
+    "sk": make_sk_channel,
 }
 
 
