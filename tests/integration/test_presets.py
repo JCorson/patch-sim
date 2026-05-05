@@ -290,12 +290,10 @@ def test_thalamic_relay_t_ref_is_mccormick_huguenard_recording_temp() -> None:
         (FAST_SPIKING_INTERNEURON, 0.4, 1.0, 0.4, 1.0),  # g_total=1.5  τ_m≈0.67 ms
         (CORTICAL_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
         (PURKINJE, 18.0, 28.0, 18.0, 28.0),  # g_total=0.044 τ_m≈22.7 ms
-        # DOPAMINERGIC post-#318 review: g_NaL=0, g_KL=0.02 (Cav1.3+SK
-        # mechanism trades a slightly lower input resistance for the SK-shaped
-        # AHP — an SNc DA neuron's mAHP target cannot be hit with the previous
-        # g_KL=0.01 once SK is added).
-        # g_total = 0.02 → τ_m = R_in ≈ 50 ms / 50 kΩ·cm².
-        (DOPAMINERGIC, 40.0, 60.0, 40.0, 60.0),
+        # DOPAMINERGIC post-#318 review: g_total = g_NaL + g_KL = 0.040 mS/cm²
+        # (split 0.012 / 0.028 to keep V_leak ≈ −45 mV) gives τ_m ≈ 25 ms,
+        # within the SNc DA literature band (20–30 ms; Wolfart et al. 2001).
+        (DOPAMINERGIC, 20.0, 30.0, 20.0, 30.0),
         (THALAMIC_RELAY, 5.0, 9.0, 5.0, 9.0),  # g_total=0.15  τ_m≈6.7 ms
         (CA1_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
         (STN, 2.5, 5.5, 2.5, 5.5),  # g_total=0.25 τ_m≈4 ms
@@ -634,7 +632,7 @@ _EXPECTED_AREAS_CM2: dict[str, float | None] = {
     FAST_SPIKING_INTERNEURON: 3e-6,
     CORTICAL_PYRAMIDAL: 20e-6,
     PURKINJE: 250e-6,
-    DOPAMINERGIC: 7e-6,
+    DOPAMINERGIC: 50e-6,
     THALAMIC_RELAY: 12e-6,
     CA1_PYRAMIDAL: 25e-6,
     STN: 7e-6,
@@ -680,13 +678,9 @@ def test_preset_with_area_yields_finite_absolute_passive_properties(
     assert props.membrane_capacitance_pf is not None
     assert props.input_resistance_mohm > 0
     assert props.membrane_capacitance_pf > 0
-    # 0.5–20000 MΩ and 0.1–1000 pF cover every plausible single-compartment
-    # preparation; tighter bands would break on legitimate preset edits.  The
-    # 20 GΩ ceiling accommodates DOPAMINERGIC post-#304, where the
-    # Purkinje-style autonomous-oscillator leak (g_total = 0.01 mS/cm²) on a
-    # 7 pF cell yields R_n ≈ 14 GΩ — high but biologically meaningful given
-    # the small somatic compartment.
-    assert 0.5 < props.input_resistance_mohm < 20000.0
+    # 0.5–10000 MΩ and 0.1–1000 pF cover every plausible single-compartment
+    # preparation; tighter bands would break on legitimate preset edits.
+    assert 0.5 < props.input_resistance_mohm < 10000.0
     assert 0.1 < props.membrane_capacitance_pf < 1000.0
     # τ_m identity: τ [ms] = R_n [MΩ] × C [pF] / 1000.  This is exact (the
     # absolute values are derived from the same density values via the same

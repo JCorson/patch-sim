@@ -22,9 +22,10 @@ from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
 # tests/integration/test_burst_metrics_simulation.py.
 #
 # DOPAMINERGIC is excluded after issue #304 — the post-fix preset is a tonic
-# pacemaker (~1.5 Hz at zero current driven by Ih + INaP) with no stable
-# zero-current equilibrium.  Pacemaking and AP shape are pinned by
-# ``test_da_spontaneous_pacemaking`` in tests/integration/test_dopaminergic.py.
+# pacemaker (~4 Hz at zero current driven by the Cav1.3 + INaP_SNc subthreshold
+# ramp and SK-shaped AHP) with no stable zero-current equilibrium.  Pacemaking
+# and AP shape are pinned by ``test_da_spontaneous_pacemaking`` in
+# tests/integration/test_dopaminergic.py.
 _STABLE_PRESET_NAMES = [
     p for p in NEURON_PRESET_NAMES if p not in (PURKINJE, TRN, DOPAMINERGIC)
 ]

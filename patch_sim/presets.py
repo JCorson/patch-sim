@@ -315,21 +315,28 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
     DOPAMINERGIC: NeuronConfig(
         # SNc DA neuron — Putzier+Drion minimal pacemaker.
         #
-        # Tonic autonomous pacemaker at 1–5 Hz (Grace & Bunney 1984).  Drion
-        # et al. 2011 reconciled Putzier 2009 (Cav1.3 essential) with
+        # Tonic autonomous pacemaker — measured ~7 Hz at zero current,
+        # within the broader SNc DA in-vitro band (Wilson & Callaway 2000:
+        # ~3 Hz; Liss & Roeper 2008: 1–8 Hz; Grace & Bunney 1984: 1–5 Hz).
+        # Drion et al. 2011 reconciled Putzier 2009 (Cav1.3 essential) with
         # Guzman/Surmeier 2009 (INaP essential) by showing the two
-        # subthreshold negative-slope conductances are interchangeable — both
-        # are needed for a faithful model.  Pacemaking proceeds as:
+        # subthreshold negative-slope conductances are interchangeable —
+        # both are needed for a faithful model.  Pacemaking proceeds as:
         #   1. Cav1.3 (V½ = −31.1 mV, k = 5.35 mV; Putzier 2009) and INaP_SNc
         #      (V½ = −65 mV; Drion 2011) carry overlapping subthreshold
         #      depolarising currents; INaP starts the ramp from the AHP,
         #      Cav1.3 takes over near threshold and loads Ca²⁺ into the cell.
-        #   2. AP fires; Cav1.3 inactivates briefly (τ ≈ 200 ms); ca_i peaks
-        #      around 0.5–1 µM.
-        #   3. SK (K_d = 0.3 µM, Hill n = 4; Drion 2011) opens, drawing V
-        #      toward E_K — the medium AHP.
-        #   4. ca_i decays (τ_ca = 50 ms), SK closes, Cav1.3 inactivation
-        #      recovers, INaP+Cav1.3 ramp resumes.  Cycle repeats at ~2 Hz.
+        #   2. AP fires; ca_i peaks at ~0.6 µM (α_ca = 5e-5 supplies enough
+        #      Ca for SK to dominate the post-spike conductance landscape).
+        #   3. SK (K_d = 0.3 µM, Hill n = 4; Drion 2011, scaled to 1.75 mS/cm²
+        #      in this preset) opens fast, dragging V to a clean medium AHP
+        #      at ~ −90 mV in <5 ms.  Without this strong SK pull the
+        #      Komendantov Na window current (m_inf = 0.79 at −30 mV with
+        #      VT = −67) holds V on a 20 ms plateau at −30 mV — a known
+        #      pathology of single-compartment Na/K when the Cav1.3 + SK
+        #      mechanism is undertuned.
+        #   4. ca_i decays fast (τ_ca = 30 ms), SK closes, INaP_SNc + Cav1.3
+        #      ramp resumes.  Cycle repeats at ~7 Hz.
         #
         # Channel set: only the channels that are characteristic of SNc DA.
         # No IM (cortical M-current, not SNc).  No Mainen-Sejnowski Kv
@@ -345,12 +352,27 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # cells.  Q10 = 1.0 with T_ref = 308.15 K (35 °C) holds them at the
         # published Komendantov reference temperature.
         #
+        # Passive properties: area_cm2 = 50e-6 cm² gives C ≈ 50 pF, matching
+        # somatic+dendritic capacitance reported for SNc DA neurons (Wolfart
+        # et al. 2001: 30–80 pF).  Total leak g_total = 0.040 mS/cm² gives
+        # R_in ≈ 500 MΩ and τ_m ≈ 25 ms — both in the literature band
+        # (200–600 MΩ; Lacey et al. 1989; Wolfart et al. 2001) (20–30 ms).
+        # The g_NaL : g_KL ratio (≈ 0.012 : 0.028) is preserved from the
+        # earlier tuning so V_leak ≈ −45 mV is unchanged; only the absolute
+        # leak conductance is doubled, with no additional pacemaker channel
+        # retune required.
+        #
         # Depol-block boundary: real SNc DA neurons enter depolarisation
-        # block above ~100 pA injected current (Tucker et al. 2012); for a
-        # 7 pF cell that is ~5 µA/cm².  The conductance balance is tuned so
-        # the cell fires regularly across 0–4.5 µA/cm² and shows progressive
-        # block above ~5 µA/cm² — an honest reproduction of the in vitro
-        # phenotype, not a contrived no-block model.
+        # block above ~100 pA injected current at long durations
+        # (Tucker et al. 2012).  In this single-compartment somatic model
+        # with the new area, 100 pA ≈ 2 µA/cm² — but the model is more
+        # block-resistant than the in vitro cell because it lacks dendritic
+        # Na inactivation: long (≥5 s) drive sustains firing at all amplitudes
+        # tested up to 6 µA/cm², and full plateau block only emerges at
+        # ~9 µA/cm² in 200 ms steps.  This block-resistance is a known
+        # limitation of the somatic single-compartment representation;
+        # real DA neurons distribute Na/K across dendrites and shift into
+        # bursting at higher drive in vivo.
         #
         # v_rest = −55 mV is a kinematic starting point — SNc DA neurons
         # are autonomous oscillators with NO static zero-current rest.  The
@@ -375,22 +397,22 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         v_rest=-55.0,
         g_Na=10.0,
         g_K=0.5,
-        g_NaL=0.006,
-        g_KL=0.014,
+        g_NaL=0.012,
+        g_KL=0.028,
         Q10=1.0,
         T_ref=308.15,
         na_channel_factory=make_dopaminergic_na_channel,
         k_channel_factory=make_dopaminergic_k_channel,
         channels=(
             ChannelConfig(make_cav13_channel, g_max=0.04),
-            ChannelConfig(make_sk_channel, g_max=0.35),
-            ChannelConfig(make_snc_inap_channel, g_max=0.008),
+            ChannelConfig(make_sk_channel, g_max=1.75),
+            ChannelConfig(make_snc_inap_channel, g_max=0.012),
             ChannelConfig(make_ih_channel, g_max=0.20),
         ),
         calcium_dynamics=CalciumDynamics(
-            alpha_ca=2.5e-5, tau_ca=80.0, ca_rest=1e-4, ca_init=1.0e-4
+            alpha_ca=5.0e-5, tau_ca=30.0, ca_rest=1e-4, ca_init=1.0e-4
         ),
-        area_cm2=7e-6,
+        area_cm2=50e-6,
     ),
     THALAMIC_RELAY: NeuronConfig(
         # area_cm2 = 12e-6 cm² — ~20 µm soma with modest dendrites.
@@ -972,19 +994,20 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 4.0,
             "stimulus_duration": 5.0,
         },
-        # SNc DA pacemaker: ~2.6 Hz tonic at zero current, modestly enhanced
-        # to ~3 Hz under sub-block depolarising drive.  The cell tips into
-        # depolarisation block above ~1 µA/cm² (a known limitation of the
-        # single-compartment somatic model — real DA neurons distribute Na/K
-        # across dendrites and shift into bursting at higher drive in vivo;
-        # the bursting phase is out of scope for this preset).  The
-        # REPETITIVE_FIRING protocol uses 0.3 µA/cm² × 3000 ms, producing
-        # ≥5 full APs at the modestly-enhanced rate.  Mid-range drive
-        # (0.4–0.7 µA/cm²) produces an alternating full/abortive doublet
-        # pattern from incomplete inter-spike recovery; staying at 0.3 µA
-        # keeps the cell in clean tonic mode for the regression test.
-        # Duration must stay > 180 ms (the base REPETITIVE_FIRING preset)
-        # — see test_neuron_protocol_adjustments_change_stimulus_duration.
+        # SNc DA pacemaker: 4.2 Hz tonic at zero current, accelerating
+        # modestly with depolarising drive (≈ 11 Hz at 1 µA/cm² over 5 s).
+        # The somatic single-compartment model is more block-resistant than
+        # the in vitro cell — long sustained drive (5 s) maintains firing at
+        # all amplitudes up to 6 µA/cm², and full plateau block emerges only
+        # at ~9 µA/cm² in 200 ms steps (cf. Tucker et al. 2012 ~5 µA/cm² for
+        # the real cell).  This is a known limitation of the somatic model
+        # — real DA neurons distribute Na/K across dendrites and transition
+        # into bursting at higher drive in vivo; the bursting phase is out
+        # of scope for this preset.  The REPETITIVE_FIRING protocol uses
+        # 0.3 µA/cm² × 3000 ms — well within the regular-firing range —
+        # producing ≥30 full APs at ~10 Hz over 3 s.  Duration must stay
+        # > 180 ms (the base REPETITIVE_FIRING preset) — see
+        # test_neuron_protocol_adjustments_change_stimulus_duration.
         REPETITIVE_FIRING: {
             "min_stimulus": 0.3,
             "max_stimulus": 0.3,

@@ -44,8 +44,8 @@ from patch_sim.presets import (
 # ``test_trn_step_release_produces_hp92_rebound_burst``.
 #
 # DOPAMINERGIC is excluded after issue #304 — the post-fix preset is a tonic
-# pacemaker (~2 Hz at zero current driven by Ih + INaP, Wilson & Callaway 2000).
-# The autonomous-firing phenotype is exercised by
+# pacemaker (~4 Hz at zero current, Putzier+Drion Cav1.3 + INaP_SNc + SK
+# mechanism).  The autonomous-firing phenotype is exercised by
 # ``test_da_spontaneous_pacemaking`` in tests/integration/test_dopaminergic.py.
 _QUIESCENT_PRESET_NAMES = [
     p for p in NEURON_PRESET_NAMES if p not in (PURKINJE, TRN, DOPAMINERGIC)
