@@ -141,9 +141,10 @@ def test_stn_inap_slow_inactivation_engages_during_drive(
     plateau at ≈ −15 mV under this drive because the Otsuka 2004 fast
     Na⁺ model has a small h tail at depolarised voltages.  That residual
     plateau is held by I_Na, not I_NaP — see the STN preset comment in
-    ``patch_sim/presets.py``.  Recovery tests for the cortical, CA1, and
-    Purkinje presets confirm the slow-inactivation fix on cells that
-    use a fully-inactivating fast Na⁺ kinetics.
+    ``patch_sim/presets.py``.  Other INaP-using presets (cortical
+    pyramidal, CA1 pyramidal, Purkinje) deliberately opt out of slow
+    inactivation to keep their existing tuning, so this test is the
+    only direct mechanism check for the new gate.
     """
     n_pre = _ms_to_samples(100.0)
     n_step = _ms_to_samples(200.0)
