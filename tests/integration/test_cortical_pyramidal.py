@@ -332,3 +332,38 @@ def test_cp_ap_ahp_depth_in_rs_range(cp_ap_shape_result) -> None:
         reference=_RS_REFERENCE,
         ahp_mv=(-70.0, -50.0),
     )
+
+
+# ---------------------------------------------------------------------------
+# Depolarisation-block recovery — issue #324 regression.
+# ---------------------------------------------------------------------------
+
+
+def test_cp_recovers_from_sustained_suprathreshold_drive(
+    cp_neuron: Neuron,
+) -> None:
+    """Cortical pyramidal repolarises after +12 µA/cm² × 200 ms.
+
+    Regression test for #324: the slow Na⁺ inactivation gate added to
+    ``make_inap_channel`` lets the cell escape any depolarisation
+    plateau seeded by sustained suprathreshold drive at the F-I sweep
+    upper bound (12 µA/cm²).  The membrane settles below −50 mV during
+    the last 200 ms of a 700 ms post-stimulus epoch.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(200.0)
+    n_post = _ms_to_samples(700.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, 12.0),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(cp_neuron, current_external=current)
+    tail = np.asarray(result["voltage"][-_ms_to_samples(200.0) :])
+    mean_v = float(tail.mean())
+    assert mean_v < -50.0, (
+        f"Cortical pyramidal failed to recover from +12 µA/cm² × 200 ms; "
+        f"mean V in last 200 ms = {mean_v:.2f} mV"
+    )
