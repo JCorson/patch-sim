@@ -290,11 +290,16 @@ def make_ih_channel(
 # experimental −47 to −54 mV / k = 7-10 mV spread to leave near-rest
 # availability high, s_inf(−65 mV) ≈ 0.94).  The paper reports τ on the order
 # of seconds at the V½ peak; the implementation uses a faster tau_scale
-# (≈200 ms peak) because this single gate substitutes for several recovery
-# mechanisms a real cell uses in concert — ATP-dependent K⁺, extracellular
-# K⁺ accumulation, and slow Na⁺ inactivation — none of which are modelled
-# elsewhere, so this gate must shoulder the full burden of pulling the cell
-# out of a depolarisation plateau within seconds.
+# (≈200 ms peak) so the gate produces a useful escape from a depolarisation
+# plateau within a single sustained step rather than over multiple seconds.
+#
+# In STN this gate co-acts with the fast-Na slow inactivation gate
+# (``make_stn_na_channel(slow_inactivation=True)``) and ``make_katp_channel``
+# (#324); the three together collapse the −15 mV plateau cleanly.  In
+# presets that opt into ``sNaP`` alone (none today; cortical pyramidal /
+# CA1 / Purkinje deliberately stay opt-out) the short τ would similarly
+# allow the gate to shoulder block-recovery on its own — the choice of τ
+# is therefore robust to the channel cocktail the gate happens to ship in.
 #
 # The slow-inactivation gate is named ``sNaP`` rather than ``s`` because the
 # gating-state dictionary is keyed by gate name only and ``make_inar_channel``
