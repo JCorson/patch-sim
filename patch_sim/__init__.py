@@ -16,6 +16,7 @@ from .additional_channels import (
     make_im_channel,
     make_inap_channel,
     make_inar_channel,
+    make_katp_channel,
     make_trn_icat_channel,
 )
 from .analysis import (
@@ -222,6 +223,7 @@ __all__ = [
     "make_im_channel",
     "make_inap_channel",
     "make_inar_channel",
+    "make_katp_channel",
     "make_trn_icat_channel",
     "alpha_h",
     "alpha_m",

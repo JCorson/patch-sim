@@ -23,6 +23,7 @@ from .constants import (
     DEFAULT_G_IKIR,
     DEFAULT_G_IKV31,
     DEFAULT_G_IM,
+    DEFAULT_G_KATP,
     DEFAULT_G_NAP,
     DEFAULT_G_NAP_SNC,
     DEFAULT_G_NAR,
@@ -587,6 +588,82 @@ def make_im_channel(
         name="M",
         g_max=g_max,
         gating_variables=(w_var,),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
+
+
+# ---------------------------------------------------------------------------
+# I_K_ATP — ATP-sensitive K⁺ channel (Kir6.x; phenomenological proxy)
+# ---------------------------------------------------------------------------
+#
+# Real K_ATP channels (Kir6.x/SUR) are gated by intracellular ATP/ADP
+# stoichiometry, opening when [ATP] falls relative to [ADP] during
+# metabolic stress.  In STN cells they contribute to depolarisation-block
+# recovery and to the membrane response under sustained suprathreshold
+# drive (Stanford & Lacey 1996; Bevan & Wilson 1999).  Modelling them
+# faithfully would require an ATP/ADP state variable coupled to firing
+# activity (Erecińska & Silver 1989); since the simulator doesn't track
+# metabolic state, this factory uses a voltage-driven slow-activation
+# proxy instead.  The channel reaches the same depol-block-rescue
+# endpoint without adding a new ODE.
+#
+# Parameters: V½ = −25 mV (above autonomous threshold ~−40 mV, so
+# subthreshold tonic pacemaking is undisturbed but the channel engages
+# strongly at the −15 mV depol-block plateau); slope 8 mV; τ_scale 400 ms,
+# τ_floor 50 ms (slow activation reflects the ATP-depletion timescale
+# during sustained spiking).  At V = −15 mV kATP_inf ≈ 0.78, so at
+# g_max = 0.5 mS/cm² the channel produces ~0.5·0.78·75 ≈ 29 µA/cm² outward
+# K⁺ drive — comfortably exceeds the residual ~10–20 µA/cm² fast-Na drive
+# at the plateau.
+
+_alpha_kATP, _beta_kATP = boltzmann_cosh_rates(
+    half=-25.0,
+    slope=8.0,
+    tau_scale=400.0,
+    tau_floor=50.0,
+)
+
+
+def make_katp_channel(
+    g_max: float = DEFAULT_G_KATP,
+) -> IonChannel:
+    """Create a K_ATP (ATP-sensitive K⁺) ion channel.
+
+    Real K_ATP channels are metabolically gated (Kir6.x/SUR octamers
+    activated by low [ATP]/[ADP]); this factory models them
+    phenomenologically with voltage-driven slow activation, since the
+    simulator does not track metabolic state.  The channel engages at
+    sustained depolarisation (V½ = −25 mV, well above autonomous
+    pacemaking threshold) with a slow time constant (~400 ms peak),
+    providing an outward K⁺ drive that helps the membrane escape
+    depolarisation block (#324 in STN).
+
+    Uses a single gating variable ``kATP`` (power 1).  The reversal
+    potential is computed dynamically from the neuron's K⁺ concentrations
+    via the Nernst equation.
+
+    References:
+        - Stanford & Lacey (1996), J. Neurophysiol. 75:1714 (K_ATP in STN
+          and SNc).
+        - Bevan & Wilson (1999), J. Neurosci. 19:7617 (STN spontaneous
+          activity).
+        - Hahn & McIntyre (2010), J. Comput. Neurosci. 28:425 (STN model
+          including K_ATP).
+        - Erecińska & Silver (1989) (ATP/ADP dynamics during firing).
+
+    Args:
+        g_max: Maximum conductance in mS/cm². Must be non-negative.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_KATP`.
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the K_ATP
+        current.
+    """
+    katp_var = GatingVariable(name="kATP", power=1, alpha=_alpha_kATP, beta=_beta_kATP)
+    return IonChannel(
+        name="KATP",
+        g_max=g_max,
+        gating_variables=(katp_var,),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )
 
