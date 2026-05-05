@@ -280,52 +280,73 @@ def make_ih_channel(
 # INaP — Persistent Na⁺ channel (Magistretti & Alonso 1999)
 # ---------------------------------------------------------------------------
 #
-# Two-gate kinetics:
-#   ``p``    — fast Boltzmann activation, V½ = −52.6 mV, slope 4.6 mV.
-#   ``sNaP`` — slow voltage-dependent inactivation, V½ = −49 mV, slope 10 mV
-#              (inverted Boltzmann), τ on the order of seconds.  Magistretti &
-#              Alonso (1999) §"Slow inactivation" describes this gate as
-#              essential for recovery from sustained depolarisation.
+# Activation gate ``p`` follows the standard Magistretti & Alonso 1999 kinetics
+# (fast Boltzmann, V½ = −52.6 mV, slope 4.6 mV).
+#
+# Slow inactivation gate ``sNaP`` (opt-in via ``slow_inactivation=True``) is
+# also from Magistretti & Alonso 1999 §"Slow inactivation": V½ = −45 mV, slope
+# 7 mV (inverted Boltzmann; values picked from the depolarised end of the
+# experimental −47 to −54 mV / k = 7-10 mV spread to leave near-rest
+# availability high, s_inf(−65 mV) ≈ 0.94).  The paper reports τ on the order
+# of seconds at the V½ peak; the implementation uses a faster tau_scale
+# (≈200 ms peak) because this single gate substitutes for several recovery
+# mechanisms a real cell uses in concert — ATP-dependent K⁺, extracellular
+# K⁺ accumulation, and slow Na⁺ inactivation — none of which are modelled
+# elsewhere, so this gate must shoulder the full burden of pulling the cell
+# out of a depolarisation plateau within seconds.
 #
 # The slow-inactivation gate is named ``sNaP`` rather than ``s`` because the
 # gating-state dictionary is keyed by gate name only and ``make_inar_channel``
 # already declares an ``s`` gate.  Sharing the name would alias the two
 # channels' gating variables.
+#
+# Slow inactivation is opt-in (default off) so that presets tuned without it
+# (cortical pyramidal, CA1 pyramidal, Purkinje) keep their existing
+# phenotypes.  Enable it on presets where depolarisation-block recovery
+# matters — e.g. STN, where #324 reports the cell hangs at ≈ −15 mV after
+# sustained suprathreshold drive.
 
 _alpha_p, _beta_p = boltzmann_cosh_rates(
     half=-52.6, slope=4.6, tau_scale=6.0, tau_floor=0.1
 )
 
 _alpha_sNaP, _beta_sNaP = boltzmann_cosh_rates(
-    half=-49.0,
-    slope=10.0,
-    tau_scale=1000.0,
-    tau_floor=50.0,
+    half=-45.0,
+    slope=7.0,
+    tau_scale=200.0,
+    tau_floor=20.0,
     inverted=True,
 )
 
 
 def make_inap_channel(
     g_max: float = DEFAULT_G_NAP,
+    *,
+    slow_inactivation: bool = False,
 ) -> IonChannel:
     """Create an INaP (persistent Na⁺) ion channel.
 
     INaP is a sustained Na⁺ current active near the resting potential that
     amplifies subthreshold depolarizations and can lower the threshold for
-    action potential generation.  Two gating variables are used:
+    action potential generation.  By default the channel uses a single
+    activation gate ``p`` (Magistretti & Alonso 1999 kinetics, V½ = −52.6 mV).
 
-    * ``p`` (power 1) — fast Boltzmann activation, V½ = −52.6 mV.
-    * ``sNaP`` (power 1) — slow voltage-dependent inactivation, V½ = −49 mV
-      (inverted Boltzmann), with a cosh-shaped time constant on the order of
-      seconds.  The slow gate is fully available at hyperpolarised potentials
-      and decays towards zero during sustained depolarisation, providing the
-      escape mechanism that lets the membrane repolarise after a prolonged
-      suprathreshold step.  The simulation column is named ``sNaP`` rather
-      than ``s`` to avoid colliding with :func:`make_inar_channel`'s
-      activation gate, which is also named ``s``.
+    With ``slow_inactivation=True`` a second gate ``sNaP`` is added (also
+    Magistretti & Alonso 1999, §"Slow inactivation"; V½ = −45 mV, inverted
+    Boltzmann).  The slow gate is mostly available at hyperpolarised
+    potentials and decays towards zero during sustained depolarisation,
+    providing an escape mechanism that lets the membrane repolarise after a
+    prolonged suprathreshold step.  The simulation column is named ``sNaP``
+    rather than ``s`` to avoid colliding with :func:`make_inar_channel`'s
+    activation gate, which is also named ``s``.
 
-    Kinetics follow Magistretti & Alonso (1999), J. Gen. Physiol. 114:491,
-    including their §"Slow inactivation" parameters.
+    Slow inactivation is opt-in because it changes the effective INaP
+    conductance during sustained firing trains (sNaP slowly decays towards
+    its sub-1 steady state), which can alter spike-frequency-adaptation
+    profiles in presets calibrated against the no-slow-inactivation INaP
+    (cortical pyramidal, CA1 pyramidal, Purkinje).  Enable it on presets
+    where depolarisation-block recovery is the dominant concern — e.g. STN
+    in issue #324.
 
     The reversal potential is computed dynamically from the neuron's Na⁺
     concentrations using the Nernst equation.
@@ -333,16 +354,21 @@ def make_inap_channel(
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~patch_sim.constants.DEFAULT_G_NAP`.
+        slow_inactivation: If True, add the Magistretti & Alonso 1999 slow
+            inactivation gate ``sNaP`` (default False).
 
     Returns:
         An :class:`~patch_sim.channels.IonChannel` representing the INaP current.
     """
     p_var = GatingVariable(name="p", power=1, alpha=_alpha_p, beta=_beta_p)
-    s_var = GatingVariable(name="sNaP", power=1, alpha=_alpha_sNaP, beta=_beta_sNaP)
+    gating: tuple[GatingVariable, ...] = (p_var,)
+    if slow_inactivation:
+        s_var = GatingVariable(name="sNaP", power=1, alpha=_alpha_sNaP, beta=_beta_sNaP)
+        gating = (p_var, s_var)
     return IonChannel(
         name="NaP",
         g_max=g_max,
-        gating_variables=(p_var, s_var),
+        gating_variables=gating,
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
     )
 

@@ -871,22 +871,20 @@ def test_inap_slow_inactivation_steady_state_in_bounds():
 
 def test_inap_slow_inactivation_decreases_with_depolarisation():
     """Availability is highest at hyperpolarised voltages (inactivation)."""
-    assert _sNaP_inf(-80.0) > _sNaP_inf(-49.0) > _sNaP_inf(-10.0)
+    assert _sNaP_inf(-80.0) > _sNaP_inf(-45.0) > _sNaP_inf(-10.0)
 
 
 def test_inap_slow_inactivation_half_voltage():
-    """V½ for sNaP sits at -49 mV per Magistretti & Alonso 1999."""
-    assert _sNaP_inf(-49.0) == pytest.approx(0.5, abs=0.01)
+    """V½ for sNaP sits at -45 mV (within Magistretti & Alonso 1999's spread)."""
+    assert _sNaP_inf(-45.0) == pytest.approx(0.5, abs=0.01)
 
 
 def test_inap_slow_inactivation_resting_availability():
     """Near-rest availability is high enough to preserve pacemaking."""
-    # At -65 mV the gate is comfortably available; -60 mV is closer to V½ of
-    # the Boltzmann (-49 mV), so availability dips into the 0.7-0.8 range —
-    # acceptable because pacemaking spends much of its cycle at the AHP near
-    # -75 mV where availability is high.
-    assert _sNaP_inf(-65.0) > 0.8
-    assert _sNaP_inf(-75.0) > 0.9
+    # At -65 mV the gate must be near 1 so opting in does not silence cells
+    # whose firing depends on the resting INaP window current.
+    assert _sNaP_inf(-65.0) > 0.9
+    assert _sNaP_inf(-75.0) > 0.95
 
 
 def test_inap_slow_inactivation_blocks_depol_plateau():
@@ -897,10 +895,10 @@ def test_inap_slow_inactivation_blocks_depol_plateau():
 
 
 def test_inap_slow_inactivation_tau_is_slow():
-    """τ_sNaP at V½ exceeds 200 ms — distinct timescale from fast activation."""
-    a, b = _alpha_sNaP(-49.0, 0.0), _beta_sNaP(-49.0, 0.0)
+    """τ_sNaP at V½ stays distinctly slow vs the fast p activation (~6 ms)."""
+    a, b = _alpha_sNaP(-45.0, 0.0), _beta_sNaP(-45.0, 0.0)
     tau = 1.0 / (a + b)
-    assert tau > 200.0, f"sNaP tau at V½ is {tau:.1f} ms, expected > 200 ms"
+    assert tau > 100.0, f"sNaP tau at V½ is {tau:.1f} ms, expected > 100 ms"
 
 
 # ---------------------------------------------------------------------------
@@ -909,7 +907,7 @@ def test_inap_slow_inactivation_tau_is_slow():
 
 
 def test_make_inap_channel_defaults():
-    """make_inap_channel() produces a channel with the expected defaults."""
+    """make_inap_channel() produces a single-gate channel by default."""
     from patch_sim.constants import DEFAULT_G_NAP
 
     ch = make_inap_channel()
@@ -917,9 +915,17 @@ def test_make_inap_channel_defaults():
     assert ch.g_max == pytest.approx(DEFAULT_G_NAP)
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.SODIUM
-    assert len(ch.gating_variables) == 2
+    assert len(ch.gating_variables) == 1
     assert ch.gating_variables[0].name == "p"
     assert ch.gating_variables[0].power == 1
+
+
+def test_make_inap_channel_with_slow_inactivation():
+    """``slow_inactivation=True`` adds the sNaP gate per Magistretti & Alonso 1999."""
+    ch = make_inap_channel(slow_inactivation=True)
+    assert ch.name == "NaP"
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "p"
     assert ch.gating_variables[1].name == "sNaP"
     assert ch.gating_variables[1].power == 1
 
@@ -938,8 +944,25 @@ def test_make_inap_channel_custom_params():
 
 
 def test_current_clamp_with_inap_extra_columns():
-    """Current clamp with NaP channel adds INaP, p, and sNaP columns."""
+    """Current clamp with NaP channel adds INaP and p columns."""
     neuron = Neuron(additional_channels=(make_inap_channel(),))
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
+    assert "INaP" in result.dtype.names
+    assert "p" in result.dtype.names
+    assert "sNaP" not in result.dtype.names
+
+
+def test_current_clamp_with_inap_slow_inactivation_extra_columns():
+    """``slow_inactivation=True`` adds the sNaP column to current-clamp output."""
+    neuron = Neuron(additional_channels=(make_inap_channel(slow_inactivation=True),))
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -955,7 +978,7 @@ def test_current_clamp_with_inap_extra_columns():
 
 
 def test_voltage_clamp_with_inap_extra_columns():
-    """Voltage clamp with NaP channel adds INaP, p, and sNaP columns."""
+    """Voltage clamp with NaP channel adds INaP and p columns."""
     neuron = Neuron(additional_channels=(make_inap_channel(),))
     prot = step_voltage(
         duration=20.0,
@@ -969,12 +992,26 @@ def test_voltage_clamp_with_inap_extra_columns():
     assert result.dtype.names is not None
     assert "INaP" in result.dtype.names
     assert "p" in result.dtype.names
-    assert "sNaP" in result.dtype.names
 
 
 def test_current_clamp_inap_gating_in_bounds():
-    """INaP gating variables p and sNaP stay in [0, 1] during current clamp."""
+    """INaP gating variable p stays in [0, 1] during current clamp."""
     neuron = Neuron(additional_channels=(make_inap_channel(),))
+    stim = step_current(
+        duration=30.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=20.0,
+        sampling_frequency=40000.0,
+    )
+    result = simulate_current_clamp(neuron, stim)
+    assert result["p"].min() >= 0.0
+    assert result["p"].max() <= 1.0
+
+
+def test_current_clamp_inap_slow_inactivation_gating_in_bounds():
+    """With slow_inactivation, both p and sNaP stay in [0, 1] during current clamp."""
+    neuron = Neuron(additional_channels=(make_inap_channel(slow_inactivation=True),))
     stim = step_current(
         duration=30.0,
         current_amplitude=10.0,
@@ -1153,9 +1190,36 @@ def test_inap_and_inar_coexist():
     assert "INaP" in result.dtype.names
     assert "INaR" in result.dtype.names
     assert "p" in result.dtype.names
-    assert "sNaP" in result.dtype.names
     assert "s" in result.dtype.names
     assert "hr" in result.dtype.names
+
+
+def test_inap_slow_inactivation_and_inar_no_gate_collision():
+    """INaP slow inactivation and INaR coexist with distinct gate columns.
+
+    Regression test for the gate-naming hazard noted in the channel
+    docstring: the gating-state dictionary is keyed by gate name only, so
+    INaP's slow inactivation gate must be named ``sNaP`` (not ``s``) to
+    avoid aliasing with :func:`make_inar_channel`'s activation gate.
+    """
+    neuron = Neuron(
+        additional_channels=(
+            make_inap_channel(slow_inactivation=True),
+            make_inar_channel(),
+        )
+    )
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
+    # Both gates present and distinct
+    assert "sNaP" in result.dtype.names
+    assert "s" in result.dtype.names
 
 
 def test_all_additional_channels_coexist():
@@ -1193,7 +1257,7 @@ def test_all_additional_channels_coexist():
         "IKCa",
     ):
         assert col in result.dtype.names
-    for gate in ("r", "a", "b", "p", "sNaP", "s", "hr", "w", "kir", "q"):
+    for gate in ("r", "a", "b", "p", "s", "hr", "w", "kir", "q"):
         assert gate in result.dtype.names
 
 
