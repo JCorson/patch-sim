@@ -108,6 +108,8 @@ class VisibilityState(rx.State):
     show_inar_gating: bool = True
     show_im_current: bool = True
     show_im_gating: bool = True
+    show_katp_current: bool = True
+    show_katp_gating: bool = True
     show_ikir_current: bool = True
     show_ikir_gating: bool = True
     show_ikca_current: bool = True

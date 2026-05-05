@@ -18,6 +18,7 @@ from patch_sim.constants import (
     DEFAULT_G_IKIR,
     DEFAULT_G_IKV31,
     DEFAULT_G_IM,
+    DEFAULT_G_KATP,
     DEFAULT_G_MSKV,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
@@ -139,6 +140,8 @@ class NeuronState(rx.State):
     inar_g_max: float = DEFAULT_G_NAR
     im_enabled: bool = False
     im_g_max: float = DEFAULT_G_IM
+    katp_enabled: bool = False
+    katp_g_max: float = DEFAULT_G_KATP
     ikir_enabled: bool = False
     ikir_g_max: float = DEFAULT_G_IKIR
     ikca_enabled: bool = False

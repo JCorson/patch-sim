@@ -161,6 +161,15 @@ ADDITIONAL_CHANNELS: tuple[ChannelMeta, ...] = (
         gating_var_colors={"w": "#17becf"},
     ),
     ChannelMeta(
+        id="katp",
+        current_key="IKATP",
+        label="K_ATP (ATP-sensitive K\u207a)",
+        gating_vars=("kATP",),
+        g_max_range=(0.0, 5.0, 0.01),
+        current_color="#bcbd22",
+        gating_var_colors={"kATP": "#bcbd22"},
+    ),
+    ChannelMeta(
         id="ikir",
         current_key="IKir",
         label="IKir (Inward Rectifier K\u207a)",
