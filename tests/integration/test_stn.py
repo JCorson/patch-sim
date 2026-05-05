@@ -63,28 +63,15 @@ def test_stn_spontaneous_pacemaking(stn_ap_shape_result) -> None:
     """STN fires autonomously at 5–50 Hz without injected current.
 
     Bevan & Wilson (1999) characterise the STN as a tonic pacemaker
-    sustained intrinsically by INaP and Ih.
+    sustained intrinsically by INaP and Ih.  The driven 2 µA/cm²
+    operating point is exercised by ``test_repetitive_firing_preset``
+    in ``test_preset_protocols.py``.
     """
     assert_ap_shape(
         stn_ap_shape_result,
         reference=_STN_REFERENCE,
         firing_rate_hz=(5.0, 50.0),
         min_spike_count=5,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Autonomous firing rate — Bevan & Wilson (1999), 5–50 Hz in vitro.
-# ---------------------------------------------------------------------------
-
-
-def test_stn_tonic_firing_rate_in_stn_range(stn_ap_shape_result) -> None:
-    """Autonomous firing rate falls within the STN range (5–50 Hz)."""
-    assert_ap_shape(
-        stn_ap_shape_result,
-        reference=_STN_REFERENCE,
-        firing_rate_hz=(5.0, 50.0),
-        min_spike_count=2,
     )
 
 
