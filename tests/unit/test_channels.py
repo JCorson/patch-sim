@@ -20,6 +20,7 @@ from patch_sim.additional_channels import (
     _alpha_fn,
     _alpha_ft,
     _alpha_hr,
+    _alpha_kATP,
     _alpha_kir,
     _alpha_p,
     _alpha_q,
@@ -36,6 +37,7 @@ from patch_sim.additional_channels import (
     _beta_fn,
     _beta_ft,
     _beta_hr,
+    _beta_kATP,
     _beta_kir,
     _beta_p,
     _beta_q,
@@ -53,6 +55,7 @@ from patch_sim.additional_channels import (
     make_im_channel,
     make_inap_channel,
     make_inar_channel,
+    make_katp_channel,
     make_trn_icat_channel,
 )
 from patch_sim.calcium import CalciumDynamics
@@ -1382,6 +1385,93 @@ def test_current_clamp_im_gating_in_bounds():
 def test_public_api_exports_im():
     """make_im_channel is exported from the patch_sim public API."""
     assert hasattr(patch_sim, "make_im_channel")
+
+
+# ---------------------------------------------------------------------------
+# I_K_ATP rate functions (kATP gate; voltage-driven proxy for the
+# metabolically gated Kir6.x channel; #324)
+# ---------------------------------------------------------------------------
+
+
+def _kATP_inf(V: float) -> float:
+    """Steady-state K_ATP activation at voltage V."""
+    a, b = _alpha_kATP(V, 0.0), _beta_kATP(V, 0.0)
+    return a / (a + b)
+
+
+def test_katp_steady_state_in_bounds():
+    """The kATP rates are positive and steady state in [0, 1] across V."""
+    for V in np.linspace(-120.0, 30.0, 50):
+        a = _alpha_kATP(V, 0.0)
+        b = _beta_kATP(V, 0.0)
+        assert a >= 0, f"alpha_kATP negative at V={V}"
+        assert b >= 0, f"beta_kATP negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"kATP steady state {ss} out of [0,1] at V={V}"
+
+
+def test_katp_increases_with_depolarisation():
+    """The kATP activation rises monotonically with depolarisation."""
+    assert _kATP_inf(-65.0) < _kATP_inf(-25.0) < _kATP_inf(0.0)
+
+
+def test_katp_half_voltage():
+    """V½ for kATP sits at -25 mV (Hahn & McIntyre 2010 fit)."""
+    assert _kATP_inf(-25.0) == pytest.approx(0.5, abs=0.01)
+
+
+def test_katp_subthreshold_closed():
+    """Subthreshold kATP availability is near zero so rest is uncorrupted."""
+    # Autonomous tonic firing cycles around -60 mV; kATP must stay closed
+    # at and below the autonomous threshold so background firing is not
+    # silenced by an unwanted outward K+ leak.
+    assert _kATP_inf(-65.0) < 0.02
+
+
+def test_katp_plateau_open():
+    """At the depol-block plateau kATP opens strongly to provide block escape."""
+    # The plateau sits ≈ −15 mV; kATP must open enough there to dominate
+    # the residual fast-Na inward drive.
+    assert _kATP_inf(-15.0) > 0.7
+
+
+def test_katp_tau_is_slow():
+    """The τ_kATP at V½ stays distinctly slow vs spike kinetics."""
+    a, b = _alpha_kATP(-25.0, 0.0), _beta_kATP(-25.0, 0.0)
+    tau = 1.0 / (a + b)
+    assert tau > 200.0, f"kATP tau at V½ is {tau:.1f} ms, expected > 200 ms"
+
+
+# ---------------------------------------------------------------------------
+# make_katp_channel
+# ---------------------------------------------------------------------------
+
+
+def test_make_katp_channel_defaults():
+    """make_katp_channel() produces a channel with the expected defaults."""
+    from patch_sim.constants import DEFAULT_G_KATP
+
+    ch = make_katp_channel()
+    assert ch.name == "KATP"
+    assert ch.g_max == pytest.approx(DEFAULT_G_KATP)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
+    assert len(ch.gating_variables) == 1
+    assert ch.gating_variables[0].name == "kATP"
+    assert ch.gating_variables[0].power == 1
+
+
+def test_make_katp_channel_custom_params():
+    """make_katp_channel accepts custom g_max."""
+    ch = make_katp_channel(g_max=1.0)
+    assert ch.g_max == pytest.approx(1.0)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
+
+
+def test_public_api_exports_katp():
+    """make_katp_channel is exported from the patch_sim public API."""
+    assert hasattr(patch_sim, "make_katp_channel")
 
 
 # ---------------------------------------------------------------------------
