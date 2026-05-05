@@ -25,6 +25,7 @@ from patch_sim.additional_channels import (
     _alpha_q,
     _alpha_r,
     _alpha_s,
+    _alpha_sNaP,
     _alpha_w,
     _beta_a,
     _beta_b,
@@ -40,6 +41,7 @@ from patch_sim.additional_channels import (
     _beta_q,
     _beta_r,
     _beta_s,
+    _beta_sNaP,
     _beta_w,
     make_ical_channel,
     make_ican_channel,
@@ -843,6 +845,62 @@ def test_inap_subthreshold_activation():
     # Subthreshold range (-55 to -40 mV) should have partial activation
     assert 0.0 < p_inf(-55.0) < 0.5
     assert 0.5 < p_inf(-40.0) < 1.0
+
+
+# ---------------------------------------------------------------------------
+# INaP slow-inactivation rate functions (Magistretti & Alonso 1999)
+# ---------------------------------------------------------------------------
+
+
+def _sNaP_inf(V: float) -> float:
+    """INaP slow-inactivation steady-state availability at voltage V."""
+    a, b = _alpha_sNaP(V, 0.0), _beta_sNaP(V, 0.0)
+    return a / (a + b)
+
+
+def test_inap_slow_inactivation_steady_state_in_bounds():
+    """INaP slow-inactivation s_inf is in [0, 1] for physiological voltages."""
+    for V in np.linspace(-120.0, 0.0, 50):
+        a = _alpha_sNaP(V, 0.0)
+        b = _beta_sNaP(V, 0.0)
+        assert a >= 0, f"alpha_sNaP negative at V={V}"
+        assert b >= 0, f"beta_sNaP negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"sNaP steady state {ss} out of [0,1] at V={V}"
+
+
+def test_inap_slow_inactivation_decreases_with_depolarisation():
+    """Availability is highest at hyperpolarised voltages (inactivation)."""
+    assert _sNaP_inf(-80.0) > _sNaP_inf(-49.0) > _sNaP_inf(-10.0)
+
+
+def test_inap_slow_inactivation_half_voltage():
+    """V½ for sNaP sits at -49 mV per Magistretti & Alonso 1999."""
+    assert _sNaP_inf(-49.0) == pytest.approx(0.5, abs=0.01)
+
+
+def test_inap_slow_inactivation_resting_availability():
+    """Near-rest availability is high enough to preserve pacemaking."""
+    # At -65 mV the gate is comfortably available; -60 mV is closer to V½ of
+    # the Boltzmann (-49 mV), so availability dips into the 0.7-0.8 range —
+    # acceptable because pacemaking spends much of its cycle at the AHP near
+    # -75 mV where availability is high.
+    assert _sNaP_inf(-65.0) > 0.8
+    assert _sNaP_inf(-75.0) > 0.9
+
+
+def test_inap_slow_inactivation_blocks_depol_plateau():
+    """At depolarised plateau voltages sNaP closes, providing block escape."""
+    # The depol-block plateau in #324 hung at ≈ −15 mV; sNaP must close
+    # firmly there so g_INaP_eff = g_max * p * sNaP collapses.
+    assert _sNaP_inf(-15.0) < 0.05
+
+
+def test_inap_slow_inactivation_tau_is_slow():
+    """τ_sNaP at V½ exceeds 200 ms — distinct timescale from fast activation."""
+    a, b = _alpha_sNaP(-49.0, 0.0), _beta_sNaP(-49.0, 0.0)
+    tau = 1.0 / (a + b)
+    assert tau > 200.0, f"sNaP tau at V½ is {tau:.1f} ms, expected > 200 ms"
 
 
 # ---------------------------------------------------------------------------
