@@ -859,9 +859,11 @@ def test_make_inap_channel_defaults():
     assert ch.g_max == pytest.approx(DEFAULT_G_NAP)
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.SODIUM
-    assert len(ch.gating_variables) == 1
+    assert len(ch.gating_variables) == 2
     assert ch.gating_variables[0].name == "p"
     assert ch.gating_variables[0].power == 1
+    assert ch.gating_variables[1].name == "sNaP"
+    assert ch.gating_variables[1].power == 1
 
 
 def test_make_inap_channel_custom_params():
@@ -878,7 +880,7 @@ def test_make_inap_channel_custom_params():
 
 
 def test_current_clamp_with_inap_extra_columns():
-    """Current clamp with NaP channel adds INaP and p columns."""
+    """Current clamp with NaP channel adds INaP, p, and sNaP columns."""
     neuron = Neuron(additional_channels=(make_inap_channel(),))
     stim = step_current(
         duration=20.0,
@@ -891,10 +893,11 @@ def test_current_clamp_with_inap_extra_columns():
     assert result.dtype.names is not None
     assert "INaP" in result.dtype.names
     assert "p" in result.dtype.names
+    assert "sNaP" in result.dtype.names
 
 
 def test_voltage_clamp_with_inap_extra_columns():
-    """Voltage clamp with NaP channel adds INaP and p columns."""
+    """Voltage clamp with NaP channel adds INaP, p, and sNaP columns."""
     neuron = Neuron(additional_channels=(make_inap_channel(),))
     prot = step_voltage(
         duration=20.0,
@@ -908,10 +911,11 @@ def test_voltage_clamp_with_inap_extra_columns():
     assert result.dtype.names is not None
     assert "INaP" in result.dtype.names
     assert "p" in result.dtype.names
+    assert "sNaP" in result.dtype.names
 
 
 def test_current_clamp_inap_gating_in_bounds():
-    """INaP gating variable p stays in [0, 1] during current clamp."""
+    """INaP gating variables p and sNaP stay in [0, 1] during current clamp."""
     neuron = Neuron(additional_channels=(make_inap_channel(),))
     stim = step_current(
         duration=30.0,
@@ -923,6 +927,8 @@ def test_current_clamp_inap_gating_in_bounds():
     result = simulate_current_clamp(neuron, stim)
     assert result["p"].min() >= 0.0
     assert result["p"].max() <= 1.0
+    assert result["sNaP"].min() >= 0.0
+    assert result["sNaP"].max() <= 1.0
 
 
 def test_public_api_exports_inap():
@@ -1089,6 +1095,7 @@ def test_inap_and_inar_coexist():
     assert "INaP" in result.dtype.names
     assert "INaR" in result.dtype.names
     assert "p" in result.dtype.names
+    assert "sNaP" in result.dtype.names
     assert "s" in result.dtype.names
     assert "hr" in result.dtype.names
 
@@ -1128,7 +1135,7 @@ def test_all_additional_channels_coexist():
         "IKCa",
     ):
         assert col in result.dtype.names
-    for gate in ("r", "a", "b", "p", "s", "hr", "w", "kir", "q"):
+    for gate in ("r", "a", "b", "p", "sNaP", "s", "hr", "w", "kir", "q"):
         assert gate in result.dtype.names
 
 
