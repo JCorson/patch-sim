@@ -533,14 +533,17 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # any rest near −60 mV; Ih activates during the AHP and drives slow
         # depolarisation back to threshold, producing autonomous firing at
         # ~20 Hz in this single-compartment model (Bevan & Wilson 1999 report
-        # 5–50 Hz in slice).  Mainen-Sejnowski Kv (slow deactivation, n_inf
-        # passes 0.5 at +25 mV) replaces the Otsuka K factory as the sole
-        # delayed rectifier — the Otsuka n^4 form has τ_n ≈ 0.3 ms near AP
-        # peak and caps half-width at ~0.1 ms regardless of g_K, whereas
-        # M-S Kv broadens the spike into the literature 0.4–1.2 ms band.
-        # The Otsuka K factory is retained for structural symmetry but
-        # pinned to ``g_K=0``; this mirrors the cortical pyramidal (#311)
-        # fix which used the same M-S Kv substitution.
+        # 5–50 Hz in slice).  IKv3.1 (Erisir 1999, V½ = −12.4 mV, n²,
+        # τ_floor = 0.2 ms) replaces the Otsuka K factory as the sole
+        # delayed rectifier — Wigmore & Lacey (2000) directly characterised
+        # the dominant somatic K current in rat STN as Kv3.1-like (V½ near
+        # −13 mV, threshold ≈ −38 mV) and concluded it "enables high-
+        # frequency spike trains in SThN neurones."  Zhou & Lee (2011)
+        # confirms Kv3-class channels as the rapid repolariser in basal-
+        # ganglia output neurons.  The Otsuka K factory is retained for
+        # structural symmetry but pinned to ``g_K=0``; this is the same
+        # core-K-bypass pattern used by the cortical pyramidal (#311) and
+        # FSI (#301) presets.
         #
         # CONDITIONAL MODE — burst firing: prominent ICaT (g_T = 5 mS/cm²)
         # supports post-inhibitory rebound bursts when the cell is sufficiently
@@ -555,7 +558,9 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #       Beurrier et al. (1999), J. Neurosci. 19:599 (NMDA burst mode);
         #       Do & Bean (2003), Neuron 39:109 (STN INaP);
         #       Magistretti & Alonso (1999), J. Gen. Physiol. 114:491 (INaP);
-        #       Mainen & Sejnowski (1996), Nature 382:363 (slow Kv);
+        #       Wigmore & Lacey (2000), J. Physiol. 527:493 (STN Kv3-like K);
+        #       Erisir et al. (1999), J. Neurophysiol. 82:2476 (Kv3.1 kinetics);
+        #       Zhou & Lee (2011), Neuroscience 195:14 (Kv3 in BG output);
         #       Destexhe et al. (1993) (Ih kinetics).
         #
         # Mammalian Na⁺/K⁺ concentrations give E_Na ≈ +60.6, E_K ≈ −89.1 mV,
@@ -567,10 +572,10 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # ``test_find_zero_current_voltage_all_presets`` exclusion.
         #
         # Q10 = 1.0 (combined with T_ref = 308.15 K, 35 °C) holds the kinetics
-        # exactly at the Otsuka 2004 reference temperature; the M-S Kv constants
-        # are pre-scaled from 23 → 34 °C inside the rate functions (Q10=2.3
-        # baked in), so the combined system represents kinetics at slice
-        # recording temperature with no further runtime adjustment.
+        # exactly at the Otsuka 2004 reference temperature; the IKv3.1 rate
+        # constants are reported by Erisir et al. (1999) at 32 °C, so the
+        # combined system represents kinetics close to slice recording
+        # temperature with no further runtime adjustment.
         #
         # g_NaL = 0 / g_KL = 0.04 mS/cm²: pure K⁺ background leak (Purkinje
         # pattern).  τ_m = C_m / g_KL ≈ 25 ms and R_in ≈ 25 kΩ·cm² (R_n ≈ 3.6 GΩ
@@ -579,18 +584,22 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # oscillator regime requires the leak NOT to bracket a zero-current root.
         #
         # Pacemaking conductances:
-        #   g_NaP = 0.10 mS/cm²: persistent Na⁺ window current that destabilises
-        #     rest.  Matches the Cortical Pyramidal value; the STN target
-        #     firing rate (5–50 Hz) sits in the same window-current regime.
-        #   g_Ih  = 1.0 mS/cm² (was 0.5): post-AHP depolarising drive.  Doubled
-        #     to provide faster recovery from AHP and meet the STN rate band.
-        #   g_MSKv = 0.5 mS/cm²: sole delayed rectifier; broadens AP half-width.
+        #   g_NaP   = 0.10 mS/cm²: persistent Na⁺ window current that
+        #     destabilises rest.  Matches the Cortical Pyramidal value; the
+        #     STN target firing rate (5–50 Hz) sits in the same window-current
+        #     regime.
+        #   g_Ih    = 1.0 mS/cm²: post-AHP depolarising drive sized to recover
+        #     the cell from AHP within the inter-spike interval at the STN
+        #     rate band.
+        #   g_IKv31 = 0.2 mS/cm²: sole delayed rectifier (Kv3.1, Erisir 1999).
+        #     Tuned low so that the n²-gated Kv3.1 — much faster and earlier-
+        #     activating than a Kv2-class Mainen-Sejnowski Kv at the same g —
+        #     does not over-repolarise or narrow the AP below the 0.4–1.2 ms
+        #     literature half-width band.
         #
-        # g_Na = 30 mS/cm² (was 49): keeps AP peak inside the +0 to +30 mV
-        # band of Bevan & Wilson 1999 (typical AP amplitudes 60–80 mV from
-        # threshold near −55 mV, putting the peak in the +5 to +25 mV range).
-        # The previous g_Na = 49 (combined with the fast Otsuka n^4 K) drove
-        # the peak above +30 mV under the broader M-S Kv repolarisation.
+        # g_Na = 30 mS/cm²: keeps AP peak inside the +0 to +30 mV band of
+        # Bevan & Wilson 1999 (typical AP amplitudes 60–80 mV from threshold
+        # near −55 mV, putting the peak in the +5 to +25 mV range).
         #
         # ca_init = 7.325e-4 mM: the previous coupled (V, ca_i) equilibrium at
         # v_rest under the static-rest preset.  Retained as a non-zero
@@ -615,7 +624,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ikca_channel, g_max=1.0),
             ChannelConfig(make_ih_channel, g_max=1.0),
             ChannelConfig(make_inap_channel, g_max=0.10),
-            ChannelConfig(make_mainen_sejnowski_kv_channel, g_max=0.5),
+            ChannelConfig(make_ikv31_channel, g_max=0.2),
         ),
         # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
         # (2 µA/cm², 200 ms).  ICaT g=5.0 mS/cm² is the largest Ca conductance in any
