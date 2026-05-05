@@ -14,9 +14,11 @@ from patch_sim.core_channels import (
     _stn_alpha_h,
     _stn_alpha_m,
     _stn_alpha_n,
+    _stn_alpha_sNa,
     _stn_beta_h,
     _stn_beta_m,
     _stn_beta_n,
+    _stn_beta_sNa,
     alpha_h,
     alpha_m,
     alpha_n,
@@ -893,6 +895,71 @@ def test_make_stn_na_channel_structure() -> None:
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.SODIUM
     assert not ch.carries_calcium
+
+
+def test_make_stn_na_channel_with_slow_inactivation() -> None:
+    """``slow_inactivation=True`` adds the sNa gate (Fleidervish & Gutnick 1996)."""
+    ch = make_stn_na_channel(g_max=30.0, slow_inactivation=True)
+    assert len(ch.gating_variables) == 3
+    assert ch.gating_variables[2].name == "sNa"
+    assert ch.gating_variables[2].power == 1
+
+
+# ---------------------------------------------------------------------------
+# STN slow Na inactivation rate functions (sNa gate; Fleidervish & Gutnick
+# 1996; Mickus, Jung & Spruston 1999; Do & Bean 2003).  Opt-in gate added in
+# #324 to abolish the residual −15 mV plateau the Otsuka 2004 fast h-tail
+# leaves open.
+# ---------------------------------------------------------------------------
+
+
+def _sNa_inf(V: float) -> float:
+    """Steady-state availability of the STN slow Na inactivation gate."""
+    a, b = _stn_alpha_sNa(V, 0.0), _stn_beta_sNa(V, 0.0)
+    return a / (a + b)
+
+
+def test_stn_slow_na_inactivation_steady_state_in_bounds() -> None:
+    """The sNa rates are positive and steady state in [0, 1] across V."""
+    for V in (-120.0, -100.0, -75.0, -65.0, -50.0, -30.0, -15.0, 0.0, 30.0):
+        a = _stn_alpha_sNa(V, 0.0)
+        b = _stn_beta_sNa(V, 0.0)
+        assert a >= 0, f"alpha_sNa negative at V={V}"
+        assert b >= 0, f"beta_sNa negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"sNa steady state {ss} out of [0,1] at V={V}"
+
+
+def test_stn_slow_na_inactivation_decreases_with_depolarisation() -> None:
+    """The sNa availability decreases monotonically with depolarisation."""
+    assert _sNa_inf(-80.0) > _sNa_inf(-50.0) > _sNa_inf(-15.0)
+
+
+def test_stn_slow_na_inactivation_half_voltage() -> None:
+    """V½ for sNa sits at -50 mV (Fleidervish & Gutnick 1996 mid-range)."""
+    assert _sNa_inf(-50.0) == pytest.approx(0.5, abs=0.01)
+
+
+def test_stn_slow_na_inactivation_resting_availability() -> None:
+    """Near-rest sNa availability stays high to preserve autonomous pacemaking."""
+    # STN cycles around -60 mV at the autonomous rate; sNa must remain high
+    # there or the spike train would lose Na availability.
+    assert _sNa_inf(-65.0) > 0.85
+    assert _sNa_inf(-75.0) > 0.93
+
+
+def test_stn_slow_na_inactivation_blocks_depol_plateau() -> None:
+    """At depolarised plateau voltages sNa closes, abolishing the residual h-tail."""
+    # The depol-block plateau in #324 hung at ≈ −15 mV; sNa must close
+    # firmly there so g_Na_eff = g_max * m^3 * h * sNa collapses.
+    assert _sNa_inf(-15.0) < 0.05
+
+
+def test_stn_slow_na_inactivation_tau_is_slow() -> None:
+    """τ_sNa at V½ stays distinctly slow vs the fast m, h gates."""
+    a, b = _stn_alpha_sNa(-50.0, 0.0), _stn_beta_sNa(-50.0, 0.0)
+    tau = 1.0 / (a + b)
+    assert tau > 100.0, f"sNa tau at V½ is {tau:.1f} ms, expected > 100 ms"
 
 
 def test_make_stn_k_channel_structure() -> None:
