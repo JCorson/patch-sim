@@ -591,10 +591,21 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # Autonomous tonic pacemaker with conditional burst mode.
         #
-        # PRIMARY MODE — tonic pacemaking: high-threshold Na⁺ (Otsuka 2004) and
-        # fast K⁺ DR replace the default HH52 kinetics; g_Na/g_K from the
-        # original paper sustain autonomous tonic firing at 5–50 Hz in vivo
-        # (~80 Hz here under a 2 µA/cm² depolarising bias).
+        # PRIMARY MODE — tonic pacemaking: INaP window current destabilises
+        # any rest near −60 mV; Ih activates during the AHP and drives slow
+        # depolarisation back to threshold, producing autonomous firing at
+        # ~20 Hz in this single-compartment model (Bevan & Wilson 1999 report
+        # 5–50 Hz in slice).  IKv3.1 (Erisir 1999, V½ = −12.4 mV, n²,
+        # τ_floor = 0.2 ms) replaces the Otsuka K factory as the sole
+        # delayed rectifier — Wigmore & Lacey (2000) directly characterised
+        # the dominant somatic K current in rat STN as Kv3.1-like (V½ near
+        # −13 mV, threshold ≈ −38 mV) and concluded it "enables high-
+        # frequency spike trains in SThN neurones."  Zhou & Lee (2011)
+        # confirms Kv3-class channels as the rapid repolariser in basal-
+        # ganglia output neurons.  The Otsuka K factory is retained for
+        # structural symmetry but pinned to ``g_K=0``; this is the same
+        # core-K-bypass pattern used by the cortical pyramidal (#311) and
+        # FSI (#301) presets.
         #
         # CONDITIONAL MODE — burst firing: prominent ICaT (g_T = 5 mS/cm²)
         # supports post-inhibitory rebound bursts when the cell is sufficiently
@@ -604,30 +615,78 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # NMDA-receptor activation (Beurrier et al. 1999, J. Neurosci. 19:599);
         # NMDA is not modelled here, so burst mode is reachable in this preset
         # only via the hyperpolarising-step-and-release protocol.
-        # Refs: Otsuka et al. (2004), J. Neurophysiol. 92:255;
-        #       Bevan & Wilson (1999), J. Neurosci. 19:7617;
+        #
+        # KNOWN LIMITATION — depolarization-block recovery (#324): under
+        # sustained suprathreshold drive (≳ +3 µA/cm² × 100+ ms) the cell
+        # enters depol block and fails to repolarise after the step releases,
+        # hanging at ≈ −15 mV.  INaP here has only an activation gate (no
+        # slow inactivation), so the depolarised plateau is a stable second
+        # attractor with no escape route.  Doublet bursts in the same regime
+        # are the same artefact (partial block).  Real STN cells recover via
+        # slow Na⁺ inactivation / ATP-K / K⁺ accumulation — none modelled.
+        # The autonomous tonic phenotype (≤ ~+2 µA/cm²) is unaffected.
+        # Refs: Otsuka et al. (2004), J. Neurophysiol. 92:255 (Na kinetics);
+        #       Bevan & Wilson (1999), J. Neurosci. 19:7617 (pacemaking);
         #       Beurrier et al. (1999), J. Neurosci. 19:599 (NMDA burst mode);
-        #       Farries & Wilson (2012), J. Neurophysiol.
+        #       Do & Bean (2003), Neuron 39:109 (STN INaP);
+        #       Magistretti & Alonso (1999), J. Gen. Physiol. 114:491 (INaP);
+        #       Wigmore & Lacey (2000), J. Physiol. 527:493 (STN Kv3-like K);
+        #       Erisir et al. (1999), J. Neurophysiol. 82:2476 (Kv3.1 kinetics);
+        #       Zhou & Lee (2011), Neuroscience 195:14 (Kv3 in BG output);
+        #       Destexhe et al. (1993) (Ih kinetics).
         #
         # Mammalian Na⁺/K⁺ concentrations give E_Na ≈ +60.6, E_K ≈ −89.1 mV,
-        # close to the Otsuka targets (+60, −90).  v_rest = −67 mV is the
-        # stable zero-current equilibrium for this channel configuration.
+        # close to the Otsuka targets (+60, −90).
         #
-        # g_NaL + g_KL = 0.25 mS/cm² gives τ_m ≈ 4 ms and R_in ≈ 4 kΩ·cm².
-        # Lower total leak (< 0.25) shifts the zero-current equilibrium away
-        # from v_rest.  With Na_out = 145 mM (mammalian), E_Na ≈ +60.6 mV,
-        # and K_out = 5 mM gives E_K ≈ −89 mV.
-        # v_rest = −68.02 mV: with dynamic E_Ca, ICaT and ICaL window currents
-        # at rest elevate ca_i above ca_rest, shifting E_Ca and moving the
-        # coupled equilibrium to −68.02 mV (vs −67 mV static).
-        # Re-run find_coupled_equilibrium if channel parameters change.
-        g_Na=49.0,
-        g_K=57.0,
-        v_rest=-68.0152,
+        # v_rest = −60.0 mV is the simulation starting point (near the INaP
+        # activation threshold); this cell has NO stable zero-current resting
+        # potential — it is an autonomous oscillator.  Listed in the
+        # ``test_find_zero_current_voltage_all_presets`` exclusion.
+        #
+        # Q10 = 1.0 (combined with T_ref = 308.15 K, 35 °C) holds the kinetics
+        # exactly at the Otsuka 2004 reference temperature; the IKv3.1 rate
+        # constants are reported by Erisir et al. (1999) at 32 °C, so the
+        # combined system represents kinetics close to slice recording
+        # temperature with no further runtime adjustment.
+        #
+        # g_NaL = 0 / g_KL = 0.04 mS/cm²: pure K⁺ background leak (Purkinje
+        # pattern).  τ_m = C_m / g_KL ≈ 25 ms and R_in ≈ 25 kΩ·cm² (R_n ≈ 3.6 GΩ
+        # at area = 7e-6 cm²).  A rebalanced Na+K leak that fixes I_total = 0
+        # at v_rest pins the cell too stably to pacemake; the autonomous-
+        # oscillator regime requires the leak NOT to bracket a zero-current root.
+        #
+        # Pacemaking conductances:
+        #   g_NaP   = 0.10 mS/cm²: persistent Na⁺ window current that
+        #     destabilises rest.  Matches the Cortical Pyramidal value; the
+        #     STN target firing rate (5–50 Hz) sits in the same window-current
+        #     regime.
+        #   g_Ih    = 1.0 mS/cm²: post-AHP depolarising drive sized to recover
+        #     the cell from AHP within the inter-spike interval at the STN
+        #     rate band.
+        #   g_IKv31 = 0.2 mS/cm²: sole delayed rectifier (Kv3.1, Erisir 1999).
+        #     Tuned low so that the n²-gated Kv3.1 — much faster and earlier-
+        #     activating than a Kv2-class Mainen-Sejnowski Kv at the same g —
+        #     does not over-repolarise or narrow the AP below the 0.4–1.2 ms
+        #     literature half-width band.
+        #
+        # g_Na = 30 mS/cm²: keeps AP peak inside the +0 to +30 mV band of
+        # Bevan & Wilson 1999 (typical AP amplitudes 60–80 mV from threshold
+        # near −55 mV, putting the peak in the +5 to +25 mV range).
+        #
+        # ca_init = 7.325e-4 mM: the previous coupled (V, ca_i) equilibrium at
+        # v_rest under the static-rest preset.  Retained as a non-zero
+        # initial Ca²⁺ guess — the cell now oscillates from t = 0 so this is
+        # not a true equilibrium, but it sits within the early-AP Ca²⁺ trace
+        # range and avoids a spurious transient at startup.
+        g_Na=30.0,
+        g_K=0.0,
+        v_rest=-60.0,
         Na_out=145.0,
         K_out=5.0,
-        g_NaL=0.038,
-        g_KL=0.212,
+        g_NaL=0.0,
+        g_KL=0.04,
+        Q10=1.0,
+        T_ref=308.15,
         na_channel_factory=make_stn_na_channel,
         k_channel_factory=make_stn_k_channel,
         channels=(
@@ -635,13 +694,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ical_channel, g_max=0.5),
             ChannelConfig(make_ika_channel, g_max=3.0),
             ChannelConfig(make_ikca_channel, g_max=1.0),
-            ChannelConfig(make_ih_channel, g_max=0.5),
+            ChannelConfig(make_ih_channel, g_max=1.0),
+            ChannelConfig(make_inap_channel, g_max=0.10),
+            ChannelConfig(make_ikv31_channel, g_max=0.2),
         ),
         # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
         # (2 µA/cm², 200 ms).  ICaT g=5.0 mS/cm² is the largest Ca conductance in any
         # preset; low alpha_ca=1.1e-5 compensates for the high Ca influx per spike.
-        # ca_init is the coupled (V, ca_i) equilibrium at v_rest: ICaT/ICaL window
-        # currents keep ca_i elevated above ca_rest at rest.
         calcium_dynamics=CalciumDynamics(
             alpha_ca=1.1e-5, tau_ca=20.0, ca_rest=1e-4, ca_init=7.325e-4
         ),
@@ -1128,8 +1187,10 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 2.0,
             "stimulus_duration": 5.0,
         },
-        # Depolarizing step for sustained tonic firing; STN pacemaker kinetics
-        # yield ~16 spikes at ~77 Hz at 2 µA/cm² over 200 ms.
+        # Depolarising bias on top of the autonomous tonic train.  At
+        # 2 µA/cm² the cell fires at ~105 Hz (well above the 5–50 Hz
+        # autonomous rate); 200 ms is long enough to comfortably exceed
+        # the ≥5 spike requirement of test_repetitive_firing_preset.
         REPETITIVE_FIRING: {
             "min_stimulus": 2.0,
             "max_stimulus": 2.0,
@@ -1144,7 +1205,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
         },
         # Inherits the base HYPERPOLARIZATION_STEPS range (−10 → −2 µA/cm²).
         # Very high ICaT conductance (g=5.0 mS/cm²) produces a prominent
-        # post-inhibitory rebound burst on step release; Ih (g=0.5 mS/cm²)
+        # post-inhibitory rebound burst on step release; Ih (g=1.0 mS/cm²)
         # adds a depolarising overshoot that can trigger additional spikes.
     },
     TRN: {

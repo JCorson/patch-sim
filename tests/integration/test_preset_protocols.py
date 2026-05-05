@@ -22,6 +22,7 @@ from patch_sim.constants import (
     DOPAMINERGIC,
     PURKINJE,
     REPETITIVE_FIRING,
+    STN,
     TRN,
 )
 from patch_sim.neuron_factory import make_neuron
@@ -47,8 +48,14 @@ from patch_sim.presets import (
 # pacemaker (~4 Hz at zero current, Putzier+Drion Cav1.3 + INaP_SNc + SK
 # mechanism).  The autonomous-firing phenotype is exercised by
 # ``test_da_spontaneous_pacemaking`` in tests/integration/test_dopaminergic.py.
+#
+# STN is excluded post-#305: the autonomous-pacemaker preset fires
+# spontaneously at ~20 Hz from v_rest = −60 mV (Bevan & Wilson 1999).  The
+# tonic-pacemaker phenotype and conditional rebound-burst phenotype are
+# exercised by tests/integration/test_stn.py and
+# ``test_stn_conditional_burst_mode_under_hyperpolarising_step_release``.
 _QUIESCENT_PRESET_NAMES = [
-    p for p in NEURON_PRESET_NAMES if p not in (PURKINJE, TRN, DOPAMINERGIC)
+    p for p in NEURON_PRESET_NAMES if p not in (PURKINJE, TRN, DOPAMINERGIC, STN)
 ]
 
 # ---------------------------------------------------------------------------
