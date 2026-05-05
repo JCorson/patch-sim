@@ -10,6 +10,7 @@ from patch_sim.calcium import CalciumDynamics
 from patch_sim.channels import IonChannel
 from patch_sim.constants import (
     CA1_PYRAMIDAL,
+    DOPAMINERGIC,
     PURKINJE,
     STN,
     THALAMIC_RELAY,
@@ -30,6 +31,7 @@ _CALCIUM_PRESETS = {
     CA1_PYRAMIDAL,
     STN,
     TRN,
+    DOPAMINERGIC,
 }
 
 _NON_CALCIUM_PRESETS = set(NEURON_PRESET_NAMES) - _CALCIUM_PRESETS

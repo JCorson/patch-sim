@@ -11,6 +11,7 @@ from typing import Any
 import numpy as np
 
 from .additional_channels import (
+    make_cav13_channel,
     make_ical_channel,
     make_ican_channel,
     make_icat_channel,
@@ -21,6 +22,8 @@ from .additional_channels import (
     make_im_channel,
     make_inap_channel,
     make_inar_channel,
+    make_sk_channel,
+    make_snc_inap_channel,
     make_thalamic_relay_icat_channel,
     make_trn_icat_channel,
 )
@@ -310,46 +313,105 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         area_cm2=250e-6,
     ),
     DOPAMINERGIC: NeuronConfig(
-        # area_cm2 = 7e-6 cm² — ~15 µm soma typical of midbrain SNc DA neurons.
-        # Yields C ≈ 7 pF and R_n ≈ 25–50 MΩ in the simulation.
+        # SNc DA neuron — Putzier+Drion minimal pacemaker.
         #
-        # Ih drives pacemaker sag and rebound; IM provides slow
-        # oscillatory hyperpolarization.
-        # Refs: Wilson & Callaway (2000), J. Neurophysiol. 83:3084;
-        #       Canavier (1999), J. Comput. Neurosci. 6:49;
-        #       Komendantov et al. (2004), J. Neurophysiol. 91:346
+        # Tonic autonomous pacemaker — measured ~7 Hz at zero current,
+        # within the broader SNc DA in-vitro band (Wilson & Callaway 2000:
+        # ~3 Hz; Liss & Roeper 2008: 1–8 Hz; Grace & Bunney 1984: 1–5 Hz).
+        # Drion et al. 2011 reconciled Putzier 2009 (Cav1.3 essential) with
+        # Guzman/Surmeier 2009 (INaP essential) by showing the two
+        # subthreshold negative-slope conductances are interchangeable —
+        # both are needed for a faithful model.  Pacemaking proceeds as:
+        #   1. Cav1.3 (V½ = −31.1 mV, k = 5.35 mV; Putzier 2009) and INaP_SNc
+        #      (V½ = −65 mV; Drion 2011) carry overlapping subthreshold
+        #      depolarising currents; INaP starts the ramp from the AHP,
+        #      Cav1.3 takes over near threshold and loads Ca²⁺ into the cell.
+        #   2. AP fires; ca_i peaks at ~0.6 µM (α_ca = 5e-5 supplies enough
+        #      Ca for SK to dominate the post-spike conductance landscape).
+        #   3. SK (K_d = 0.3 µM, Hill n = 4; Drion 2011, scaled to 1.75 mS/cm²
+        #      in this preset) opens fast, dragging V to a clean medium AHP
+        #      at ~ −90 mV in <5 ms.  Without this strong SK pull the
+        #      Komendantov Na window current (m_inf = 0.79 at −30 mV with
+        #      VT = −67) holds V on a 20 ms plateau at −30 mV — a known
+        #      pathology of single-compartment Na/K when the Cav1.3 + SK
+        #      mechanism is undertuned.
+        #   4. ca_i decays fast (τ_ca = 30 ms), SK closes, INaP_SNc + Cav1.3
+        #      ramp resumes.  Cycle repeats at ~7 Hz.
         #
-        # Canavier (1999) / Komendantov (2004) Traub-Miles Na⁺/K⁺ kinetics
-        # (VT = −67 mV) replace the default HH52 core channels.  HH52 kinetics
-        # (fitted to room-temperature squid axon) over-accelerate Na⁺ inactivation
-        # under the default Q10=3.0 scaling (22→37 °C, factor ~5.2×), biologically
-        # wrong for a mammalian midbrain DA cell.  The Canavier/Komendantov kinetics
-        # at ~35 °C give VT = −67 mV (equivalent to α_m = 0.32*(V+54)/...), which
-        # produces m_inf ≈ 5.6% at rest — the Na⁺ window current that supports
-        # Ih-driven post-hyperpolarization rebound spiking in SNc neurons (Wilson &
-        # Callaway 2000).  T_ref = 308.15 K (35 °C) limits the Q10 correction to
-        # ~1.26× (35→37 °C), preserving the published kinetics.
+        # Channel set: only the channels that are characteristic of SNc DA.
+        # No IM (cortical M-current, not SNc).  No Mainen-Sejnowski Kv
+        # (cortical/Purkinje fit, not SNc) — repolarisation is carried by
+        # the Komendantov Kdr alone, which avoids the competing slow K
+        # timescales that produce subthreshold oscillation in the depol-block
+        # window.  Ih is retained but small: Putzier showed ZD7288 has only
+        # a minor effect on rate.
         #
-        # v_rest = −62.5 mV: with VT = −67 mV and g_Ih = 2.0 mS/cm², the HCN
-        # channel provides ~6% activation at −60 mV, yielding ~4 µA/cm² inward
-        # current that shifts the zero-current equilibrium to −62.5 mV.  This is
-        # within the published resting-potential range for SNc DA neurons
-        # (Grace & Bunney 1983; Lacey et al. 1989: −60 to −65 mV).
+        # Canavier (1999) / Komendantov (2004) Na/K kinetics (VT = −67 mV)
+        # replace the default HH52 core channels — HH52 kinetics fitted to
+        # squid axon over-accelerate inactivation in mammalian midbrain
+        # cells.  Q10 = 1.0 with T_ref = 308.15 K (35 °C) holds them at the
+        # published Komendantov reference temperature.
         #
-        # g_NaL + g_KL = 0.3 mS/cm² (τ_m ≈ 3.3 ms); split tuned so that
-        # I_NaL + I_KL + I_channels = 0 at v_rest = −62.5 mV with K_out=4 mM
-        # (E_K ≈ −95 mV) and the Canavier/Komendantov steady-state currents.
-        v_rest=-62.5,
-        g_NaL=0.0615,
-        g_KL=0.2385,
+        # Passive properties: area_cm2 = 50e-6 cm² gives C ≈ 50 pF, matching
+        # somatic+dendritic capacitance reported for SNc DA neurons (Wolfart
+        # et al. 2001: 30–80 pF).  Total leak g_total = 0.040 mS/cm² gives
+        # R_in ≈ 500 MΩ and τ_m ≈ 25 ms — both in the literature band
+        # (200–600 MΩ; Lacey et al. 1989; Wolfart et al. 2001) (20–30 ms).
+        # The g_NaL : g_KL ratio (≈ 0.012 : 0.028) is preserved from the
+        # earlier tuning so V_leak ≈ −45 mV is unchanged; only the absolute
+        # leak conductance is doubled, with no additional pacemaker channel
+        # retune required.
+        #
+        # Depol-block: real SNc DA neurons enter depolarisation block above
+        # ~100 pA injected current at long sustained drive (Tucker et al.
+        # 2012).  This single-compartment somatic model does not reproduce
+        # block at any tested (amplitude, duration): empirical sweep
+        # (scratch/characterize_da_block.py) confirms tonic firing at every
+        # amplitude up to 15 µA/cm² and every duration up to 10 s, with the
+        # 150 ms rolling-mean V never exceeding −70 mV.  This is a known
+        # limitation of the somatic representation, which lacks the
+        # dendritic Na inactivation that drives in-vivo block.  Tracked
+        # in #323.
+        #
+        # v_rest = −55 mV is a kinematic starting point — SNc DA neurons
+        # are autonomous oscillators with NO static zero-current rest.  The
+        # integrator settles onto the limit cycle within one ISI.
+        #
+        # References:
+        #   Putzier, Kullmann, Roeper (2009), J. Neurosci. 29:15414
+        #     — Cav1.3 V½ drives SNc pacemaking (dynamic clamp).
+        #   Drion, Massotte, Sepulchre, Seutin (2011), PLOS Comp Biol
+        #     7:e1002050 — reconciliation: Cav1.3 + INaP both required.
+        #   Guzman, Sanchez-Padilla, Wokosin et al. (2009), J. Neurosci.
+        #     29:11011 — INaP essential, Cav1.3 dispensable in SN DA.
+        #   Tucker, Huertas, Horn et al. (2012), J. Neurophysiol.
+        #     108:288 — depol-block onset ~100 pA.
+        #   Wolfart, Neuhoff, Franz, Roeper (2001), J. Neurosci. 21:3443
+        #     — SK gates SNc tonic firing.
+        #   Komendantov, Komendantova, Johnson et al. (2004),
+        #     J. Neurophysiol. 91:346 — Na/K kinetics, AP-shape band.
+        #   Grace & Bunney (1984), J. Neurosci. 4:2877 — 1–5 Hz in vitro.
+        #   Lacey, Mercuri, North (1989), J. Physiol. 415:55 — −55 to
+        #     −65 mV interspike trough.
+        v_rest=-55.0,
+        g_Na=10.0,
+        g_K=0.5,
+        g_NaL=0.012,
+        g_KL=0.028,
+        Q10=1.0,
         T_ref=308.15,
         na_channel_factory=make_dopaminergic_na_channel,
         k_channel_factory=make_dopaminergic_k_channel,
         channels=(
-            ChannelConfig(make_ih_channel, g_max=2.0),
-            ChannelConfig(make_im_channel, g_max=1.0),
+            ChannelConfig(make_cav13_channel, g_max=0.04),
+            ChannelConfig(make_sk_channel, g_max=1.75),
+            ChannelConfig(make_snc_inap_channel, g_max=0.012),
+            ChannelConfig(make_ih_channel, g_max=0.20),
         ),
-        area_cm2=7e-6,
+        calcium_dynamics=CalciumDynamics(
+            alpha_ca=5.0e-5, tau_ca=30.0, ca_rest=1e-4, ca_init=1.0e-4
+        ),
+        area_cm2=50e-6,
     ),
     THALAMIC_RELAY: NeuronConfig(
         # area_cm2 = 12e-6 cm² — ~20 µm soma with modest dendrites.
@@ -931,14 +993,22 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 4.0,
             "stimulus_duration": 5.0,
         },
-        # Long pacemaking window; 2 µA/cm² drives sustained supra-threshold
-        # firing (≥5 APs) over 480 ms with Canavier/Komendantov kinetics.
-        # Duration must stay at 480 ms — this override is used as a regression
-        # target in test_neuron_protocol_adjustments_change_stimulus_duration.
+        # SNc DA pacemaker: tonic firing throughout, accelerating modestly
+        # with depolarising drive.  The somatic single-compartment model
+        # does not reproduce depolarisation block at any tested amplitude
+        # × duration (empirical sweep in scratch/characterize_da_block.py
+        # — tonic firing up to 15 µA/cm² × 5 s and 2 µA/cm² × 10 s).
+        # Real SNc DA neurons enter block above ~100 pA sustained drive
+        # (Tucker et al. 2012); reproducing this requires dendritic Na
+        # inactivation absent from this representation (#323).
+        # The REPETITIVE_FIRING protocol uses 0.3 µA/cm² × 3000 ms,
+        # producing ≥30 full APs at ~10 Hz over 3 s.  Duration must stay
+        # > 180 ms (the base REPETITIVE_FIRING preset) — see
+        # test_neuron_protocol_adjustments_change_stimulus_duration.
         REPETITIVE_FIRING: {
-            "min_stimulus": 2.0,
-            "max_stimulus": 2.0,
-            "stimulus_duration": 480.0,
+            "min_stimulus": 0.3,
+            "max_stimulus": 0.3,
+            "stimulus_duration": 3000.0,
         },
         # Threshold ~1 µA/cm²; 0 → 12 µA/cm² in 1.5 µA steps spans the
         # subthreshold zone through repetitive firing.  200 ms duration shows

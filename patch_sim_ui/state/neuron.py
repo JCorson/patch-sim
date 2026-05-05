@@ -8,6 +8,7 @@ import reflex as rx
 
 import patch_sim
 from patch_sim.constants import (
+    DEFAULT_G_CAV13,
     DEFAULT_G_ICAL,
     DEFAULT_G_ICAN,
     DEFAULT_G_ICAT,
@@ -20,6 +21,7 @@ from patch_sim.constants import (
     DEFAULT_G_MSKV,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
+    DEFAULT_G_SK,
 )
 from patch_sim_ui import presets
 from patch_sim_ui.channels import ADDITIONAL_CHANNELS
@@ -143,10 +145,14 @@ class NeuronState(rx.State):
     ikca_g_max: float = DEFAULT_G_IKCA
     ical_enabled: bool = False
     ical_g_max: float = DEFAULT_G_ICAL
+    cav13_enabled: bool = False
+    cav13_g_max: float = DEFAULT_G_CAV13
     icat_enabled: bool = False
     icat_g_max: float = DEFAULT_G_ICAT
     ican_enabled: bool = False
     ican_g_max: float = DEFAULT_G_ICAN
+    sk_enabled: bool = False
+    sk_g_max: float = DEFAULT_G_SK
 
     # ------------------------------------------------------------------ #
     # Preset label                                                        #

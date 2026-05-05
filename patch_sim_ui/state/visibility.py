@@ -114,10 +114,14 @@ class VisibilityState(rx.State):
     show_ikca_gating: bool = True
     show_ical_current: bool = True
     show_ical_gating: bool = True
+    show_cav13_current: bool = True
+    show_cav13_gating: bool = True
     show_icat_current: bool = True
     show_icat_gating: bool = True
     show_ican_current: bool = True
     show_ican_gating: bool = True
+    show_sk_current: bool = True
+    show_sk_gating: bool = True
 
     # ------------------------------------------------------------------ #
     # Visibility setters                                                 #
