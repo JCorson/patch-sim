@@ -616,15 +616,6 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # NMDA is not modelled here, so burst mode is reachable in this preset
         # only via the hyperpolarising-step-and-release protocol.
         #
-        # KNOWN LIMITATION — depolarization-block recovery (#324): under
-        # sustained suprathreshold drive (≳ +3 µA/cm² × 100+ ms) the cell
-        # enters depol block and fails to repolarise after the step releases,
-        # hanging at ≈ −15 mV.  INaP here has only an activation gate (no
-        # slow inactivation), so the depolarised plateau is a stable second
-        # attractor with no escape route.  Doublet bursts in the same regime
-        # are the same artefact (partial block).  Real STN cells recover via
-        # slow Na⁺ inactivation / ATP-K / K⁺ accumulation — none modelled.
-        # The autonomous tonic phenotype (≤ ~+2 µA/cm²) is unaffected.
         # Refs: Otsuka et al. (2004), J. Neurophysiol. 92:255 (Na kinetics);
         #       Bevan & Wilson (1999), J. Neurosci. 19:7617 (pacemaking);
         #       Beurrier et al. (1999), J. Neurosci. 19:599 (NMDA burst mode);
