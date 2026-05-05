@@ -1,13 +1,16 @@
 """Behavioural tests for the SNc Dopaminergic neuron preset.
 
-Pins the SNc DA pacemaker phenotype: slow autonomous firing (measured 4.2 Hz,
-within the Grace & Bunney 1984 1–5 Hz in-vitro band) sustained by the
+Pins the SNc DA pacemaker phenotype: autonomous firing within the published
+in-vitro range (Grace & Bunney 1984; Liss & Roeper 2008) sustained by the
 Cav1.3 + INaP_SNc subthreshold ramp and SK-shaped AHP (Putzier 2009 + Drion
-2011 reconciliation), broad APs, and depolarisation block at ~9 µA/cm² in
-short (200 ms) steps.  The single-compartment somatic model is more
-block-resistant than the in vitro cell at long durations (Tucker et al. 2012
-report block above ~100 pA at long sustained drive), since the model lacks
-the dendritic Na inactivation that drives in-vivo block at lower amplitudes.
+2011 reconciliation), broad APs, and tonic firing across the UI F-I sweep.
+
+The somatic single-compartment model does not reproduce depolarisation block:
+at every amplitude tested up to 15 µA/cm² and every duration up to 10 s the
+cell fires tonically with rolling-mean V below −70 mV.  Real SNc DA neurons
+enter sustained block above ~100 pA (Tucker et al. 2012); reproducing that
+phenotype requires dendritic Na inactivation that this representation lacks.
+Tracked in #323.
 """
 
 import numpy as np
@@ -118,39 +121,42 @@ def test_da_modest_step_sustains_firing(da_neuron: Neuron) -> None:
 
 # ---------------------------------------------------------------------------
 # UI default F-I protocol — 200 ms steps over 0–12 µA/cm² in 1.5 µA/cm² steps.
-# Encodes the model's short-step depol-block boundary: the cell fires
-# regularly across 0–6 µA/cm² in 200 ms and only fully blocks at ~9 µA/cm².
-# This is more block-resistant than the in vitro phenotype (Tucker et al.
-# 2012 report block above ~100 pA on long sustained drive) — a documented
-# limitation of the somatic single-compartment model that lacks dendritic
-# Na inactivation.
+# The somatic single-compartment model fires tonically across the entire
+# sweep: empirical sweep (scratch/characterize_da_block.py) shows 4–7 spikes
+# per 200 ms step at every amplitude, with 150 ms rolling-mean V never
+# exceeding −70 mV.  Real SNc DA neurons enter depolarisation block above
+# ~100 pA sustained drive (Tucker et al. 2012, J. Neurophysiol. 108:288),
+# but reproducing this requires the dendritic Na inactivation pool that a
+# somatic single-compartment representation cannot supply.  Tracked in #323.
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "amplitude,min_spikes,allow_block",
+    "amplitude,min_spikes",
     [
-        # Regular-firing range: cell fires throughout the step.
-        (0.0, 1, False),
-        (1.5, 2, False),
-        (3.0, 2, False),
-        (4.5, 2, False),
-        (6.0, 1, False),
-        # Block range: cell fires briefly and parks at depolarised V.
-        (9.0, 0, True),
+        (0.0, 3),
+        (1.5, 3),
+        (3.0, 3),
+        (4.5, 4),
+        (6.0, 4),
+        (7.5, 4),
+        (9.0, 4),
+        (10.5, 5),
+        (12.0, 5),
     ],
 )
 def test_da_ui_fi_protocol(
-    da_neuron: Neuron, amplitude: float, min_spikes: int, allow_block: bool
+    da_neuron: Neuron, amplitude: float, min_spikes: int
 ) -> None:
     """200 ms F-I step matches the UI default protocol — issue #304.
 
-    Pins the model's short-step block boundary at ~9 µA/cm² (more
-    block-resistant than the in vitro ~5 µA/cm² of Tucker et al. 2012, since
-    the somatic single-compartment representation lacks dendritic Na
-    inactivation).  Below the boundary the cell must fire at least one
-    spike per 200 ms window without a sustained depol-block plateau; above
-    it, plateau block is expected.
+    The somatic single-compartment model fires tonically across the full
+    UI F-I sweep — depolarisation block is not reproduced (#323; missing
+    dendritic Na inactivation, Tucker et al. 2012).  Each step must
+    therefore produce at least ``min_spikes`` action potentials and must
+    never park above −40 mV in the 150 ms rolling mean.  ``min_spikes``
+    floors are set 1–2 below the empirically observed counts to allow for
+    routine retuning without spurious failures.
     """
     duration_ms = 200.0
     protocol = step_current(duration=duration_ms, current_amplitude=amplitude)
@@ -158,18 +164,17 @@ def test_da_ui_fi_protocol(
     ap = analyze_aps_from_result(result)
     assert ap.spike_count >= min_spikes, (
         f"At I = {amplitude} µA/cm², cell fired only {ap.spike_count} spike(s); "
-        f"expected ≥{min_spikes} (Tucker 2012 depol-block onset ~5 µA/cm²)."
+        f"expected ≥{min_spikes}."
     )
-    if not allow_block:
-        # Below depol-block onset, no sustained plateau above −40 mV.
-        voltage = np.asarray(result["voltage"])
-        window = _ms_to_samples(150.0)
-        kernel = np.ones(window) / window
-        rolling_mean = np.convolve(voltage, kernel, mode="valid")
-        assert np.max(rolling_mean) < -40.0, (
-            f"At I = {amplitude} µA/cm², 150 ms rolling-mean V reached "
-            f"{np.max(rolling_mean):.1f} mV — depolarisation block below onset."
-        )
+    voltage = np.asarray(result["voltage"])
+    window = _ms_to_samples(150.0)
+    kernel = np.ones(window) / window
+    rolling_mean = np.convolve(voltage, kernel, mode="valid")
+    assert np.max(rolling_mean) < -40.0, (
+        f"At I = {amplitude} µA/cm², 150 ms rolling-mean V reached "
+        f"{np.max(rolling_mean):.1f} mV — unexpected depolarisation block "
+        f"plateau (the somatic model is not expected to enter block; #323)."
+    )
 
 
 # ---------------------------------------------------------------------------

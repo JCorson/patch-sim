@@ -362,17 +362,16 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # leak conductance is doubled, with no additional pacemaker channel
         # retune required.
         #
-        # Depol-block boundary: real SNc DA neurons enter depolarisation
-        # block above ~100 pA injected current at long durations
-        # (Tucker et al. 2012).  In this single-compartment somatic model
-        # with the new area, 100 pA ≈ 2 µA/cm² — but the model is more
-        # block-resistant than the in vitro cell because it lacks dendritic
-        # Na inactivation: long (≥5 s) drive sustains firing at all amplitudes
-        # tested up to 6 µA/cm², and full plateau block only emerges at
-        # ~9 µA/cm² in 200 ms steps.  This block-resistance is a known
-        # limitation of the somatic single-compartment representation;
-        # real DA neurons distribute Na/K across dendrites and shift into
-        # bursting at higher drive in vivo.
+        # Depol-block: real SNc DA neurons enter depolarisation block above
+        # ~100 pA injected current at long sustained drive (Tucker et al.
+        # 2012).  This single-compartment somatic model does not reproduce
+        # block at any tested (amplitude, duration): empirical sweep
+        # (scratch/characterize_da_block.py) confirms tonic firing at every
+        # amplitude up to 15 µA/cm² and every duration up to 10 s, with the
+        # 150 ms rolling-mean V never exceeding −70 mV.  This is a known
+        # limitation of the somatic representation, which lacks the
+        # dendritic Na inactivation that drives in-vivo block.  Tracked
+        # in #323.
         #
         # v_rest = −55 mV is a kinematic starting point — SNc DA neurons
         # are autonomous oscillators with NO static zero-current rest.  The
@@ -994,17 +993,15 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "max_stimulus": 4.0,
             "stimulus_duration": 5.0,
         },
-        # SNc DA pacemaker: 4.2 Hz tonic at zero current, accelerating
-        # modestly with depolarising drive (≈ 11 Hz at 1 µA/cm² over 5 s).
-        # The somatic single-compartment model is more block-resistant than
-        # the in vitro cell — long sustained drive (5 s) maintains firing at
-        # all amplitudes up to 6 µA/cm², and full plateau block emerges only
-        # at ~9 µA/cm² in 200 ms steps (cf. Tucker et al. 2012 ~5 µA/cm² for
-        # the real cell).  This is a known limitation of the somatic model
-        # — real DA neurons distribute Na/K across dendrites and transition
-        # into bursting at higher drive in vivo; the bursting phase is out
-        # of scope for this preset.  The REPETITIVE_FIRING protocol uses
-        # 0.3 µA/cm² × 3000 ms — well within the regular-firing range —
+        # SNc DA pacemaker: tonic firing throughout, accelerating modestly
+        # with depolarising drive.  The somatic single-compartment model
+        # does not reproduce depolarisation block at any tested amplitude
+        # × duration (empirical sweep in scratch/characterize_da_block.py
+        # — tonic firing up to 15 µA/cm² × 5 s and 2 µA/cm² × 10 s).
+        # Real SNc DA neurons enter block above ~100 pA sustained drive
+        # (Tucker et al. 2012); reproducing this requires dendritic Na
+        # inactivation absent from this representation (#323).
+        # The REPETITIVE_FIRING protocol uses 0.3 µA/cm² × 3000 ms,
         # producing ≥30 full APs at ~10 Hz over 3 s.  Duration must stay
         # > 180 ms (the base REPETITIVE_FIRING preset) — see
         # test_neuron_protocol_adjustments_change_stimulus_duration.
