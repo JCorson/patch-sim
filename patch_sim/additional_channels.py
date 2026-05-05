@@ -279,9 +279,29 @@ def make_ih_channel(
 # ---------------------------------------------------------------------------
 # INaP — Persistent Na⁺ channel (Magistretti & Alonso 1999)
 # ---------------------------------------------------------------------------
+#
+# Two-gate kinetics:
+#   ``p``    — fast Boltzmann activation, V½ = −52.6 mV, slope 4.6 mV.
+#   ``sNaP`` — slow voltage-dependent inactivation, V½ = −49 mV, slope 10 mV
+#              (inverted Boltzmann), τ on the order of seconds.  Magistretti &
+#              Alonso (1999) §"Slow inactivation" describes this gate as
+#              essential for recovery from sustained depolarisation.
+#
+# The slow-inactivation gate is named ``sNaP`` rather than ``s`` because the
+# gating-state dictionary is keyed by gate name only and ``make_inar_channel``
+# already declares an ``s`` gate.  Sharing the name would alias the two
+# channels' gating variables.
 
 _alpha_p, _beta_p = boltzmann_cosh_rates(
     half=-52.6, slope=4.6, tau_scale=6.0, tau_floor=0.1
+)
+
+_alpha_sNaP, _beta_sNaP = boltzmann_cosh_rates(
+    half=-49.0,
+    slope=10.0,
+    tau_scale=1000.0,
+    tau_floor=50.0,
+    inverted=True,
 )
 
 
@@ -290,13 +310,22 @@ def make_inap_channel(
 ) -> IonChannel:
     """Create an INaP (persistent Na⁺) ion channel.
 
-    INaP is a non-inactivating Na⁺ current active near the resting potential.
-    It amplifies subthreshold depolarizations and can lower the threshold for
-    action potential generation.  It uses a single gating variable ``p``
-    (power 1).
+    INaP is a sustained Na⁺ current active near the resting potential that
+    amplifies subthreshold depolarizations and can lower the threshold for
+    action potential generation.  Two gating variables are used:
 
-    Kinetics follow Magistretti & Alonso (1999), with a Boltzmann activation
-    centred at -52.6 mV and a cosh-based time constant.
+    * ``p`` (power 1) — fast Boltzmann activation, V½ = −52.6 mV.
+    * ``sNaP`` (power 1) — slow voltage-dependent inactivation, V½ = −49 mV
+      (inverted Boltzmann), with a cosh-shaped time constant on the order of
+      seconds.  The slow gate is fully available at hyperpolarised potentials
+      and decays towards zero during sustained depolarisation, providing the
+      escape mechanism that lets the membrane repolarise after a prolonged
+      suprathreshold step.  The simulation column is named ``sNaP`` rather
+      than ``s`` to avoid colliding with :func:`make_inar_channel`'s
+      activation gate, which is also named ``s``.
+
+    Kinetics follow Magistretti & Alonso (1999), J. Gen. Physiol. 114:491,
+    including their §"Slow inactivation" parameters.
 
     The reversal potential is computed dynamically from the neuron's Na⁺
     concentrations using the Nernst equation.
@@ -309,10 +338,11 @@ def make_inap_channel(
         An :class:`~patch_sim.channels.IonChannel` representing the INaP current.
     """
     p_var = GatingVariable(name="p", power=1, alpha=_alpha_p, beta=_beta_p)
+    s_var = GatingVariable(name="sNaP", power=1, alpha=_alpha_sNaP, beta=_beta_sNaP)
     return IonChannel(
         name="NaP",
         g_max=g_max,
-        gating_variables=(p_var,),
+        gating_variables=(p_var, s_var),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
     )
 
