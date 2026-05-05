@@ -320,7 +320,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Cav1.3 window current ramps the cell from the medium AHP back to
         # threshold; each spike loads Ca²⁺, SK opens to produce the medium
         # AHP, the AHP closes Cav1.3, Ca²⁺ buffers, SK closes — and the cycle
-        # repeats at ~1.5–3 Hz (Grace & Bunney 1984: 1–5 Hz in vitro).
+        # repeats at ~3–4 Hz (Grace & Bunney 1984: 1–5 Hz in vitro).
         # Ih and IM remain in the preset as supporting modulators (Putzier
         # shows ZD7288 has only a minor rate effect; this matches the
         # Wilson & Callaway 2000 hypothesis as a secondary mechanism rather
@@ -355,52 +355,61 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # mirroring the CA1 (#302) and Cortical Pyramidal (#311) fixes —
         # Q10 = 3.0 scaling to 37 °C makes APs ~25 % too narrow.
         #
-        # Pacemaking mechanism (post-#318 review):
-        #   1. Cav1.3 (g = 0.1 mS/cm², half = −45 mV, slope 5 mV) carries a
+        # Conductance balance (issue #304 retune):
+        #   The previous Cav1.3+SK tuning over-stacked inward currents (Ih=2.5,
+        #   INaP=0.02) against a weak repolarising K⁺ stack (g_K=0.1), creating
+        #   a depol-block fixed point near −31 mV that the cell drifted to
+        #   within the first 200 ms of any F-I sweep.  The retune raises the
+        #   fast Kdr component (g_K=0.4) to break the block plateau in the
+        #   −40 to −20 mV window, lowers Ih to the SNc-literature range
+        #   (0.7 vs 2.5 — Putzier 2009 ZD7288 only-minor-effect), trims INaP
+        #   to a token level (0.005–0.012 supporting role per Wilson & Callaway
+        #   2000), and lengthens τ_ca to 50 ms so SK stays open a bit longer
+        #   per spike — slowing the limit cycle to the literature 1–5 Hz band.
+        #   g_Na is reduced 25→18 mS/cm² so the peak lands in +10 to +40 mV
+        #   under the now-stronger Kdr; M-S Kv is trimmed 0.4→0.3 to keep AP
+        #   half-width above 1.5 ms.  The fAHP trough sits near E_K (−95 mV)
+        #   because the SK transient draws V close to E_K before Cav1.3
+        #   reactivates — see test_da_ap_ahp_depth_in_da_range for the band.
+        #
+        # Pacemaking mechanism (Putzier 2009 / Wolfart 2001):
+        #   1. Cav1.3 (g = 0.1 mS/cm², half = −33 mV, slope 4 mV) carries a
         #      small persistent Ca²⁺ window current at sub-threshold V; this
         #      current depolarises the cell from the AHP back to threshold.
-        #   2. AP fires; Ca²⁺ enters via Cav1.3 (and a small contribution from
-        #      the M-S Kv-coupled spike).  ca_i transient peaks at ~0.5–1 µM.
-        #   3. SK (g = 1.0 mS/cm², K_d = 0.5 µM, Hill n = 4) opens, drawing the
-        #      cell to the SK-shaped medium AHP near −65 mV.
+        #   2. AP fires; Ca²⁺ enters via Cav1.3.  ca_i transient peaks at
+        #      ~0.5–1 µM.
+        #   3. SK (g = 0.3 mS/cm², K_d = 0.5 µM, Hill n = 4) opens, drawing the
+        #      cell to the SK-shaped AHP near E_K.
         #   4. The AHP closes Cav1.3 (deactivation) and the Cav1.3 inactivation
         #      gate has time to recover (τ ≈ 200 ms); SK closes as ca_i decays
-        #      (τ_ca ≈ 80 ms).  Cav1.3 window current resumes — back to step 1.
+        #      (τ_ca ≈ 50 ms).  Cav1.3 window current resumes — back to step 1.
         #
         # v_rest is a kinematic starting point — this cell is an autonomous
-        # oscillator with NO stable zero-current resting potential, exactly
-        # like Purkinje and the previous DA preset.  The fixed-point search
-        # (find_coupled_equilibrium) returns a depolarised root near −31 mV
-        # which is the depol-block-locked equilibrium, NOT the relevant
-        # operating point: the cell oscillates *around* that point at ~2.5–3 Hz
-        # because INaP+Cav1.3 destabilise it past the bifurcation boundary.
-        # Listed in the test_current_clamp STABLE/QUIESCENT exclusion lists
-        # and in the test_find_zero_current_voltage_all_presets exclusion.
-        # Starting V = −55 mV places the cell mid-way between threshold
-        # (≈ −45 mV) and the AHP trough (≈ −70 mV); the integrator settles
-        # onto the limit cycle within one inter-spike interval (~400 ms).
+        # oscillator with NO stable zero-current resting potential.  Listed in
+        # the test_current_clamp STABLE/QUIESCENT exclusion lists and in the
+        # test_find_zero_current_voltage_all_presets exclusion.  Starting V =
+        # −55 mV places the cell mid-way between threshold (≈ −45 mV) and the
+        # AHP trough (deep, near E_K); the integrator settles onto the limit
+        # cycle within one inter-spike interval (~250 ms).
         #
         # K kinetics: ``k_channel_factory`` is wired to
         # ``make_dopaminergic_k_channel`` (Canavier/Komendantov n-gate) at
-        # a small g_K = 0.1 mS/cm² — a real but minor fast Kdr component
-        # cooperating with the dominant Mainen-Sejnowski Kv (g = 0.4 mS/cm²)
-        # for AP repolarisation.  Higher g_K narrows the AP below the SNc
-        # 1.5–3.5 ms half-width band (Lacey et al. 1989; Canavier kinetics
-        # are fast at the AP peak), so g_K is held small while M-S Kv's slow
-        # deactivation (τ ~1–2 ms, n_inf passes 0.5 at +4 mV) carries the
-        # bulk of the repolarisation.  Reviewer concern from PR #318 about
-        # ``make_dopaminergic_k_channel`` being wired with g_K = 0 was
-        # addressed by giving it this small but non-zero conductance.
+        # g_K = 0.4 mS/cm² — sufficient to break the depol-block plateau in
+        # the −40 to −20 mV window, while M-S Kv (g = 0.3 mS/cm²) carries the
+        # late repolarisation and keeps AP half-width above 1.5 ms.  The
+        # combined Kdr+M-S Kv is the post-#304 balance: more Kdr (was 0.1)
+        # to escape block, less M-S Kv (was 0.4) to avoid an over-narrow AP.
         #
         # g_NaL = 0 / g_KL = 0.02 mS/cm²: pure K⁺ background leak (Purkinje
         # pattern).  τ_m = C_m / g_KL ≈ 50 ms and R_in ≈ 50 kΩ·cm².
         #
-        # g_Na = 25 mS/cm²: somatic density that places the AP peak in the
-        # +10 to +40 mV band (Komendantov et al. 2004) under combined M-S Kv
-        # + Kdr repolarisation.
+        # g_Na = 18 mS/cm²: somatic density that places the AP peak in the
+        # +10 to +40 mV band (Komendantov et al. 2004) under the new combined
+        # M-S Kv + Kdr repolarisation; reduced from 25 mS/cm² as part of the
+        # #304 retune to balance the stronger Kdr.
         v_rest=-55.0,
-        g_Na=25.0,
-        g_K=0.1,
+        g_Na=18.0,
+        g_K=0.4,
         g_NaL=0.0,
         g_KL=0.02,
         Q10=1.0,
@@ -410,21 +419,23 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         channels=(
             ChannelConfig(make_cav13_channel, g_max=0.1),
             ChannelConfig(make_sk_channel, g_max=0.3),
-            ChannelConfig(make_ih_channel, g_max=2.5),
-            ChannelConfig(make_im_channel, g_max=0.5),
-            ChannelConfig(make_inap_channel, g_max=0.02),
-            ChannelConfig(make_mainen_sejnowski_kv_channel, g_max=0.4),
+            ChannelConfig(make_ih_channel, g_max=0.7),
+            ChannelConfig(make_im_channel, g_max=0.6),
+            ChannelConfig(make_inap_channel, g_max=0.010),
+            ChannelConfig(make_mainen_sejnowski_kv_channel, g_max=0.3),
         ),
         # alpha_ca / tau_ca calibrated so that one AP raises ca_i to ~0.6 µM
         # — sufficient to half-saturate SK (K_d = 0.5 µM) — and ca_i decays
-        # with τ ≈ 30 ms between spikes (fast enough that SK fully closes
-        # before the next spike at 2.5–3 Hz, allowing Cav1.3+Ih to ramp the
-        # cell back to threshold).  ca_init = 1e-4 mM = ca_rest is fine
-        # because the cell never sits at static rest — every simulation
-        # starts ~mid-cycle and converges onto the limit cycle within the
-        # first ISI.
+        # with τ ≈ 50 ms between spikes (slow enough that SK stays open across
+        # the full AHP, deep enough that the cell reaches E_K, but fully
+        # closes before the next spike at 3–4 Hz, allowing Cav1.3+Ih to ramp
+        # the cell back to threshold).  τ_ca was lengthened from 30 ms in the
+        # #304 retune so the limit-cycle period sits in the literature 1–5 Hz
+        # band.  ca_init = 1e-4 mM = ca_rest is fine because the cell never
+        # sits at static rest — every simulation starts ~mid-cycle and
+        # converges onto the limit cycle within the first ISI.
         calcium_dynamics=CalciumDynamics(
-            alpha_ca=2.5e-5, tau_ca=30.0, ca_rest=1e-4, ca_init=1.0e-4
+            alpha_ca=2.5e-5, tau_ca=50.0, ca_rest=1e-4, ca_init=1.0e-4
         ),
         area_cm2=7e-6,
     ),
