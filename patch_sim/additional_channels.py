@@ -24,6 +24,7 @@ from .constants import (
     DEFAULT_G_IKV31,
     DEFAULT_G_IM,
     DEFAULT_G_NAP,
+    DEFAULT_G_NAP_SNC,
     DEFAULT_G_NAR,
     DEFAULT_G_SK,
     DEFAULT_IH_P_NA,
@@ -310,6 +311,60 @@ def make_inap_channel(
     p_var = GatingVariable(name="p", power=1, alpha=_alpha_p, beta=_beta_p)
     return IonChannel(
         name="NaP",
+        g_max=g_max,
+        gating_variables=(p_var,),
+        reversal_spec=NernstSpec(IonSpecies.SODIUM),
+    )
+
+
+# ---------------------------------------------------------------------------
+# INaP_SNc — SNc-specific persistent Na⁺ (Drion et al. 2011)
+# ---------------------------------------------------------------------------
+# Drion et al. 2011 (PLOS Comp Biol) reconciles Putzier 2009 (Cav1.3 essential)
+# with Guzman/Surmeier 2009 (Cav1.3 dispensable, INaP essential): the two
+# subthreshold negative-slope conductances are interchangeable drivers of SNc
+# DA pacemaking, and an honest model needs both.  The Drion fit places SNc
+# INaP V½ at −65 mV (well below firing threshold), so this channel carries a
+# subthreshold ramp-up current rather than a near-threshold amplifier.
+# This is structurally distinct from the Magistretti & Alonso 1999 entorhinal
+# fit (V½ = −52.6 mV) used by ``make_inap_channel``, which is preserved for
+# cortical/hippocampal presets.
+#
+# Reference:
+#   Drion, Massotte, Sepulchre, Seutin (2011), PLOS Comp Biol 7:e1002050
+_alpha_p_snc, _beta_p_snc = boltzmann_cosh_rates(
+    half=-65.0, slope=5.0, tau_scale=5.0, tau_floor=0.1
+)
+
+
+def make_snc_inap_channel(
+    g_max: float = DEFAULT_G_NAP_SNC,
+) -> IonChannel:
+    """Create an SNc-specific INaP (persistent Na⁺) channel.
+
+    Drion et al. 2011 fit SNc DA INaP at V½ = −65 mV (slope k = 5 mV), well
+    below firing threshold.  In this regime INaP carries a subthreshold
+    ramp-up current that, together with Cav1.3, drives the inter-spike
+    depolarisation in the Putzier+Drion reconciliation of SNc pacemaking.
+
+    The single gating variable is named ``pSNc`` so it does not collide with
+    the ``p`` gate of :func:`make_inap_channel` (Magistretti & Alonso 1999),
+    which is retained for cortical and hippocampal presets.
+
+    The reversal potential is computed dynamically from the neuron's Na⁺
+    concentrations using the Nernst equation.
+
+    Args:
+        g_max: Maximum conductance in mS/cm². Must be non-negative.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_NAP_SNC`.
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the SNc INaP
+        current.
+    """
+    p_var = GatingVariable(name="pSNc", power=1, alpha=_alpha_p_snc, beta=_beta_p_snc)
+    return IonChannel(
+        name="NaP_SNc",
         g_max=g_max,
         gating_variables=(p_var,),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
@@ -696,21 +751,27 @@ def make_ical_channel(
 # Cav1.3 — LVA L-type Ca²⁺ channel (Putzier 2009 SNc pacemaker driver)
 # ---------------------------------------------------------------------------
 # Cav1.3 (α1D) is the low-voltage-activated isoform of the L-type Ca²⁺ family.
-# Activation midpoint is shifted ~25 mV negative of the canonical Cav1.2 ICaL
-# (half ≈ −45 mV vs −10 mV), so a small persistent window current flows at
-# sub-threshold voltages near the SNc DA resting potential (−60 to −50 mV).
-# This window current is the slow inward driver of the inter-spike "pacemaker
-# potential" that ramps from the post-AP AHP back to threshold (Putzier et
-# al. 2009, fig 5).  Inactivation is slow (τ ≈ 200 ms) and incomplete, so the
-# residual window persists through the inter-spike interval.
+# Activation midpoint sits well below the canonical Cav1.2 ICaL, so a small
+# persistent window current flows at sub-threshold voltages near the SNc DA
+# pacemaker potential.  This window current is the slow inward driver of the
+# inter-spike depolarisation that ramps from the post-AP AHP back to threshold
+# (Putzier et al. 2009).  Inactivation is slow (τ ≈ 200 ms) and incomplete, so
+# the residual window persists through the inter-spike interval.
+#
+# Activation kinetics use Putzier et al. 2009 dynamic-clamp Boltzmann fit:
+# half = −31.1 mV, slope k = 5.35 mV.  Putzier's central thesis is that this
+# specific V½ is what drives pacemaking — shifting V½ by ±20 mV abolishes
+# rescue, demonstrating that the negative-slope conductance window at this V½
+# is the load-bearing mechanism (not Ca²⁺ flux per se).
 #
 # References:
-#   Putzier, Kullmann, Roeper (2009), J. Neurosci. 29:15531 — Cav1.3 is
-#       the dominant pacemaker driver in SNc DA neurons
+#   Putzier, Kullmann, Roeper (2009), J. Neurosci. 29:15414 — Cav1.3 V½
+#       drives SNc pacemaking; dynamic-clamp Boltzmann fit V½ = -31.1 mV,
+#       k = 5.35 mV
 #   Xu & Lipscombe (2001), J. Neurosci. 21:5944 — Cav1.3 vs Cav1.2 kinetics
 #   Wolfart et al. (2001), J. Neurosci. 21:3443 — SNc Cav1.3/SK pairing
 _alpha_dL13, _beta_dL13 = boltzmann_cosh_rates(
-    half=-33.0, slope=4.0, tau_scale=2.0, tau_floor=0.5
+    half=-31.1, slope=5.35, tau_scale=2.0, tau_floor=0.5
 )
 _alpha_fL13, _beta_fL13 = boltzmann_cosh_rates(
     half=-50.0, slope=-8.0, tau_scale=200.0, tau_floor=20.0
@@ -723,11 +784,11 @@ def make_cav13_channel(
     """Create a Cav1.3 (LVA L-type Ca²⁺) ion channel.
 
     Cav1.3 is the low-voltage-activated isoform of the neuronal L-type Ca²⁺
-    family.  Its activation midpoint is shifted ~25 mV negative of the
-    canonical Cav1.2 (half ≈ −45 mV, slope 5 mV) so a persistent sub-threshold
-    window current flows near the SNc DA resting potential.  This window
-    current drives the slow inter-spike depolarisation that defines SNc
-    autonomous pacemaking (Putzier et al. 2009).
+    family.  Activation follows the Putzier et al. 2009 dynamic-clamp
+    Boltzmann fit (half = −31.1 mV, slope k = 5.35 mV) — the specific V½ at
+    which a persistent sub-threshold window current drives SNc autonomous
+    pacemaking.  Putzier's central result is that shifting V½ by ±20 mV
+    abolishes pacemaker rescue, so this V½ is load-bearing.
 
     Inactivation is slow (τ ≈ 200 ms) and incomplete (half ≈ −50 mV, slope
     −8 mV), so the residual window persists through the full inter-spike
@@ -1073,17 +1134,20 @@ def make_ican_channel(
 # the firing regularity that distinguishes tonic SNc DA pacemaking from the
 # bursting seen when SK is blocked with apamin (Wolfart et al. 2001).
 #
-# Half-activation [Ca²⁺]_i = 0.5 µM (5e-4 mM) with Hill coefficient n = 4
-# matches the steady-state Ca²⁺ sensitivity reported for SK2/SK3 in expression
-# systems (Bond et al. 2004) and used in the Putzier 2009 SNc model.  The
-# kinetics are fast (τ ≈ 10 ms) — fast enough to follow each AP's Ca²⁺
-# transient and shape the medium AHP that immediately follows.
+# Half-activation [Ca²⁺]_i = 0.3 µM (3e-4 mM) with Hill coefficient n = 4.
+# Drion et al. 2011 use this K_d in the reconciled SNc DA model; it sits
+# between the high-affinity SK2 fit of Hirschberg et al. 1998 (~0.3 µM) and
+# the SK3 fit of Bond et al. 2004 (~0.5 µM), and is the value that gives the
+# tightest ISI regularity in the Cav1.3↔SK loop.  The kinetics are fast
+# (τ ≈ 10 ms) — fast enough to follow each AP's Ca²⁺ transient and shape
+# the medium AHP that immediately follows.
 #
 # References:
 #   Wolfart et al. (2001), J. Neurosci. 21:3443 — SK gates SNc tonic firing
-#   Bond et al. (2004), J. Neurosci. 24:5301 — SK2 Ca²⁺ sensitivity
-#   Putzier, Kullmann, Roeper (2009), J. Neurosci. 29:15531 — SNc model
-_SK_HILL_KD: float = 5e-4  # Half-activation [Ca²⁺]_i in mM (= 0.5 µM)
+#   Hirschberg et al. (1998), J. Gen. Physiol. 111:565 — SK2 Ca²⁺ K_d
+#   Bond et al. (2004), J. Neurosci. 24:5301 — SK2/SK3 Ca²⁺ sensitivity
+#   Drion et al. (2011), PLOS Comp Biol 7:e1002050 — SNc K_d = 0.3 µM
+_SK_HILL_KD: float = 3e-4  # Half-activation [Ca²⁺]_i in mM (= 0.3 µM)
 _SK_HILL_N: int = 4
 _SK_TAU: float = 10.0  # Time constant in ms
 
@@ -1091,7 +1155,7 @@ _SK_TAU: float = 10.0  # Time constant in ms
 def _sk_q_inf(ca_i: float) -> float:
     """Steady-state activation of the SK gating variable at [Ca²⁺]_i.
 
-    Hill function with K_d = 0.5 µM and Hill coefficient n = 4.  No voltage
+    Hill function with K_d = 0.3 µM and Hill coefficient n = 4.  No voltage
     dependence — SK is purely Ca²⁺-gated.
 
     Args:
@@ -1147,9 +1211,9 @@ def make_sk_channel(
     """Create an SK (small-conductance Ca²⁺-activated K⁺) ion channel.
 
     SK is gated purely by intracellular Ca²⁺ (no voltage dependence) via a
-    Hill function (K_d = 0.5 µM, Hill coefficient n = 4).  The kinetics are
-    fast (τ ≈ 10 ms), so the channel follows each AP's Ca²⁺ transient and
-    shapes the medium afterhyperpolarisation.
+    Hill function (K_d = 0.3 µM, Hill coefficient n = 4 — Drion et al. 2011).
+    The kinetics are fast (τ ≈ 10 ms), so the channel follows each AP's Ca²⁺
+    transient and shapes the medium afterhyperpolarisation.
 
     In SNc DA neurons SK couples tightly to Cav1.3 Ca²⁺ entry: each spike
     loads Ca²⁺, SK opens to produce the medium AHP, the AHP closes Cav1.3,
