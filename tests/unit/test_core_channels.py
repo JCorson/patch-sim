@@ -978,11 +978,17 @@ def test_make_stn_k_channel_structure() -> None:
 
 def test_stn_preset_uses_otsuka_factories() -> None:
     """STN preset uses make_stn_na_channel and make_stn_k_channel factories."""
+    import functools
+
     from patch_sim.constants import STN
     from patch_sim.presets import NEURON_PRESETS
 
     config = NEURON_PRESETS[STN]
-    assert config.na_channel_factory is make_stn_na_channel
+    # The Na factory is wrapped in functools.partial(..., slow_inactivation=True)
+    # to opt into the sNa gate (#324 depol-block recovery).
+    assert isinstance(config.na_channel_factory, functools.partial)
+    assert config.na_channel_factory.func is make_stn_na_channel
+    assert config.na_channel_factory.keywords == {"slow_inactivation": True}
     assert config.k_channel_factory is make_stn_k_channel
 
 

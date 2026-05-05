@@ -129,22 +129,24 @@ def test_stn_ap_ahp_depth_in_stn_range(stn_ap_shape_result) -> None:
 def test_stn_inap_slow_inactivation_engages_during_drive(
     stn_neuron: Neuron,
 ) -> None:
-    """The sNaP gate closes during +5 µA/cm² × 200 ms, removing INaP from the plateau.
+    """The sNaP gate closes during +5 µA/cm² × 200 ms drive.
 
     Direct mechanism check for #324: the Magistretti & Alonso 1999 slow
     inactivation gate added to ``make_inap_channel`` must be doing real
-    work during sustained suprathreshold drive — by the end of the step,
-    sNaP should be below 0.1 (>90 % inactivation), so the persistent Na⁺
-    contribution to any depol-block plateau is essentially abolished.
+    work during sustained suprathreshold drive.  By the end of the step,
+    sNaP should have lost at least half its rest availability so the
+    persistent Na⁺ contribution to the depol-block plateau is suppressed.
 
-    Note: the STN preset can still settle on a residual depol-block
-    plateau at ≈ −15 mV under this drive because the Otsuka 2004 fast
-    Na⁺ model has a small h tail at depolarised voltages.  That residual
-    plateau is held by I_Na, not I_NaP — see the STN preset comment in
-    ``patch_sim/presets.py``.  Other INaP-using presets (cortical
-    pyramidal, CA1 pyramidal, Purkinje) deliberately opt out of slow
-    inactivation to keep their existing tuning, so this test is the
-    only direct mechanism check for the new gate.
+    Other INaP-using presets (cortical pyramidal, CA1 pyramidal,
+    Purkinje) deliberately opt out of slow inactivation to keep their
+    existing tuning, so this test is the only direct mechanism check for
+    the new gate.
+
+    The 0.5 threshold is loose because in STN sNaP co-acts with the new
+    fast-Na sNa gate and K_ATP (also added for #324) to rescue the cell
+    from the plateau; once voltage starts recovering during the step,
+    sNaP starts recovering too, so it never reaches the deep ≈ 0.05
+    plateau value it would attain if the cell hung at −15 mV indefinitely.
     """
     n_pre = _ms_to_samples(100.0)
     n_step = _ms_to_samples(200.0)
@@ -160,8 +162,8 @@ def test_stn_inap_slow_inactivation_engages_during_drive(
     sNaP_at_rest = float(result["sNaP"][n_pre - 1])
     sNaP_at_step_end = float(result["sNaP"][n_pre + n_step - 1])
     fraction_inactivated = 1.0 - sNaP_at_step_end / sNaP_at_rest
-    assert fraction_inactivated > 0.7, (
+    assert fraction_inactivated > 0.5, (
         f"sNaP did not meaningfully inactivate: rest={sNaP_at_rest:.3f}, "
         f"step end={sNaP_at_step_end:.3f}, "
-        f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.7)"
+        f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.5)"
     )
