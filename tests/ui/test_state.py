@@ -1928,3 +1928,92 @@ async def test_ca1_recovers_from_depol_block_via_ui_build_neuron() -> None:
         f"CA1 pyramidal failed to recover via UI build path: mean V "
         f"last 200 ms = {last_200ms.mean():.2f} mV (expected < −50 mV)"
     )
+
+
+async def test_build_neuron_preserves_inap_slow_inactivation_for_purkinje() -> None:
+    """Purkinje _build_neuron preserves INaP slow_inactivation (#329).
+
+    Mirror of the cortical pyramidal / CA1 regression for Purkinje:
+    ``_build_neuron`` must forward ``ChannelConfig.extra_kwargs`` from
+    the preset so that the INaP sNaP gate added in #329 round-trips
+    through the UI build path.  Without this, the live Reflex app
+    would silently drop sNaP and fail depol-block recovery while the
+    python-only integration tests keep passing.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(PURKINJE)]
+    neuron = ns._build_neuron()
+
+    inap = next((ch for ch in neuron.additional_channels if ch.name == "NaP"), None)
+    assert inap is not None, "Purkinje preset must include INaP channel"
+    gate_names = {g.name for g in inap.gating_variables}
+    assert "sNaP" in gate_names, (
+        f"INaP slow-inactivation gate sNaP missing from UI-built Purkinje "
+        f"neuron; gates present: {sorted(gate_names)}.  _build_neuron is "
+        f"dropping ChannelConfig.extra_kwargs="
+        f"{{'slow_inactivation': True}}."
+    )
+
+
+async def test_build_neuron_preserves_purkinje_sNa_for_purkinje() -> None:
+    """Purkinje _build_neuron preserves the always-on Purkinje-Na sNa gate (#329).
+
+    ``_build_neuron`` forwards ``preset_cfg.na_channel_factory`` directly,
+    so ``make_purkinje_na_channel`` must round-trip and yield a 3-gate
+    Na channel including the Carter & Bean 2009 sNa slow inactivation
+    gate.  This pins the channel-factory contract: a regression that
+    dropped sNa from the factory itself would silently lose depol-block
+    recovery via the UI path.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(PURKINJE)]
+    neuron = ns._build_neuron()
+
+    na = next((ch for ch in neuron.core_channels if ch.name == "Na"), None)
+    assert na is not None, "Purkinje preset must include core Na channel"
+    gate_names = {g.name for g in na.gating_variables}
+    assert "sNa" in gate_names, (
+        f"Purkinje sNa gate missing from UI-built Purkinje neuron; "
+        f"gates present: {sorted(gate_names)}.  make_purkinje_na_channel "
+        f"is no longer producing the Carter & Bean 2009 slow-inactivation "
+        f"gate."
+    )
+
+
+async def test_purkinje_recovers_from_depol_block_via_ui_build_neuron() -> None:
+    """End-to-end #329 regression via UI _build_neuron path.
+
+    Loads the Purkinje preset into a NeuronState (the path the live
+    Reflex app uses on Run), builds the neuron through ``_build_neuron``,
+    drives +10 µA/cm² × 200 ms and asserts the membrane settles below
+    −50 mV in the last 200 ms of a 700 ms post-stim epoch.
+
+    Without this test, an integration test that bypasses _build_neuron
+    happily passes while the live UI silently loses sNa or sNaP.
+    """
+    from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(PURKINJE)]
+    neuron = ns._build_neuron()
+
+    def n_samples(ms: float) -> int:
+        """Convert ms to simulation samples."""
+        return int(ms * SIM_SAMPLING_FREQ / 1000.0)
+
+    current = np.concatenate(
+        [
+            np.zeros(n_samples(100.0)),
+            np.full(n_samples(200.0), 10.0),
+            np.zeros(n_samples(700.0) + 1),
+        ]
+    )
+    result = simulate_current_clamp(neuron, current_external=current)
+    last_200ms = np.asarray(result["voltage"][-n_samples(200.0) :])
+    assert last_200ms.mean() < -50.0, (
+        f"Purkinje failed to recover via UI build path: mean V "
+        f"last 200 ms = {last_200ms.mean():.2f} mV (expected < −50 mV)"
+    )

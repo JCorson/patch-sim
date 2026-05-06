@@ -262,3 +262,145 @@ def test_pk_ap_ahp_depth_in_pacemaker_range(pk_pacemaker_ap_result) -> None:
         reference=_PK_REFERENCE,
         ahp_mv=(-72.0, -55.0),
     )
+
+
+# ---------------------------------------------------------------------------
+# Slow Na inactivation engagement and depol-block recovery — issue #329.
+# ---------------------------------------------------------------------------
+
+_PK_DEPOL_DRIVE_AMP_UA = 10.0
+_PK_DEPOL_DRIVE_MS = 200.0
+
+
+def test_pk_inap_slow_inactivation_engages_during_drive(pk_neuron: Neuron) -> None:
+    """The sNaP gate closes during +10 µA/cm² × 200 ms drive (#329 mechanism).
+
+    Direct mechanism check for #329: the Magistretti & Alonso 1999 slow
+    inactivation gate added to ``make_inap_channel`` must be doing real
+    work during sustained suprathreshold drive.  By the end of the step,
+    sNaP should have lost at least half its rest availability so the
+    persistent Na⁺ contribution to the depol-block plateau is suppressed.
+    The +10 µA/cm² level matches the existing
+    ``test_complex_spiking_with_strong_stimulus`` step current and the
+    issue body's specified amplitude.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(_PK_DEPOL_DRIVE_MS)
+    n_post = _ms_to_samples(50.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, _PK_DEPOL_DRIVE_AMP_UA),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(pk_neuron, current_external=current)
+    sNaP_at_rest = float(result["sNaP"][n_pre - 1])
+    assert sNaP_at_rest > 0.5, (
+        f"sNaP rest availability is unexpectedly low ({sNaP_at_rest:.3f}); "
+        "the inactivation engagement check below is meaningless if the "
+        "gate is already mostly closed at v_rest."
+    )
+    sNaP_at_step_end = float(result["sNaP"][n_pre + n_step - 1])
+    fraction_inactivated = 1.0 - sNaP_at_step_end / sNaP_at_rest
+    assert fraction_inactivated > 0.5, (
+        f"sNaP did not meaningfully inactivate: rest={sNaP_at_rest:.3f}, "
+        f"step end={sNaP_at_step_end:.3f}, "
+        f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.5)"
+    )
+
+
+def test_pk_fast_na_slow_inactivation_engages_during_drive(
+    pk_neuron: Neuron,
+) -> None:
+    """The sNa gate (fast Na slow inactivation) closes during +10 µA/cm² × 200 ms.
+
+    Direct mechanism check for #329: the Carter & Bean 2009 slow voltage-
+    dependent inactivation gate baked into ``make_purkinje_na_channel``
+    must lose at least half its rest availability by the end of a sustained
+    suprathreshold step, abolishing the residual fast-Na h-tail that would
+    otherwise pin the cell on a depolarisation plateau.  Carter & Bean 2009
+    directly studied cerebellar Purkinje cells, so this is the cell type
+    the paper actually characterised.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(_PK_DEPOL_DRIVE_MS)
+    n_post = _ms_to_samples(50.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, _PK_DEPOL_DRIVE_AMP_UA),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(pk_neuron, current_external=current)
+    sNa_at_rest = float(result["sNa"][n_pre - 1])
+    assert sNa_at_rest > 0.5, (
+        f"sNa rest availability is unexpectedly low ({sNa_at_rest:.3f}); "
+        "the inactivation engagement check below is meaningless if the "
+        "gate is already mostly closed at v_rest."
+    )
+    sNa_at_step_end = float(result["sNa"][n_pre + n_step - 1])
+    fraction_inactivated = 1.0 - sNa_at_step_end / sNa_at_rest
+    assert fraction_inactivated > 0.5, (
+        f"sNa did not meaningfully inactivate: rest={sNa_at_rest:.3f}, "
+        f"step end={sNa_at_step_end:.3f}, "
+        f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.5)"
+    )
+
+
+def test_pk_recovers_from_sustained_suprathreshold_drive(
+    pk_neuron: Neuron,
+) -> None:
+    """Purkinje repolarises after +10 µA/cm² × 200 ms (#329 regression).
+
+    Without slow Na inactivation the cell can hang on a depol-block
+    plateau under sustained drive (cf. STN #324, cortical pyramidal
+    #327, CA1 pyramidal #328).  With sNaP (Magistretti & Alonso 1999)
+    and Purkinje sNa (Carter & Bean 2009) both present, the cell must
+    escape the plateau within the post-stim window and settle below
+    −50 mV during the last 200 ms of a 700 ms post-stimulus epoch.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(_PK_DEPOL_DRIVE_MS)
+    n_post = _ms_to_samples(700.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, _PK_DEPOL_DRIVE_AMP_UA),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(pk_neuron, current_external=current)
+    tail = np.asarray(result["voltage"][-_ms_to_samples(200.0) :])
+    mean_v = float(tail.mean())
+    assert mean_v < -50.0, (
+        f"Purkinje failed to recover from +10 µA/cm² × 200 ms; "
+        f"mean V in last 200 ms = {mean_v:.2f} mV"
+    )
+
+
+def test_pk_sNa_and_sNaP_columns_present(pk_neuron: Neuron) -> None:
+    """``sNa`` and ``sNaP`` columns appear in the simulation output.
+
+    Direct check of the issue #329 acceptance criterion that both slow
+    inactivation gating variables surface as named columns.  The Purkinje
+    preset is unique in that it concurrently runs INaR (with its own ``s``
+    activation gate), INaP (with its ``sNaP`` slow inactivation gate),
+    and the fast-Na ``sNa`` slow inactivation gate; this test pins the
+    namespacing so the three gate names cannot collide.
+    """
+    n_samples = _ms_to_samples(50.0) + 1
+    zero_current = np.zeros(n_samples)
+    result = simulate_current_clamp(pk_neuron, current_external=zero_current)
+    names = result.dtype.names or ()
+    assert "sNa" in names, (
+        f"Expected 'sNa' column for fast-Na slow inactivation; got {names!r}"
+    )
+    assert "sNaP" in names, (
+        f"Expected 'sNaP' column for INaP slow inactivation; got {names!r}"
+    )
+    assert "s" in names, (
+        f"Expected 'INaR' activation 's' column; got {names!r}.  Loss of "
+        "this column would indicate a regression in INaR wiring."
+    )

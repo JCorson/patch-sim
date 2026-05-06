@@ -341,6 +341,49 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # the AP peak in the +10 to +40 mV band of Häusser & Clark (1997) and
         # the AHP near −68 mV, inside the −55 to −72 mV band of Raman & Bean
         # (1999).
+        #
+        # FIX — depolarization-block recovery (#329, mirror of STN #324 /
+        # cortical pyramidal #327 / CA1 pyramidal #328).  Two complementary
+        # slow inactivation gates cooperate so the cell repolarises after a
+        # sustained suprathreshold step (e.g. +10 µA/cm² × 200 ms) instead
+        # of hanging on a depol-block plateau:
+        #   1. INaP slow inactivation (sNaP, Magistretti & Alonso 1999) via
+        #      ``slow_inactivation=True`` on make_inap_channel — removes
+        #      the persistent Na⁺ window current that otherwise sustains
+        #      the plateau.
+        #   2. Fast-Na slow inactivation (sNa, Carter & Bean 2009) baked
+        #      into make_purkinje_na_channel — closes the residual fast-Na
+        #      h-tail at the depolarised plateau that single-gate INaP
+        #      slow inactivation could not reach.  Carter & Bean 2009
+        #      directly demonstrated cumulative slow inactivation in
+        #      cerebellar Purkinje somatic Na⁺ channels, so this is the
+        #      primary cellular reference for Purkinje (companion to
+        #      Do & Bean 2003 for STN).
+        #
+        # K_ATP is intentionally NOT included (unlike STN): although
+        # Purkinje cells are intrinsic pacemakers, Carter & Bean's own
+        # demonstration of depol-block recovery uses the two slow-
+        # inactivation gates alone, so the metabolic-safety K_ATP rescue
+        # added for STN is not biologically motivated here.
+        #
+        # No conductance retuning was needed when the two slow gates were
+        # opted in: at g_Na=30, g_K=10, g_NaP=0.1 (the values calibrated
+        # in #299 / #314) the spontaneous AP shape and 10–50 Hz pacemaker
+        # rate stay in band (rate ≈ 30 Hz, peak ≈ +30 mV, half-width ≈
+        # 0.39 ms, threshold ≈ −42 mV, AHP ≈ −68 mV — all inside the
+        # Häusser & Clark / Raman & Bean tolerances).  The Purkinje preset
+        # relies primarily on Ih for AHP recovery and on the moderate
+        # g_Na density to set AP threshold, so the reduction in Na⁺
+        # availability from the always-on sNa gate (s_inf ≈ 0.87 at
+        # v_rest=-65 mV) is offset by sNaP curtailing the persistent Na⁺
+        # ramp; the two gates together stabilise tonic firing.
+        #
+        # Refs: Carter & Bean (2009), Neuron 64:898 (slow Na inactivation
+        #         directly in cerebellar Purkinje cells — primary source);
+        #       Magistretti & Alonso (1999), J. Gen. Physiol. 114:491 (INaP
+        #         slow inactivation);
+        #       Do & Bean (2003), Neuron 39:109 (Na pacemaker channels in
+        #         STN — companion paper).
         v_rest=-65.0,
         g_Na=30.0,
         g_K=10.0,
@@ -353,7 +396,11 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ical_channel, g_max=1.0),
             ChannelConfig(make_icat_channel, g_max=0.5),
             ChannelConfig(make_ikca_channel, g_max=2.0),
-            ChannelConfig(make_inap_channel, g_max=0.1),
+            ChannelConfig(
+                make_inap_channel,
+                g_max=0.1,
+                extra_kwargs={"slow_inactivation": True},
+            ),
             ChannelConfig(make_inar_channel, g_max=0.1),
             ChannelConfig(make_ih_channel, g_max=1.0),
         ),

@@ -13,6 +13,8 @@ from patch_sim.core_channels import (
     PURKINJE_VT,
     _pospischil_alpha_sNa,
     _pospischil_beta_sNa,
+    _purkinje_alpha_sNa,
+    _purkinje_beta_sNa,
     _stn_alpha_h,
     _stn_alpha_m,
     _stn_alpha_n,
@@ -1190,19 +1192,88 @@ def test_purkinje_rate_functions_ignore_ca_i(V: float, fn: Rate) -> None:
 
 
 def test_make_purkinje_na_channel_structure() -> None:
-    """make_purkinje_na_channel returns a channel with m³h gating and Na⁺ reversal."""
+    """make_purkinje_na_channel returns m³, h, and sNa gates with Na⁺ reversal."""
     ch = make_purkinje_na_channel(g_max=120.0)
     assert isinstance(ch, IonChannel)
     assert ch.name == "Na"
     assert ch.g_max == pytest.approx(120.0)
-    assert len(ch.gating_variables) == 2
+    assert len(ch.gating_variables) == 3
     assert ch.gating_variables[0].name == "m"
     assert ch.gating_variables[0].power == 3
     assert ch.gating_variables[1].name == "h"
     assert ch.gating_variables[1].power == 1
+    assert ch.gating_variables[2].name == "sNa"
+    assert ch.gating_variables[2].power == 1
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.SODIUM
     assert not ch.carries_calcium
+
+
+# ---------------------------------------------------------------------------
+# Purkinje slow Na inactivation rate functions (sNa gate; Carter & Bean
+# 2009).  Always-on gate added in #329 to abolish the residual depol-block
+# plateau under sustained climbing-fibre-style drive.
+# ---------------------------------------------------------------------------
+
+
+def _purkinje_sNa_inf(V: float) -> float:
+    """Steady-state availability of the Purkinje slow Na inactivation gate.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Steady-state availability of the sNa gate at voltage V, in [0, 1].
+    """
+    a, b = _purkinje_alpha_sNa(V, 0.0), _purkinje_beta_sNa(V, 0.0)
+    return a / (a + b)
+
+
+def test_purkinje_slow_na_inactivation_steady_state_in_bounds() -> None:
+    """The sNa rates are positive and steady state in [0, 1] across V."""
+    for V in (-120.0, -100.0, -75.0, -65.0, -50.0, -30.0, -15.0, 0.0, 30.0):
+        a = _purkinje_alpha_sNa(V, 0.0)
+        b = _purkinje_beta_sNa(V, 0.0)
+        assert a >= 0, f"alpha_sNa negative at V={V}"
+        assert b >= 0, f"beta_sNa negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"sNa steady state {ss} out of [0,1] at V={V}"
+
+
+def test_purkinje_slow_na_inactivation_decreases_with_depolarisation() -> None:
+    """The sNa availability decreases monotonically with depolarisation."""
+    assert (
+        _purkinje_sNa_inf(-80.0) > _purkinje_sNa_inf(-50.0) > _purkinje_sNa_inf(-15.0)
+    )
+
+
+def test_purkinje_slow_na_inactivation_half_voltage() -> None:
+    """V½ for sNa sits at -50 mV (mirrors STN / Pospischil mid-range)."""
+    assert _purkinje_sNa_inf(-50.0) == pytest.approx(0.5, abs=0.01)
+
+
+def test_purkinje_slow_na_inactivation_resting_availability() -> None:
+    """Purkinje rests near -65 mV — sNa must remain mostly open."""
+    # Purkinje v_rest = -65 mV (matches the STN cycle hyperpolarised end).
+    # Loss of >15 % rest availability would noticeably suppress AP amplitude
+    # on every spontaneous beat.
+    assert _purkinje_sNa_inf(-65.0) > 0.85
+
+
+def test_purkinje_slow_na_inactivation_blocks_depol_plateau() -> None:
+    """At depolarised plateau voltages sNa closes, abolishing the residual h-tail."""
+    # The depol-block plateau the new gate must escape (mirroring #324) hangs
+    # at ≈ −15 mV; sNa must close firmly there so g_Na_eff = g_max * m^3 * h
+    # * sNa collapses below the leak + IK outward drive.
+    assert _purkinje_sNa_inf(-15.0) < 0.05
+
+
+def test_purkinje_slow_na_inactivation_tau_is_slow() -> None:
+    """τ_sNa at V½ stays distinctly slow vs the fast m, h gates."""
+    a = _purkinje_alpha_sNa(-50.0, 0.0)
+    b = _purkinje_beta_sNa(-50.0, 0.0)
+    tau = 1.0 / (a + b)
+    assert tau > 100.0, f"sNa tau at V½ is {tau:.1f} ms, expected > 100 ms"
 
 
 def test_make_purkinje_k_channel_structure() -> None:
