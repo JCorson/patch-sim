@@ -552,7 +552,12 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Ih produces modest voltage sag; Ca²⁺ channels (L, N, T) feed [Ca²⁺]ᵢ,
         # which slowly activates IKCa over the train and contributes to SFA;
         # INaP eliminates the ~500 ms post-AP latency that otherwise stalls
-        # repetitive firing while IKCa decays.
+        # repetitive firing while IKCa decays.  Slow Na inactivation (sNa,
+        # sNaP) added in #328 picks up part of the SFA load that previously
+        # rested entirely on IM and IKCa, so g_M was trimmed 1.0→0.75 to
+        # avoid double-counting adaptation; g_Na was raised 38→60 to
+        # compensate for the train-long sNa accumulation that would
+        # otherwise stall the train.
         # Refs: Warman et al. (1994); Migliore et al. (1999), ModelDB #2796;
         #       Storm (1990); Madison & Nicoll (1984)
         #
@@ -580,12 +585,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # thereby allowing IM and IKCa to drive proper monotonic
         # spike-frequency adaptation rather than the inverted ramp pattern.
         #
-        # IM g_max raised 0.5 → 1.0 mS/cm²: at 0.5 the slow IM accumulation
-        # produced by the muscarinic K current was too small (relative to
-        # the combined Ca-channel inward conductance of 1.1 mS/cm²) to
-        # generate visible adaptation across the test 500 ms train.  At 1.0
-        # the late-train ISI grows from ~22 ms to ~35 ms — the SFA signature
-        # reported by Storm (1990).
+        # IM g_max set to 0.75 mS/cm²: previously 1.0 (Storm 1990 SFA target);
+        # trimmed when slow Na inactivation was opted in (#328) to avoid
+        # double-counting adaptation now that the sNa and sNaP gates also
+        # accumulate inactivation across the train.  IKCa stays at 2.0 —
+        # only IM was reduced — keeping the Ca²⁺/IKCa-driven AHP that
+        # Storm 1990 and Madison & Nicoll 1984 highlight as the deeper
+        # AHP signature of CA1.
         #
         # alpha_ca = 5e-6, tau_ca = 100 ms: original (alpha_ca=2.1e-5,
         # tau_ca=20 ms) saturated IKCa via the Hill function (K_d = 1 µM)
@@ -603,23 +609,60 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # in slice recordings.  Values tuned for K_out=4 mM (E_K ≈ −95 mV)
         # via brentq on the steady-state current at v_rest = −65 mV with the
         # new active conductances (INaP shifts the inward/outward balance).
-        g_Na=38.0,
+        #
+        # FIX — depolarization-block recovery (#328, mirror of #324/#327).
+        # Two complementary slow inactivation gates cooperate so the cell
+        # repolarises after a sustained suprathreshold step (e.g. +30
+        # µA/cm² × 200 ms — CA1's deeper IKCa AHP makes it less excitable
+        # than cortical pyramidal, so the +12 µA/cm² level used in #327 is
+        # too weak to engage the gates here) instead of hanging on a
+        # depol-block plateau:
+        #   1. INaP slow inactivation (sNaP, Magistretti & Alonso 1999)
+        #      via ``slow_inactivation=True`` on make_inap_channel —
+        #      removes the persistent Na⁺ window current that otherwise
+        #      sustains the plateau.
+        #   2. Fast-Na slow inactivation (sNa, Mickus, Jung & Spruston 1999)
+        #      via ``slow_inactivation=True`` on make_pospischil_na_channel
+        #      — closes the residual fast-Na h-tail at the depolarised
+        #      plateau that single-gate INaP slow inactivation could not
+        #      reach.  Mickus et al. 1999 directly studied CA1 pyramidal
+        #      cells, so the slow Na inactivation kinetics motivated for
+        #      STN in #324 (which cited the same paper) apply a fortiori
+        #      here.
+        #
+        # K_ATP is intentionally NOT included (unlike STN): CA1 pyramidal
+        # cells are not autonomous pacemakers, so the metabolic-safety
+        # K_ATP rescue is not biologically motivated; the two slow-
+        # inactivation gates suffice for depol-block recovery.
+        #
+        # Refs: Mickus, Jung & Spruston (1999), Biophys. J. 76:846 (slow
+        #         Na inactivation directly in CA1 pyramidal cells —
+        #         primary source);
+        #       Magistretti & Alonso (1999), J. Gen. Physiol. 114:491 (INaP
+        #         slow inactivation).
+        g_Na=60.0,
         g_K=3.0,
-        g_NaL=0.022994,
-        g_KL=0.027006,
+        g_NaL=0.020854,
+        g_KL=0.029146,
         Q10=1.0,
         T_ref=307.15,
-        na_channel_factory=make_pospischil_na_channel,
+        na_channel_factory=functools.partial(
+            make_pospischil_na_channel, slow_inactivation=True
+        ),
         k_channel_factory=make_pospischil_k_channel,
         channels=(
             ChannelConfig(make_ika_channel, g_max=0.5),
-            ChannelConfig(make_im_channel, g_max=1.0),
+            ChannelConfig(make_im_channel, g_max=0.75),
             ChannelConfig(make_ih_channel, g_max=0.05),
             ChannelConfig(make_ical_channel, g_max=0.5),
             ChannelConfig(make_ican_channel, g_max=0.3),
             ChannelConfig(make_icat_channel, g_max=0.3),
             ChannelConfig(make_ikca_channel, g_max=2.0),
-            ChannelConfig(make_inap_channel, g_max=0.1),
+            ChannelConfig(
+                make_inap_channel,
+                g_max=0.1,
+                extra_kwargs={"slow_inactivation": True},
+            ),
         ),
         # alpha_ca/tau_ca rebalanced so [Ca²⁺]ᵢ accumulates gradually over the
         # 500 ms test train rather than saturating IKCa within the first AP
@@ -632,7 +675,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # ca_rest.  Use find_coupled_equilibrium to recompute if any channel
         # parameters change.
         calcium_dynamics=CalciumDynamics(
-            alpha_ca=5e-6, tau_ca=100.0, ca_rest=1e-4, ca_init=2.5766e-4
+            alpha_ca=5e-6, tau_ca=100.0, ca_rest=1e-4, ca_init=2.5845e-4
         ),
         area_cm2=25e-6,
     ),
