@@ -11,6 +11,8 @@ from patch_sim.core_channels import (
     MAINEN_SEJNOWSKI_KV_VHALF,
     POSPISCHIL_VT,
     PURKINJE_VT,
+    _pospischil_alpha_sNa,
+    _pospischil_beta_sNa,
     _stn_alpha_h,
     _stn_alpha_m,
     _stn_alpha_n,
@@ -473,6 +475,85 @@ def test_make_pospischil_na_channel_structure() -> None:
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.SODIUM
     assert not ch.carries_calcium
+
+
+def test_make_pospischil_na_channel_with_slow_inactivation() -> None:
+    """``slow_inactivation=True`` adds the sNa gate (Fleidervish & Gutnick 1996)."""
+    ch = make_pospischil_na_channel(g_max=35.0, slow_inactivation=True)
+    assert len(ch.gating_variables) == 3
+    assert ch.gating_variables[2].name == "sNa"
+    assert ch.gating_variables[2].power == 1
+
+
+# ---------------------------------------------------------------------------
+# Pospischil slow Na inactivation rate functions (sNa gate; Fleidervish &
+# Gutnick 1996; Mickus, Jung & Spruston 1999).  Opt-in gate added in #327
+# to abolish the residual depol-block plateau that single-gate Pospischil
+# kinetics leave open under sustained suprathreshold drive.
+# ---------------------------------------------------------------------------
+
+
+def _pospischil_sNa_inf(V: float) -> float:
+    """Steady-state availability of the Pospischil slow Na inactivation gate.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Steady-state availability of the sNa gate at voltage V, in [0, 1].
+    """
+    a, b = _pospischil_alpha_sNa(V, 0.0), _pospischil_beta_sNa(V, 0.0)
+    return a / (a + b)
+
+
+def test_pospischil_slow_na_inactivation_steady_state_in_bounds() -> None:
+    """The sNa rates are positive and steady state in [0, 1] across V."""
+    for V in (-120.0, -100.0, -75.0, -65.0, -50.0, -30.0, -15.0, 0.0, 30.0):
+        a = _pospischil_alpha_sNa(V, 0.0)
+        b = _pospischil_beta_sNa(V, 0.0)
+        assert a >= 0, f"alpha_sNa negative at V={V}"
+        assert b >= 0, f"beta_sNa negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"sNa steady state {ss} out of [0,1] at V={V}"
+
+
+def test_pospischil_slow_na_inactivation_decreases_with_depolarisation() -> None:
+    """The sNa availability decreases monotonically with depolarisation."""
+    assert (
+        _pospischil_sNa_inf(-80.0)
+        > _pospischil_sNa_inf(-50.0)
+        > _pospischil_sNa_inf(-15.0)
+    )
+
+
+def test_pospischil_slow_na_inactivation_half_voltage() -> None:
+    """V½ for sNa sits at -50 mV (Fleidervish & Gutnick 1996 mid-range)."""
+    assert _pospischil_sNa_inf(-50.0) == pytest.approx(0.5, abs=0.01)
+
+
+def test_pospischil_slow_na_inactivation_resting_availability() -> None:
+    """Cortical pyramidal rests at -70 mV — sNa must remain near-fully open."""
+    # Cortical pyramidal v_rest = -70 mV (deeper than STN's -60 mV cycle), so
+    # subthreshold sNa availability should be even higher than the STN gate's
+    # rest value.  Loss of >10 % rest availability would noticeably suppress
+    # AP amplitude on every step from rest.
+    assert _pospischil_sNa_inf(-70.0) > 0.9
+
+
+def test_pospischil_slow_na_inactivation_blocks_depol_plateau() -> None:
+    """At depolarised plateau voltages sNa closes, abolishing the residual h-tail."""
+    # The depol-block plateau the new gate must escape (mirroring #324) hangs
+    # at ≈ −15 mV; sNa must close firmly there so g_Na_eff = g_max * m^3 * h
+    # * sNa collapses below the leak + IM outward drive.
+    assert _pospischil_sNa_inf(-15.0) < 0.05
+
+
+def test_pospischil_slow_na_inactivation_tau_is_slow() -> None:
+    """τ_sNa at V½ stays distinctly slow vs the fast m, h gates."""
+    a = _pospischil_alpha_sNa(-50.0, 0.0)
+    b = _pospischil_beta_sNa(-50.0, 0.0)
+    tau = 1.0 / (a + b)
+    assert tau > 100.0, f"sNa tau at V½ is {tau:.1f} ms, expected > 100 ms"
 
 
 def test_make_pospischil_k_channel_structure() -> None:

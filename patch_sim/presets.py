@@ -221,7 +221,50 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # T_ref = 307.15 K (34 °C): the M-S Kv prescale and Pospischil Na
         # reference both target this temperature.
-        g_Na=35.0,
+        #
+        # FIX — depolarization-block recovery (#327, mirror of STN #324).
+        # Two complementary slow inactivation gates cooperate so the cell
+        # repolarises after a sustained suprathreshold step (e.g. +12
+        # µA/cm² × 200 ms) instead of hanging on a depol-block plateau:
+        #   1. INaP slow inactivation (sNaP, Magistretti & Alonso 1999)
+        #      via ``slow_inactivation=True`` on make_inap_channel —
+        #      removes the persistent Na⁺ window current that otherwise
+        #      sustains the plateau.
+        #   2. Fast-Na slow inactivation (sNa, Fleidervish & Gutnick 1996;
+        #      Mickus et al. 1999) via ``slow_inactivation=True`` on
+        #      make_pospischil_na_channel — closes the residual fast-Na
+        #      h-tail at the depolarised plateau that single-gate INaP
+        #      slow inactivation could not reach.  Fleidervish & Gutnick
+        #      1996 directly studied cortical pyramidal cells, so the
+        #      same paper that motivated STN slow inactivation in #324
+        #      applies a fortiori here.
+        #
+        # K_ATP is intentionally NOT included (unlike STN): cortical
+        # pyramidal cells are not autonomous pacemakers, so the
+        # metabolic-safety K_ATP rescue is not biologically motivated;
+        # the two slow-inactivation gates suffice for depol-block
+        # recovery.
+        #
+        # Refs: Fleidervish & Gutnick (1996), J. Physiol. 493:83 (slow Na
+        #         inactivation directly in cortical pyramidal cells —
+        #         primary source);
+        #       Magistretti & Alonso (1999), J. Gen. Physiol. 114:491 (INaP
+        #         slow inactivation);
+        #       Mickus, Jung & Spruston (1999), Biophys. J. 76:846 (slow Na
+        #         inactivation, CA1 pyramidal — same Na-channel family).
+        #
+        # g_Na was raised from 35 to 70 mS/cm² when slow Na inactivation
+        # was opted in (#327): sNa availability at v_rest=-70 mV is ≈ 0.92
+        # and drops further during sustained firing as the slow gate
+        # accumulates inactivation across spikes.  This reduced effective
+        # Na drive on the AP upstroke and pushed mean threshold above the
+        # McCormick et al. 1985 RS band of [-55, -40] mV.  g_Na=70 (above
+        # Pospischil's published 56 to compensate for the train-long sNa
+        # accumulation) restores threshold into band while the slow gate
+        # itself keeps peak voltage inside the +20 to +45 mV band — at
+        # g_Na=90 the cell over-loads and enters depol block during the
+        # sustained step.
+        g_Na=70.0,
         g_K=0.0,
         v_rest=-70.0,
         K_out=3.32,
@@ -229,11 +272,17 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         g_KL=0.049609,
         Q10=1.0,
         T_ref=307.15,
-        na_channel_factory=make_pospischil_na_channel,
+        na_channel_factory=functools.partial(
+            make_pospischil_na_channel, slow_inactivation=True
+        ),
         k_channel_factory=make_pospischil_k_channel,
         channels=(
             ChannelConfig(make_ih_channel, g_max=0.3),
-            ChannelConfig(make_inap_channel, g_max=0.1),
+            ChannelConfig(
+                make_inap_channel,
+                g_max=0.1,
+                extra_kwargs={"slow_inactivation": True},
+            ),
             ChannelConfig(make_im_channel, g_max=0.075),
             ChannelConfig(make_mainen_sejnowski_kv_channel, g_max=1.8),
         ),
