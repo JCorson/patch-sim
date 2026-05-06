@@ -145,14 +145,6 @@ def test_tc_ap_threshold_in_tc_tonic_range(tc_tonic_ap_result) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Mean tonic peak voltage ~+49 mV exceeds the +10 to +40 mV range "
-        "reported for TC cells (McCormick & Huguenard 1992). Likely g_Na "
-        "too high relative to leak; tracked in #307."
-    ),
-)
 def test_tc_ap_peak_voltage_in_tc_tonic_range(tc_tonic_ap_result) -> None:
     """Mean tonic AP peak voltage falls within the TC range (+10 to +40 mV)."""
     assert_ap_shape(
@@ -162,14 +154,6 @@ def test_tc_ap_peak_voltage_in_tc_tonic_range(tc_tonic_ap_result) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Mean tonic AHP depth ~−77 mV is slightly deeper than the −55 to "
-        "−75 mV range reported for TC cells (McCormick & Huguenard 1992). "
-        "Suggests g_KL or K⁺ DR conductance over-tuned; tracked in #307."
-    ),
-)
 def test_tc_ap_ahp_depth_in_tc_tonic_range(tc_tonic_ap_result) -> None:
     """Mean tonic AHP depth falls within the TC range (−75 to −55 mV)."""
     assert_ap_shape(
