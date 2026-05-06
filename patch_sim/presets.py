@@ -577,12 +577,14 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # inactivation is required to sustain the LTS plateau for the
         # full multi-spike burst.
         #
-        # g_NaL = 0, g_KL ≈ 0.18 mS/cm²: purely K⁺ background leak,
-        # τ_m ≈ 5.6 ms and R_in ≈ 5.6 kΩ·cm² — both within the physiological
-        # bounds in test_preset_passive_properties_in_physiological_range.
-        # The MH92 K⁺ kinetics produce negligible tonic window current at rest
-        # (n_inf ≈ 0.004 vs HH52 n_inf ≈ 0.32), so the leak must be pure-K⁺
-        # to balance the ICaT and Ih window inward currents at rest.
+        # g_NaL = 0, g_KL = 0.19 mS/cm²: purely K⁺ background leak,
+        # τ_m ≈ 5.26 ms and R_in ≈ 5.26 kΩ·cm² — both within the physiological
+        # bounds in test_preset_passive_properties_in_physiological_range
+        # (band [5.0, 9.0]).  Cannot raise g_KL further to 0.20 without
+        # putting τ_m on the bound boundary.  The MH92 K⁺ kinetics produce
+        # negligible tonic window current at rest (n_inf ≈ 0.004 vs HH52
+        # n_inf ≈ 0.32), so the leak must be pure-K⁺ to balance the ICaT
+        # and Ih window inward currents at rest.
         #
         # WARNING: v_rest depends on ICaT (g=2.5) and Ih (g=1.0) window
         # currents at rest, not purely on the leak ratio.  With dynamic
@@ -1289,7 +1291,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
     },
     THALAMIC_RELAY: {
         # Burst-mode TC has a very low rheobase (~0.012 µA/cm²) because the
-        # slow-inactivating ICaT (issue #287) and reduced g_K (=18) combine to
+        # slow-inactivating ICaT (issue #287) and reduced g_K (=10) combine to
         # amplify any depolarisation through the LTS.  0.01 µA/cm² stays below
         # threshold while still giving a visible voltage deflection.  The
         # subthreshold margin is narrow: any stimulus ≥ ~0.05 µA/cm² already
