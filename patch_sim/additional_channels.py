@@ -295,11 +295,12 @@ def make_ih_channel(
 #
 # In STN this gate co-acts with the fast-Na slow inactivation gate
 # (``make_stn_na_channel(slow_inactivation=True)``) and ``make_katp_channel``
-# (#324); the three together collapse the −15 mV plateau cleanly.  In
-# presets that opt into ``sNaP`` alone (none today; cortical pyramidal /
-# CA1 / Purkinje deliberately stay opt-out) the short τ would similarly
-# allow the gate to shoulder block-recovery on its own — the choice of τ
-# is therefore robust to the channel cocktail the gate happens to ship in.
+# (#324); the three together collapse the −15 mV plateau cleanly.  Cortical
+# pyramidal opts into ``sNaP`` together with the Pospischil fast-Na sNa
+# gate (#327) but no K_ATP — autonomous-pacemaker metabolic safety isn't
+# biologically motivated there, and the two slow-inactivation gates suffice.
+# CA1 / Purkinje currently stay opt-out.  The chosen τ is therefore robust
+# to the channel cocktail the gate happens to ship in.
 #
 # The slow-inactivation gate is named ``sNaP`` rather than ``s`` because the
 # gating-state dictionary is keyed by gate name only and ``make_inar_channel``
@@ -307,10 +308,9 @@ def make_ih_channel(
 # channels' gating variables.
 #
 # Slow inactivation is opt-in (default off) so that presets tuned without it
-# (cortical pyramidal, CA1 pyramidal, Purkinje) keep their existing
-# phenotypes.  Enable it on presets where depolarisation-block recovery
-# matters — e.g. STN, where #324 reports the cell hangs at ≈ −15 mV after
-# sustained suprathreshold drive.
+# (CA1 pyramidal, Purkinje) keep their existing phenotypes.  Enable it on
+# presets where depolarisation-block recovery matters — STN (#324) and
+# cortical pyramidal (#327).
 
 _alpha_p, _beta_p = boltzmann_cosh_rates(
     half=-52.6, slope=4.6, tau_scale=6.0, tau_floor=0.1
