@@ -22,6 +22,7 @@ from .additional_channels import (
     make_im_channel,
     make_inap_channel,
     make_inar_channel,
+    make_katp_channel,
     make_sk_channel,
 )
 from .calcium import CalciumDynamics
@@ -172,6 +173,7 @@ CHANNEL_REGISTRY: dict[str, Callable[..., IonChannel]] = {
     "inap": make_inap_channel,
     "inar": make_inar_channel,
     "im": make_im_channel,
+    "katp": make_katp_channel,
     "ikir": make_ikir_channel,
     "ikca": make_ikca_channel,
     "ical": make_ical_channel,

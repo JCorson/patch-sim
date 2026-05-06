@@ -18,6 +18,7 @@ from patch_sim.constants import (
     DEFAULT_G_IKIR,
     DEFAULT_G_IKV31,
     DEFAULT_G_IM,
+    DEFAULT_G_KATP,
     DEFAULT_G_MSKV,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
@@ -139,6 +140,8 @@ class NeuronState(rx.State):
     inar_g_max: float = DEFAULT_G_NAR
     im_enabled: bool = False
     im_g_max: float = DEFAULT_G_IM
+    katp_enabled: bool = False
+    katp_g_max: float = DEFAULT_G_KATP
     ikir_enabled: bool = False
     ikir_g_max: float = DEFAULT_G_IKIR
     ikca_enabled: bool = False
@@ -332,17 +335,25 @@ class NeuronState(rx.State):
         # use a non-canonical factory (e.g. Thalamic Relay's slow-inactivating
         # ICaT) keep their kinetics through UI round-trip.  Channels not in
         # the preset fall back to the canonical CHANNEL_REGISTRY factory.
+        # Also map channel-name → extra_kwargs so opt-in factory parameters
+        # like ``slow_inactivation=True`` (STN INaP per #324) survive the
+        # round-trip — without this, ChannelConfig defaults override the
+        # preset's tuned values and the cell loses its slow Na+ recovery.
         preset_factory_overrides: dict[str, Any] = {}
+        preset_extra_kwargs_overrides: dict[str, dict[str, Any]] = {}
         if preset_cfg is not None:
             for cc in preset_cfg.channels:
                 name = presets._FACTORY_TO_NAME.get(cc.factory)
                 if name is not None:
                     preset_factory_overrides[name] = cc.factory
+                    if cc.extra_kwargs:
+                        preset_extra_kwargs_overrides[name] = dict(cc.extra_kwargs)
 
         channels = tuple(
             patch_sim.ChannelConfig(
                 preset_factory_overrides.get(name, factory),
                 g_max=getattr(self, f"{name}_g_max"),
+                extra_kwargs=preset_extra_kwargs_overrides.get(name, {}),
             )
             for name, factory in patch_sim.CHANNEL_REGISTRY.items()
             if getattr(self, f"{name}_enabled")

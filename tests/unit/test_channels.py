@@ -20,11 +20,13 @@ from patch_sim.additional_channels import (
     _alpha_fn,
     _alpha_ft,
     _alpha_hr,
+    _alpha_kATP,
     _alpha_kir,
     _alpha_p,
     _alpha_q,
     _alpha_r,
     _alpha_s,
+    _alpha_sNaP,
     _alpha_w,
     _beta_a,
     _beta_b,
@@ -35,11 +37,13 @@ from patch_sim.additional_channels import (
     _beta_fn,
     _beta_ft,
     _beta_hr,
+    _beta_kATP,
     _beta_kir,
     _beta_p,
     _beta_q,
     _beta_r,
     _beta_s,
+    _beta_sNaP,
     _beta_w,
     make_ical_channel,
     make_ican_channel,
@@ -51,6 +55,7 @@ from patch_sim.additional_channels import (
     make_im_channel,
     make_inap_channel,
     make_inar_channel,
+    make_katp_channel,
     make_trn_icat_channel,
 )
 from patch_sim.calcium import CalciumDynamics
@@ -846,12 +851,66 @@ def test_inap_subthreshold_activation():
 
 
 # ---------------------------------------------------------------------------
+# INaP slow-inactivation rate functions (Magistretti & Alonso 1999)
+# ---------------------------------------------------------------------------
+
+
+def _sNaP_inf(V: float) -> float:
+    """INaP slow-inactivation steady-state availability at voltage V."""
+    a, b = _alpha_sNaP(V, 0.0), _beta_sNaP(V, 0.0)
+    return a / (a + b)
+
+
+def test_inap_slow_inactivation_steady_state_in_bounds():
+    """INaP slow-inactivation s_inf is in [0, 1] for physiological voltages."""
+    for V in np.linspace(-120.0, 0.0, 50):
+        a = _alpha_sNaP(V, 0.0)
+        b = _beta_sNaP(V, 0.0)
+        assert a >= 0, f"alpha_sNaP negative at V={V}"
+        assert b >= 0, f"beta_sNaP negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"sNaP steady state {ss} out of [0,1] at V={V}"
+
+
+def test_inap_slow_inactivation_decreases_with_depolarisation():
+    """Availability is highest at hyperpolarised voltages (inactivation)."""
+    assert _sNaP_inf(-80.0) > _sNaP_inf(-45.0) > _sNaP_inf(-10.0)
+
+
+def test_inap_slow_inactivation_half_voltage():
+    """V½ for sNaP sits at -45 mV (within Magistretti & Alonso 1999's spread)."""
+    assert _sNaP_inf(-45.0) == pytest.approx(0.5, abs=0.01)
+
+
+def test_inap_slow_inactivation_resting_availability():
+    """Near-rest availability is high enough to preserve pacemaking."""
+    # At -65 mV the gate must be near 1 so opting in does not silence cells
+    # whose firing depends on the resting INaP window current.
+    assert _sNaP_inf(-65.0) > 0.9
+    assert _sNaP_inf(-75.0) > 0.95
+
+
+def test_inap_slow_inactivation_blocks_depol_plateau():
+    """At depolarised plateau voltages sNaP closes, providing block escape."""
+    # The depol-block plateau in #324 hung at ≈ −15 mV; sNaP must close
+    # firmly there so g_INaP_eff = g_max * p * sNaP collapses.
+    assert _sNaP_inf(-15.0) < 0.05
+
+
+def test_inap_slow_inactivation_tau_is_slow():
+    """τ_sNaP at V½ stays distinctly slow vs the fast p activation (~6 ms)."""
+    a, b = _alpha_sNaP(-45.0, 0.0), _beta_sNaP(-45.0, 0.0)
+    tau = 1.0 / (a + b)
+    assert tau > 100.0, f"sNaP tau at V½ is {tau:.1f} ms, expected > 100 ms"
+
+
+# ---------------------------------------------------------------------------
 # make_inap_channel
 # ---------------------------------------------------------------------------
 
 
 def test_make_inap_channel_defaults():
-    """make_inap_channel() produces a channel with the expected defaults."""
+    """make_inap_channel() produces a single-gate channel by default."""
     from patch_sim.constants import DEFAULT_G_NAP
 
     ch = make_inap_channel()
@@ -862,6 +921,16 @@ def test_make_inap_channel_defaults():
     assert len(ch.gating_variables) == 1
     assert ch.gating_variables[0].name == "p"
     assert ch.gating_variables[0].power == 1
+
+
+def test_make_inap_channel_with_slow_inactivation():
+    """``slow_inactivation=True`` adds the sNaP gate per Magistretti & Alonso 1999."""
+    ch = make_inap_channel(slow_inactivation=True)
+    assert ch.name == "NaP"
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "p"
+    assert ch.gating_variables[1].name == "sNaP"
+    assert ch.gating_variables[1].power == 1
 
 
 def test_make_inap_channel_custom_params():
@@ -891,6 +960,24 @@ def test_current_clamp_with_inap_extra_columns():
     assert result.dtype.names is not None
     assert "INaP" in result.dtype.names
     assert "p" in result.dtype.names
+    assert "sNaP" not in result.dtype.names
+
+
+def test_current_clamp_with_inap_slow_inactivation_extra_columns():
+    """``slow_inactivation=True`` adds the sNaP column to current-clamp output."""
+    neuron = Neuron(additional_channels=(make_inap_channel(slow_inactivation=True),))
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
+    assert "INaP" in result.dtype.names
+    assert "p" in result.dtype.names
+    assert "sNaP" in result.dtype.names
 
 
 def test_voltage_clamp_with_inap_extra_columns():
@@ -923,6 +1010,23 @@ def test_current_clamp_inap_gating_in_bounds():
     result = simulate_current_clamp(neuron, stim)
     assert result["p"].min() >= 0.0
     assert result["p"].max() <= 1.0
+
+
+def test_current_clamp_inap_slow_inactivation_gating_in_bounds():
+    """With slow_inactivation, both p and sNaP stay in [0, 1] during current clamp."""
+    neuron = Neuron(additional_channels=(make_inap_channel(slow_inactivation=True),))
+    stim = step_current(
+        duration=30.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=20.0,
+        sampling_frequency=40000.0,
+    )
+    result = simulate_current_clamp(neuron, stim)
+    assert result["p"].min() >= 0.0
+    assert result["p"].max() <= 1.0
+    assert result["sNaP"].min() >= 0.0
+    assert result["sNaP"].max() <= 1.0
 
 
 def test_public_api_exports_inap():
@@ -1093,6 +1197,34 @@ def test_inap_and_inar_coexist():
     assert "hr" in result.dtype.names
 
 
+def test_inap_slow_inactivation_and_inar_no_gate_collision():
+    """INaP slow inactivation and INaR coexist with distinct gate columns.
+
+    Regression test for the gate-naming hazard noted in the channel
+    docstring: the gating-state dictionary is keyed by gate name only, so
+    INaP's slow inactivation gate must be named ``sNaP`` (not ``s``) to
+    avoid aliasing with :func:`make_inar_channel`'s activation gate.
+    """
+    neuron = Neuron(
+        additional_channels=(
+            make_inap_channel(slow_inactivation=True),
+            make_inar_channel(),
+        )
+    )
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
+    # Both gates present and distinct
+    assert "sNaP" in result.dtype.names
+    assert "s" in result.dtype.names
+
+
 def test_all_additional_channels_coexist():
     """All seven additional channels (Ih, IKa, INaP, INaR, IM, IKir, IKCa) coexist."""
     from patch_sim.calcium import CalciumDynamics
@@ -1253,6 +1385,93 @@ def test_current_clamp_im_gating_in_bounds():
 def test_public_api_exports_im():
     """make_im_channel is exported from the patch_sim public API."""
     assert hasattr(patch_sim, "make_im_channel")
+
+
+# ---------------------------------------------------------------------------
+# I_K_ATP rate functions (kATP gate; voltage-driven proxy for the
+# metabolically gated Kir6.x channel; #324)
+# ---------------------------------------------------------------------------
+
+
+def _kATP_inf(V: float) -> float:
+    """Steady-state K_ATP activation at voltage V."""
+    a, b = _alpha_kATP(V, 0.0), _beta_kATP(V, 0.0)
+    return a / (a + b)
+
+
+def test_katp_steady_state_in_bounds():
+    """The kATP rates are positive and steady state in [0, 1] across V."""
+    for V in np.linspace(-120.0, 30.0, 50):
+        a = _alpha_kATP(V, 0.0)
+        b = _beta_kATP(V, 0.0)
+        assert a >= 0, f"alpha_kATP negative at V={V}"
+        assert b >= 0, f"beta_kATP negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"kATP steady state {ss} out of [0,1] at V={V}"
+
+
+def test_katp_increases_with_depolarisation():
+    """The kATP activation rises monotonically with depolarisation."""
+    assert _kATP_inf(-65.0) < _kATP_inf(-25.0) < _kATP_inf(0.0)
+
+
+def test_katp_half_voltage():
+    """V½ for kATP sits at -25 mV (Hahn & McIntyre 2010 fit)."""
+    assert _kATP_inf(-25.0) == pytest.approx(0.5, abs=0.01)
+
+
+def test_katp_subthreshold_closed():
+    """Subthreshold kATP availability is near zero so rest is uncorrupted."""
+    # Autonomous tonic firing cycles around -60 mV; kATP must stay closed
+    # at and below the autonomous threshold so background firing is not
+    # silenced by an unwanted outward K+ leak.
+    assert _kATP_inf(-65.0) < 0.02
+
+
+def test_katp_plateau_open():
+    """At the depol-block plateau kATP opens strongly to provide block escape."""
+    # The plateau sits ≈ −15 mV; kATP must open enough there to dominate
+    # the residual fast-Na inward drive.
+    assert _kATP_inf(-15.0) > 0.7
+
+
+def test_katp_tau_is_slow():
+    """The τ_kATP at V½ stays distinctly slow vs spike kinetics."""
+    a, b = _alpha_kATP(-25.0, 0.0), _beta_kATP(-25.0, 0.0)
+    tau = 1.0 / (a + b)
+    assert tau > 200.0, f"kATP tau at V½ is {tau:.1f} ms, expected > 200 ms"
+
+
+# ---------------------------------------------------------------------------
+# make_katp_channel
+# ---------------------------------------------------------------------------
+
+
+def test_make_katp_channel_defaults():
+    """make_katp_channel() produces a channel with the expected defaults."""
+    from patch_sim.constants import DEFAULT_G_KATP
+
+    ch = make_katp_channel()
+    assert ch.name == "KATP"
+    assert ch.g_max == pytest.approx(DEFAULT_G_KATP)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
+    assert len(ch.gating_variables) == 1
+    assert ch.gating_variables[0].name == "kATP"
+    assert ch.gating_variables[0].power == 1
+
+
+def test_make_katp_channel_custom_params():
+    """make_katp_channel accepts custom g_max."""
+    ch = make_katp_channel(g_max=1.0)
+    assert ch.g_max == pytest.approx(1.0)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
+
+
+def test_public_api_exports_katp():
+    """make_katp_channel is exported from the patch_sim public API."""
+    assert hasattr(patch_sim, "make_katp_channel")
 
 
 # ---------------------------------------------------------------------------

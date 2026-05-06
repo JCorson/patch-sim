@@ -119,3 +119,163 @@ def test_stn_ap_ahp_depth_in_stn_range(stn_ap_shape_result) -> None:
         reference=_STN_REFERENCE,
         ahp_mv=(-85.0, -55.0),
     )
+
+
+# ---------------------------------------------------------------------------
+# Slow INaP inactivation engages during sustained drive — issue #324.
+# ---------------------------------------------------------------------------
+
+
+def test_stn_inap_slow_inactivation_engages_during_drive(
+    stn_neuron: Neuron,
+) -> None:
+    """The sNaP gate closes during +5 µA/cm² × 200 ms drive.
+
+    Direct mechanism check for #324: the Magistretti & Alonso 1999 slow
+    inactivation gate added to ``make_inap_channel`` must be doing real
+    work during sustained suprathreshold drive.  By the end of the step,
+    sNaP should have lost at least half its rest availability so the
+    persistent Na⁺ contribution to the depol-block plateau is suppressed.
+
+    Other INaP-using presets (cortical pyramidal, CA1 pyramidal,
+    Purkinje) deliberately opt out of slow inactivation to keep their
+    existing tuning, so this test is the only direct mechanism check for
+    the new gate.
+
+    The 0.5 threshold is loose because in STN sNaP co-acts with the new
+    fast-Na sNa gate and K_ATP (also added for #324) to rescue the cell
+    from the plateau; once voltage starts recovering during the step,
+    sNaP starts recovering too, so it never reaches the deep ≈ 0.05
+    plateau value it would attain if the cell hung at −15 mV indefinitely.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(200.0)
+    n_post = _ms_to_samples(50.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, 5.0),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(stn_neuron, current_external=current)
+    sNaP_at_rest = float(result["sNaP"][n_pre - 1])
+    sNaP_at_step_end = float(result["sNaP"][n_pre + n_step - 1])
+    fraction_inactivated = 1.0 - sNaP_at_step_end / sNaP_at_rest
+    assert fraction_inactivated > 0.5, (
+        f"sNaP did not meaningfully inactivate: rest={sNaP_at_rest:.3f}, "
+        f"step end={sNaP_at_step_end:.3f}, "
+        f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.5)"
+    )
+
+
+def test_stn_fast_na_slow_inactivation_engages_during_drive(
+    stn_neuron: Neuron,
+) -> None:
+    """The sNa gate (fast Na slow inactivation) closes during +5 µA/cm² × 200 ms.
+
+    Direct mechanism check for #324 fix part 2: the Fleidervish & Gutnick
+    1996 / Mickus et al. 1999 / Do & Bean 2003 slow voltage-dependent
+    inactivation gate added to ``make_stn_na_channel`` must lose at least
+    half its rest availability by the end of a sustained suprathreshold
+    step, abolishing the residual h-tail that pinned the cell at −15 mV.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(200.0)
+    n_post = _ms_to_samples(50.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, 5.0),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(stn_neuron, current_external=current)
+    sNa_at_rest = float(result["sNa"][n_pre - 1])
+    sNa_at_step_end = float(result["sNa"][n_pre + n_step - 1])
+    fraction_inactivated = 1.0 - sNa_at_step_end / sNa_at_rest
+    assert fraction_inactivated > 0.5, (
+        f"sNa did not meaningfully inactivate: rest={sNa_at_rest:.3f}, "
+        f"step end={sNa_at_step_end:.3f}, "
+        f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.5)"
+    )
+
+
+def test_stn_katp_engages_during_drive(stn_neuron: Neuron) -> None:
+    """K_ATP opens during +5 µA/cm² × 200 ms drive and stays closed at rest.
+
+    Direct mechanism check for #324 fix part 3: the K_ATP gate
+    (Stanford & Lacey 1996; Bevan & Wilson 1999; Hahn & McIntyre 2010)
+    must engage strongly during sustained suprathreshold drive so the
+    outward K⁺ current it provides can dominate the residual fast-Na
+    drive at the depolarised plateau.  Subthreshold availability must
+    stay near zero or autonomous tonic firing would silence.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(200.0)
+    n_post = _ms_to_samples(50.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, 5.0),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(stn_neuron, current_external=current)
+    kATP_at_rest = float(result["kATP"][n_pre - 1])
+    kATP_at_step_end = float(result["kATP"][n_pre + n_step - 1])
+    # The "rest" sample is one slice of an autonomously oscillating
+    # trajectory; with τ_kATP ≈ 400 ms and ~50 ms AP cycle, kATP
+    # time-averages to a few percent during normal pacemaking rather than
+    # being strictly zero, but stays low enough not to silence firing.
+    assert kATP_at_rest < 0.05, (
+        f"kATP not closed at autonomous rest: rest={kATP_at_rest:.3f} (expected < 0.05)"
+    )
+    # During sustained drive kATP doesn't reach steady-state because sNaP
+    # and sNa repolarise the cell before τ_kATP (≈400 ms at V½) has time
+    # to fully activate; engagement is still several-fold above rest.
+    assert kATP_at_step_end > 0.15, (
+        f"kATP did not meaningfully open during drive: "
+        f"step end={kATP_at_step_end:.3f} (expected > 0.15)"
+    )
+    assert kATP_at_step_end > 4.0 * kATP_at_rest, (
+        f"kATP step-end {kATP_at_step_end:.3f} not meaningfully above "
+        f"autonomous-firing rest {kATP_at_rest:.3f} (expected > 4× rest)"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Depolarisation-block recovery — issue #324 regression.
+# ---------------------------------------------------------------------------
+
+
+def test_stn_recovers_from_sustained_suprathreshold_drive(
+    stn_neuron: Neuron,
+) -> None:
+    """STN repolarises after +5 µA/cm² × 200 ms (full #324 regression).
+
+    Regression test for #324: the three opt-in mechanisms (INaP sNaP,
+    fast-Na sNa, K_ATP) cooperate so the membrane escapes the
+    depolarisation-block plateau seeded by sustained suprathreshold
+    drive at the F-I sweep upper bound (+5 µA/cm²).  The cell should
+    settle below −50 mV during the last 200 ms of a 700 ms post-stimulus
+    epoch, confirming a return to the autonomous-oscillation regime
+    (cycling around −60 mV) rather than hanging at −15 mV.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(200.0)
+    n_post = _ms_to_samples(700.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, 5.0),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(stn_neuron, current_external=current)
+    tail = np.asarray(result["voltage"][-_ms_to_samples(200.0) :])
+    mean_v = float(tail.mean())
+    assert mean_v < -50.0, (
+        f"STN failed to recover from +5 µA/cm² × 200 ms; "
+        f"mean V in last 200 ms = {mean_v:.2f} mV"
+    )

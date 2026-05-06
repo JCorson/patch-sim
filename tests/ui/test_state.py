@@ -1670,3 +1670,81 @@ def test_build_neuron_has_no_area_for_squid() -> None:
     ns.active_neuron_type = SQUID_GIANT_AXON
     neuron = ns._build_neuron()
     assert neuron.area_cm2 is None
+
+
+# ---------------------------------------------------------------------------
+# _build_neuron preserves ChannelConfig.extra_kwargs (#324)
+# ---------------------------------------------------------------------------
+
+
+async def test_build_neuron_preserves_inap_slow_inactivation_for_stn() -> None:
+    """STN _build_neuron forwards INaP slow_inactivation extra_kwarg.
+
+    Regression: previously _build_neuron rebuilt channels from
+    CHANNEL_REGISTRY without forwarding the preset's extra_kwargs, which
+    silently disabled INaP slow inactivation in the UI.  Visible
+    consequence: STN at +5 µA/cm² × 200 ms exits the deepest depol block
+    but settles into a damped quasi-plateau around −30 mV instead of
+    autonomous tonic firing.  The python-only integration test passes
+    because it bypasses _build_neuron and uses the preset directly.
+
+    This test asserts the gate is present in the UI-built neuron.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(STN)]
+    neuron = ns._build_neuron()
+
+    inap = next((ch for ch in neuron.additional_channels if ch.name == "NaP"), None)
+    assert inap is not None, "STN preset must include INaP channel"
+    gate_names = {g.name for g in inap.gating_variables}
+    assert "sNaP" in gate_names, (
+        f"INaP slow-inactivation gate sNaP missing from UI-built STN neuron; "
+        f"gates present: {sorted(gate_names)}.  _build_neuron is dropping "
+        f"ChannelConfig.extra_kwargs={{'slow_inactivation': True}}."
+    )
+
+
+async def test_stn_recovers_from_depol_block_via_ui_build_neuron() -> None:
+    """End-to-end #324 regression via UI _build_neuron path.
+
+    Loads the STN preset into a NeuronState (the path the live Reflex app
+    uses on Run), builds the neuron through ``_build_neuron``, drives
+    +5 µA/cm² × 200 ms and asserts the membrane resumes autonomous tonic
+    firing during the post-stim window (max V > 0 mV — APs present, mean V
+    < −40 mV — not stuck on a quasi-plateau).
+
+    Without this test, an integration test that bypasses _build_neuron
+    happily passes while the live UI silently loses sNaP and stalls
+    around −30 mV.
+    """
+    from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(STN)]
+    neuron = ns._build_neuron()
+
+    def n_samples(ms: float) -> int:
+        """Convert ms to simulation samples."""
+        return int(ms * SIM_SAMPLING_FREQ / 1000.0)
+
+    current = np.concatenate(
+        [
+            np.zeros(n_samples(10.0)),
+            np.full(n_samples(200.0), 5.0),
+            np.zeros(n_samples(700.0) + 1),
+        ]
+    )
+    result = simulate_current_clamp(neuron, current_external=current)
+    post = np.asarray(result["voltage"][n_samples(10.0) + n_samples(200.0) :])
+    last_200ms = post[-n_samples(200.0) :]
+
+    assert post.max() > 0.0, (
+        f"STN failed to fire post-stim via UI build path: post-stim max V "
+        f"= {post.max():.2f} mV (expected APs > 0 mV)"
+    )
+    assert last_200ms.mean() < -40.0, (
+        f"STN settled on quasi-plateau via UI build path: mean V last 200 ms "
+        f"= {last_200ms.mean():.2f} mV (expected < −40 mV for autonomous firing)"
+    )

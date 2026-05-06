@@ -23,6 +23,7 @@ from .constants import (
     DEFAULT_G_IKIR,
     DEFAULT_G_IKV31,
     DEFAULT_G_IM,
+    DEFAULT_G_KATP,
     DEFAULT_G_NAP,
     DEFAULT_G_NAP_SNC,
     DEFAULT_G_NAR,
@@ -279,24 +280,79 @@ def make_ih_channel(
 # ---------------------------------------------------------------------------
 # INaP — Persistent Na⁺ channel (Magistretti & Alonso 1999)
 # ---------------------------------------------------------------------------
+#
+# Activation gate ``p`` follows the standard Magistretti & Alonso 1999 kinetics
+# (fast Boltzmann, V½ = −52.6 mV, slope 4.6 mV).
+#
+# Slow inactivation gate ``sNaP`` (opt-in via ``slow_inactivation=True``) is
+# also from Magistretti & Alonso 1999 §"Slow inactivation": V½ = −45 mV, slope
+# 7 mV (inverted Boltzmann; values picked from the depolarised end of the
+# experimental −47 to −54 mV / k = 7-10 mV spread to leave near-rest
+# availability high, s_inf(−65 mV) ≈ 0.94).  The paper reports τ on the order
+# of seconds at the V½ peak; the implementation uses a faster tau_scale
+# (≈200 ms peak) so the gate produces a useful escape from a depolarisation
+# plateau within a single sustained step rather than over multiple seconds.
+#
+# In STN this gate co-acts with the fast-Na slow inactivation gate
+# (``make_stn_na_channel(slow_inactivation=True)``) and ``make_katp_channel``
+# (#324); the three together collapse the −15 mV plateau cleanly.  In
+# presets that opt into ``sNaP`` alone (none today; cortical pyramidal /
+# CA1 / Purkinje deliberately stay opt-out) the short τ would similarly
+# allow the gate to shoulder block-recovery on its own — the choice of τ
+# is therefore robust to the channel cocktail the gate happens to ship in.
+#
+# The slow-inactivation gate is named ``sNaP`` rather than ``s`` because the
+# gating-state dictionary is keyed by gate name only and ``make_inar_channel``
+# already declares an ``s`` gate.  Sharing the name would alias the two
+# channels' gating variables.
+#
+# Slow inactivation is opt-in (default off) so that presets tuned without it
+# (cortical pyramidal, CA1 pyramidal, Purkinje) keep their existing
+# phenotypes.  Enable it on presets where depolarisation-block recovery
+# matters — e.g. STN, where #324 reports the cell hangs at ≈ −15 mV after
+# sustained suprathreshold drive.
 
 _alpha_p, _beta_p = boltzmann_cosh_rates(
     half=-52.6, slope=4.6, tau_scale=6.0, tau_floor=0.1
 )
 
+_alpha_sNaP, _beta_sNaP = boltzmann_cosh_rates(
+    half=-45.0,
+    slope=7.0,
+    tau_scale=200.0,
+    tau_floor=20.0,
+    inverted=True,
+)
+
 
 def make_inap_channel(
     g_max: float = DEFAULT_G_NAP,
+    *,
+    slow_inactivation: bool = False,
 ) -> IonChannel:
     """Create an INaP (persistent Na⁺) ion channel.
 
-    INaP is a non-inactivating Na⁺ current active near the resting potential.
-    It amplifies subthreshold depolarizations and can lower the threshold for
-    action potential generation.  It uses a single gating variable ``p``
-    (power 1).
+    INaP is a sustained Na⁺ current active near the resting potential that
+    amplifies subthreshold depolarizations and can lower the threshold for
+    action potential generation.  By default the channel uses a single
+    activation gate ``p`` (Magistretti & Alonso 1999 kinetics, V½ = −52.6 mV).
 
-    Kinetics follow Magistretti & Alonso (1999), with a Boltzmann activation
-    centred at -52.6 mV and a cosh-based time constant.
+    With ``slow_inactivation=True`` a second gate ``sNaP`` is added (also
+    Magistretti & Alonso 1999, §"Slow inactivation"; V½ = −45 mV, inverted
+    Boltzmann).  The slow gate is mostly available at hyperpolarised
+    potentials and decays towards zero during sustained depolarisation,
+    providing an escape mechanism that lets the membrane repolarise after a
+    prolonged suprathreshold step.  The simulation column is named ``sNaP``
+    rather than ``s`` to avoid colliding with :func:`make_inar_channel`'s
+    activation gate, which is also named ``s``.
+
+    Slow inactivation is opt-in because it changes the effective INaP
+    conductance during sustained firing trains (sNaP slowly decays towards
+    its sub-1 steady state), which can alter spike-frequency-adaptation
+    profiles in presets calibrated against the no-slow-inactivation INaP
+    (cortical pyramidal, CA1 pyramidal, Purkinje).  Enable it on presets
+    where depolarisation-block recovery is the dominant concern — e.g. STN
+    in issue #324.
 
     The reversal potential is computed dynamically from the neuron's Na⁺
     concentrations using the Nernst equation.
@@ -304,15 +360,21 @@ def make_inap_channel(
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~patch_sim.constants.DEFAULT_G_NAP`.
+        slow_inactivation: If True, add the Magistretti & Alonso 1999 slow
+            inactivation gate ``sNaP`` (default False).
 
     Returns:
         An :class:`~patch_sim.channels.IonChannel` representing the INaP current.
     """
     p_var = GatingVariable(name="p", power=1, alpha=_alpha_p, beta=_beta_p)
+    gating: tuple[GatingVariable, ...] = (p_var,)
+    if slow_inactivation:
+        s_var = GatingVariable(name="sNaP", power=1, alpha=_alpha_sNaP, beta=_beta_sNaP)
+        gating = (p_var, s_var)
     return IonChannel(
         name="NaP",
         g_max=g_max,
-        gating_variables=(p_var,),
+        gating_variables=gating,
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
     )
 
@@ -531,6 +593,82 @@ def make_im_channel(
         name="M",
         g_max=g_max,
         gating_variables=(w_var,),
+        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
+    )
+
+
+# ---------------------------------------------------------------------------
+# I_K_ATP — ATP-sensitive K⁺ channel (Kir6.x; phenomenological proxy)
+# ---------------------------------------------------------------------------
+#
+# Real K_ATP channels (Kir6.x/SUR) are gated by intracellular ATP/ADP
+# stoichiometry, opening when [ATP] falls relative to [ADP] during
+# metabolic stress.  In STN cells they contribute to depolarisation-block
+# recovery and to the membrane response under sustained suprathreshold
+# drive (Stanford & Lacey 1996; Bevan & Wilson 1999).  Modelling them
+# faithfully would require an ATP/ADP state variable coupled to firing
+# activity (Erecińska & Silver 1989); since the simulator doesn't track
+# metabolic state, this factory uses a voltage-driven slow-activation
+# proxy instead.  The channel reaches the same depol-block-rescue
+# endpoint without adding a new ODE.
+#
+# Parameters: V½ = −25 mV (above autonomous threshold ~−40 mV, so
+# subthreshold tonic pacemaking is undisturbed but the channel engages
+# strongly at the −15 mV depol-block plateau); slope 8 mV; τ_scale 400 ms,
+# τ_floor 50 ms (slow activation reflects the ATP-depletion timescale
+# during sustained spiking).  At V = −15 mV kATP_inf ≈ 0.78, so at
+# g_max = 0.5 mS/cm² the channel produces ~0.5·0.78·75 ≈ 29 µA/cm² outward
+# K⁺ drive — comfortably exceeds the residual ~10–20 µA/cm² fast-Na drive
+# at the plateau.
+
+_alpha_kATP, _beta_kATP = boltzmann_cosh_rates(
+    half=-25.0,
+    slope=8.0,
+    tau_scale=400.0,
+    tau_floor=50.0,
+)
+
+
+def make_katp_channel(
+    g_max: float = DEFAULT_G_KATP,
+) -> IonChannel:
+    """Create a K_ATP (ATP-sensitive K⁺) ion channel.
+
+    Real K_ATP channels are metabolically gated (Kir6.x/SUR octamers
+    activated by low [ATP]/[ADP]); this factory models them
+    phenomenologically with voltage-driven slow activation, since the
+    simulator does not track metabolic state.  The channel engages at
+    sustained depolarisation (V½ = −25 mV, well above autonomous
+    pacemaking threshold) with a slow time constant (~400 ms peak),
+    providing an outward K⁺ drive that helps the membrane escape
+    depolarisation block (#324 in STN).
+
+    Uses a single gating variable ``kATP`` (power 1).  The reversal
+    potential is computed dynamically from the neuron's K⁺ concentrations
+    via the Nernst equation.
+
+    References:
+        - Stanford & Lacey (1996), J. Neurophysiol. 75:1714 (K_ATP in STN
+          and SNc).
+        - Bevan & Wilson (1999), J. Neurosci. 19:7617 (STN spontaneous
+          activity).
+        - Hahn & McIntyre (2010), J. Comput. Neurosci. 28:425 (STN model
+          including K_ATP).
+        - Erecińska & Silver (1989) (ATP/ADP dynamics during firing).
+
+    Args:
+        g_max: Maximum conductance in mS/cm². Must be non-negative.
+            Defaults to :data:`~patch_sim.constants.DEFAULT_G_KATP`.
+
+    Returns:
+        An :class:`~patch_sim.channels.IonChannel` representing the K_ATP
+        current.
+    """
+    katp_var = GatingVariable(name="kATP", power=1, alpha=_alpha_kATP, beta=_beta_kATP)
+    return IonChannel(
+        name="KATP",
+        g_max=g_max,
+        gating_variables=(katp_var,),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )
 

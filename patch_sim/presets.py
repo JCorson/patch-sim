@@ -6,6 +6,7 @@ adjustments — all expressed in terms of core library types so they can
 be used without importing the UI package.
 """
 
+import functools
 from typing import Any
 
 import numpy as np
@@ -22,6 +23,7 @@ from .additional_channels import (
     make_im_channel,
     make_inap_channel,
     make_inar_channel,
+    make_katp_channel,
     make_sk_channel,
     make_snc_inap_channel,
     make_thalamic_relay_icat_channel,
@@ -616,20 +618,41 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # NMDA is not modelled here, so burst mode is reachable in this preset
         # only via the hyperpolarising-step-and-release protocol.
         #
-        # KNOWN LIMITATION — depolarization-block recovery (#324): under
-        # sustained suprathreshold drive (≳ +3 µA/cm² × 100+ ms) the cell
-        # enters depol block and fails to repolarise after the step releases,
-        # hanging at ≈ −15 mV.  INaP here has only an activation gate (no
-        # slow inactivation), so the depolarised plateau is a stable second
-        # attractor with no escape route.  Doublet bursts in the same regime
-        # are the same artefact (partial block).  Real STN cells recover via
-        # slow Na⁺ inactivation / ATP-K / K⁺ accumulation — none modelled.
-        # The autonomous tonic phenotype (≤ ~+2 µA/cm²) is unaffected.
+        # FIX — depolarization-block recovery (#324). Three complementary
+        # mechanisms cooperate so the cell repolarises after a sustained
+        # suprathreshold step (e.g. +5 µA/cm² × 200 ms) instead of hanging
+        # on a −15 mV plateau:
+        #   1. INaP slow inactivation (sNaP, Magistretti & Alonso 1999)
+        #      via ``slow_inactivation=True`` on make_inap_channel — removes
+        #      >70 % of the persistent Na⁺ window current at the plateau.
+        #   2. Fast-Na slow inactivation (sNa, Fleidervish & Gutnick 1996;
+        #      Mickus et al. 1999; Do & Bean 2003) via
+        #      ``slow_inactivation=True`` on make_stn_na_channel — closes
+        #      the residual ~10–20 µA/cm² h-tail at the depolarised
+        #      plateau that single-gate INaP slow inactivation could not
+        #      reach (Otsuka 2004 h_inf ≈ 1 % at −15 mV × g_Na = 30 mS/cm²).
+        #   3. K_ATP (Stanford & Lacey 1996; Bevan & Wilson 1999;
+        #      Hahn & McIntyre 2010) via make_katp_channel(g_max=0.5) —
+        #      provides outward K⁺ drive under sustained depolarisation,
+        #      modelled here as a voltage-driven slow-activation proxy
+        #      (V½ = −25 mV, τ ≈ 400 ms) for the metabolically gated
+        #      Kir6.x channel.  Subthreshold availability is < 2 % so
+        #      autonomous pacemaking (≤ ~+2 µA/cm²) is unaffected.
+        #
         # Refs: Otsuka et al. (2004), J. Neurophysiol. 92:255 (Na kinetics);
-        #       Bevan & Wilson (1999), J. Neurosci. 19:7617 (pacemaking);
+        #       Bevan & Wilson (1999), J. Neurosci. 19:7617 (pacemaking,
+        #         K_ATP role);
         #       Beurrier et al. (1999), J. Neurosci. 19:599 (NMDA burst mode);
-        #       Do & Bean (2003), Neuron 39:109 (STN INaP);
+        #       Do & Bean (2003), Neuron 39:109 (STN INaP, slow Na inactivation);
         #       Magistretti & Alonso (1999), J. Gen. Physiol. 114:491 (INaP);
+        #       Fleidervish & Gutnick (1996), J. Physiol. 493:83 (slow Na
+        #         inactivation, cortical pyramidal);
+        #       Mickus, Jung & Spruston (1999), Biophys. J. 76:846 (slow Na
+        #         inactivation, CA1 pyramidal);
+        #       Stanford & Lacey (1996), J. Neurophysiol. 75:1714 (K_ATP in STN);
+        #       Hahn & McIntyre (2010), J. Comput. Neurosci. 28:425 (STN model
+        #         with K_ATP);
+        #       Erecińska & Silver (1989) (ATP/ADP dynamics during firing);
         #       Wigmore & Lacey (2000), J. Physiol. 527:493 (STN Kv3-like K);
         #       Erisir et al. (1999), J. Neurophysiol. 82:2476 (Kv3.1 kinetics);
         #       Zhou & Lee (2011), Neuroscience 195:14 (Kv3 in BG output);
@@ -687,7 +710,9 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         g_KL=0.04,
         Q10=1.0,
         T_ref=308.15,
-        na_channel_factory=make_stn_na_channel,
+        na_channel_factory=functools.partial(
+            make_stn_na_channel, slow_inactivation=True
+        ),
         k_channel_factory=make_stn_k_channel,
         channels=(
             ChannelConfig(make_icat_channel, g_max=5.0),
@@ -695,8 +720,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ika_channel, g_max=3.0),
             ChannelConfig(make_ikca_channel, g_max=1.0),
             ChannelConfig(make_ih_channel, g_max=1.0),
-            ChannelConfig(make_inap_channel, g_max=0.10),
+            ChannelConfig(
+                make_inap_channel,
+                g_max=0.10,
+                extra_kwargs={"slow_inactivation": True},
+            ),
             ChannelConfig(make_ikv31_channel, g_max=0.2),
+            ChannelConfig(make_katp_channel, g_max=0.5),
         ),
         # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
         # (2 µA/cm², 200 ms).  ICaT g=5.0 mS/cm² is the largest Ca conductance in any
