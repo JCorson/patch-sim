@@ -28,7 +28,7 @@ from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
 # tests/integration/test_dopaminergic.py.
 #
 # STN is excluded post-#305: the autonomous-pacemaker preset uses INaP and
-# Ih to destabilise rest near −60 mV and fires spontaneously at ~20 Hz from
+# Ih to destabilise rest near −60 mV and fires spontaneously at ~11 Hz from
 # v_rest = −60 mV (Bevan & Wilson 1999: 5–50 Hz autonomous firing in slice).
 # See test_stn_spontaneous_pacemaking in tests/integration/test_stn.py.
 _STABLE_PRESET_NAMES = [

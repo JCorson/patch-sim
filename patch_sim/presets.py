@@ -688,8 +688,11 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # PRIMARY MODE — tonic pacemaking: INaP window current destabilises
         # any rest near −60 mV; Ih activates during the AHP and drives slow
         # depolarisation back to threshold, producing autonomous firing at
-        # ~20 Hz in this single-compartment model (Bevan & Wilson 1999 report
-        # 5–50 Hz in slice).  IKv3.1 (Erisir 1999, V½ = −12.4 mV, n²,
+        # ~11 Hz in this single-compartment model (Bevan & Wilson 1999 report
+        # 5–50 Hz in slice; Hallworth, Wilson & Bevan 2003 report ISI
+        # CV ≈ 0.05–0.15 — the regular single-spike pattern is exercised by
+        # ``test_stn_tonic_firing_is_regular_single_spikes``).  IKv3.1
+        # (Erisir 1999, V½ = −12.4 mV, n²,
         # τ_floor = 0.2 ms) replaces the Otsuka K factory as the sole
         # delayed rectifier — Wigmore & Lacey (2000) directly characterised
         # the dominant somatic K current in rat STN as Kv3.1-like (V½ near
@@ -734,6 +737,8 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Refs: Otsuka et al. (2004), J. Neurophysiol. 92:255 (Na kinetics);
         #       Bevan & Wilson (1999), J. Neurosci. 19:7617 (pacemaking,
         #         K_ATP role);
+        #       Hallworth, Wilson & Bevan (2003), J. Neurosci. 23:7525
+        #         (STN tonic ISI regularity, CV ≈ 0.05–0.15 — issue #326);
         #       Beurrier et al. (1999), J. Neurosci. 19:599 (NMDA burst mode);
         #       Do & Bean (2003), Neuron 39:109 (STN INaP, slow Na inactivation);
         #       Magistretti & Alonso (1999), J. Gen. Physiol. 114:491 (INaP);
@@ -770,30 +775,43 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # at v_rest pins the cell too stably to pacemake; the autonomous-
         # oscillator regime requires the leak NOT to bracket a zero-current root.
         #
-        # Pacemaking conductances:
-        #   g_NaP   = 0.10 mS/cm²: persistent Na⁺ window current that
-        #     destabilises rest.  Matches the Cortical Pyramidal value; the
-        #     STN target firing rate (5–50 Hz) sits in the same window-current
-        #     regime.
-        #   g_Ih    = 1.0 mS/cm²: post-AHP depolarising drive sized to recover
-        #     the cell from AHP within the inter-spike interval at the STN
-        #     rate band.
-        #   g_IKv31 = 0.2 mS/cm²: sole delayed rectifier (Kv3.1, Erisir 1999).
-        #     Tuned low so that the n²-gated Kv3.1 — much faster and earlier-
-        #     activating than a Kv2-class Mainen-Sejnowski Kv at the same g —
-        #     does not over-repolarise or narrow the AP below the 0.4–1.2 ms
-        #     literature half-width band.
+        # Pacemaking conductances (retuned for #326 to abolish post-AHP
+        # doublets and restore regular single-spike pacemaking with
+        # CV(ISI) ≤ 0.15 per Hallworth, Wilson & Bevan 2003):
+        #   g_NaP   = 0.05 mS/cm²: persistent Na⁺ window current that
+        #     destabilises rest.  Halved from the previous 0.10 mS/cm² —
+        #     the larger value rebounded the membrane within ~5 ms after
+        #     each AHP, before fast-Na ``h`` had fully de-inactivated, and
+        #     produced an abortive ~0 mV spikelet (the doublet artifact
+        #     reported in #326).  At 0.05 mS/cm² INaP still destabilises
+        #     rest (the cell remains an autonomous oscillator with no
+        #     stable zero-current root) but the rebound is slow enough for
+        #     ``h`` to fully de-inactivate before the next threshold
+        #     crossing.
+        #   g_Ih    = 1.0 mS/cm²: unchanged.  Still sizes post-AHP
+        #     depolarising drive to recover the cell from AHP within the
+        #     inter-spike interval at the STN rate band.
+        #   g_IKv31 = 1.0 mS/cm²: sole delayed rectifier (Kv3.1, Erisir
+        #     1999).  Raised from 0.2 mS/cm² to keep the AP half-width
+        #     inside the 0.4–1.2 ms band after the g_Na reduction below
+        #     widened it.  Wigmore & Lacey (2000) characterise Kv3.1-like
+        #     as the dominant somatic K current in rat STN, so 1.0 mS/cm²
+        #     is well within the channel's expressed-conductance range.
         #
-        # g_Na = 30 mS/cm²: keeps AP peak inside the +0 to +30 mV band of
-        # Bevan & Wilson 1999 (typical AP amplitudes 60–80 mV from threshold
-        # near −55 mV, putting the peak in the +5 to +25 mV range).
+        # g_Na = 14 mS/cm²: lowered from 30 mS/cm² for #326.  At g_Na = 30
+        # the full-spike peak sat at ~+43 mV — well above the Bevan &
+        # Wilson 1999 +5 to +25 mV range; the previous AP-peak test only
+        # passed because the doublet's abortive ~0 mV spikelet pulled the
+        # mean down.  At g_Na = 14 the mean peak lands near +27 mV, inside
+        # the 0 to +30 mV test band and consistent with the literature
+        # range from a threshold of about −51 mV (≈ 78 mV amplitude).
         #
         # ca_init = 7.325e-4 mM: the previous coupled (V, ca_i) equilibrium at
         # v_rest under the static-rest preset.  Retained as a non-zero
         # initial Ca²⁺ guess — the cell now oscillates from t = 0 so this is
         # not a true equilibrium, but it sits within the early-AP Ca²⁺ trace
         # range and avoids a spurious transient at startup.
-        g_Na=30.0,
+        g_Na=14.0,
         g_K=0.0,
         v_rest=-60.0,
         Na_out=145.0,
@@ -814,10 +832,10 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ih_channel, g_max=1.0),
             ChannelConfig(
                 make_inap_channel,
-                g_max=0.10,
+                g_max=0.05,
                 extra_kwargs={"slow_inactivation": True},
             ),
-            ChannelConfig(make_ikv31_channel, g_max=0.2),
+            ChannelConfig(make_ikv31_channel, g_max=1.0),
             ChannelConfig(make_katp_channel, g_max=0.5),
         ),
         # alpha_ca/tau_ca calibrated so peak ca_i ≤ 5 µM under REPETITIVE_FIRING
@@ -1310,9 +1328,10 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_duration": 5.0,
         },
         # Depolarising bias on top of the autonomous tonic train.  At
-        # 2 µA/cm² the cell fires at ~105 Hz (well above the 5–50 Hz
-        # autonomous rate); 200 ms is long enough to comfortably exceed
-        # the ≥5 spike requirement of test_repetitive_firing_preset.
+        # +2 µA/cm² the cell fires at ~36 Hz (top of the Bevan & Wilson
+        # 1999 5–50 Hz autonomous range); 200 ms is long enough to
+        # comfortably exceed the ≥5 spike requirement of
+        # test_repetitive_firing_preset.
         REPETITIVE_FIRING: {
             "min_stimulus": 2.0,
             "max_stimulus": 2.0,
