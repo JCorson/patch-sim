@@ -1248,7 +1248,7 @@ def test_purkinje_slow_na_inactivation_decreases_with_depolarisation() -> None:
 
 
 def test_purkinje_slow_na_inactivation_half_voltage() -> None:
-    """V½ for sNa sits at -50 mV (Carter & Bean 2009 mid-range)."""
+    """V½ for sNa sits at -50 mV (mirrors STN / Pospischil mid-range)."""
     assert _purkinje_sNa_inf(-50.0) == pytest.approx(0.5, abs=0.01)
 
 

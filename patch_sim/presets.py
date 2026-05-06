@@ -369,13 +369,14 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # No conductance retuning was needed when the two slow gates were
         # opted in: at g_Na=30, g_K=10, g_NaP=0.1 (the values calibrated
         # in #299 / #314) the spontaneous AP shape and 10–50 Hz pacemaker
-        # rate stay in band.  The Purkinje preset relies primarily on Ih
-        # for AHP recovery and on the moderate g_Na density to set AP
-        # threshold, so the small reduction in Na⁺ availability from the
-        # always-on sNa gate (s_inf ≈ 0.87 at v_rest=-65 mV) is offset by
-        # sNaP curtailing the persistent Na⁺ ramp and slowing the firing
-        # rate down from the pre-fix 134 Hz to ~30 Hz, well within the
-        # 10–50 Hz Häusser & Clark / Raman & Bean band.
+        # rate stay in band (rate ≈ 30 Hz, peak ≈ +30 mV, half-width ≈
+        # 0.39 ms, threshold ≈ −42 mV, AHP ≈ −68 mV — all inside the
+        # Häusser & Clark / Raman & Bean tolerances).  The Purkinje preset
+        # relies primarily on Ih for AHP recovery and on the moderate
+        # g_Na density to set AP threshold, so the reduction in Na⁺
+        # availability from the always-on sNa gate (s_inf ≈ 0.87 at
+        # v_rest=-65 mV) is offset by sNaP curtailing the persistent Na⁺
+        # ramp; the two gates together stabilise tonic firing.
         #
         # Refs: Carter & Bean (2009), Neuron 64:898 (slow Na inactivation
         #         directly in cerebellar Purkinje cells — primary source);
