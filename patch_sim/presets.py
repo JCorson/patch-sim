@@ -544,15 +544,27 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Q10 correction to ~1.12× (36→37 °C) — a negligible adjustment that
         # preserves the published kinetics.
         #
-        # g_K = 18 mS/cm² (vs the HH52 default of 36): the lower
-        # delayed-rectifier conductance reduces the deep K⁺-driven AHP that
-        # otherwise collapses the LTS plateau after the first Na⁺ spike.
-        # Pospischil 2008 Table 2 specifies g_K = 7 mS/cm² for TC, but at
-        # that value the cell has multiple zero-current crossings in the
-        # default [-100, -20] mV bracket used by find_coupled_equilibrium
-        # (the test_find_zero_current_voltage_all_presets coupled-equilibrium
-        # test breaks).  g_K = 18 is the smallest value that both supports
-        # the multi-spike LTS burst AND keeps the equilibrium bracket valid.
+        # g_Na = 45 mS/cm², g_K = 10 mS/cm² are explicit somatic densities
+        # for the single-compartment reduction.  Without these overrides the
+        # preset would silently inherit NeuronConfig's HH52 defaults
+        # (g_Na = 120, g_K = 36), driving the mean tonic AP peak to ~+49 mV
+        # and the AHP to ~−77 mV — both outside the McCormick & Huguenard
+        # (1992) thalamic-relay bands (peak +10 to +40 mV; AHP −75 to −55
+        # mV).  Pospischil 2008 Table 2 specifies (g_Na = 90, g_K = 7) for
+        # the lumped TC single-compartment model, but at those densities the
+        # MH92 Traub-Miles kinetics still overshoot peak (~+45 mV) — Pospischil
+        # presumably absorbs the residual peak into different leak/area
+        # choices.  (45, 10) is the smallest reduction that lands every M&H92
+        # AP-shape metric (peak, AHP, half-width, threshold, firing rate)
+        # comfortably inside its band while preserving the LTS rebound burst
+        # (3–7 spikes, 200–500 Hz).  g_KL is bumped from 0.18 → 0.19 in
+        # tandem so that total resting outward conductance compensates for
+        # the lower g_K, keeping the cell genuinely quiescent at rest under
+        # zero injected current (without the bump, the lowered delayed-
+        # rectifier damping lets numerical noise grow into a slow LTS-coupled
+        # mini-burst over the 1-second test window).  Same kinetic pattern
+        # and fix as the cortical pyramidal (#298), Purkinje (#299), FSI
+        # (#301), DA (#304), and STN (#305) presets; closes #307.
         #
         # g_T = 2.5 mS/cm²: Pospischil 2008 specifies 2.0; bumped slightly
         # to land squarely within the 200–500 Hz / 3–7 spike acceptance band
@@ -578,10 +590,11 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # shifting E_Ca and moving the coupled equilibrium.  If g_CaT, g_Ih,
         # or the ICaT factory are ever retuned, re-run
         # find_coupled_equilibrium to recompute v_rest, g_KL, and ca_init.
-        g_K=18.0,
-        v_rest=-68.8121,
+        g_Na=45.0,
+        g_K=10.0,
+        v_rest=-69.2550,
         g_NaL=0.0,
-        g_KL=0.18,
+        g_KL=0.19,
         T_ref=309.15,
         na_channel_factory=make_thalamic_relay_na_channel,
         k_channel_factory=make_thalamic_relay_k_channel,
@@ -596,7 +609,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # ca_i elevated above ca_rest.  Use find_coupled_equilibrium to
         # recompute if CalciumDynamics or channel parameters change.
         calcium_dynamics=CalciumDynamics(
-            alpha_ca=2.6e-5, tau_ca=20.0, ca_rest=1e-4, ca_init=7.4123e-4
+            alpha_ca=2.6e-5, tau_ca=20.0, ca_rest=1e-4, ca_init=6.9107e-4
         ),
         area_cm2=12e-6,
     ),
@@ -1286,13 +1299,16 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "min_stimulus": 0.01,
             "max_stimulus": 0.01,
         },
-        # 20 µA/cm² at 2.5 ms evokes a single AP; threshold rose with K_out=4.0 mM
-        # (E_K ≈ −95 mV), and the brief pulse prevents the ICaT rebound from
-        # triggering additional oscillatory spikes.
+        # 8 µA/cm² × 0.5 ms evokes a single AP under the retuned (g_Na=45,
+        # g_K=10) preset (#307).  Excitability rose with the lower g_K, so
+        # the previous 20 µA/cm² × 2.5 ms now triggers an LTS-coupled
+        # rebound spike on top of the primary AP.  Shortening the pulse to
+        # 0.5 ms narrows the de-inactivation window for ICaT enough that
+        # only a single AP fires.
         ACTION_POTENTIAL: {
-            "min_stimulus": 20.0,
-            "max_stimulus": 20.0,
-            "stimulus_duration": 2.5,
+            "min_stimulus": 8.0,
+            "max_stimulus": 8.0,
+            "stimulus_duration": 0.5,
         },
         # 8 µA/cm² drives sustained tonic firing via T-type Ca²⁺ and Ih
         # over 200 ms (≥52 spikes).
