@@ -896,8 +896,11 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # Channel set: ICaT + IKCa + Ih over the HP92/Pospischil RE Na⁺/K⁺ core.
         # Conductances:
-        #   g_T   = 3.0 mS/cm² (within HP92 voltage-clamp recorded range;
-        #                       tuned for the 5–15 spike LTS rebound burst)
+        #   g_Na  = 50 mS/cm² (explicit somatic density — see below)
+        #   g_K   = 24 mS/cm² (explicit somatic density — see below)
+        #   g_T   = 2.85 mS/cm² (within HP92 voltage-clamp recorded range;
+        #                       co-tuned with g_Na/g_K for the 5–15 spike LTS
+        #                       rebound burst)
         #   g_KCa = 0.3 mS/cm² (Huguenard & Prince 1992, TRN)
         #   g_h   = 0.020 mS/cm² (slightly below the ≈0.025 reported by
         #                          Bal & McCormick 1993 for cat TRN; tuned to
@@ -938,6 +941,32 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # Q10 correction to ~1.12× (36→37 °C) — a negligible adjustment that
         # preserves the published kinetics.
         #
+        # g_Na = 50 mS/cm², g_K = 24 mS/cm² are explicit somatic densities
+        # for the single-compartment reduction.  Without these overrides the
+        # preset would silently inherit NeuronConfig's HH52 defaults
+        # (g_Na = 120, g_K = 36), driving the mean tonic AP peak to ~+49 mV
+        # and the AHP to ~−86 mV — both outside the Huguenard & Prince (1992)
+        # TRN bands (peak +10 to +40 mV; AHP −75 to −55 mV).  Same kinetic
+        # pattern and fix as the cortical pyramidal (#298), Purkinje (#299),
+        # FSI (#301), DA (#304), STN (#305), TC (#307) presets; closes #308.
+        # Pospischil 2008 Table 2 specifies (g_Na = 200, g_K = 20) for the
+        # lumped RE single-compartment model, but at those densities the
+        # MH92 Traub-Miles kinetics still overshoot peak.  (50, 24) is the
+        # smallest reduction that lands every HP92 tonic AP-shape metric
+        # (peak, AHP, half-width, threshold, firing rate) inside its band
+        # while preserving (a) the HP92 rebound-burst phenotype (5–15
+        # spikes, 200–600 Hz, single coherent burst) and (b) the v_rest =
+        # −80 mV initial condition pinned by
+        # ``test_trn_preset_vrest_is_physiological``.
+        #
+        # g_T is bumped down from 3.0 → 2.85 mS/cm² (within HP92 range) in
+        # tandem to keep the LTS rebound burst from fragmenting into multiple
+        # detected bursts: the lower g_K reduces post-spike repolarisation,
+        # which lets the LTS plateau drive too many spikes (>15) when g_T is
+        # held at 3.0; the small g_T cut shortens the plateau back into the
+        # 5–15 spike band and keeps ``analyze_bursts`` finding exactly one
+        # burst (required by ``test_trn_step_release_produces_hp92_rebound_burst``).
+        #
         # PACEMAKER MODE.  With Ih and the elevated g_T, the cell is no longer
         # silent at zero current — it fires tonically at ~3 Hz, consistent
         # with the spontaneous firing observed in TRN slice recordings (HP92,
@@ -963,13 +992,15 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # the 5–15 Na⁺ spike, 200–600 Hz HP92 rebound burst).  ``ft_inf(V)``
         # is unchanged from Destexhe (1994).
         v_rest=-80.0,
+        g_Na=50.0,
+        g_K=24.0,
         g_NaL=0.0066,
         g_KL=0.0634,
         T_ref=309.15,
         na_channel_factory=make_trn_na_channel,
         k_channel_factory=make_trn_k_channel,
         channels=(
-            ChannelConfig(make_trn_icat_channel, g_max=3.0),
+            ChannelConfig(make_trn_icat_channel, g_max=2.85),
             ChannelConfig(make_ikca_channel, g_max=0.3),
             ChannelConfig(make_ih_channel, g_max=0.020),
         ),
