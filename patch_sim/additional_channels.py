@@ -284,29 +284,33 @@ def make_ih_channel(
 # Activation gate ``p`` follows the standard Magistretti & Alonso 1999 kinetics
 # (fast Boltzmann, V½ = −52.6 mV, slope 4.6 mV).
 #
-# Slow inactivation gate ``sNaP`` (opt-in via ``slow_inactivation=True``) is
-# also from Magistretti & Alonso 1999 §"Slow inactivation": V½ = −45 mV, slope
-# 7 mV (inverted Boltzmann; values picked from the depolarised end of the
-# experimental −47 to −54 mV / k = 7-10 mV spread to leave near-rest
-# availability high, s_inf(−65 mV) ≈ 0.94).  The paper reports τ on the order
-# of seconds at the V½ peak; the implementation uses a faster tau_scale
-# (≈200 ms peak) so the gate produces a useful escape from a depolarisation
-# plateau within a single sustained step rather than over multiple seconds.
+# Slow inactivation gate ``sNaP`` is also from Magistretti & Alonso 1999
+# §"Slow inactivation": V½ = −45 mV, slope 7 mV (inverted Boltzmann;
+# values picked from the depolarised end of the experimental −47 to −54
+# mV / k = 7-10 mV spread to leave near-rest availability high,
+# s_inf(−65 mV) ≈ 0.94).  The paper reports τ on the order of seconds at
+# the V½ peak; the implementation uses a faster tau_scale (≈200 ms peak)
+# so the gate produces a useful escape from a depolarisation plateau
+# within a single sustained step rather than over multiple seconds.  The
+# gate is part of the standard topology because native INaP biologically
+# undergoes this slow inactivation (Magistretti & Alonso 1999).
 #
-# In STN this gate co-acts with the fast-Na slow inactivation gate
-# (``make_stn_na_channel(slow_inactivation=True)``) and ``make_katp_channel``
-# (#324); the three together collapse the −15 mV plateau cleanly.  Cortical
-# pyramidal (#327), CA1 pyramidal (#328), and Purkinje (#329) all opt into
-# ``sNaP`` together with their own fast-Na slow-inactivation gate but no
-# K_ATP — autonomous-pacemaker metabolic safety isn't biologically
-# motivated there (or, for Purkinje, Carter & Bean 2009 demonstrate
-# depol-block recovery without it), and the two slow-inactivation gates
-# suffice.  SNc dopaminergic (#330) ships its slow-inactivation gates via
-# the SNc-specific factories ``make_dopaminergic_na_channel`` (sNa_da gate,
-# Khaliq & Bean 2010) and ``make_snc_inap_channel`` (sNaP_snc gate, V½
-# shifted to track the Drion 2011 SNc INaP fit) rather than this entorhinal
-# factory.  The chosen τ is therefore robust to the channel cocktail the
-# gate happens to ship in.
+# In STN this gate co-acts with the fast-Na slow inactivation gate baked
+# into ``make_stn_na_channel`` and with ``make_katp_channel`` (#324); the
+# three together collapse the −15 mV plateau cleanly.  Cortical pyramidal
+# (#327), CA1 pyramidal (#328), and Purkinje (#329) combine ``sNaP`` with
+# their own fast-Na slow-inactivation gate (built into
+# ``make_nav12_channel`` for the cortical/CA1 cases, ``make_purkinje_na_channel``
+# for Purkinje) but no K_ATP — autonomous-pacemaker metabolic safety
+# isn't biologically motivated there (or, for Purkinje, Carter & Bean
+# 2009 demonstrate depol-block recovery without it), and the two slow-
+# inactivation gates suffice.  SNc dopaminergic (#330) ships its slow-
+# inactivation gates via the SNc-specific factories
+# ``make_dopaminergic_na_channel`` (sNa_da gate, Khaliq & Bean 2010) and
+# ``make_snc_inap_channel`` (sNaP_snc gate, V½ shifted to track the
+# Drion 2011 SNc INaP fit) rather than this entorhinal factory.  The
+# chosen τ is therefore robust to the channel cocktail the gate happens
+# to ship in.
 #
 # The slow-inactivation gate is named ``sNaP`` rather than ``s`` because the
 # gating-state dictionary is keyed by gate name only and ``make_inar_channel``
@@ -331,56 +335,47 @@ _alpha_sNaP, _beta_sNaP = boltzmann_cosh_rates(
 )
 
 
-def make_inap_channel(
-    g_max: float = DEFAULT_G_NAP,
-    *,
-    slow_inactivation: bool = False,
-) -> IonChannel:
+def make_inap_channel(g_max: float = DEFAULT_G_NAP) -> IonChannel:
     """Create an INaP (persistent Na⁺) ion channel.
 
     INaP is a sustained Na⁺ current active near the resting potential that
     amplifies subthreshold depolarizations and can lower the threshold for
-    action potential generation.  By default the channel uses a single
-    activation gate ``p`` (Magistretti & Alonso 1999 kinetics, V½ = −52.6 mV).
+    action potential generation.
 
-    With ``slow_inactivation=True`` a second gate ``sNaP`` is added (also
-    Magistretti & Alonso 1999, §"Slow inactivation"; V½ = −45 mV, inverted
-    Boltzmann).  The slow gate is mostly available at hyperpolarised
-    potentials and decays towards zero during sustained depolarisation,
-    providing an escape mechanism that lets the membrane repolarise after a
-    prolonged suprathreshold step.  The simulation column is named ``sNaP``
+    The channel always includes two gates: an activation gate ``p``
+    (Magistretti & Alonso 1999 kinetics, V½ = −52.6 mV) and a slow
+    voltage-dependent inactivation gate ``sNaP`` (also Magistretti &
+    Alonso 1999, §"Slow inactivation"; V½ = −45 mV, slope 7 mV, inverted
+    Boltzmann; τ_scale = 200 ms / τ_floor = 20 ms).  The slow gate is
+    mostly available at hyperpolarised potentials and decays towards zero
+    during sustained depolarisation, providing the escape mechanism that
+    lets the membrane repolarise after a prolonged suprathreshold step.
+    Native INaP biologically undergoes this slow inactivation (Magistretti
+    & Alonso 1999), so the gate is part of the standard topology rather
+    than an opt-in feature.  The simulation column is named ``sNaP``
     rather than ``s`` to avoid colliding with :func:`make_inar_channel`'s
     activation gate, which is also named ``s``.
-
-    Slow inactivation is opt-in because it changes the effective INaP
-    conductance during sustained firing trains (sNaP slowly decays towards
-    its sub-1 steady state), which can alter spike-frequency-adaptation
-    profiles in presets calibrated against the no-slow-inactivation INaP.
-    Enable it on presets where depolarisation-block recovery is the
-    dominant concern — STN (#324), cortical pyramidal (#327), CA1
-    pyramidal (#328), and Purkinje (#329).
 
     The reversal potential is computed dynamically from the neuron's Na⁺
     concentrations using the Nernst equation.
 
+    References:
+        - Magistretti & Alonso (1999), J. Gen. Physiol. 114:491
+          (entorhinal INaP activation and slow inactivation).
+
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
             Defaults to :data:`~patch_sim.constants.DEFAULT_G_NAP`.
-        slow_inactivation: If True, add the Magistretti & Alonso 1999 slow
-            inactivation gate ``sNaP`` (default False).
 
     Returns:
         An :class:`~patch_sim.channels.IonChannel` representing the INaP current.
     """
     p_var = GatingVariable(name="p", power=1, alpha=_alpha_p, beta=_beta_p)
-    gating: tuple[GatingVariable, ...] = (p_var,)
-    if slow_inactivation:
-        s_var = GatingVariable(name="sNaP", power=1, alpha=_alpha_sNaP, beta=_beta_sNaP)
-        gating = (p_var, s_var)
+    s_var = GatingVariable(name="sNaP", power=1, alpha=_alpha_sNaP, beta=_beta_sNaP)
     return IonChannel(
         name="NaP",
         g_max=g_max,
-        gating_variables=gating,
+        gating_variables=(p_var, s_var),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
     )
 

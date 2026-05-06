@@ -6,7 +6,6 @@ adjustments — all expressed in terms of core library types so they can
 be used without importing the UI package.
 """
 
-import functools
 from typing import Any
 
 import numpy as np
@@ -55,8 +54,9 @@ from .core_channels import (
     make_dopaminergic_k_channel,
     make_dopaminergic_na_channel,
     make_mainen_sejnowski_kv_channel,
+    make_nav11_channel,
+    make_nav12_channel,
     make_pospischil_k_channel,
-    make_pospischil_na_channel,
     make_purkinje_k_channel,
     make_purkinje_na_channel,
     make_stn_k_channel,
@@ -128,6 +128,20 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # so T_ref=307.15 K limits the Q10 factor to ~1.4× and the cell sustains
         # non-adapting high-frequency firing as expected.
         #
+        # Fast Na⁺ uses ``make_nav11_channel`` (Pospischil base + a weak
+        # Nav1.1-flavoured slow inactivation gate, V½ = −45 mV, τ_floor =
+        # 5000 ms) so the model captures the biological fact that Nav1.1
+        # has slow inactivation (Patel et al. 2015) while the kinetics
+        # remain too slow to dominate at FSI firing rates.  At v_rest =
+        # −65 mV the gate sits at sNa11_inf ≈ 0.92, so g_Na is bumped
+        # from the previous 80 → 88 mS/cm² to compensate for the ~8 %
+        # rest-availability reduction; AP peak (~+38 mV), AHP (~−74 mV),
+        # half-width (~0.30 ms), and ~235 Hz firing at 30 µA/cm² stay
+        # within the Erisir / Kawaguchi / Wang-Buzsáki bands.  A higher-
+        # fidelity isoform-fitted overhaul (true Nav1.1 activation/fast-
+        # inactivation kinetics from Hu & Jonas 2014) is tracked as a
+        # follow-up.
+        #
         # g_NaL + g_KL = 1.5 mS/cm² gives τ_m ≈ 0.67 ms — highly leaky membrane
         # that narrows the synaptic integration window, a hallmark of FS cells.
         # Values originally tuned so that I_NaL + I_KL + I_channels = 0 at
@@ -137,12 +151,12 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # each active conductance does not perturb v_rest measurably; the leak
         # split is therefore kept identical, and `test_fs_no_spontaneous_firing`
         # confirms the cell still rests stably below threshold.
-        g_Na=80.0,
+        g_Na=88.0,
         g_K=30.0,
         g_NaL=0.3115,
         g_KL=1.1885,
         T_ref=307.15,
-        na_channel_factory=make_pospischil_na_channel,
+        na_channel_factory=make_nav11_channel,
         k_channel_factory=make_pospischil_k_channel,
         channels=(ChannelConfig(make_ikv31_channel, g_max=20.0),),
         area_cm2=3e-6,
@@ -227,12 +241,11 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # repolarises after a sustained suprathreshold step (e.g. +12
         # µA/cm² × 200 ms) instead of hanging on a depol-block plateau:
         #   1. INaP slow inactivation (sNaP, Magistretti & Alonso 1999)
-        #      via ``slow_inactivation=True`` on make_inap_channel —
-        #      removes the persistent Na⁺ window current that otherwise
-        #      sustains the plateau.
-        #   2. Fast-Na slow inactivation (sNa, Fleidervish & Gutnick 1996;
-        #      Mickus et al. 1999) via ``slow_inactivation=True`` on
-        #      make_pospischil_na_channel — closes the residual fast-Na
+        #      baked into ``make_inap_channel`` — removes the persistent
+        #      Na⁺ window current that otherwise sustains the plateau.
+        #   2. Fast-Na slow inactivation (sNa12, Fleidervish & Gutnick
+        #      1996; Mickus et al. 1999) baked into
+        #      ``make_nav12_channel`` — closes the residual fast-Na
         #      h-tail at the depolarised plateau that single-gate INaP
         #      slow inactivation could not reach.  Fleidervish & Gutnick
         #      1996 directly studied cortical pyramidal cells, so the
@@ -272,17 +285,11 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         g_KL=0.049609,
         Q10=1.0,
         T_ref=307.15,
-        na_channel_factory=functools.partial(
-            make_pospischil_na_channel, slow_inactivation=True
-        ),
+        na_channel_factory=make_nav12_channel,
         k_channel_factory=make_pospischil_k_channel,
         channels=(
             ChannelConfig(make_ih_channel, g_max=0.3),
-            ChannelConfig(
-                make_inap_channel,
-                g_max=0.1,
-                extra_kwargs={"slow_inactivation": True},
-            ),
+            ChannelConfig(make_inap_channel, g_max=0.1),
             ChannelConfig(make_im_channel, g_max=0.075),
             ChannelConfig(make_mainen_sejnowski_kv_channel, g_max=1.8),
         ),
@@ -347,14 +354,13 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # slow inactivation gates cooperate so the cell repolarises after a
         # sustained suprathreshold step (e.g. +10 µA/cm² × 200 ms) instead
         # of hanging on a depol-block plateau:
-        #   1. INaP slow inactivation (sNaP, Magistretti & Alonso 1999) via
-        #      ``slow_inactivation=True`` on make_inap_channel — removes
-        #      the persistent Na⁺ window current that otherwise sustains
-        #      the plateau.
+        #   1. INaP slow inactivation (sNaP, Magistretti & Alonso 1999)
+        #      baked into ``make_inap_channel`` — removes the persistent
+        #      Na⁺ window current that otherwise sustains the plateau.
         #   2. Fast-Na slow inactivation (sNa, Carter & Bean 2009) baked
-        #      into make_purkinje_na_channel — closes the residual fast-Na
-        #      h-tail at the depolarised plateau that single-gate INaP
-        #      slow inactivation could not reach.  Carter & Bean 2009
+        #      into ``make_purkinje_na_channel`` — closes the residual
+        #      fast-Na h-tail at the depolarised plateau that single-gate
+        #      INaP slow inactivation could not reach.  Carter & Bean 2009
         #      directly demonstrated cumulative slow inactivation in
         #      cerebellar Purkinje somatic Na⁺ channels, so this is the
         #      primary cellular reference for Purkinje (companion to
@@ -396,11 +402,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ical_channel, g_max=1.0),
             ChannelConfig(make_icat_channel, g_max=0.5),
             ChannelConfig(make_ikca_channel, g_max=2.0),
-            ChannelConfig(
-                make_inap_channel,
-                g_max=0.1,
-                extra_kwargs={"slow_inactivation": True},
-            ),
+            ChannelConfig(make_inap_channel, g_max=0.1),
             ChannelConfig(make_inar_channel, g_max=0.1),
             ChannelConfig(make_ih_channel, g_max=1.0),
         ),
@@ -674,17 +676,15 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # too weak to engage the gates here) instead of hanging on a
         # depol-block plateau:
         #   1. INaP slow inactivation (sNaP, Magistretti & Alonso 1999)
-        #      via ``slow_inactivation=True`` on make_inap_channel —
-        #      removes the persistent Na⁺ window current that otherwise
-        #      sustains the plateau.
-        #   2. Fast-Na slow inactivation (sNa, Mickus, Jung & Spruston 1999)
-        #      via ``slow_inactivation=True`` on make_pospischil_na_channel
-        #      — closes the residual fast-Na h-tail at the depolarised
-        #      plateau that single-gate INaP slow inactivation could not
-        #      reach.  Mickus et al. 1999 directly studied CA1 pyramidal
-        #      cells, so the slow Na inactivation kinetics motivated for
-        #      STN in #324 (which cited the same paper) apply a fortiori
-        #      here.
+        #      baked into ``make_inap_channel`` — removes the persistent
+        #      Na⁺ window current that otherwise sustains the plateau.
+        #   2. Fast-Na slow inactivation (sNa12, Mickus, Jung & Spruston
+        #      1999) baked into ``make_nav12_channel`` — closes the
+        #      residual fast-Na h-tail at the depolarised plateau that
+        #      single-gate INaP slow inactivation could not reach.
+        #      Mickus et al. 1999 directly studied CA1 pyramidal cells,
+        #      so the slow Na inactivation kinetics motivated for STN in
+        #      #324 (which cited the same paper) apply a fortiori here.
         #
         # K_ATP is intentionally NOT included (unlike STN): CA1 pyramidal
         # cells are not autonomous pacemakers, so the metabolic-safety
@@ -702,9 +702,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         g_KL=0.029146,
         Q10=1.0,
         T_ref=307.15,
-        na_channel_factory=functools.partial(
-            make_pospischil_na_channel, slow_inactivation=True
-        ),
+        na_channel_factory=make_nav12_channel,
         k_channel_factory=make_pospischil_k_channel,
         channels=(
             ChannelConfig(make_ika_channel, g_max=0.5),
@@ -714,11 +712,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ican_channel, g_max=0.3),
             ChannelConfig(make_icat_channel, g_max=0.3),
             ChannelConfig(make_ikca_channel, g_max=2.0),
-            ChannelConfig(
-                make_inap_channel,
-                g_max=0.1,
-                extra_kwargs={"slow_inactivation": True},
-            ),
+            ChannelConfig(make_inap_channel, g_max=0.1),
         ),
         # alpha_ca/tau_ca rebalanced so [Ca²⁺]ᵢ accumulates gradually over the
         # 500 ms test train rather than saturating IKCa within the first AP
@@ -774,14 +768,14 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # suprathreshold step (e.g. +5 µA/cm² × 200 ms) instead of hanging
         # on a −15 mV plateau:
         #   1. INaP slow inactivation (sNaP, Magistretti & Alonso 1999)
-        #      via ``slow_inactivation=True`` on make_inap_channel — removes
-        #      >70 % of the persistent Na⁺ window current at the plateau.
+        #      baked into ``make_inap_channel`` — removes >70 % of the
+        #      persistent Na⁺ window current at the plateau.
         #   2. Fast-Na slow inactivation (sNa, Fleidervish & Gutnick 1996;
-        #      Mickus et al. 1999; Do & Bean 2003) via
-        #      ``slow_inactivation=True`` on make_stn_na_channel — closes
-        #      the residual ~10–20 µA/cm² h-tail at the depolarised
-        #      plateau that single-gate INaP slow inactivation could not
-        #      reach (Otsuka 2004 h_inf ≈ 1 % at −15 mV × g_Na = 30 mS/cm²).
+        #      Mickus et al. 1999; Do & Bean 2003) baked into
+        #      ``make_stn_na_channel`` — closes the residual ~10–20
+        #      µA/cm² h-tail at the depolarised plateau that single-gate
+        #      INaP slow inactivation could not reach (Otsuka 2004 h_inf
+        #      ≈ 1 % at −15 mV × g_Na = 30 mS/cm²).
         #   3. K_ATP (Stanford & Lacey 1996; Bevan & Wilson 1999;
         #      Hahn & McIntyre 2010) via make_katp_channel(g_max=0.5) —
         #      provides outward K⁺ drive under sustained depolarisation,
@@ -876,9 +870,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         g_KL=0.04,
         Q10=1.0,
         T_ref=308.15,
-        na_channel_factory=functools.partial(
-            make_stn_na_channel, slow_inactivation=True
-        ),
+        na_channel_factory=make_stn_na_channel,
         k_channel_factory=make_stn_k_channel,
         channels=(
             ChannelConfig(make_icat_channel, g_max=5.0),
@@ -886,11 +878,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ika_channel, g_max=3.0),
             ChannelConfig(make_ikca_channel, g_max=1.0),
             ChannelConfig(make_ih_channel, g_max=1.0),
-            ChannelConfig(
-                make_inap_channel,
-                g_max=0.05,
-                extra_kwargs={"slow_inactivation": True},
-            ),
+            ChannelConfig(make_inap_channel, g_max=0.05),
             ChannelConfig(make_ikv31_channel, g_max=1.0),
             ChannelConfig(make_katp_channel, g_max=0.5),
         ),

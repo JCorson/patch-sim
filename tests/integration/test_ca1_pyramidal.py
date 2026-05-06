@@ -220,10 +220,10 @@ def test_ca1_inap_slow_inactivation_engages_during_drive(ca1_neuron: Neuron) -> 
 def test_ca1_fast_na_slow_inactivation_engages_during_drive(
     ca1_neuron: Neuron,
 ) -> None:
-    """The sNa gate (fast Na slow inactivation) closes during +30 µA/cm² × 200 ms.
+    """The sNa12 gate (fast Na slow inactivation) closes during +30 µA/cm² × 200 ms.
 
     Direct mechanism check for #328: the Mickus, Jung & Spruston 1999 slow
-    voltage-dependent inactivation gate added to ``make_pospischil_na_channel``
+    voltage-dependent inactivation gate baked into ``make_nav12_channel``
     must lose at least half its rest availability by the end of a sustained
     suprathreshold step, abolishing the residual fast-Na h-tail that would
     otherwise pin the cell on a depolarisation plateau.  Mickus 1999
@@ -241,16 +241,16 @@ def test_ca1_fast_na_slow_inactivation_engages_during_drive(
         ]
     )
     result = simulate_current_clamp(ca1_neuron, current_external=current)
-    sNa_at_rest = float(result["sNa"][n_pre - 1])
+    sNa_at_rest = float(result["sNa12"][n_pre - 1])
     assert sNa_at_rest > 0.5, (
-        f"sNa rest availability is unexpectedly low ({sNa_at_rest:.3f}); "
+        f"sNa12 rest availability is unexpectedly low ({sNa_at_rest:.3f}); "
         "the inactivation engagement check below is meaningless if the "
         "gate is already mostly closed at v_rest."
     )
-    sNa_at_step_end = float(result["sNa"][n_pre + n_step - 1])
+    sNa_at_step_end = float(result["sNa12"][n_pre + n_step - 1])
     fraction_inactivated = 1.0 - sNa_at_step_end / sNa_at_rest
     assert fraction_inactivated > 0.5, (
-        f"sNa did not meaningfully inactivate: rest={sNa_at_rest:.3f}, "
+        f"sNa12 did not meaningfully inactivate: rest={sNa_at_rest:.3f}, "
         f"step end={sNa_at_step_end:.3f}, "
         f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.5)"
     )

@@ -13,8 +13,10 @@ from patch_sim.core_channels import (
     PURKINJE_VT,
     _dopaminergic_alpha_sNa,
     _dopaminergic_beta_sNa,
-    _pospischil_alpha_sNa,
-    _pospischil_beta_sNa,
+    _nav11_alpha_sNa,
+    _nav11_beta_sNa,
+    _nav12_alpha_sNa,
+    _nav12_beta_sNa,
     _purkinje_alpha_sNa,
     _purkinje_beta_sNa,
     _stn_alpha_h,
@@ -51,8 +53,9 @@ from patch_sim.core_channels import (
     make_mainen_sejnowski_na_channel,
     make_na_channel,
     make_na_leak_channel,
+    make_nav11_channel,
+    make_nav12_channel,
     make_pospischil_k_channel,
-    make_pospischil_na_channel,
     make_purkinje_k_channel,
     make_purkinje_na_channel,
     make_stn_k_channel,
@@ -465,99 +468,173 @@ def test_pospischil_steady_state_gating_bounds(V: float) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_make_pospischil_na_channel_structure() -> None:
-    """make_pospischil_na_channel returns a channel with correct structure."""
-    ch = make_pospischil_na_channel(g_max=50.0)
+def test_make_nav12_channel_structure() -> None:
+    """make_nav12_channel returns a (m, h, sNa12) Nav1.2-flavoured Na channel."""
+    ch = make_nav12_channel(g_max=50.0)
     assert isinstance(ch, IonChannel)
     assert ch.name == "Na"
     assert ch.g_max == pytest.approx(50.0)
-    assert len(ch.gating_variables) == 2
+    assert len(ch.gating_variables) == 3
     assert ch.gating_variables[0].name == "m"
     assert ch.gating_variables[0].power == 3
     assert ch.gating_variables[1].name == "h"
     assert ch.gating_variables[1].power == 1
+    assert ch.gating_variables[2].name == "sNa12"
+    assert ch.gating_variables[2].power == 1
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.SODIUM
     assert not ch.carries_calcium
 
 
-def test_make_pospischil_na_channel_with_slow_inactivation() -> None:
-    """``slow_inactivation=True`` adds the sNa gate (Fleidervish & Gutnick 1996)."""
-    ch = make_pospischil_na_channel(g_max=35.0, slow_inactivation=True)
+def test_make_nav11_channel_structure() -> None:
+    """make_nav11_channel returns a (m, h, sNa11) Nav1.1-flavoured Na channel."""
+    ch = make_nav11_channel(g_max=80.0)
+    assert isinstance(ch, IonChannel)
+    assert ch.name == "Na"
+    assert ch.g_max == pytest.approx(80.0)
     assert len(ch.gating_variables) == 3
-    assert ch.gating_variables[2].name == "sNa"
+    assert ch.gating_variables[0].name == "m"
+    assert ch.gating_variables[0].power == 3
+    assert ch.gating_variables[1].name == "h"
+    assert ch.gating_variables[1].power == 1
+    assert ch.gating_variables[2].name == "sNa11"
     assert ch.gating_variables[2].power == 1
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.SODIUM
+    assert not ch.carries_calcium
 
 
 # ---------------------------------------------------------------------------
-# Pospischil slow Na inactivation rate functions (sNa gate; Fleidervish &
-# Gutnick 1996; Mickus, Jung & Spruston 1999).  Opt-in gate added in #327
-# to abolish the residual depol-block plateau that single-gate Pospischil
-# kinetics leave open under sustained suprathreshold drive.
+# Nav1.2 slow Na inactivation rate functions (sNa12 gate; Fleidervish &
+# Gutnick 1996; Mickus, Jung & Spruston 1999).  Always-on gate baked into
+# make_nav12_channel to abolish the residual depol-block plateau that
+# single-gate Pospischil kinetics leave open under sustained suprathreshold
+# drive.
 # ---------------------------------------------------------------------------
 
 
-def _pospischil_sNa_inf(V: float) -> float:
-    """Steady-state availability of the Pospischil slow Na inactivation gate.
+def _nav12_sNa_inf(V: float) -> float:
+    """Steady-state availability of the Nav1.2 slow Na inactivation gate.
 
     Args:
         V: Membrane voltage in mV.
 
     Returns:
-        Steady-state availability of the sNa gate at voltage V, in [0, 1].
+        Steady-state availability of the sNa12 gate at voltage V, in [0, 1].
     """
-    a, b = _pospischil_alpha_sNa(V, 0.0), _pospischil_beta_sNa(V, 0.0)
+    a, b = _nav12_alpha_sNa(V, 0.0), _nav12_beta_sNa(V, 0.0)
     return a / (a + b)
 
 
-def test_pospischil_slow_na_inactivation_steady_state_in_bounds() -> None:
-    """The sNa rates are positive and steady state in [0, 1] across V."""
+def test_nav12_slow_na_inactivation_steady_state_in_bounds() -> None:
+    """The sNa12 rates are positive and steady state in [0, 1] across V."""
     for V in (-120.0, -100.0, -75.0, -65.0, -50.0, -30.0, -15.0, 0.0, 30.0):
-        a = _pospischil_alpha_sNa(V, 0.0)
-        b = _pospischil_beta_sNa(V, 0.0)
-        assert a >= 0, f"alpha_sNa negative at V={V}"
-        assert b >= 0, f"beta_sNa negative at V={V}"
+        a = _nav12_alpha_sNa(V, 0.0)
+        b = _nav12_beta_sNa(V, 0.0)
+        assert a >= 0, f"alpha_sNa12 negative at V={V}"
+        assert b >= 0, f"beta_sNa12 negative at V={V}"
         ss = a / (a + b)
-        assert 0.0 <= ss <= 1.0, f"sNa steady state {ss} out of [0,1] at V={V}"
+        assert 0.0 <= ss <= 1.0, f"sNa12 steady state {ss} out of [0,1] at V={V}"
 
 
-def test_pospischil_slow_na_inactivation_decreases_with_depolarisation() -> None:
-    """The sNa availability decreases monotonically with depolarisation."""
-    assert (
-        _pospischil_sNa_inf(-80.0)
-        > _pospischil_sNa_inf(-50.0)
-        > _pospischil_sNa_inf(-15.0)
-    )
+def test_nav12_slow_na_inactivation_decreases_with_depolarisation() -> None:
+    """The sNa12 availability decreases monotonically with depolarisation."""
+    assert _nav12_sNa_inf(-80.0) > _nav12_sNa_inf(-50.0) > _nav12_sNa_inf(-15.0)
 
 
-def test_pospischil_slow_na_inactivation_half_voltage() -> None:
-    """V½ for sNa sits at -50 mV (Fleidervish & Gutnick 1996 mid-range)."""
-    assert _pospischil_sNa_inf(-50.0) == pytest.approx(0.5, abs=0.01)
+def test_nav12_slow_na_inactivation_half_voltage() -> None:
+    """V½ for sNa12 sits at -50 mV (Fleidervish & Gutnick 1996 mid-range)."""
+    assert _nav12_sNa_inf(-50.0) == pytest.approx(0.5, abs=0.01)
 
 
-def test_pospischil_slow_na_inactivation_resting_availability() -> None:
-    """Cortical pyramidal rests at -70 mV — sNa must remain near-fully open."""
+def test_nav12_slow_na_inactivation_resting_availability() -> None:
+    """Cortical pyramidal rests at -70 mV — sNa12 must remain near-fully open."""
     # Cortical pyramidal v_rest = -70 mV (deeper than STN's -60 mV cycle), so
-    # subthreshold sNa availability should be even higher than the STN gate's
-    # rest value.  Loss of >10 % rest availability would noticeably suppress
-    # AP amplitude on every step from rest.
-    assert _pospischil_sNa_inf(-70.0) > 0.9
+    # subthreshold sNa12 availability should be even higher than the STN
+    # gate's rest value.  Loss of >10 % rest availability would noticeably
+    # suppress AP amplitude on every step from rest.
+    assert _nav12_sNa_inf(-70.0) > 0.9
 
 
-def test_pospischil_slow_na_inactivation_blocks_depol_plateau() -> None:
-    """At depolarised plateau voltages sNa closes, abolishing the residual h-tail."""
-    # The depol-block plateau the new gate must escape (mirroring #324) hangs
-    # at ≈ −15 mV; sNa must close firmly there so g_Na_eff = g_max * m^3 * h
-    # * sNa collapses below the leak + IM outward drive.
-    assert _pospischil_sNa_inf(-15.0) < 0.05
+def test_nav12_slow_na_inactivation_blocks_depol_plateau() -> None:
+    """At depolarised plateau voltages sNa12 closes, abolishing the residual h-tail."""
+    # The depol-block plateau the gate must escape (mirroring #324) hangs at
+    # ≈ −15 mV; sNa12 must close firmly there so g_Na_eff = g_max * m^3 * h
+    # * sNa12 collapses below the leak + IM outward drive.
+    assert _nav12_sNa_inf(-15.0) < 0.05
 
 
-def test_pospischil_slow_na_inactivation_tau_is_slow() -> None:
-    """τ_sNa at V½ stays distinctly slow vs the fast m, h gates."""
-    a = _pospischil_alpha_sNa(-50.0, 0.0)
-    b = _pospischil_beta_sNa(-50.0, 0.0)
+def test_nav12_slow_na_inactivation_tau_is_slow() -> None:
+    """τ_sNa12 at V½ stays distinctly slow vs the fast m, h gates."""
+    a = _nav12_alpha_sNa(-50.0, 0.0)
+    b = _nav12_beta_sNa(-50.0, 0.0)
     tau = 1.0 / (a + b)
-    assert tau > 100.0, f"sNa tau at V½ is {tau:.1f} ms, expected > 100 ms"
+    assert tau > 100.0, f"sNa12 tau at V½ is {tau:.1f} ms, expected > 100 ms"
+
+
+# ---------------------------------------------------------------------------
+# Nav1.1 slow Na inactivation rate functions (sNa11 gate; Patel et al. 2015
+# Nav1.1 vs Nav1.6 comparison).  Weak gate baked into make_nav11_channel:
+# V½ = −65 mV with a much slower τ_scale (5000 ms) so the gate barely
+# engages at the 100–500 Hz firing rates typical of FSI.
+# ---------------------------------------------------------------------------
+
+
+def _nav11_sNa_inf(V: float) -> float:
+    """Steady-state availability of the Nav1.1 slow Na inactivation gate.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Steady-state availability of the sNa11 gate at voltage V, in [0, 1].
+    """
+    a, b = _nav11_alpha_sNa(V, 0.0), _nav11_beta_sNa(V, 0.0)
+    return a / (a + b)
+
+
+def test_nav11_slow_na_inactivation_steady_state_in_bounds() -> None:
+    """The sNa11 rates are positive and steady state in [0, 1] across V."""
+    for V in (-120.0, -100.0, -75.0, -65.0, -50.0, -30.0, -15.0, 0.0, 30.0):
+        a = _nav11_alpha_sNa(V, 0.0)
+        b = _nav11_beta_sNa(V, 0.0)
+        assert a >= 0, f"alpha_sNa11 negative at V={V}"
+        assert b >= 0, f"beta_sNa11 negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"sNa11 steady state {ss} out of [0,1] at V={V}"
+
+
+def test_nav11_slow_na_inactivation_half_voltage() -> None:
+    """V½ for sNa11 sits at -45 mV (native β-subunit-shifted Nav1.1 estimate)."""
+    assert _nav11_sNa_inf(-45.0) == pytest.approx(0.5, abs=0.01)
+
+
+def test_nav11_slow_na_inactivation_resting_availability() -> None:
+    """At FSI v_rest = −65 mV the sNa11 gate must be near-fully open.
+
+    A meaningful reduction at rest would suppress Na availability and
+    break the high-frequency firing phenotype FSI relies on.  V½ = −45 mV
+    keeps sNa11_inf above 0.9 at v_rest = −65 mV.
+    """
+    assert _nav11_sNa_inf(-65.0) > 0.9
+
+
+def test_nav11_slow_na_inactivation_tau_floor_is_seconds() -> None:
+    """τ_sNa11 must be in seconds at every voltage so the gate barely moves over 1 s.
+
+    The kinetic separation is the whole reason the gate survives on FSI:
+    even at AP peak voltages (~+30 mV) the gate must move slowly enough
+    that 250+ APs over 1 s do not collapse FSI Na availability.
+    τ_floor = 5000 ms enforces this.
+    """
+    for V in (-65.0, -45.0, -15.0, 0.0, 30.0):
+        a = _nav11_alpha_sNa(V, 0.0)
+        b = _nav11_beta_sNa(V, 0.0)
+        tau = 1.0 / (a + b)
+        assert tau >= 4990.0, (
+            f"sNa11 τ at V={V} mV is {tau:.1f} ms — must be at the 5000 ms "
+            f"floor or above so per-spike inactivation closure is negligible."
+        )
 
 
 def test_make_pospischil_k_channel_structure() -> None:
@@ -580,10 +657,10 @@ def test_make_pospischil_k_channel_structure() -> None:
 
 
 @pytest.mark.parametrize("V", [-100.0, -80.0, -65.0, -43.2, -16.2, 0.0, 20.0, 40.0])
-def test_pospischil_na_channel_current_matches_inline(V: float) -> None:
-    """Pospischil Na channel compute_current equals g_Na * m³ * h * (V − E_Na)."""
+def test_nav12_channel_current_matches_inline(V: float) -> None:
+    """nav12 Na channel compute_current equals g_Na * m³ * h * sNa12 * (V − E_Na)."""
     neuron = Neuron()
-    ch = make_pospischil_na_channel(g_max=neuron.g_Na)
+    ch = make_nav12_channel(g_max=neuron.g_Na)
 
     m = pospischil_alpha_m(V, 0.0) / (
         pospischil_alpha_m(V, 0.0) + pospischil_beta_m(V, 0.0)
@@ -591,11 +668,12 @@ def test_pospischil_na_channel_current_matches_inline(V: float) -> None:
     h = pospischil_alpha_h(V, 0.0) / (
         pospischil_alpha_h(V, 0.0) + pospischil_beta_h(V, 0.0)
     )
-    gating_state = {"m": m, "h": h}
+    s = _nav12_alpha_sNa(V, 0.0) / (_nav12_alpha_sNa(V, 0.0) + _nav12_beta_sNa(V, 0.0))
+    gating_state = {"m": m, "h": h, "sNa12": s}
 
     result = ch.compute_current(V, gating_state, neuron)
     E_Na = ch.reversal_potential(neuron)
-    expected = neuron.g_Na * (m**3) * h * (V - E_Na)
+    expected = neuron.g_Na * (m**3) * h * s * (V - E_Na)
     assert result == pytest.approx(expected)
 
 
@@ -967,34 +1045,28 @@ def test_stn_na_m_tau_is_voltage_independent() -> None:
 
 
 def test_make_stn_na_channel_structure() -> None:
-    """make_stn_na_channel returns correct gates and Na⁺ reversal spec."""
+    """make_stn_na_channel returns the (m, h, sNa) three-gate Na topology."""
     ch = make_stn_na_channel(g_max=49.0)
     assert isinstance(ch, IonChannel)
     assert ch.name == "Na"
     assert ch.g_max == pytest.approx(49.0)
-    assert len(ch.gating_variables) == 2
+    assert len(ch.gating_variables) == 3
     assert ch.gating_variables[0].name == "m"
     assert ch.gating_variables[0].power == 3
     assert ch.gating_variables[1].name == "h"
     assert ch.gating_variables[1].power == 1
+    assert ch.gating_variables[2].name == "sNa"
+    assert ch.gating_variables[2].power == 1
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.SODIUM
     assert not ch.carries_calcium
 
 
-def test_make_stn_na_channel_with_slow_inactivation() -> None:
-    """``slow_inactivation=True`` adds the sNa gate (Fleidervish & Gutnick 1996)."""
-    ch = make_stn_na_channel(g_max=30.0, slow_inactivation=True)
-    assert len(ch.gating_variables) == 3
-    assert ch.gating_variables[2].name == "sNa"
-    assert ch.gating_variables[2].power == 1
-
-
 # ---------------------------------------------------------------------------
 # STN slow Na inactivation rate functions (sNa gate; Fleidervish & Gutnick
-# 1996; Mickus, Jung & Spruston 1999; Do & Bean 2003).  Opt-in gate added in
-# #324 to abolish the residual −15 mV plateau the Otsuka 2004 fast h-tail
-# leaves open.
+# 1996; Mickus, Jung & Spruston 1999; Do & Bean 2003).  Always-on gate
+# baked into make_stn_na_channel to abolish the residual −15 mV plateau
+# the Otsuka 2004 fast h-tail leaves open.
 # ---------------------------------------------------------------------------
 
 
@@ -1063,17 +1135,13 @@ def test_make_stn_k_channel_structure() -> None:
 
 def test_stn_preset_uses_otsuka_factories() -> None:
     """STN preset uses make_stn_na_channel and make_stn_k_channel factories."""
-    import functools
-
     from patch_sim.constants import STN
     from patch_sim.presets import NEURON_PRESETS
 
     config = NEURON_PRESETS[STN]
-    # The Na factory is wrapped in functools.partial(..., slow_inactivation=True)
-    # to opt into the sNa gate (#324 depol-block recovery).
-    assert isinstance(config.na_channel_factory, functools.partial)
-    assert config.na_channel_factory.func is make_stn_na_channel
-    assert config.na_channel_factory.keywords == {"slow_inactivation": True}
+    # make_stn_na_channel always includes the sNa slow inactivation gate
+    # (#324 depol-block recovery), so no factory wrapping is needed.
+    assert config.na_channel_factory is make_stn_na_channel
     assert config.k_channel_factory is make_stn_k_channel
 
 
