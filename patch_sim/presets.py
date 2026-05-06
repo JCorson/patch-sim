@@ -460,16 +460,25 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # leak conductance is doubled, with no additional pacemaker channel
         # retune required.
         #
+        # Slow Na inactivation: ``make_dopaminergic_na_channel`` carries an
+        # always-on ``sNa_da`` gate (Khaliq & Bean 2010; Tucker et al. 2012)
+        # and ``make_snc_inap_channel`` carries an always-on ``sNaP_snc``
+        # gate (Magistretti & Alonso 1999, V½ shifted to match the Drion
+        # 2011 SNc fit).  These two slow gates make the cell biologically
+        # more accurate (#330) and would, in principle, provide an escape
+        # route from a depol-block plateau.
+        #
         # Depol-block: real SNc DA neurons enter depolarisation block above
         # ~100 pA injected current at long sustained drive (Tucker et al.
-        # 2012).  This single-compartment somatic model does not reproduce
-        # block at any tested (amplitude, duration): empirical sweep
-        # (scratch/characterize_da_block.py) confirms tonic firing at every
-        # amplitude up to 15 µA/cm² and every duration up to 10 s, with the
-        # 150 ms rolling-mean V never exceeding −70 mV.  This is a known
-        # limitation of the somatic representation, which lacks the
-        # dendritic Na inactivation that drives in-vivo block.  Tracked
-        # in #323.
+        # 2012).  Even with the new slow-inactivation gates this single-
+        # compartment somatic model does not reproduce block: empirical
+        # sweep (scratch/characterize_da_block.py) confirms tonic firing at
+        # every amplitude up to 15 µA/cm² and every duration up to 10 s,
+        # with the 150 ms rolling-mean V never exceeding −70 mV.  Block
+        # onset requires the dendritic Na inactivation pool that this
+        # somatic representation lacks; the new gates are a biological
+        # accuracy improvement but not a fix for #323, which tracks the
+        # missing depol-block onset.
         #
         # v_rest = −55 mV is a kinematic starting point — SNc DA neurons
         # are autonomous oscillators with NO static zero-current rest.  The

@@ -2300,6 +2300,44 @@ def _dopaminergic_beta_n_impl(V: float, ca_i: float) -> float:
 dopaminergic_beta_n = VoltageOnlyFn(_dopaminergic_beta_n_impl)
 
 
+# ---------------------------------------------------------------------------
+# Dopaminergic SNc fast Na⁺ slow voltage-dependent inactivation gate ``sNa_da``.
+# ---------------------------------------------------------------------------
+#
+# Khaliq & Bean (2010) directly demonstrated cumulative slow inactivation of
+# the fast Na⁺ current in SNc dopaminergic neurons; Tucker, Hagiwara &
+# Williams (2012) confirmed the same in midbrain DA cells.  The Canavier
+# (1999) / Komendantov et al. (2004) Traub-Miles kinetics carry only the
+# fast h gate and therefore retain a residual h-tail under sustained
+# depolarisation.  Adding the slow gate makes the cell biologically more
+# accurate and guards against pathological depol-block plateaus.
+#
+# Parameters mirror the STN, Pospischil and Purkinje sNa gates: V½ = −50 mV
+# (within the −47 mV midpoint reported by Khaliq & Bean 2010), slope 8 mV,
+# inverted Boltzmann so the gate is open at hyperpolarised potentials;
+# τ_scale = 200 ms / τ_floor = 20 ms.  At the SNc oscillator's hyperpolarised
+# trough (≈ −75 mV) s_inf > 0.93; at v_rest = −55 mV s_inf ≈ 0.65 (lower
+# margin than STN/Purkinje because SNc rests more depolarised); at the
+# −15 mV plateau s_inf < 0.02 (residual h-tail abolished).
+#
+# Gate name ``sNa_da`` follows the SNc-specific ``pSNc`` namespacing already
+# used by :func:`~patch_sim.additional_channels.make_snc_inap_channel`; it
+# avoids colliding with the bare ``sNa`` of the Purkinje / STN / Pospischil
+# Na factories should a hypothetical preset ever combine them.
+#
+# Slow inactivation is always on here because ``make_dopaminergic_na_channel``
+# is dedicated to the SNc Dopaminergic preset — there is no other caller
+# whose calibration could be perturbed by enabling the gate.
+
+_dopaminergic_alpha_sNa, _dopaminergic_beta_sNa = boltzmann_cosh_rates(
+    half=-50.0,
+    slope=8.0,
+    tau_scale=200.0,
+    tau_floor=20.0,
+    inverted=True,
+)
+
+
 def make_dopaminergic_na_channel(g_max: float) -> IonChannel:
     """Create the midbrain dopaminergic fast sodium channel (Na⁺).
 
@@ -2313,9 +2351,24 @@ def make_dopaminergic_na_channel(g_max: float) -> IonChannel:
     and prevent the ~5.2× Q10 overcorrection that distorts Na⁺ inactivation
     under the default reference temperature.
 
-    Reference: Canavier (1999), J. Comput. Neurosci. 6:49;
-    Komendantov et al. (2004), J. Neurophysiol. 91:346.
-    Kinetics at ~35 °C — use T_ref = 308.15 K with this factory.
+    The channel exposes three gates: activation ``m`` (power 3), fast
+    inactivation ``h`` (power 1), and slow voltage-dependent inactivation
+    ``sNa_da`` (power 1; V½ = −50 mV, slope 8 mV, inverted Boltzmann).  The
+    slow gate is mostly available at hyperpolarised potentials and decays
+    towards zero on sustained depolarisation, providing the escape route
+    from depol-block plateaus reported in real SNc DA neurons (Khaliq &
+    Bean 2010).  The column is named ``sNa_da`` rather than ``sNa`` to
+    match the SNc-specific ``pSNc`` namespacing convention used by
+    :func:`~patch_sim.additional_channels.make_snc_inap_channel`.
+
+    References:
+        - Canavier (1999), J. Comput. Neurosci. 6:49; Komendantov et al.
+          (2004), J. Neurophysiol. 91:346 — m, h, n kinetics at ~35 °C
+          (use T_ref = 308.15 K with this factory).
+        - Khaliq & Bean (2010), J. Neurosci. 30:7401 (slow Na inactivation in
+          SNc dopaminergic neurons — primary source for the sNa_da gate).
+        - Tucker, Hagiwara & Williams (2012), J. Neurophysiol. 108:2492
+          (confirms slow Na inactivation in midbrain DA neurons).
 
     Args:
         g_max: Maximum conductance in mS/cm².
@@ -2339,6 +2392,12 @@ def make_dopaminergic_na_channel(g_max: float) -> IonChannel:
                 power=1,
                 alpha=dopaminergic_alpha_h,
                 beta=dopaminergic_beta_h,
+            ),
+            GatingVariable(
+                name="sNa_da",
+                power=1,
+                alpha=_dopaminergic_alpha_sNa,
+                beta=_dopaminergic_beta_sNa,
             ),
         ),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
