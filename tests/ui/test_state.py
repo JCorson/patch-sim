@@ -1681,13 +1681,13 @@ async def test_build_neuron_preserves_inap_slow_inactivation_for_stn() -> None:
     """STN _build_neuron preserves the INaP sNaP slow inactivation gate (#324).
 
     Regression: previously _build_neuron rebuilt channels from
-    CHANNEL_REGISTRY without forwarding the preset's extra_kwargs, which
-    silently disabled INaP slow inactivation in the UI.  Visible
-    consequence: STN at +5 µA/cm² × 200 ms exits the deepest depol block
-    but settles into a damped quasi-plateau around −30 mV instead of
-    autonomous tonic firing.  Now that make_inap_channel always emits the
-    sNaP gate, the round-trip preserves it by construction; this test
-    pins that contract.
+    CHANNEL_REGISTRY in a way that silently disabled INaP slow
+    inactivation in the UI.  Visible consequence: STN at +5 µA/cm² ×
+    200 ms exits the deepest depol block but settles into a damped
+    quasi-plateau around −30 mV instead of autonomous tonic firing.
+    Now that make_inap_channel always emits the sNaP gate, the
+    round-trip preserves it by construction; this test pins that
+    contract.
     """
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
