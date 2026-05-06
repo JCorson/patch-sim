@@ -167,3 +167,110 @@ def test_ca1_spike_frequency_adaptation(ca1_ap_shape_result) -> None:
         f"got mean_early={mean_early:.2f} ms, mean_late={mean_late:.2f} ms. "
         f"Reference: Storm (1990); Madison & Nicoll (1984)."
     )
+
+
+# ---------------------------------------------------------------------------
+# Slow Na inactivation engagement and depol-block recovery — issue #328.
+# ---------------------------------------------------------------------------
+
+
+_CA1_DEPOL_DRIVE_AMP_UA = 30.0
+_CA1_DEPOL_DRIVE_MS = 200.0
+
+
+def test_ca1_inap_slow_inactivation_engages_during_drive(ca1_neuron: Neuron) -> None:
+    """The sNaP gate closes during +30 µA/cm² × 200 ms drive (#328 mechanism).
+
+    Direct mechanism check for #328: the Magistretti & Alonso 1999 slow
+    inactivation gate added to ``make_inap_channel`` must be doing real
+    work during sustained suprathreshold drive.  By the end of the step,
+    sNaP should have lost at least half its rest availability so the
+    persistent Na⁺ contribution to the depol-block plateau is suppressed.
+    The +30 µA/cm² level matches the recovery-test stimulus suggested in
+    the issue body — CA1's deeper IKCa AHP makes it less excitable than
+    cortical pyramidal, so the +12 µA/cm² level used for CP is too weak
+    here to drive engagement past 50 %.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(_CA1_DEPOL_DRIVE_MS)
+    n_post = _ms_to_samples(50.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, _CA1_DEPOL_DRIVE_AMP_UA),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(ca1_neuron, current_external=current)
+    sNaP_at_rest = float(result["sNaP"][n_pre - 1])
+    sNaP_at_step_end = float(result["sNaP"][n_pre + n_step - 1])
+    fraction_inactivated = 1.0 - sNaP_at_step_end / sNaP_at_rest
+    assert fraction_inactivated > 0.5, (
+        f"sNaP did not meaningfully inactivate: rest={sNaP_at_rest:.3f}, "
+        f"step end={sNaP_at_step_end:.3f}, "
+        f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.5)"
+    )
+
+
+def test_ca1_fast_na_slow_inactivation_engages_during_drive(
+    ca1_neuron: Neuron,
+) -> None:
+    """The sNa gate (fast Na slow inactivation) closes during +30 µA/cm² × 200 ms.
+
+    Direct mechanism check for #328: the Mickus, Jung & Spruston 1999 slow
+    voltage-dependent inactivation gate added to ``make_pospischil_na_channel``
+    must lose at least half its rest availability by the end of a sustained
+    suprathreshold step, abolishing the residual fast-Na h-tail that would
+    otherwise pin the cell on a depolarisation plateau.  Mickus 1999
+    directly studied CA1 pyramidal cells, so this is the cell type the
+    paper actually characterised.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(_CA1_DEPOL_DRIVE_MS)
+    n_post = _ms_to_samples(50.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, _CA1_DEPOL_DRIVE_AMP_UA),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(ca1_neuron, current_external=current)
+    sNa_at_rest = float(result["sNa"][n_pre - 1])
+    sNa_at_step_end = float(result["sNa"][n_pre + n_step - 1])
+    fraction_inactivated = 1.0 - sNa_at_step_end / sNa_at_rest
+    assert fraction_inactivated > 0.5, (
+        f"sNa did not meaningfully inactivate: rest={sNa_at_rest:.3f}, "
+        f"step end={sNa_at_step_end:.3f}, "
+        f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.5)"
+    )
+
+
+def test_ca1_recovers_from_sustained_suprathreshold_drive(
+    ca1_neuron: Neuron,
+) -> None:
+    """CA1 pyramidal repolarises after +30 µA/cm² × 200 ms (#328 regression).
+
+    Without slow Na inactivation the cell can hang on a depol-block
+    plateau under sustained drive.  With sNaP (Magistretti & Alonso 1999)
+    and Pospischil sNa (Mickus, Jung & Spruston 1999) opted in, the cell
+    must escape the plateau within the post-stim window and settle below
+    −50 mV during the last 200 ms of a 700 ms post-stimulus epoch.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(_CA1_DEPOL_DRIVE_MS)
+    n_post = _ms_to_samples(700.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, _CA1_DEPOL_DRIVE_AMP_UA),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(ca1_neuron, current_external=current)
+    tail = np.asarray(result["voltage"][-_ms_to_samples(200.0) :])
+    mean_v = float(tail.mean())
+    assert mean_v < -50.0, (
+        f"CA1 pyramidal failed to recover from +30 µA/cm² × 200 ms; "
+        f"mean V in last 200 ms = {mean_v:.2f} mV"
+    )
