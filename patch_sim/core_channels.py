@@ -552,7 +552,49 @@ def _pospischil_beta_n_impl(V: float, ca_i: float) -> float:
 pospischil_beta_n = VoltageOnlyFn(_pospischil_beta_n_impl)
 
 
-def make_pospischil_na_channel(g_max: float) -> IonChannel:
+# ---------------------------------------------------------------------------
+# Pospischil fast Na⁺ slow voltage-dependent inactivation gate ``sNa``
+# (opt-in).
+# ---------------------------------------------------------------------------
+#
+# The Pospischil 2008 / Traub-Miles fast Na⁺ kinetics retain a small but
+# non-zero h-availability at depolarised plateau voltages; under sustained
+# suprathreshold drive this residual h-tail can pin the membrane on a
+# depol-block plateau (#327, mirror of the STN issue #324).  Real cortical
+# pyramidal Na⁺ channels also undergo slow voltage-dependent inactivation
+# on top of the fast h gate — directly demonstrated in cortical pyramidal
+# cells by Fleidervish & Gutnick (1996), J. Physiol. 493:83 (the same
+# paper cited by ``make_stn_na_channel`` for STN slow inactivation).  This
+# second gate engages only on sustained depolarisation and provides the
+# missing escape route from the plateau.
+#
+# Parameters mirror the STN sNa gate (Fleidervish & Gutnick 1996 was the
+# primary source for both): V½ = −50 mV, slope 8 mV, inverted Boltzmann so
+# the gate is open at hyperpolarised potentials; τ_scale = 200 ms /
+# τ_floor = 20 ms.  At V = −70 mV (cortical rest) s_inf ≈ 0.92; at V =
+# −15 mV s_inf ≈ 0.01.  Slow inactivation is opt-in (default off) so
+# presets calibrated against the no-slow-inactivation Pospischil kinetics
+# (FSI, CA1) keep their existing phenotypes.
+#
+# Gate name ``sNa`` matches the STN choice, avoiding collision with ``s``
+# (INaR activation) and ``sNaP`` (INaP slow inactivation).  Pospischil-Na
+# and STN-Na presets never coexist on the same neuron, so reusing the
+# column name is safe and keeps the simulation result schema consistent.
+
+_pospischil_alpha_sNa, _pospischil_beta_sNa = boltzmann_cosh_rates(
+    half=-50.0,
+    slope=8.0,
+    tau_scale=200.0,
+    tau_floor=20.0,
+    inverted=True,
+)
+
+
+def make_pospischil_na_channel(
+    g_max: float,
+    *,
+    slow_inactivation: bool = False,
+) -> IonChannel:
     """Create the Pospischil cortical RS fast sodium channel (Na⁺).
 
     Uses Pospischil et al. (2008) Traub-Miles kinetics with VT = −56.2 mV:
@@ -560,27 +602,60 @@ def make_pospischil_na_channel(g_max: float) -> IonChannel:
     The reversal potential is computed dynamically via the Nernst equation
     for Na⁺.
 
-    Intended for use as the ``na_channel_factory`` of the Cortical Pyramidal
-    preset to match the Pospischil RS neuron model.
+    By default the channel uses two gates ``"m"`` and ``"h"`` matching the
+    original Pospischil 2008 formulation.  With ``slow_inactivation=True``
+    a third gate ``"sNa"`` is added (V½ = −50 mV, slope 8 mV, inverted
+    Boltzmann).  The slow gate is mostly available at hyperpolarised
+    potentials and decays towards zero on sustained depolarisation,
+    providing an escape mechanism that lets the membrane repolarise after
+    a prolonged suprathreshold step (#327).  The simulation column is
+    named ``sNa`` rather than ``s`` to avoid colliding with
+    :func:`~patch_sim.additional_channels.make_inar_channel`'s activation
+    gate.
+
+    Slow inactivation is opt-in because it changes the effective Na⁺
+    availability during sustained firing trains, which can alter F-I and
+    spike-frequency-adaptation profiles in presets calibrated against the
+    no-slow-inactivation Pospischil kinetics.  Enable it on presets where
+    depolarisation-block recovery is the dominant concern — e.g. Cortical
+    Pyramidal (#327).
+
+    References:
+        - Pospischil et al. (2008), Biol. Cybern. 99:427 (cortical RS Na
+          kinetics).
+        - Fleidervish & Gutnick (1996), J. Physiol. 493:83 (slow Na
+          inactivation, cortical pyramidal — primary source).
+        - Mickus, Jung & Spruston (1999), Biophys. J. 76:846 (slow Na
+          inactivation, CA1 pyramidal).
 
     Args:
         g_max: Maximum conductance in mS/cm².
+        slow_inactivation: If True, add the slow voltage-dependent
+            inactivation gate ``sNa`` (default False).
 
     Returns:
         An :class:`~patch_sim.channels.IonChannel` representing the
         Pospischil cortical RS fast Na⁺ channel.
     """
+    m_var = GatingVariable(
+        name="m", power=3, alpha=pospischil_alpha_m, beta=pospischil_beta_m
+    )
+    h_var = GatingVariable(
+        name="h", power=1, alpha=pospischil_alpha_h, beta=pospischil_beta_h
+    )
+    gating: tuple[GatingVariable, ...] = (m_var, h_var)
+    if slow_inactivation:
+        s_var = GatingVariable(
+            name="sNa",
+            power=1,
+            alpha=_pospischil_alpha_sNa,
+            beta=_pospischil_beta_sNa,
+        )
+        gating = (m_var, h_var, s_var)
     return IonChannel(
         name="Na",
         g_max=g_max,
-        gating_variables=(
-            GatingVariable(
-                name="m", power=3, alpha=pospischil_alpha_m, beta=pospischil_beta_m
-            ),
-            GatingVariable(
-                name="h", power=1, alpha=pospischil_alpha_h, beta=pospischil_beta_h
-            ),
-        ),
+        gating_variables=gating,
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
     )
 
