@@ -289,13 +289,20 @@ def cp_ap_shape_result(cp_neuron: Neuron):
 def test_cp_ap_threshold_in_rs_range(cp_ap_shape_result) -> None:
     """Mean AP threshold falls in the literature RS-pyramidal range.
 
-    McCormick et al. (1985) report threshold around −55 to −40 mV for L5
-    regular-spiking pyramidal cells in slice.
+    McCormick et al. (1985) report single-spike threshold around −55 to
+    −40 mV for L5 regular-spiking pyramidal cells in slice.  The metric
+    here is the *mean* threshold across an 800 ms suprathreshold train
+    (~120 spikes); the train-mean is intrinsically more positive than
+    the single-spike threshold because slow K (IM) and — since #327 —
+    slow Na inactivation (sNa, Fleidervish & Gutnick 1996) accumulate
+    across the train, raising threshold for later spikes.  Upper edge
+    widened to −35 mV to accept the ~3–5 mV positive drift from this
+    biology while still excluding clearly pathological values.
     """
     assert_ap_shape(
         cp_ap_shape_result,
         reference=_RS_REFERENCE,
-        threshold_mv=(-55.0, -40.0),
+        threshold_mv=(-55.0, -35.0),
     )
 
 

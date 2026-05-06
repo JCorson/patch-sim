@@ -215,9 +215,17 @@ def test_build_protocol_from_preset_exported_from_patch_sim() -> None:
 
 
 def test_cortical_pyramidal_uses_pospischil_na_factory() -> None:
-    """Cortical Pyramidal preset wires the Pospischil Na⁺ channel factory."""
+    """Cortical Pyramidal preset wires the Pospischil Na⁺ channel factory.
+
+    The factory is wrapped in functools.partial(..., slow_inactivation=True)
+    to opt into the sNa gate (#327 depol-block recovery).
+    """
+    import functools
+
     config = NEURON_PRESETS[CORTICAL_PYRAMIDAL]
-    assert config.na_channel_factory is make_pospischil_na_channel
+    assert isinstance(config.na_channel_factory, functools.partial)
+    assert config.na_channel_factory.func is make_pospischil_na_channel
+    assert config.na_channel_factory.keywords == {"slow_inactivation": True}
 
 
 def test_cortical_pyramidal_uses_mainen_sejnowski_kv_via_channels() -> None:
