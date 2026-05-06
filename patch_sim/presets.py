@@ -612,8 +612,11 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #
         # FIX — depolarization-block recovery (#328, mirror of #324/#327).
         # Two complementary slow inactivation gates cooperate so the cell
-        # repolarises after a sustained suprathreshold step (e.g. +12
-        # µA/cm² × 200 ms) instead of hanging on a depol-block plateau:
+        # repolarises after a sustained suprathreshold step (e.g. +30
+        # µA/cm² × 200 ms — CA1's deeper IKCa AHP makes it less excitable
+        # than cortical pyramidal, so the +12 µA/cm² level used in #327 is
+        # too weak to engage the gates here) instead of hanging on a
+        # depol-block plateau:
         #   1. INaP slow inactivation (sNaP, Magistretti & Alonso 1999)
         #      via ``slow_inactivation=True`` on make_inap_channel —
         #      removes the persistent Na⁺ window current that otherwise

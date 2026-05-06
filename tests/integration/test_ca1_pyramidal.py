@@ -203,6 +203,11 @@ def test_ca1_inap_slow_inactivation_engages_during_drive(ca1_neuron: Neuron) -> 
     )
     result = simulate_current_clamp(ca1_neuron, current_external=current)
     sNaP_at_rest = float(result["sNaP"][n_pre - 1])
+    assert sNaP_at_rest > 0.5, (
+        f"sNaP rest availability is unexpectedly low ({sNaP_at_rest:.3f}); "
+        "the inactivation engagement check below is meaningless if the "
+        "gate is already mostly closed at v_rest."
+    )
     sNaP_at_step_end = float(result["sNaP"][n_pre + n_step - 1])
     fraction_inactivated = 1.0 - sNaP_at_step_end / sNaP_at_rest
     assert fraction_inactivated > 0.5, (
@@ -237,6 +242,11 @@ def test_ca1_fast_na_slow_inactivation_engages_during_drive(
     )
     result = simulate_current_clamp(ca1_neuron, current_external=current)
     sNa_at_rest = float(result["sNa"][n_pre - 1])
+    assert sNa_at_rest > 0.5, (
+        f"sNa rest availability is unexpectedly low ({sNa_at_rest:.3f}); "
+        "the inactivation engagement check below is meaningless if the "
+        "gate is already mostly closed at v_rest."
+    )
     sNa_at_step_end = float(result["sNa"][n_pre + n_step - 1])
     fraction_inactivated = 1.0 - sNa_at_step_end / sNa_at_rest
     assert fraction_inactivated > 0.5, (
