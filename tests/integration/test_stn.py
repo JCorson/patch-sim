@@ -75,6 +75,46 @@ def test_stn_spontaneous_pacemaking(stn_ap_shape_result) -> None:
     )
 
 
+def test_stn_tonic_firing_is_regular_single_spikes(stn_ap_shape_result) -> None:
+    """STN tonic firing is regular single spikes, not doublets/spikelets.
+
+    Bevan & Wilson (1999) describe the STN as a regular tonic pacemaker;
+    Hallworth, Wilson & Bevan (2003), J. Neurosci. 23:7525, report ISI
+    CV ≈ 0.05–0.15 in tonic mode.  Doublets/triplets only appear in
+    burst mode (Beurrier et al. 1999, NMDA-induced plateau or rebound
+    bursts), not at zero current.
+
+    This test catches two failure modes that the AP-shape tests average
+    away (issue #326):
+
+      • Bimodal ISI (full spike followed by an abortive spikelet a few
+        ms later) → high CV(ISI).
+      • Spike peaks below 0 mV (abortive overshoot when fast-Na ``h``
+        has not fully de-inactivated) — Bevan & Wilson 1999 put the
+        full STN AP peak in the +5 to +25 mV band.
+    """
+    isis = np.asarray(stn_ap_shape_result.isis)
+    assert isis.size >= 4, (
+        f"need ≥5 spikes for a stable CV(ISI) estimate; got "
+        f"{stn_ap_shape_result.spike_count} spikes"
+    )
+    cv_isi = float(isis.std(ddof=0) / isis.mean())
+    assert cv_isi < 0.2, (
+        f"[Hallworth, Wilson & Bevan 2003] STN tonic ISI is regular "
+        f"(CV 0.05–0.15); got CV(ISI)={cv_isi:.3f} over ISIs={isis.tolist()}"
+    )
+
+    bad_peaks = [
+        (s.index, s.peak_voltage)
+        for s in stn_ap_shape_result.spikes
+        if s.peak_voltage <= 0.0
+    ]
+    assert not bad_peaks, (
+        f"[Bevan & Wilson 1999] every STN tonic spike should overshoot "
+        f"0 mV; got abortive peaks (index, peak_mV)={bad_peaks}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # AP shape — STN tonic phenotype, Bevan & Wilson (1999).
 # ---------------------------------------------------------------------------
@@ -234,9 +274,15 @@ def test_stn_katp_engages_during_drive(stn_neuron: Neuron) -> None:
     # During sustained drive kATP doesn't reach steady-state because sNaP
     # and sNa repolarise the cell before τ_kATP (≈400 ms at V½) has time
     # to fully activate; engagement is still several-fold above rest.
-    assert kATP_at_step_end > 0.15, (
+    # The 0.08 floor reflects the post-#326 tuning, where a halved INaP
+    # makes the depolarisation-block plateau shallower and shorter-lived
+    # — kATP engages a few-fold above rest rather than reaching the
+    # ~0.19 it attained when INaP was holding the cell at the plateau
+    # for longer.  The third assertion below (>4× rest) is the primary
+    # mechanism check; this absolute floor just guards against silence.
+    assert kATP_at_step_end > 0.08, (
         f"kATP did not meaningfully open during drive: "
-        f"step end={kATP_at_step_end:.3f} (expected > 0.15)"
+        f"step end={kATP_at_step_end:.3f} (expected > 0.08)"
     )
     assert kATP_at_step_end > 4.0 * kATP_at_rest, (
         f"kATP step-end {kATP_at_step_end:.3f} not meaningfully above "

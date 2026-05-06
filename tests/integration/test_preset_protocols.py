@@ -50,7 +50,7 @@ from patch_sim.presets import (
 # ``test_da_spontaneous_pacemaking`` in tests/integration/test_dopaminergic.py.
 #
 # STN is excluded post-#305: the autonomous-pacemaker preset fires
-# spontaneously at ~20 Hz from v_rest = −60 mV (Bevan & Wilson 1999).  The
+# spontaneously at ~11 Hz from v_rest = −60 mV (Bevan & Wilson 1999).  The
 # tonic-pacemaker phenotype and conditional rebound-burst phenotype are
 # exercised by tests/integration/test_stn.py and
 # ``test_stn_conditional_burst_mode_under_hyperpolarising_step_release``.
