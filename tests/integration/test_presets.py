@@ -35,8 +35,9 @@ from patch_sim.core_channels import (
     make_dopaminergic_k_channel,
     make_dopaminergic_na_channel,
     make_mainen_sejnowski_kv_channel,
+    make_nav11_channel,
+    make_nav12_channel,
     make_pospischil_k_channel,
-    make_pospischil_na_channel,
     make_purkinje_k_channel,
     make_purkinje_na_channel,
     make_thalamic_relay_k_channel,
@@ -215,17 +216,13 @@ def test_build_protocol_from_preset_exported_from_patch_sim() -> None:
 
 
 def test_cortical_pyramidal_uses_pospischil_na_factory() -> None:
-    """Cortical Pyramidal preset wires the Pospischil Na⁺ channel factory.
+    """Cortical Pyramidal preset wires the Nav1.2-flavoured Na⁺ channel factory.
 
-    The factory is wrapped in functools.partial(..., slow_inactivation=True)
-    to opt into the sNa gate (#327 depol-block recovery).
+    make_nav12_channel always includes the sNa12 slow inactivation gate
+    (#327 depol-block recovery) — no factory wrapping needed.
     """
-    import functools
-
     config = NEURON_PRESETS[CORTICAL_PYRAMIDAL]
-    assert isinstance(config.na_channel_factory, functools.partial)
-    assert config.na_channel_factory.func is make_pospischil_na_channel
-    assert config.na_channel_factory.keywords == {"slow_inactivation": True}
+    assert config.na_channel_factory is make_nav12_channel
 
 
 def test_cortical_pyramidal_uses_mainen_sejnowski_kv_via_channels() -> None:
@@ -238,10 +235,10 @@ def test_cortical_pyramidal_uses_mainen_sejnowski_kv_via_channels() -> None:
     assert config.g_K == 0.0
 
 
-def test_fsi_uses_pospischil_na_factory() -> None:
-    """FSI preset wires the Pospischil Na⁺ channel factory (issue #231)."""
+def test_fsi_uses_nav11_factory() -> None:
+    """FSI preset wires the Nav1.1-flavoured Na⁺ channel factory (issue #231)."""
     config = NEURON_PRESETS[FAST_SPIKING_INTERNEURON]
-    assert config.na_channel_factory is make_pospischil_na_channel
+    assert config.na_channel_factory is make_nav11_channel
 
 
 def test_fsi_uses_pospischil_k_factory() -> None:
@@ -250,18 +247,14 @@ def test_fsi_uses_pospischil_k_factory() -> None:
     assert config.k_channel_factory is make_pospischil_k_channel
 
 
-def test_ca1_uses_pospischil_na_factory() -> None:
-    """CA1 preset wires the Pospischil Na⁺ channel factory (issue #231).
+def test_ca1_uses_nav12_factory() -> None:
+    """CA1 preset wires the Nav1.2-flavoured Na⁺ channel factory (issue #231).
 
-    The factory is wrapped in functools.partial(..., slow_inactivation=True)
-    to opt into the sNa gate (#328 depol-block recovery).
+    make_nav12_channel always includes the sNa12 slow inactivation gate
+    (#328 depol-block recovery) — no factory wrapping needed.
     """
-    import functools
-
     config = NEURON_PRESETS[CA1_PYRAMIDAL]
-    assert isinstance(config.na_channel_factory, functools.partial)
-    assert config.na_channel_factory.func is make_pospischil_na_channel
-    assert config.na_channel_factory.keywords == {"slow_inactivation": True}
+    assert config.na_channel_factory is make_nav12_channel
 
 
 def test_ca1_uses_pospischil_k_factory() -> None:

@@ -276,8 +276,8 @@ def test_pk_inap_slow_inactivation_engages_during_drive(pk_neuron: Neuron) -> No
     """The sNaP gate closes during +10 µA/cm² × 200 ms drive (#329 mechanism).
 
     Direct mechanism check for #329: the Magistretti & Alonso 1999 slow
-    inactivation gate added to ``make_inap_channel`` must be doing real
-    work during sustained suprathreshold drive.  By the end of the step,
+    inactivation gate baked into ``make_inap_channel`` must be doing
+    real work during sustained suprathreshold drive.  By the end of the step,
     sNaP should have lost at least half its rest availability so the
     persistent Na⁺ contribution to the depol-block plateau is suppressed.
     The +10 µA/cm² level matches the existing

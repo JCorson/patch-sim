@@ -379,10 +379,10 @@ def test_cp_inap_slow_inactivation_engages_during_drive(cp_neuron: Neuron) -> No
 def test_cp_fast_na_slow_inactivation_engages_during_drive(
     cp_neuron: Neuron,
 ) -> None:
-    """The sNa gate (fast Na slow inactivation) closes during +12 µA/cm² × 200 ms.
+    """The sNa12 gate (fast Na slow inactivation) closes during +12 µA/cm² × 200 ms.
 
     Direct mechanism check for #327: the Fleidervish & Gutnick 1996 slow
-    voltage-dependent inactivation gate added to ``make_pospischil_na_channel``
+    voltage-dependent inactivation gate baked into ``make_nav12_channel``
     must lose at least half its rest availability by the end of a sustained
     suprathreshold step, abolishing the residual fast-Na h-tail that would
     otherwise pin the cell on a depolarisation plateau.
@@ -398,11 +398,11 @@ def test_cp_fast_na_slow_inactivation_engages_during_drive(
         ]
     )
     result = simulate_current_clamp(cp_neuron, current_external=current)
-    sNa_at_rest = float(result["sNa"][n_pre - 1])
-    sNa_at_step_end = float(result["sNa"][n_pre + n_step - 1])
+    sNa_at_rest = float(result["sNa12"][n_pre - 1])
+    sNa_at_step_end = float(result["sNa12"][n_pre + n_step - 1])
     fraction_inactivated = 1.0 - sNa_at_step_end / sNa_at_rest
     assert fraction_inactivated > 0.5, (
-        f"sNa did not meaningfully inactivate: rest={sNa_at_rest:.3f}, "
+        f"sNa12 did not meaningfully inactivate: rest={sNa_at_rest:.3f}, "
         f"step end={sNa_at_step_end:.3f}, "
         f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.5)"
     )
@@ -414,9 +414,10 @@ def test_cp_recovers_from_sustained_suprathreshold_drive(
     """Cortical pyramidal repolarises after +12 µA/cm² × 200 ms (#327 regression).
 
     Without slow Na inactivation the cell can hang on a depol-block
-    plateau under sustained drive.  With sNaP (Magistretti & Alonso 1999)
-    and Pospischil sNa (Fleidervish & Gutnick 1996) opted in, the cell
-    must escape the plateau within the post-stim window and settle below
+    plateau under sustained drive.  With sNaP (Magistretti & Alonso 1999,
+    baked into ``make_inap_channel``) and Nav1.2 sNa12 (Fleidervish &
+    Gutnick 1996, baked into ``make_nav12_channel``), the cell must
+    escape the plateau within the post-stim window and settle below
     −50 mV during the last 200 ms of a 700 ms post-stimulus epoch.
     """
     n_pre = _ms_to_samples(100.0)

@@ -1673,22 +1673,21 @@ def test_build_neuron_has_no_area_for_squid() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _build_neuron preserves ChannelConfig.extra_kwargs (#324)
+# _build_neuron preserves slow-inactivation gates from preset factories
 # ---------------------------------------------------------------------------
 
 
 async def test_build_neuron_preserves_inap_slow_inactivation_for_stn() -> None:
-    """STN _build_neuron forwards INaP slow_inactivation extra_kwarg.
+    """STN _build_neuron preserves the INaP sNaP slow inactivation gate (#324).
 
     Regression: previously _build_neuron rebuilt channels from
-    CHANNEL_REGISTRY without forwarding the preset's extra_kwargs, which
-    silently disabled INaP slow inactivation in the UI.  Visible
-    consequence: STN at +5 µA/cm² × 200 ms exits the deepest depol block
-    but settles into a damped quasi-plateau around −30 mV instead of
-    autonomous tonic firing.  The python-only integration test passes
-    because it bypasses _build_neuron and uses the preset directly.
-
-    This test asserts the gate is present in the UI-built neuron.
+    CHANNEL_REGISTRY in a way that silently disabled INaP slow
+    inactivation in the UI.  Visible consequence: STN at +5 µA/cm² ×
+    200 ms exits the deepest depol block but settles into a damped
+    quasi-plateau around −30 mV instead of autonomous tonic firing.
+    Now that make_inap_channel always emits the sNaP gate, the
+    round-trip preserves it by construction; this test pins that
+    contract.
     """
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
@@ -1700,8 +1699,9 @@ async def test_build_neuron_preserves_inap_slow_inactivation_for_stn() -> None:
     gate_names = {g.name for g in inap.gating_variables}
     assert "sNaP" in gate_names, (
         f"INaP slow-inactivation gate sNaP missing from UI-built STN neuron; "
-        f"gates present: {sorted(gate_names)}.  _build_neuron is dropping "
-        f"ChannelConfig.extra_kwargs={{'slow_inactivation': True}}."
+        f"gates present: {sorted(gate_names)}.  Either make_inap_channel "
+        f"stopped emitting sNaP, or _build_neuron is overriding the preset's "
+        f"INaP factory."
     )
 
 
@@ -1751,14 +1751,13 @@ async def test_stn_recovers_from_depol_block_via_ui_build_neuron() -> None:
 
 
 async def test_build_neuron_preserves_inap_slow_inactivation_for_cp() -> None:
-    """Cortical pyramidal _build_neuron preserves INaP slow_inactivation (#327).
+    """Cortical pyramidal _build_neuron preserves INaP slow inactivation (#327).
 
     Mirror of the STN regression for cortical pyramidal: ``_build_neuron``
-    must forward ``ChannelConfig.extra_kwargs`` from the preset so that
-    the INaP sNaP gate added in #327 round-trips through the UI build
-    path.  Without this, the live Reflex app would silently drop sNaP and
-    fail depol-block recovery while the python-only integration tests
-    keep passing.
+    must forward the preset's INaP factory so that the sNaP gate added in
+    #327 round-trips through the UI build path.  make_inap_channel now
+    always emits the sNaP gate; this test pins that the round-trip
+    preserves it.
     """
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
@@ -1770,21 +1769,20 @@ async def test_build_neuron_preserves_inap_slow_inactivation_for_cp() -> None:
     gate_names = {g.name for g in inap.gating_variables}
     assert "sNaP" in gate_names, (
         f"INaP slow-inactivation gate sNaP missing from UI-built cortical "
-        f"pyramidal neuron; gates present: {sorted(gate_names)}.  "
-        f"_build_neuron is dropping ChannelConfig.extra_kwargs="
-        f"{{'slow_inactivation': True}}."
+        f"pyramidal neuron; gates present: {sorted(gate_names)}.  Either "
+        f"make_inap_channel stopped emitting sNaP, or _build_neuron is "
+        f"overriding the preset's INaP factory."
     )
 
 
-async def test_build_neuron_preserves_pospischil_sNa_for_cortical_pyramidal() -> None:
-    """Cortical pyramidal _build_neuron preserves the Pospischil-Na sNa gate (#327).
+async def test_build_neuron_preserves_nav12_sNa_for_cortical_pyramidal() -> None:
+    """Cortical pyramidal _build_neuron preserves the Nav1.2 sNa12 gate (#327).
 
     ``_build_neuron`` forwards ``preset_cfg.na_channel_factory`` directly,
-    so the ``functools.partial(make_pospischil_na_channel,
-    slow_inactivation=True)`` wrapper must round-trip and yield a 3-gate
-    Na channel including sNa.  Without this, the cortical pyramidal cell
-    would lose the fast-Na slow-inactivation gate via the UI path even
-    though the preset itself wires it on.
+    so ``make_nav12_channel`` must round-trip and yield a 3-gate Na channel
+    including the sNa12 slow inactivation gate.  Without this, the cortical
+    pyramidal cell would lose the fast-Na slow-inactivation gate via the
+    UI path even though the preset itself wires it on.
     """
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
@@ -1794,11 +1792,10 @@ async def test_build_neuron_preserves_pospischil_sNa_for_cortical_pyramidal() ->
     na = next((ch for ch in neuron.core_channels if ch.name == "Na"), None)
     assert na is not None, "Cortical pyramidal preset must include core Na channel"
     gate_names = {g.name for g in na.gating_variables}
-    assert "sNa" in gate_names, (
-        f"Pospischil sNa gate missing from UI-built cortical pyramidal "
+    assert "sNa12" in gate_names, (
+        f"Nav1.2 sNa12 gate missing from UI-built cortical pyramidal "
         f"neuron; gates present: {sorted(gate_names)}.  _build_neuron is "
-        f"not forwarding the functools.partial(make_pospischil_na_channel, "
-        f"slow_inactivation=True) factory."
+        f"not forwarding the make_nav12_channel factory."
     )
 
 
@@ -1841,14 +1838,13 @@ async def test_cp_recovers_from_depol_block_via_ui_build_neuron() -> None:
 
 
 async def test_build_neuron_preserves_inap_slow_inactivation_for_ca1() -> None:
-    """CA1 pyramidal _build_neuron preserves INaP slow_inactivation (#328).
+    """CA1 pyramidal _build_neuron preserves INaP slow inactivation (#328).
 
     Mirror of the cortical pyramidal regression for CA1: ``_build_neuron``
-    must forward ``ChannelConfig.extra_kwargs`` from the preset so that
-    the INaP sNaP gate added in #328 round-trips through the UI build
-    path.  Without this, the live Reflex app would silently drop sNaP and
-    fail depol-block recovery while the python-only integration tests
-    keep passing.
+    must forward the preset's INaP factory so that the sNaP gate added in
+    #328 round-trips through the UI build path.  make_inap_channel now
+    always emits the sNaP gate; this test pins that the round-trip
+    preserves it.
     """
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
@@ -1860,21 +1856,20 @@ async def test_build_neuron_preserves_inap_slow_inactivation_for_ca1() -> None:
     gate_names = {g.name for g in inap.gating_variables}
     assert "sNaP" in gate_names, (
         f"INaP slow-inactivation gate sNaP missing from UI-built CA1 "
-        f"pyramidal neuron; gates present: {sorted(gate_names)}.  "
-        f"_build_neuron is dropping ChannelConfig.extra_kwargs="
-        f"{{'slow_inactivation': True}}."
+        f"pyramidal neuron; gates present: {sorted(gate_names)}.  Either "
+        f"make_inap_channel stopped emitting sNaP, or _build_neuron is "
+        f"overriding the preset's INaP factory."
     )
 
 
-async def test_build_neuron_preserves_pospischil_sNa_for_ca1() -> None:
-    """CA1 pyramidal _build_neuron preserves the Pospischil-Na sNa gate (#328).
+async def test_build_neuron_preserves_nav12_sNa_for_ca1() -> None:
+    """CA1 pyramidal _build_neuron preserves the Nav1.2 sNa12 gate (#328).
 
     ``_build_neuron`` forwards ``preset_cfg.na_channel_factory`` directly,
-    so the ``functools.partial(make_pospischil_na_channel,
-    slow_inactivation=True)`` wrapper must round-trip and yield a 3-gate
-    Na channel including sNa.  Without this, the CA1 pyramidal cell
-    would lose the fast-Na slow-inactivation gate via the UI path even
-    though the preset itself wires it on.
+    so ``make_nav12_channel`` must round-trip and yield a 3-gate Na channel
+    including the sNa12 slow inactivation gate.  Without this, the CA1
+    pyramidal cell would lose the fast-Na slow-inactivation gate via the
+    UI path even though the preset itself wires it on.
     """
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
@@ -1884,11 +1879,10 @@ async def test_build_neuron_preserves_pospischil_sNa_for_ca1() -> None:
     na = next((ch for ch in neuron.core_channels if ch.name == "Na"), None)
     assert na is not None, "CA1 pyramidal preset must include core Na channel"
     gate_names = {g.name for g in na.gating_variables}
-    assert "sNa" in gate_names, (
-        f"Pospischil sNa gate missing from UI-built CA1 pyramidal "
-        f"neuron; gates present: {sorted(gate_names)}.  _build_neuron is "
-        f"not forwarding the functools.partial(make_pospischil_na_channel, "
-        f"slow_inactivation=True) factory."
+    assert "sNa12" in gate_names, (
+        f"Nav1.2 sNa12 gate missing from UI-built CA1 pyramidal neuron; "
+        f"gates present: {sorted(gate_names)}.  _build_neuron is not "
+        f"forwarding the make_nav12_channel factory."
     )
 
 
@@ -1931,14 +1925,13 @@ async def test_ca1_recovers_from_depol_block_via_ui_build_neuron() -> None:
 
 
 async def test_build_neuron_preserves_inap_slow_inactivation_for_purkinje() -> None:
-    """Purkinje _build_neuron preserves INaP slow_inactivation (#329).
+    """Purkinje _build_neuron preserves INaP slow inactivation (#329).
 
     Mirror of the cortical pyramidal / CA1 regression for Purkinje:
-    ``_build_neuron`` must forward ``ChannelConfig.extra_kwargs`` from
-    the preset so that the INaP sNaP gate added in #329 round-trips
-    through the UI build path.  Without this, the live Reflex app
-    would silently drop sNaP and fail depol-block recovery while the
-    python-only integration tests keep passing.
+    ``_build_neuron`` must forward the preset's INaP factory so that the
+    sNaP gate added in #329 round-trips through the UI build path.
+    make_inap_channel now always emits the sNaP gate; this test pins
+    that the round-trip preserves it.
     """
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
@@ -1950,9 +1943,9 @@ async def test_build_neuron_preserves_inap_slow_inactivation_for_purkinje() -> N
     gate_names = {g.name for g in inap.gating_variables}
     assert "sNaP" in gate_names, (
         f"INaP slow-inactivation gate sNaP missing from UI-built Purkinje "
-        f"neuron; gates present: {sorted(gate_names)}.  _build_neuron is "
-        f"dropping ChannelConfig.extra_kwargs="
-        f"{{'slow_inactivation': True}}."
+        f"neuron; gates present: {sorted(gate_names)}.  Either "
+        f"make_inap_channel stopped emitting sNaP, or _build_neuron is "
+        f"overriding the preset's INaP factory."
     )
 
 

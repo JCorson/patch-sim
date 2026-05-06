@@ -172,21 +172,17 @@ def test_stn_inap_slow_inactivation_engages_during_drive(
     """The sNaP gate closes during +5 µA/cm² × 200 ms drive.
 
     Direct mechanism check for #324: the Magistretti & Alonso 1999 slow
-    inactivation gate added to ``make_inap_channel`` must be doing real
+    inactivation gate baked into ``make_inap_channel`` must be doing real
     work during sustained suprathreshold drive.  By the end of the step,
     sNaP should have lost at least half its rest availability so the
     persistent Na⁺ contribution to the depol-block plateau is suppressed.
 
-    Other INaP-using presets (cortical pyramidal, CA1 pyramidal,
-    Purkinje) deliberately opt out of slow inactivation to keep their
-    existing tuning, so this test is the only direct mechanism check for
-    the new gate.
-
-    The 0.5 threshold is loose because in STN sNaP co-acts with the new
-    fast-Na sNa gate and K_ATP (also added for #324) to rescue the cell
-    from the plateau; once voltage starts recovering during the step,
-    sNaP starts recovering too, so it never reaches the deep ≈ 0.05
-    plateau value it would attain if the cell hung at −15 mV indefinitely.
+    The 0.5 threshold is loose because in STN sNaP co-acts with the
+    fast-Na sNa gate and K_ATP (all part of the #324 fix) to rescue the
+    cell from the plateau; once voltage starts recovering during the
+    step, sNaP starts recovering too, so it never reaches the deep
+    ≈ 0.05 plateau value it would attain if the cell hung at −15 mV
+    indefinitely.
     """
     n_pre = _ms_to_samples(100.0)
     n_step = _ms_to_samples(200.0)
@@ -216,9 +212,10 @@ def test_stn_fast_na_slow_inactivation_engages_during_drive(
 
     Direct mechanism check for #324 fix part 2: the Fleidervish & Gutnick
     1996 / Mickus et al. 1999 / Do & Bean 2003 slow voltage-dependent
-    inactivation gate added to ``make_stn_na_channel`` must lose at least
-    half its rest availability by the end of a sustained suprathreshold
-    step, abolishing the residual h-tail that pinned the cell at −15 mV.
+    inactivation gate baked into ``make_stn_na_channel`` must lose at
+    least half its rest availability by the end of a sustained
+    suprathreshold step, abolishing the residual h-tail that pinned the
+    cell at −15 mV.
     """
     n_pre = _ms_to_samples(100.0)
     n_step = _ms_to_samples(200.0)

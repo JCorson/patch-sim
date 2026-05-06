@@ -7,7 +7,7 @@ neurons with optional additional channels.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Callable
 
 from .additional_channels import (
     make_cav13_channel,
@@ -61,12 +61,10 @@ class ChannelConfig:
     Attributes:
         factory: Channel factory function (e.g. ``make_ih_channel``).
         g_max: Maximum conductance in mS/cm².
-        extra_kwargs: Additional keyword arguments forwarded to *factory*.
     """
 
     factory: Callable[..., IonChannel]
     g_max: float
-    extra_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -216,9 +214,7 @@ def make_neuron(config: NeuronConfig) -> Neuron:
     Returns:
         A fully constructed :class:`~patch_sim.Neuron` instance.
     """
-    built_channels = tuple(
-        cc.factory(g_max=cc.g_max, **cc.extra_kwargs) for cc in config.channels
-    )
+    built_channels = tuple(cc.factory(g_max=cc.g_max) for cc in config.channels)
     if config.calcium_dynamics is not None:
         if not _needs_calcium(built_channels):
             raise ValueError(

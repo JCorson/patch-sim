@@ -174,3 +174,48 @@ def test_fs_low_spike_frequency_adaptation(fs_ap_shape_result) -> None:
         f"got mean_early={mean_early:.2f} ms, mean_late={mean_late:.2f} ms, "
         f"ratio={ratio:.2f}.  Reference: Erisir et al. (1999)."
     )
+
+
+def test_fs_nav11_slow_inactivation_does_not_dominate_firing(
+    fs_neuron: Neuron,
+) -> None:
+    """The Nav1.1 sNa11 slow gate must barely engage at FSI firing rates.
+
+    The whole point of giving FSI a *weak* Nav1.1-flavoured slow gate
+    (V½ = −45 mV, τ_floor = 5000 ms — see make_nav11_channel; Patel et
+    al. 2015 PLOS ONE 10:e0133485 for the underlying biology) instead of
+    no slow inactivation at all is that the gate captures the biological
+    fact that Nav1.1 slow-inactivates while not suppressing the
+    100–500 Hz fast-spiking phenotype (Hu & Jonas 2014, Nat. Neurosci.
+    17:686).
+
+    This test asserts the gate barely moves over a 500 ms suprathreshold
+    step: sNa11 at the end of the step must remain ≥ 0.85 of its rest
+    availability.  If it falls below that, FSI biology is being
+    suppressed by the gate kinetics and the τ_floor needs further
+    slowing or the FSI g_Na needs an upward retune.
+    """
+    n_pre = _ms_to_samples(50.0)
+    n_step = _ms_to_samples(500.0)
+    n_post = _ms_to_samples(50.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, _FS_STEP_CURRENT),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(fs_neuron, current_external=current)
+    assert result.dtype.names is not None and "sNa11" in result.dtype.names, (
+        f"FSI Na channel must expose sNa11 column (got {result.dtype.names})"
+    )
+    sNa11_at_rest = float(result["sNa11"][n_pre - 1])
+    sNa11_at_step_end = float(result["sNa11"][n_pre + n_step - 1])
+    fraction_remaining = sNa11_at_step_end / sNa11_at_rest
+    assert fraction_remaining >= 0.85, (
+        f"Nav1.1 slow gate accumulated too much inactivation at FSI firing "
+        f"rates: rest={sNa11_at_rest:.3f}, step end={sNa11_at_step_end:.3f}, "
+        f"fraction remaining={fraction_remaining:.3f} (expected ≥ 0.85). "
+        "Either τ_scale on _nav11_alpha_sNa needs further slowing, or g_Na "
+        "needs an upward retune to compensate."
+    )
