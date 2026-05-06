@@ -274,9 +274,15 @@ def test_stn_katp_engages_during_drive(stn_neuron: Neuron) -> None:
     # During sustained drive kATP doesn't reach steady-state because sNaP
     # and sNa repolarise the cell before τ_kATP (≈400 ms at V½) has time
     # to fully activate; engagement is still several-fold above rest.
-    assert kATP_at_step_end > 0.15, (
+    # The 0.08 floor reflects the post-#326 tuning, where a halved INaP
+    # makes the depolarisation-block plateau shallower and shorter-lived
+    # — kATP engages a few-fold above rest rather than reaching the
+    # ~0.19 it attained when INaP was holding the cell at the plateau
+    # for longer.  The third assertion below (>4× rest) is the primary
+    # mechanism check; this absolute floor just guards against silence.
+    assert kATP_at_step_end > 0.08, (
         f"kATP did not meaningfully open during drive: "
-        f"step end={kATP_at_step_end:.3f} (expected > 0.15)"
+        f"step end={kATP_at_step_end:.3f} (expected > 0.08)"
     )
     assert kATP_at_step_end > 4.0 * kATP_at_rest, (
         f"kATP step-end {kATP_at_step_end:.3f} not meaningfully above "
