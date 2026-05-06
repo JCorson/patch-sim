@@ -301,7 +301,11 @@ def make_ih_channel(
 # K_ATP — autonomous-pacemaker metabolic safety isn't biologically
 # motivated there (or, for Purkinje, Carter & Bean 2009 demonstrate
 # depol-block recovery without it), and the two slow-inactivation gates
-# suffice.  The chosen τ is therefore robust to the channel cocktail the
+# suffice.  SNc dopaminergic (#330) ships its slow-inactivation gates via
+# the SNc-specific factories ``make_dopaminergic_na_channel`` (sNa_da gate,
+# Khaliq & Bean 2010) and ``make_snc_inap_channel`` (sNaP_snc gate, V½
+# shifted to track the Drion 2011 SNc INaP fit) rather than this entorhinal
+# factory.  The chosen τ is therefore robust to the channel cocktail the
 # gate happens to ship in.
 #
 # The slow-inactivation gate is named ``sNaP`` rather than ``s`` because the
@@ -394,10 +398,42 @@ def make_inap_channel(
 # fit (V½ = −52.6 mV) used by ``make_inap_channel``, which is preserved for
 # cortical/hippocampal presets.
 #
+# Activation gate ``pSNc`` is paired with an always-on slow inactivation gate
+# ``sNaP_snc`` (V½ = −55 mV, slope 7 mV, inverted Boltzmann; τ_scale 200 ms /
+# τ_floor 20 ms).  Magistretti & Alonso (1999) §"Slow inactivation" report
+# the entorhinal INaP slow gate at V½ in the −47 to −54 mV range; the SNc
+# Drion fit shifts INaP activation V½ ~12 mV more hyperpolarised (−65 mV
+# vs −52.6 mV), so the slow gate V½ is shifted by the same Δ to −55 mV
+# (within the hyperpolarised edge of the Magistretti-Alonso experimental
+# band).  This keeps the activation/slow-inactivation overlap that underlies
+# the INaP escape from sustained depolarisation.  Slow inactivation in SNc
+# DA Na⁺ currents is documented by Khaliq & Bean (2010) and Tucker, Hagiwara
+# & Williams (2012); the gate makes the cell biologically more accurate.
+# Always on because ``make_snc_inap_channel`` is dedicated to the SNc
+# Dopaminergic preset — there is no other caller whose calibration could be
+# perturbed by enabling the gate.
+#
+# Gate name ``sNaP_snc`` mirrors the SNc-specific ``pSNc`` namespacing and
+# avoids colliding with the bare ``sNaP`` of ``make_inap_channel`` should a
+# hypothetical preset combine the two factories.
+#
 # Reference:
 #   Drion, Massotte, Sepulchre, Seutin (2011), PLOS Comp Biol 7:e1002050
+#     (activation kinetics).
+#   Magistretti & Alonso (1999), J. Gen. Physiol. 114:491
+#     (slow inactivation V½/slope band).
+#   Khaliq & Bean (2010), J. Neurosci. 30:7401 (slow Na inactivation, SNc).
+#   Tucker, Hagiwara & Williams (2012), J. Neurophysiol. 108:2492.
 _alpha_p_snc, _beta_p_snc = boltzmann_cosh_rates(
     half=-65.0, slope=5.0, tau_scale=5.0, tau_floor=0.1
+)
+
+_alpha_sNaP_snc, _beta_sNaP_snc = boltzmann_cosh_rates(
+    half=-55.0,
+    slope=7.0,
+    tau_scale=200.0,
+    tau_floor=20.0,
+    inverted=True,
 )
 
 
@@ -411,12 +447,24 @@ def make_snc_inap_channel(
     ramp-up current that, together with Cav1.3, drives the inter-spike
     depolarisation in the Putzier+Drion reconciliation of SNc pacemaking.
 
-    The single gating variable is named ``pSNc`` so it does not collide with
-    the ``p`` gate of :func:`make_inap_channel` (Magistretti & Alonso 1999),
-    which is retained for cortical and hippocampal presets.
+    The channel exposes two gates: activation ``pSNc`` (power 1) and slow
+    voltage-dependent inactivation ``sNaP_snc`` (power 1; V½ = −55 mV,
+    slope 7 mV, inverted Boltzmann).  The slow gate is always on, mirroring
+    the Khaliq & Bean (2010) and Tucker, Hagiwara & Williams (2012)
+    observations of slow Na inactivation in SNc DA neurons.  Both gate
+    columns are SNc-namespaced (``pSNc``, ``sNaP_snc``) so they do not
+    collide with the ``p``/``sNaP`` gates of :func:`make_inap_channel`.
 
     The reversal potential is computed dynamically from the neuron's Na⁺
     concentrations using the Nernst equation.
+
+    References:
+        - Drion et al. (2011), PLOS Comp Biol 7:e1002050 (activation V½).
+        - Magistretti & Alonso (1999), J. Gen. Physiol. 114:491 (slow
+          inactivation V½/slope band).
+        - Khaliq & Bean (2010), J. Neurosci. 30:7401 (slow Na inactivation
+          in SNc DA — primary source for the sNaP_snc gate).
+        - Tucker, Hagiwara & Williams (2012), J. Neurophysiol. 108:2492.
 
     Args:
         g_max: Maximum conductance in mS/cm². Must be non-negative.
@@ -427,10 +475,16 @@ def make_snc_inap_channel(
         current.
     """
     p_var = GatingVariable(name="pSNc", power=1, alpha=_alpha_p_snc, beta=_beta_p_snc)
+    s_var = GatingVariable(
+        name="sNaP_snc",
+        power=1,
+        alpha=_alpha_sNaP_snc,
+        beta=_beta_sNaP_snc,
+    )
     return IonChannel(
         name="NaP_SNc",
         g_max=g_max,
-        gating_variables=(p_var,),
+        gating_variables=(p_var, s_var),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
     )
 

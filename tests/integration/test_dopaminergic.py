@@ -17,12 +17,16 @@ import numpy as np
 import pytest
 
 from patch_sim.analysis.ap_metrics import analyze_aps_from_result
-from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+from patch_sim.clamp_simulations import (
+    SIM_SAMPLING_FREQ,
+    simulate_current_clamp,
+    simulate_voltage_clamp,
+)
 from patch_sim.constants import DOPAMINERGIC
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESETS
-from patch_sim.protocols import step_current
+from patch_sim.protocols import step_current, step_voltage
 from tests.integration._ap_shape import assert_ap_shape
 
 # ---------------------------------------------------------------------------
@@ -263,4 +267,149 @@ def test_da_ap_ahp_depth_in_da_range(da_ap_shape_result) -> None:
         da_ap_shape_result,
         reference=_DA_REFERENCE,
         ahp_mv=(-95.0, -55.0),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Slow Na inactivation engagement and depol-block recovery — issue #330.
+# ---------------------------------------------------------------------------
+
+# F-I sweep upper bound from test_da_ui_fi_protocol; the issue specifies the
+# sustained drive at the F-I sweep upper bound as the acceptance amplitude.
+_DA_DEPOL_DRIVE_AMP_UA = 12.0
+_DA_DEPOL_DRIVE_MS = 200.0
+
+
+def test_da_inap_slow_inactivation_engages_under_depol_clamp(
+    da_neuron: Neuron,
+) -> None:
+    """The sNaP_snc gate closes under sustained voltage clamp at −15 mV (#330).
+
+    Direct mechanism check for #330: the Khaliq & Bean 2010 / Magistretti &
+    Alonso 1999 slow inactivation gate baked into ``make_snc_inap_channel``
+    must close significantly when the membrane is held depolarised.  Voltage
+    clamp from a −75 mV hold (slow gate ≈ 0.94 available) to −15 mV for
+    300 ms is enough time for the τ_floor ≈ 20 ms gate to settle below 5%
+    availability.  Under current clamp the SNc cell continues firing through
+    the F-I-upper-bound drive (the somatic model resists depol-block, #323),
+    so the slow gate spends most of the cycle near hyperpolarised AHPs and
+    does not engage strongly — voltage clamp is the cleaner mechanism check.
+    """
+    hold_ms, step_ms = 100.0, 300.0
+    protocol = step_voltage(
+        duration=hold_ms + step_ms,
+        voltage_amplitude=-15.0,
+        step_start=hold_ms,
+        step_duration=step_ms,
+        holding_voltage=-75.0,
+    )
+    result = simulate_voltage_clamp(da_neuron, protocol)
+    sNaP_at_rest = float(result["sNaP_snc"][_ms_to_samples(hold_ms) - 1])
+    assert sNaP_at_rest > 0.9, (
+        f"sNaP_snc rest availability at −75 mV hold is unexpectedly low "
+        f"({sNaP_at_rest:.3f}); the inactivation engagement check below "
+        "would be meaningless if the gate were already partly closed."
+    )
+    sNaP_at_step_end = float(result["sNaP_snc"][-1])
+    fraction_inactivated = 1.0 - sNaP_at_step_end / sNaP_at_rest
+    assert fraction_inactivated > 0.5, (
+        f"sNaP_snc did not meaningfully inactivate: rest={sNaP_at_rest:.3f}, "
+        f"step end={sNaP_at_step_end:.3f}, "
+        f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.5)"
+    )
+
+
+def test_da_fast_na_slow_inactivation_engages_under_depol_clamp(
+    da_neuron: Neuron,
+) -> None:
+    """The sNa_da gate closes under sustained voltage clamp at −15 mV (#330).
+
+    Direct mechanism check for #330: the Khaliq & Bean 2010 slow voltage-
+    dependent inactivation gate baked into ``make_dopaminergic_na_channel``
+    must close significantly when the membrane is held depolarised.  Khaliq
+    & Bean 2010 directly studied SNc DA neurons.  Voltage clamp at −15 mV
+    is used (rather than current clamp) because the SNc cell continues
+    firing through the F-I-upper-bound drive (#323) so the slow gate stays
+    mostly open under current clamp.
+    """
+    hold_ms, step_ms = 100.0, 300.0
+    protocol = step_voltage(
+        duration=hold_ms + step_ms,
+        voltage_amplitude=-15.0,
+        step_start=hold_ms,
+        step_duration=step_ms,
+        holding_voltage=-75.0,
+    )
+    result = simulate_voltage_clamp(da_neuron, protocol)
+    sNa_at_rest = float(result["sNa_da"][_ms_to_samples(hold_ms) - 1])
+    assert sNa_at_rest > 0.9, (
+        f"sNa_da rest availability at −75 mV hold is unexpectedly low "
+        f"({sNa_at_rest:.3f}); the inactivation engagement check below "
+        "would be meaningless if the gate were already partly closed."
+    )
+    sNa_at_step_end = float(result["sNa_da"][-1])
+    fraction_inactivated = 1.0 - sNa_at_step_end / sNa_at_rest
+    assert fraction_inactivated > 0.5, (
+        f"sNa_da did not meaningfully inactivate: rest={sNa_at_rest:.3f}, "
+        f"step end={sNa_at_step_end:.3f}, "
+        f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.5)"
+    )
+
+
+def test_da_recovers_from_sustained_suprathreshold_drive(
+    da_neuron: Neuron,
+) -> None:
+    """SNc DA settles below −50 mV after +12 µA/cm² × 200 ms drive (#330).
+
+    Regression guard rather than a fix for #323: the somatic single-
+    compartment model already cycles around −60 mV under this drive
+    (it never enters depol-block; see the module docstring and #323).
+    With the new sNa_da and sNaP_snc gates the cell still must not park
+    above −50 mV in the last 200 ms of the post-stim epoch.  This guards
+    against the new gates *introducing* a depol-block plateau via
+    misconfigured kinetics or an unintended interaction with the rest of
+    the channel cocktail.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(_DA_DEPOL_DRIVE_MS)
+    n_post = _ms_to_samples(700.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, _DA_DEPOL_DRIVE_AMP_UA),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(da_neuron, current_external=current)
+    tail = np.asarray(result["voltage"][-_ms_to_samples(200.0) :])
+    mean_v = float(tail.mean())
+    assert mean_v < -50.0, (
+        f"SNc DA failed to recover from +12 µA/cm² × 200 ms; "
+        f"mean V in last 200 ms = {mean_v:.2f} mV"
+    )
+
+
+def test_da_sNa_da_and_sNaP_snc_columns_present(da_neuron: Neuron) -> None:
+    """``sNa_da`` and ``sNaP_snc`` columns appear in the simulation output.
+
+    Direct check of the issue #330 acceptance criterion that both slow
+    inactivation gating variables surface as named columns.  The SNc preset
+    runs Cav1.3, SK, and Ih alongside the SNc-namespaced INaP_SNc; this
+    test pins the SNc-specific gate naming (``sNa_da``, ``sNaP_snc``) so
+    they cannot collide with the bare ``sNa``/``sNaP`` of other Na factories
+    should a hypothetical preset combine them.
+    """
+    n_samples = _ms_to_samples(50.0) + 1
+    zero_current = np.zeros(n_samples)
+    result = simulate_current_clamp(da_neuron, current_external=zero_current)
+    names = result.dtype.names or ()
+    assert "sNa_da" in names, (
+        f"Expected 'sNa_da' column for fast-Na slow inactivation; got {names!r}"
+    )
+    assert "sNaP_snc" in names, (
+        f"Expected 'sNaP_snc' column for INaP_SNc slow inactivation; got {names!r}"
+    )
+    assert "pSNc" in names, (
+        f"Expected 'pSNc' INaP_SNc activation column; got {names!r}.  Loss "
+        "of this column would indicate a regression in INaP_SNc wiring."
     )

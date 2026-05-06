@@ -2017,3 +2017,57 @@ async def test_purkinje_recovers_from_depol_block_via_ui_build_neuron() -> None:
         f"Purkinje failed to recover via UI build path: mean V "
         f"last 200 ms = {last_200ms.mean():.2f} mV (expected < −50 mV)"
     )
+
+
+async def test_build_neuron_preserves_snc_inap_slow_inactivation_for_dopaminergic() -> (
+    None
+):
+    """Dopaminergic _build_neuron preserves the always-on sNaP_snc gate (#330).
+
+    ``_build_neuron`` forwards ``ChannelConfig.factory`` directly, so
+    ``make_snc_inap_channel`` must round-trip and yield a 2-gate INaP_SNc
+    channel including the Khaliq & Bean 2010 / Magistretti & Alonso 1999
+    sNaP_snc slow-inactivation gate.  This pins the channel-factory contract:
+    a regression that dropped sNaP_snc from the factory would silently lose
+    biological accuracy via the UI path.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
+    neuron = ns._build_neuron()
+
+    inap = next((ch for ch in neuron.additional_channels if ch.name == "NaP_SNc"), None)
+    assert inap is not None, "Dopaminergic preset must include INaP_SNc channel"
+    gate_names = {g.name for g in inap.gating_variables}
+    assert "sNaP_snc" in gate_names, (
+        f"INaP_SNc slow-inactivation gate sNaP_snc missing from UI-built "
+        f"dopaminergic neuron; gates present: {sorted(gate_names)}.  "
+        f"make_snc_inap_channel is no longer producing the slow-inactivation "
+        f"gate."
+    )
+
+
+async def test_build_neuron_preserves_dopaminergic_sNa_da_for_dopaminergic() -> None:
+    """Dopaminergic _build_neuron preserves the always-on sNa_da gate (#330).
+
+    ``_build_neuron`` forwards ``preset_cfg.na_channel_factory`` directly,
+    so ``make_dopaminergic_na_channel`` must round-trip and yield a 3-gate
+    Na channel including the Khaliq & Bean 2010 sNa_da slow-inactivation
+    gate.  This pins the channel-factory contract: a regression that
+    dropped sNa_da from the factory would silently lose biological accuracy
+    via the UI path.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
+    neuron = ns._build_neuron()
+
+    na = next((ch for ch in neuron.core_channels if ch.name == "Na"), None)
+    assert na is not None, "Dopaminergic preset must include core Na channel"
+    gate_names = {g.name for g in na.gating_variables}
+    assert "sNa_da" in gate_names, (
+        f"Dopaminergic sNa_da gate missing from UI-built dopaminergic "
+        f"neuron; gates present: {sorted(gate_names)}.  "
+        f"make_dopaminergic_na_channel is no longer producing the Khaliq "
+        f"& Bean 2010 slow-inactivation gate."
+    )

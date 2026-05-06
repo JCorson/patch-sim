@@ -11,6 +11,8 @@ from patch_sim.core_channels import (
     MAINEN_SEJNOWSKI_KV_VHALF,
     POSPISCHIL_VT,
     PURKINJE_VT,
+    _dopaminergic_alpha_sNa,
+    _dopaminergic_beta_sNa,
     _pospischil_alpha_sNa,
     _pospischil_beta_sNa,
     _purkinje_alpha_sNa,
@@ -1451,19 +1453,93 @@ def test_dopaminergic_steady_state_gating_bounds(V: float) -> None:
 
 
 def test_make_dopaminergic_na_channel_structure() -> None:
-    """make_dopaminergic_na_channel returns a Na⁺ channel with m³h gating."""
+    """make_dopaminergic_na_channel returns m³, h, sNa_da gates with Na⁺ reversal."""
     ch = make_dopaminergic_na_channel(g_max=120.0)
     assert isinstance(ch, IonChannel)
     assert ch.name == "Na"
     assert ch.g_max == pytest.approx(120.0)
-    assert len(ch.gating_variables) == 2
+    assert len(ch.gating_variables) == 3
     assert ch.gating_variables[0].name == "m"
     assert ch.gating_variables[0].power == 3
     assert ch.gating_variables[1].name == "h"
     assert ch.gating_variables[1].power == 1
+    assert ch.gating_variables[2].name == "sNa_da"
+    assert ch.gating_variables[2].power == 1
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.SODIUM
     assert not ch.carries_calcium
+
+
+# ---------------------------------------------------------------------------
+# Dopaminergic SNc slow Na inactivation rate functions (sNa_da gate;
+# Khaliq & Bean 2010).  Always-on gate added in #330.
+# ---------------------------------------------------------------------------
+
+
+def _dopaminergic_sNa_inf(V: float) -> float:
+    """Steady-state availability of the dopaminergic slow Na inactivation gate.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Steady-state availability of the sNa_da gate at voltage V, in [0, 1].
+    """
+    a, b = _dopaminergic_alpha_sNa(V, 0.0), _dopaminergic_beta_sNa(V, 0.0)
+    return a / (a + b)
+
+
+def test_dopaminergic_slow_na_inactivation_steady_state_in_bounds() -> None:
+    """The sNa_da rates are positive and steady state in [0, 1] across V."""
+    for V in (-120.0, -100.0, -75.0, -55.0, -50.0, -30.0, -15.0, 0.0, 30.0):
+        a = _dopaminergic_alpha_sNa(V, 0.0)
+        b = _dopaminergic_beta_sNa(V, 0.0)
+        assert a >= 0, f"alpha_sNa_da negative at V={V}"
+        assert b >= 0, f"beta_sNa_da negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"sNa_da steady state {ss} out of [0,1] at V={V}"
+
+
+def test_dopaminergic_slow_na_inactivation_decreases_with_depolarisation() -> None:
+    """The sNa_da availability decreases monotonically with depolarisation."""
+    assert (
+        _dopaminergic_sNa_inf(-80.0)
+        > _dopaminergic_sNa_inf(-50.0)
+        > _dopaminergic_sNa_inf(-15.0)
+    )
+
+
+def test_dopaminergic_slow_na_inactivation_half_voltage() -> None:
+    """V½ for sNa_da sits at -50 mV (mirrors STN / Pospischil / Purkinje sNa)."""
+    assert _dopaminergic_sNa_inf(-50.0) == pytest.approx(0.5, abs=0.01)
+
+
+def test_dopaminergic_slow_na_inactivation_resting_availability() -> None:
+    """SNc DA cycles through −90 to −55 mV; sNa_da must stay open in the trough.
+
+    The looser lower bound at v_rest = −55 mV (vs Purkinje 0.85 at −65 mV) is
+    expected: SNc rests more depolarised, so the slow gate sits closer to V½
+    at rest.  The cycle hyperpolarised end (≈ −75 mV) is what matters for
+    recovery between spikes, and there sNa_da > 0.93.
+    """
+    assert _dopaminergic_sNa_inf(-75.0) > 0.93
+    assert _dopaminergic_sNa_inf(-55.0) > 0.6
+
+
+def test_dopaminergic_slow_na_inactivation_blocks_depol_plateau() -> None:
+    """At depolarised plateau voltages sNa_da closes, abolishing the residual h-tail."""
+    # The depol-block plateau the new gate guards against (mirroring STN/
+    # Purkinje rationale) hangs at ≈ −15 mV; sNa_da must close firmly there
+    # so g_Na_eff = g_max * m^3 * h * sNa_da collapses below leak + IK.
+    assert _dopaminergic_sNa_inf(-15.0) < 0.05
+
+
+def test_dopaminergic_slow_na_inactivation_tau_is_slow() -> None:
+    """τ_sNa_da at V½ stays distinctly slow vs the fast m, h gates."""
+    a = _dopaminergic_alpha_sNa(-50.0, 0.0)
+    b = _dopaminergic_beta_sNa(-50.0, 0.0)
+    tau = 1.0 / (a + b)
+    assert tau > 100.0, f"sNa_da tau at V½ is {tau:.1f} ms, expected > 100 ms"
 
 
 def test_make_dopaminergic_k_channel_structure() -> None:

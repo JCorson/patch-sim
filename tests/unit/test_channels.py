@@ -27,6 +27,7 @@ from patch_sim.additional_channels import (
     _alpha_r,
     _alpha_s,
     _alpha_sNaP,
+    _alpha_sNaP_snc,
     _alpha_w,
     _beta_a,
     _beta_b,
@@ -44,6 +45,7 @@ from patch_sim.additional_channels import (
     _beta_r,
     _beta_s,
     _beta_sNaP,
+    _beta_sNaP_snc,
     _beta_w,
     make_ical_channel,
     make_ican_channel,
@@ -56,6 +58,7 @@ from patch_sim.additional_channels import (
     make_inap_channel,
     make_inar_channel,
     make_katp_channel,
+    make_snc_inap_channel,
     make_trn_icat_channel,
 )
 from patch_sim.calcium import CalciumDynamics
@@ -939,6 +942,100 @@ def test_make_inap_channel_custom_params():
     assert ch.g_max == pytest.approx(1.0)
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.SODIUM
+
+
+# ---------------------------------------------------------------------------
+# SNc INaP slow inactivation rate functions (sNaP_snc gate; Magistretti &
+# Alonso 1999 V½ shifted to match the Drion 2011 SNc fit).  Always-on gate
+# added in #330.
+# ---------------------------------------------------------------------------
+
+
+def _sNaP_snc_inf(V: float) -> float:
+    """Steady-state availability of the SNc INaP slow inactivation gate.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Steady-state availability of the sNaP_snc gate at voltage V, in [0, 1].
+    """
+    a, b = _alpha_sNaP_snc(V, 0.0), _beta_sNaP_snc(V, 0.0)
+    return a / (a + b)
+
+
+def test_snc_inap_slow_inactivation_steady_state_in_bounds():
+    """The sNaP_snc rates are positive and steady state in [0, 1] across V."""
+    for V in (-120.0, -100.0, -75.0, -55.0, -45.0, -30.0, -15.0, 0.0, 30.0):
+        a = _alpha_sNaP_snc(V, 0.0)
+        b = _beta_sNaP_snc(V, 0.0)
+        assert a >= 0, f"alpha_sNaP_snc negative at V={V}"
+        assert b >= 0, f"beta_sNaP_snc negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"sNaP_snc steady state {ss} out of [0,1] at V={V}"
+
+
+def test_snc_inap_slow_inactivation_decreases_with_depolarisation():
+    """The sNaP_snc availability decreases monotonically with depolarisation."""
+    assert _sNaP_snc_inf(-80.0) > _sNaP_snc_inf(-55.0) > _sNaP_snc_inf(-15.0)
+
+
+def test_snc_inap_slow_inactivation_half_voltage():
+    """V½ for sNaP_snc sits at -55 mV (Drion 2011 shift from M&A 1999)."""
+    assert _sNaP_snc_inf(-55.0) == pytest.approx(0.5, abs=0.01)
+
+
+def test_snc_inap_slow_inactivation_resting_availability():
+    """SNc DA cycles through −90 to −55 mV; sNaP_snc must stay open in the trough.
+
+    The looser lower bound at v_rest = −55 mV (vs entorhinal sNaP at 0.94
+    at −65 mV) is expected: SNc rests more depolarised, and the SNc-shifted
+    V½ tracks.  The cycle hyperpolarised end (≈ −75 mV) is what matters
+    for recovery between spikes, and there sNaP_snc > 0.94.
+    """
+    assert _sNaP_snc_inf(-75.0) > 0.94
+    assert _sNaP_snc_inf(-55.0) == pytest.approx(0.5, abs=0.01)
+
+
+def test_snc_inap_slow_inactivation_blocks_depol_plateau():
+    """At depolarised plateau voltages sNaP_snc closes, providing block escape."""
+    # At ≈ −15 mV the slow gate must close firmly so the residual SNc
+    # persistent Na current (g_NaP_SNc * pSNc * sNaP_snc) collapses.
+    assert _sNaP_snc_inf(-15.0) < 0.05
+
+
+def test_snc_inap_slow_inactivation_tau_is_slow():
+    """τ_sNaP_snc at V½ stays distinctly slow vs the fast pSNc activation (~5 ms)."""
+    a, b = _alpha_sNaP_snc(-55.0, 0.0), _beta_sNaP_snc(-55.0, 0.0)
+    tau = 1.0 / (a + b)
+    assert tau > 100.0, f"sNaP_snc tau at V½ is {tau:.1f} ms, expected > 100 ms"
+
+
+# ---------------------------------------------------------------------------
+# make_snc_inap_channel
+# ---------------------------------------------------------------------------
+
+
+def test_make_snc_inap_channel_defaults():
+    """make_snc_inap_channel() exposes pSNc and sNaP_snc gates by default."""
+    from patch_sim.constants import DEFAULT_G_NAP_SNC
+
+    ch = make_snc_inap_channel()
+    assert ch.name == "NaP_SNc"
+    assert ch.g_max == pytest.approx(DEFAULT_G_NAP_SNC)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.SODIUM
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "pSNc"
+    assert ch.gating_variables[0].power == 1
+    assert ch.gating_variables[1].name == "sNaP_snc"
+    assert ch.gating_variables[1].power == 1
+
+
+def test_make_snc_inap_channel_custom_params():
+    """make_snc_inap_channel accepts custom g_max."""
+    ch = make_snc_inap_channel(g_max=0.05)
+    assert ch.g_max == pytest.approx(0.05)
 
 
 # ---------------------------------------------------------------------------
