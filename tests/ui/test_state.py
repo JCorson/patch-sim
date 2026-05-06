@@ -1838,3 +1838,93 @@ async def test_cp_recovers_from_depol_block_via_ui_build_neuron() -> None:
         f"Cortical pyramidal failed to recover via UI build path: mean V "
         f"last 200 ms = {last_200ms.mean():.2f} mV (expected < −50 mV)"
     )
+
+
+async def test_build_neuron_preserves_inap_slow_inactivation_for_ca1() -> None:
+    """CA1 pyramidal _build_neuron preserves INaP slow_inactivation (#328).
+
+    Mirror of the cortical pyramidal regression for CA1: ``_build_neuron``
+    must forward ``ChannelConfig.extra_kwargs`` from the preset so that
+    the INaP sNaP gate added in #328 round-trips through the UI build
+    path.  Without this, the live Reflex app would silently drop sNaP and
+    fail depol-block recovery while the python-only integration tests
+    keep passing.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(CA1_PYRAMIDAL)]
+    neuron = ns._build_neuron()
+
+    inap = next((ch for ch in neuron.additional_channels if ch.name == "NaP"), None)
+    assert inap is not None, "CA1 pyramidal preset must include INaP channel"
+    gate_names = {g.name for g in inap.gating_variables}
+    assert "sNaP" in gate_names, (
+        f"INaP slow-inactivation gate sNaP missing from UI-built CA1 "
+        f"pyramidal neuron; gates present: {sorted(gate_names)}.  "
+        f"_build_neuron is dropping ChannelConfig.extra_kwargs="
+        f"{{'slow_inactivation': True}}."
+    )
+
+
+async def test_build_neuron_preserves_pospischil_sNa_for_ca1() -> None:
+    """CA1 pyramidal _build_neuron preserves the Pospischil-Na sNa gate (#328).
+
+    ``_build_neuron`` forwards ``preset_cfg.na_channel_factory`` directly,
+    so the ``functools.partial(make_pospischil_na_channel,
+    slow_inactivation=True)`` wrapper must round-trip and yield a 3-gate
+    Na channel including sNa.  Without this, the CA1 pyramidal cell
+    would lose the fast-Na slow-inactivation gate via the UI path even
+    though the preset itself wires it on.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(CA1_PYRAMIDAL)]
+    neuron = ns._build_neuron()
+
+    na = next((ch for ch in neuron.core_channels if ch.name == "Na"), None)
+    assert na is not None, "CA1 pyramidal preset must include core Na channel"
+    gate_names = {g.name for g in na.gating_variables}
+    assert "sNa" in gate_names, (
+        f"Pospischil sNa gate missing from UI-built CA1 pyramidal "
+        f"neuron; gates present: {sorted(gate_names)}.  _build_neuron is "
+        f"not forwarding the functools.partial(make_pospischil_na_channel, "
+        f"slow_inactivation=True) factory."
+    )
+
+
+async def test_ca1_recovers_from_depol_block_via_ui_build_neuron() -> None:
+    """End-to-end #328 regression via UI _build_neuron path.
+
+    Loads the CA1 pyramidal preset into a NeuronState (the path the
+    live Reflex app uses on Run), builds the neuron through
+    ``_build_neuron``, drives +30 µA/cm² × 200 ms and asserts the
+    membrane settles below −50 mV in the last 200 ms of a 700 ms post-stim
+    epoch.
+
+    Without this test, an integration test that bypasses _build_neuron
+    happily passes while the live UI silently loses sNa or sNaP.
+    """
+    from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(CA1_PYRAMIDAL)]
+    neuron = ns._build_neuron()
+
+    def n_samples(ms: float) -> int:
+        """Convert ms to simulation samples."""
+        return int(ms * SIM_SAMPLING_FREQ / 1000.0)
+
+    current = np.concatenate(
+        [
+            np.zeros(n_samples(100.0)),
+            np.full(n_samples(200.0), 30.0),
+            np.zeros(n_samples(700.0) + 1),
+        ]
+    )
+    result = simulate_current_clamp(neuron, current_external=current)
+    last_200ms = np.asarray(result["voltage"][-n_samples(200.0) :])
+    assert last_200ms.mean() < -50.0, (
+        f"CA1 pyramidal failed to recover via UI build path: mean V "
+        f"last 200 ms = {last_200ms.mean():.2f} mV (expected < −50 mV)"
+    )
