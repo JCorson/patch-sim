@@ -569,7 +569,7 @@ pospischil_beta_n = VoltageOnlyFn(_pospischil_beta_n_impl)
 # fast-Na factories below:
 #
 #   * Nav1.2 (somatic in cortical / CA1 pyramidal): V½ = −50 mV, slope
-#     8 mV, τ_scale = 200 ms, τ_floor = 20 mV. Matches Fleidervish &
+#     8 mV, τ_scale = 200 ms, τ_floor = 20 ms. Matches Fleidervish &
 #     Gutnick (1996) within rounding; the gate fully equilibrates within
 #     ~1 s of sustained depolarisation, providing the depolarisation-block
 #     escape route required by the cortical/CA1 presets (#327, #328).
@@ -593,8 +593,12 @@ pospischil_beta_n = VoltageOnlyFn(_pospischil_beta_n_impl)
 #
 # Distinct gate names ``sNa11`` / ``sNa12`` keep the simulation result
 # schema unambiguous if both factories are ever used in the same network,
-# and avoid collision with ``s`` (INaR activation), ``sNa`` (STN slow
-# inactivation), and ``sNaP`` (INaP slow inactivation).
+# and avoid collision with the other slow-inactivation gate names already
+# in use: ``s`` (INaR activation), ``sNa`` (STN and Purkinje fast-Na slow
+# inactivation; reused because the two presets never coexist on the same
+# neuron), ``sNa_da`` (SNc dopaminergic fast-Na slow inactivation),
+# ``sNaP`` (INaP slow inactivation), and ``sNaP_snc`` (SNc INaP slow
+# inactivation).
 
 _nav12_alpha_sNa, _nav12_beta_sNa = boltzmann_cosh_rates(
     half=-50.0,

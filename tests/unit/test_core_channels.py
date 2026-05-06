@@ -575,8 +575,9 @@ def test_nav12_slow_na_inactivation_tau_is_slow() -> None:
 # ---------------------------------------------------------------------------
 # Nav1.1 slow Na inactivation rate functions (sNa11 gate; Patel et al. 2015
 # Nav1.1 vs Nav1.6 comparison).  Weak gate baked into make_nav11_channel:
-# V½ = −65 mV with a much slower τ_scale (5000 ms) so the gate barely
-# engages at the 100–500 Hz firing rates typical of FSI.
+# V½ = −45 mV with much slower kinetics (τ_scale = 50000 ms,
+# τ_floor = 5000 ms) so the gate barely engages at the 100–500 Hz firing
+# rates typical of FSI.
 # ---------------------------------------------------------------------------
 
 
