@@ -339,3 +339,100 @@ def test_cp_ap_ahp_depth_in_rs_range(cp_ap_shape_result) -> None:
         reference=_RS_REFERENCE,
         ahp_mv=(-70.0, -50.0),
     )
+
+
+# ---------------------------------------------------------------------------
+# Slow Na inactivation engagement and depol-block recovery — issue #327.
+# ---------------------------------------------------------------------------
+
+
+def test_cp_inap_slow_inactivation_engages_during_drive(cp_neuron: Neuron) -> None:
+    """The sNaP gate closes during +12 µA/cm² × 200 ms drive (#327 mechanism).
+
+    Direct mechanism check for #327: the Magistretti & Alonso 1999 slow
+    inactivation gate added to ``make_inap_channel`` must be doing real
+    work during sustained suprathreshold drive.  By the end of the step,
+    sNaP should have lost at least half its rest availability so the
+    persistent Na⁺ contribution to the depol-block plateau is suppressed.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(200.0)
+    n_post = _ms_to_samples(50.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, 12.0),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(cp_neuron, current_external=current)
+    sNaP_at_rest = float(result["sNaP"][n_pre - 1])
+    sNaP_at_step_end = float(result["sNaP"][n_pre + n_step - 1])
+    fraction_inactivated = 1.0 - sNaP_at_step_end / sNaP_at_rest
+    assert fraction_inactivated > 0.5, (
+        f"sNaP did not meaningfully inactivate: rest={sNaP_at_rest:.3f}, "
+        f"step end={sNaP_at_step_end:.3f}, "
+        f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.5)"
+    )
+
+
+def test_cp_fast_na_slow_inactivation_engages_during_drive(
+    cp_neuron: Neuron,
+) -> None:
+    """The sNa gate (fast Na slow inactivation) closes during +12 µA/cm² × 200 ms.
+
+    Direct mechanism check for #327: the Fleidervish & Gutnick 1996 slow
+    voltage-dependent inactivation gate added to ``make_pospischil_na_channel``
+    must lose at least half its rest availability by the end of a sustained
+    suprathreshold step, abolishing the residual fast-Na h-tail that would
+    otherwise pin the cell on a depolarisation plateau.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(200.0)
+    n_post = _ms_to_samples(50.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, 12.0),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(cp_neuron, current_external=current)
+    sNa_at_rest = float(result["sNa"][n_pre - 1])
+    sNa_at_step_end = float(result["sNa"][n_pre + n_step - 1])
+    fraction_inactivated = 1.0 - sNa_at_step_end / sNa_at_rest
+    assert fraction_inactivated > 0.5, (
+        f"sNa did not meaningfully inactivate: rest={sNa_at_rest:.3f}, "
+        f"step end={sNa_at_step_end:.3f}, "
+        f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.5)"
+    )
+
+
+def test_cp_recovers_from_sustained_suprathreshold_drive(
+    cp_neuron: Neuron,
+) -> None:
+    """Cortical pyramidal repolarises after +12 µA/cm² × 200 ms (#327 regression).
+
+    Without slow Na inactivation the cell can hang on a depol-block
+    plateau under sustained drive.  With sNaP (Magistretti & Alonso 1999)
+    and Pospischil sNa (Fleidervish & Gutnick 1996) opted in, the cell
+    must escape the plateau within the post-stim window and settle below
+    −50 mV during the last 200 ms of a 700 ms post-stimulus epoch.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(200.0)
+    n_post = _ms_to_samples(700.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, 12.0),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(cp_neuron, current_external=current)
+    tail = np.asarray(result["voltage"][-_ms_to_samples(200.0) :])
+    mean_v = float(tail.mean())
+    assert mean_v < -50.0, (
+        f"Cortical pyramidal failed to recover from +12 µA/cm² × 200 ms; "
+        f"mean V in last 200 ms = {mean_v:.2f} mV"
+    )
