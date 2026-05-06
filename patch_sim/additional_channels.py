@@ -296,11 +296,13 @@ def make_ih_channel(
 # In STN this gate co-acts with the fast-Na slow inactivation gate
 # (``make_stn_na_channel(slow_inactivation=True)``) and ``make_katp_channel``
 # (#324); the three together collapse the −15 mV plateau cleanly.  Cortical
-# pyramidal opts into ``sNaP`` together with the Pospischil fast-Na sNa
-# gate (#327) but no K_ATP — autonomous-pacemaker metabolic safety isn't
-# biologically motivated there, and the two slow-inactivation gates suffice.
-# CA1 / Purkinje currently stay opt-out.  The chosen τ is therefore robust
-# to the channel cocktail the gate happens to ship in.
+# pyramidal (#327), CA1 pyramidal (#328), and Purkinje (#329) all opt into
+# ``sNaP`` together with their own fast-Na slow-inactivation gate but no
+# K_ATP — autonomous-pacemaker metabolic safety isn't biologically
+# motivated there (or, for Purkinje, Carter & Bean 2009 demonstrate
+# depol-block recovery without it), and the two slow-inactivation gates
+# suffice.  The chosen τ is therefore robust to the channel cocktail the
+# gate happens to ship in.
 #
 # The slow-inactivation gate is named ``sNaP`` rather than ``s`` because the
 # gating-state dictionary is keyed by gate name only and ``make_inar_channel``
@@ -308,9 +310,9 @@ def make_ih_channel(
 # channels' gating variables.
 #
 # Slow inactivation is opt-in (default off) so that presets tuned without it
-# (CA1 pyramidal, Purkinje) keep their existing phenotypes.  Enable it on
-# presets where depolarisation-block recovery matters — STN (#324) and
-# cortical pyramidal (#327).
+# keep their existing phenotypes.  Enable it on presets where depolarisation-
+# block recovery matters — STN (#324), cortical pyramidal (#327), CA1
+# pyramidal (#328), and Purkinje (#329).
 
 _alpha_p, _beta_p = boltzmann_cosh_rates(
     half=-52.6, slope=4.6, tau_scale=6.0, tau_floor=0.1
@@ -349,10 +351,10 @@ def make_inap_channel(
     Slow inactivation is opt-in because it changes the effective INaP
     conductance during sustained firing trains (sNaP slowly decays towards
     its sub-1 steady state), which can alter spike-frequency-adaptation
-    profiles in presets calibrated against the no-slow-inactivation INaP
-    (cortical pyramidal, CA1 pyramidal, Purkinje).  Enable it on presets
-    where depolarisation-block recovery is the dominant concern — e.g. STN
-    in issue #324.
+    profiles in presets calibrated against the no-slow-inactivation INaP.
+    Enable it on presets where depolarisation-block recovery is the
+    dominant concern — STN (#324), cortical pyramidal (#327), CA1
+    pyramidal (#328), and Purkinje (#329).
 
     The reversal potential is computed dynamically from the neuron's Na⁺
     concentrations using the Nernst equation.
