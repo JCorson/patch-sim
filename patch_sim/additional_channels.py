@@ -403,10 +403,11 @@ def make_inap_channel(
 # τ_floor 20 ms).  Magistretti & Alonso (1999) §"Slow inactivation" report
 # the entorhinal INaP slow gate at V½ in the −47 to −54 mV range; the SNc
 # Drion fit shifts INaP activation V½ ~12 mV more hyperpolarised (−65 mV
-# vs −52.6 mV), so the slow gate V½ is shifted by the same Δ to −55 mV
-# (within the hyperpolarised edge of the Magistretti-Alonso experimental
-# band).  This keeps the activation/slow-inactivation overlap that underlies
-# the INaP escape from sustained depolarisation.  Slow inactivation in SNc
+# vs −52.6 mV).  Applying the same shift strictly would place the slow gate
+# at ≈ −57 mV; V½ = −55 mV is chosen as a round number just past the
+# hyperpolarised edge of the Magistretti-Alonso band, preserving the
+# activation/slow-inactivation overlap that underlies the INaP escape from
+# sustained depolarisation.  Slow inactivation in SNc
 # DA Na⁺ currents is documented by Khaliq & Bean (2010) and Tucker, Hagiwara
 # & Williams (2012); the gate makes the cell biologically more accurate.
 # Always on because ``make_snc_inap_channel`` is dedicated to the SNc

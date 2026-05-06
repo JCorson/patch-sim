@@ -2362,13 +2362,13 @@ def make_dopaminergic_na_channel(g_max: float) -> IonChannel:
     :func:`~patch_sim.additional_channels.make_snc_inap_channel`.
 
     References:
-        - Canavier (1999), J. Comput. Neurosci. 6:49 (m, h, n kinetics).
-        - Komendantov et al. (2004), J. Neurophysiol. 91:346 (m, h, n kinetics).
+        - Canavier (1999), J. Comput. Neurosci. 6:49; Komendantov et al.
+          (2004), J. Neurophysiol. 91:346 — m, h, n kinetics at ~35 °C
+          (use T_ref = 308.15 K with this factory).
         - Khaliq & Bean (2010), J. Neurosci. 30:7401 (slow Na inactivation in
           SNc dopaminergic neurons — primary source for the sNa_da gate).
         - Tucker, Hagiwara & Williams (2012), J. Neurophysiol. 108:2492
           (confirms slow Na inactivation in midbrain DA neurons).
-    Kinetics at ~35 °C — use T_ref = 308.15 K with this factory.
 
     Args:
         g_max: Maximum conductance in mS/cm².
