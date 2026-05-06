@@ -689,7 +689,7 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #   g_NaP   = 0.05 mS/cm²: persistent Na⁺ window current that
         #     destabilises rest.  Halved from the previous 0.10 mS/cm² —
         #     the larger value rebounded the membrane within ~5 ms after
-        #     each AHP, while fast-Na ``h`` was still ~10 % available, and
+        #     each AHP, before fast-Na ``h`` had fully de-inactivated, and
         #     produced an abortive ~0 mV spikelet (the doublet artifact
         #     reported in #326).  At 0.05 mS/cm² INaP still destabilises
         #     rest (the cell remains an autonomous oscillator with no
@@ -1236,9 +1236,10 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "stimulus_duration": 5.0,
         },
         # Depolarising bias on top of the autonomous tonic train.  At
-        # 2 µA/cm² the cell fires at ~105 Hz (well above the 5–50 Hz
-        # autonomous rate); 200 ms is long enough to comfortably exceed
-        # the ≥5 spike requirement of test_repetitive_firing_preset.
+        # +2 µA/cm² the cell fires at ~36 Hz (top of the Bevan & Wilson
+        # 1999 5–50 Hz autonomous range); 200 ms is long enough to
+        # comfortably exceed the ≥5 spike requirement of
+        # test_repetitive_firing_preset.
         REPETITIVE_FIRING: {
             "min_stimulus": 2.0,
             "max_stimulus": 2.0,
