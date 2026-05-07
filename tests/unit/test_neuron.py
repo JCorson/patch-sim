@@ -4,8 +4,9 @@ import dataclasses
 
 import pytest
 
-from patch_sim.channels import IonChannel, IonSpecies
-from patch_sim.core_channels import (
+from patch_sim.channels import (
+    IonChannel,
+    IonSpecies,
     make_k_channel,
     make_k_leak_channel,
     make_na_channel,
@@ -70,8 +71,7 @@ def test_all_gating_variables_no_additional(hh_model: Neuron) -> None:
 def test_all_gating_variables_with_additional() -> None:
     """all_gating_variables includes gating vars from additional channels."""
     # Rename the gating variable to avoid name collision with the core K channel
-    from patch_sim.channels import GatingVariable, NernstSpec
-    from patch_sim.core_channels import alpha_n, beta_n
+    from patch_sim.channels import GatingVariable, NernstSpec, alpha_n, beta_n
 
     gv_new = GatingVariable(
         name="kextra_activation", power=4, alpha=alpha_n, beta=beta_n

@@ -5,9 +5,8 @@ Covers automatic calcium-dynamics detection and custom configuration.
 
 import pytest
 
-from patch_sim.additional_channels import make_ical_channel, make_icat_channel
 from patch_sim.calcium import CalciumDynamics
-from patch_sim.channels import IonChannel
+from patch_sim.channels import IonChannel, make_ical_channel, make_icat_channel
 from patch_sim.constants import (
     CA1_PYRAMIDAL,
     DOPAMINERGIC,
@@ -127,7 +126,7 @@ def test_make_neuron_additional_channels_attached() -> None:
 
 def test_make_neuron_passes_na_factory() -> None:
     """make_neuron forwards na_channel_factory from NeuronConfig to Neuron."""
-    from patch_sim.core_channels import make_na_channel
+    from patch_sim.channels import make_na_channel
 
     calls: list[float] = []
 
@@ -145,7 +144,7 @@ def test_make_neuron_passes_na_factory() -> None:
 
 def test_make_neuron_passes_k_factory() -> None:
     """make_neuron forwards k_channel_factory from NeuronConfig to Neuron."""
-    from patch_sim.core_channels import make_k_channel
+    from patch_sim.channels import make_k_channel
 
     def alt_k(g_max: float) -> IonChannel:
         """Alternate K factory."""
@@ -158,7 +157,7 @@ def test_make_neuron_passes_k_factory() -> None:
 
 def test_make_neuron_passes_na_leak_factory() -> None:
     """make_neuron forwards na_leak_channel_factory from NeuronConfig to Neuron."""
-    from patch_sim.core_channels import make_na_leak_channel
+    from patch_sim.channels import make_na_leak_channel
 
     def alt_nal(g_max: float) -> IonChannel:
         """Alternate Na leak factory."""
@@ -171,7 +170,7 @@ def test_make_neuron_passes_na_leak_factory() -> None:
 
 def test_make_neuron_passes_k_leak_factory() -> None:
     """make_neuron forwards k_leak_channel_factory from NeuronConfig to Neuron."""
-    from patch_sim.core_channels import make_k_leak_channel
+    from patch_sim.channels import make_k_leak_channel
 
     def alt_kl(g_max: float) -> IonChannel:
         """Alternate K leak factory."""
@@ -184,7 +183,7 @@ def test_make_neuron_passes_k_leak_factory() -> None:
 
 def test_neuron_config_default_factories_are_hh52() -> None:
     """NeuronConfig default factories are the standard HH functions."""
-    from patch_sim.core_channels import (
+    from patch_sim.channels import (
         make_k_channel,
         make_k_leak_channel,
         make_na_channel,

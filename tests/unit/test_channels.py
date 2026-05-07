@@ -10,7 +10,28 @@ import numpy as np
 import pytest
 
 import patch_sim
-from patch_sim.additional_channels import (
+from patch_sim.calcium import CalciumDynamics
+from patch_sim.channels import (
+    GatingVariable,
+    GoldmanSpec,
+    IonChannel,
+    IonSpecies,
+    NernstSpec,
+    make_ical_channel,
+    make_ican_channel,
+    make_icat_channel,
+    make_ih_channel,
+    make_ika_channel,
+    make_ikca_channel,
+    make_ikir_channel,
+    make_im_channel,
+    make_inap_channel,
+    make_inar_channel,
+    make_katp_channel,
+    make_snc_inap_channel,
+    make_trn_icat_channel,
+)
+from patch_sim.channels.auxiliary import (
     _alpha_a,
     _alpha_b,
     _alpha_d,
@@ -27,7 +48,6 @@ from patch_sim.additional_channels import (
     _alpha_r,
     _alpha_s,
     _alpha_sNaP,
-    _alpha_sNaP_snc,
     _alpha_w,
     _beta_a,
     _beta_b,
@@ -45,30 +65,9 @@ from patch_sim.additional_channels import (
     _beta_r,
     _beta_s,
     _beta_sNaP,
-    _beta_sNaP_snc,
     _beta_w,
-    make_ical_channel,
-    make_ican_channel,
-    make_icat_channel,
-    make_ih_channel,
-    make_ika_channel,
-    make_ikca_channel,
-    make_ikir_channel,
-    make_im_channel,
-    make_inap_channel,
-    make_inar_channel,
-    make_katp_channel,
-    make_snc_inap_channel,
-    make_trn_icat_channel,
 )
-from patch_sim.calcium import CalciumDynamics
-from patch_sim.channels import (
-    GatingVariable,
-    GoldmanSpec,
-    IonChannel,
-    IonSpecies,
-    NernstSpec,
-)
+from patch_sim.channels.snc import _alpha_sNaP_snc, _beta_sNaP_snc
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from patch_sim.electrochemistry import nernst_potential
 from patch_sim.neuron import Neuron
@@ -749,7 +748,7 @@ def test_public_api_exports_ika():
 
 def test_ikv31_gating_steady_state_in_bounds():
     """IKv31 gating variable nk_inf is in [0, 1] for physiological voltages."""
-    from patch_sim.additional_channels import _ikv31_alpha_nk, _ikv31_beta_nk
+    from patch_sim.channels.auxiliary import _ikv31_alpha_nk, _ikv31_beta_nk
 
     for V in range(-100, 61):
         alpha = _ikv31_alpha_nk(float(V), 0.0)
@@ -764,7 +763,7 @@ def test_ikv31_near_zero_activation_at_rest():
     The high activation threshold of Kv3.1 means virtually no outward current
     at rest — this is the key property that fixes issue #155.
     """
-    from patch_sim.additional_channels import _ikv31_alpha_nk, _ikv31_beta_nk
+    from patch_sim.channels.auxiliary import _ikv31_alpha_nk, _ikv31_beta_nk
 
     alpha = _ikv31_alpha_nk(-65.0, 0.0)
     beta = _ikv31_beta_nk(-65.0, 0.0)
@@ -774,7 +773,7 @@ def test_ikv31_near_zero_activation_at_rest():
 
 def test_ikv31_strong_activation_depolarized():
     """IKv31 nk_inf is well above 0.5 at 0 mV (depolarized)."""
-    from patch_sim.additional_channels import _ikv31_alpha_nk, _ikv31_beta_nk
+    from patch_sim.channels.auxiliary import _ikv31_alpha_nk, _ikv31_beta_nk
 
     alpha = _ikv31_alpha_nk(0.0, 0.0)
     beta = _ikv31_beta_nk(0.0, 0.0)
@@ -784,7 +783,7 @@ def test_ikv31_strong_activation_depolarized():
 
 def test_make_ikv31_channel_defaults():
     """make_ikv31_channel() produces a channel with the expected defaults."""
-    from patch_sim.additional_channels import make_ikv31_channel
+    from patch_sim.channels import make_ikv31_channel
     from patch_sim.constants import DEFAULT_G_IKV31
 
     ch = make_ikv31_channel()
@@ -797,7 +796,7 @@ def test_make_ikv31_channel_defaults():
 
 def test_current_clamp_with_ikv31():
     """Current clamp with IKv31 channel adds Kv31 and nk columns."""
-    from patch_sim.additional_channels import make_ikv31_channel
+    from patch_sim.channels import make_ikv31_channel
 
     neuron = Neuron(additional_channels=(make_ikv31_channel(),))
     stimulus = np.zeros(int(40_000 * 0.05))
@@ -1763,7 +1762,7 @@ def test_ikca_gating_steady_state_in_bounds():
 
 def test_ikca_activation_increases_with_calcium():
     """IKCa q_inf is higher at higher [Ca²⁺]ᵢ at a fixed voltage."""
-    from patch_sim.additional_channels import _ikca_q_inf
+    from patch_sim.channels.auxiliary import _ikca_q_inf
 
     V = -20.0
     assert _ikca_q_inf(V, 1e-2) > _ikca_q_inf(V, 1e-3) > _ikca_q_inf(V, 1e-4)
@@ -1771,7 +1770,7 @@ def test_ikca_activation_increases_with_calcium():
 
 def test_ikca_activation_increases_with_depolarisation():
     """IKCa q_inf is higher at depolarised voltages at fixed [Ca²⁺]ᵢ."""
-    from patch_sim.additional_channels import _ikca_q_inf
+    from patch_sim.channels.auxiliary import _ikca_q_inf
 
     ca = 1e-3
     assert _ikca_q_inf(20.0, ca) > _ikca_q_inf(-20.0, ca) > _ikca_q_inf(-80.0, ca)
@@ -1779,7 +1778,7 @@ def test_ikca_activation_increases_with_depolarisation():
 
 def test_ikca_zero_calcium_gives_zero_activation():
     """IKCa q_inf is zero when [Ca²⁺]ᵢ is zero, regardless of voltage."""
-    from patch_sim.additional_channels import _ikca_q_inf
+    from patch_sim.channels.auxiliary import _ikca_q_inf
 
     for V in np.linspace(-120.0, 60.0, 10):
         assert _ikca_q_inf(V, 0.0) == 0.0, f"q_inf non-zero at V={V} with ca=0"

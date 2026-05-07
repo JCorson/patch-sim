@@ -4,29 +4,15 @@ import math
 
 import pytest
 
-from patch_sim.channels import IonChannel, IonSpecies, NernstSpec
-from patch_sim.core_channels import (
+from patch_sim.channels import (
     DOPAMINERGIC_VT,
     MAINEN_SEJNOWSKI_KV_PRESCALE,
     MAINEN_SEJNOWSKI_KV_VHALF,
     POSPISCHIL_VT,
     PURKINJE_VT,
-    _dopaminergic_alpha_sNa,
-    _dopaminergic_beta_sNa,
-    _nav11_alpha_sNa,
-    _nav11_beta_sNa,
-    _nav12_alpha_sNa,
-    _nav12_beta_sNa,
-    _purkinje_alpha_sNa,
-    _purkinje_beta_sNa,
-    _stn_alpha_h,
-    _stn_alpha_m,
-    _stn_alpha_n,
-    _stn_alpha_sNa,
-    _stn_beta_h,
-    _stn_beta_m,
-    _stn_beta_n,
-    _stn_beta_sNa,
+    IonChannel,
+    IonSpecies,
+    NernstSpec,
     alpha_h,
     alpha_m,
     alpha_n,
@@ -72,6 +58,24 @@ from patch_sim.core_channels import (
     purkinje_beta_h,
     purkinje_beta_m,
     purkinje_beta_n,
+)
+from patch_sim.channels.pospischil import (
+    _nav11_alpha_sNa,
+    _nav11_beta_sNa,
+    _nav12_alpha_sNa,
+    _nav12_beta_sNa,
+)
+from patch_sim.channels.purkinje import _purkinje_alpha_sNa, _purkinje_beta_sNa
+from patch_sim.channels.snc import _dopaminergic_alpha_sNa, _dopaminergic_beta_sNa
+from patch_sim.channels.stn import (
+    _stn_alpha_h,
+    _stn_alpha_m,
+    _stn_alpha_n,
+    _stn_alpha_sNa,
+    _stn_beta_h,
+    _stn_beta_m,
+    _stn_beta_n,
+    _stn_beta_sNa,
 )
 from patch_sim.neuron import Neuron
 from patch_sim.rates import Rate
