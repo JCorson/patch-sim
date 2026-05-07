@@ -4,21 +4,6 @@ A package for simulating patch clamp experiments using conductance-based neuron 
 """
 
 from . import analysis, constants
-from .additional_channels import (
-    make_ical_channel,
-    make_ican_channel,
-    make_icat_channel,
-    make_ih_channel,
-    make_ika_channel,
-    make_ikca_channel,
-    make_ikir_channel,
-    make_ikv31_channel,
-    make_im_channel,
-    make_inap_channel,
-    make_inar_channel,
-    make_katp_channel,
-    make_trn_icat_channel,
-)
 from .analysis import (
     MEMBRANE_TEST_CURRENT,
     MEMBRANE_TEST_POST_MS,
@@ -67,11 +52,44 @@ from .analysis import (
 )
 from .calcium import CalciumDynamics
 from .channels import (
+    POSPISCHIL_VT,
     GatingVariable,
     GoldmanSpec,
     IonChannel,
     IonSpecies,
     NernstSpec,
+    alpha_h,
+    alpha_m,
+    alpha_n,
+    beta_h,
+    beta_m,
+    beta_n,
+    make_ical_channel,
+    make_ican_channel,
+    make_icat_channel,
+    make_ih_channel,
+    make_ika_channel,
+    make_ikca_channel,
+    make_ikir_channel,
+    make_ikv31_channel,
+    make_im_channel,
+    make_inap_channel,
+    make_inar_channel,
+    make_k_channel,
+    make_k_leak_channel,
+    make_katp_channel,
+    make_na_channel,
+    make_na_leak_channel,
+    make_nav11_channel,
+    make_nav12_channel,
+    make_pospischil_k_channel,
+    make_trn_icat_channel,
+    pospischil_alpha_h,
+    pospischil_alpha_m,
+    pospischil_alpha_n,
+    pospischil_beta_h,
+    pospischil_beta_m,
+    pospischil_beta_n,
 )
 from .clamp_simulations import (
     SimulationResult,
@@ -88,28 +106,6 @@ from .constants import (
     DEFAULT_T_REF,
     VOLTAGE_CLAMP,
     VOLTAGE_PROTOCOLS,
-)
-from .core_channels import (
-    POSPISCHIL_VT,
-    alpha_h,
-    alpha_m,
-    alpha_n,
-    beta_h,
-    beta_m,
-    beta_n,
-    make_k_channel,
-    make_k_leak_channel,
-    make_na_channel,
-    make_na_leak_channel,
-    make_nav11_channel,
-    make_nav12_channel,
-    make_pospischil_k_channel,
-    pospischil_alpha_h,
-    pospischil_alpha_m,
-    pospischil_alpha_n,
-    pospischil_beta_h,
-    pospischil_beta_m,
-    pospischil_beta_n,
 )
 from .electrochemistry import goldman_potential, nernst_potential
 from .equilibrium import find_coupled_equilibrium, find_zero_current_voltage
