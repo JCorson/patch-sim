@@ -195,7 +195,7 @@ async def run_flow(
         protocol_preset: Protocol preset name (e.g. ``ACTION_POTENTIAL``).
 
     Returns:
-        The :class:`~patch_sim_ui.state.simulation._SimResult` produced by the
+        The :class:`~patch_sim_ui.state._sweep_executor._SimResult` produced by the
         simulation, also already applied to ``tree.sim`` and ``tree.analysis``.
     """
     async with patch_get_state(tree):
@@ -232,7 +232,7 @@ def simulate_and_apply(tree: StateTree) -> _SimResult:
         tree: :class:`StateTree` with neuron and protocol already configured.
 
     Returns:
-        The :class:`~patch_sim_ui.state.simulation._SimResult` produced by
+        The :class:`~patch_sim_ui.state._sweep_executor._SimResult` produced by
         the simulation, also already applied to ``tree.sim`` and ``tree.analysis``.
     """
     neuron = tree.neuron._build_neuron()

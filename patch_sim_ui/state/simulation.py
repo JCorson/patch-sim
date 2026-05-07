@@ -41,8 +41,8 @@ from patch_sim_ui.state._common import (
     _PLOTLY_GD_JS,
 )
 from patch_sim_ui.state._figure_js import (
-    render_fetch_figure_js,
-    render_sweep_highlight_js,
+    _render_fetch_figure_js,
+    _render_sweep_highlight_js,
 )
 from patch_sim_ui.state._sweep_executor import _compute_simulation, _SimResult
 from patch_sim_ui.state.analysis import AnalysisState
@@ -356,7 +356,7 @@ class SimulationState(rx.State):
         post_js = "".join(post_parts)
 
         api_url = _get_config().api_url.rstrip("/")
-        return render_fetch_figure_js(token, post_js, api_url)
+        return _render_fetch_figure_js(token, post_js, api_url)
 
     def _sweep_highlight_js(self) -> str:
         """Return the sweep highlight JS with styling constants substituted.
@@ -364,7 +364,7 @@ class SimulationState(rx.State):
         Returns:
             A self-executing JS function string.
         """
-        return render_sweep_highlight_js(self.selected_sweep)
+        return _render_sweep_highlight_js(self.selected_sweep)
 
     def _rebuild_figure_and_fetch_js(
         self, stored_traces: list[Sweep], vis_st: "VisibilityState"

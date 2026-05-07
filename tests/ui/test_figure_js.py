@@ -10,14 +10,14 @@ os.environ.setdefault("PYTEST_CURRENT_TEST", "test_figure_js.py::setup")
 pytest.importorskip("reflex")
 
 from patch_sim_ui.state._figure_js import (  # noqa: E402
-    render_fetch_figure_js,
-    render_sweep_highlight_js,
+    _render_fetch_figure_js,
+    _render_sweep_highlight_js,
 )
 
 
 def test_render_sweep_highlight_js_substitutes_selected_sweep() -> None:
     """The selected_sweep value lands in the rendered JS string."""
-    js = render_sweep_highlight_js(2)
+    js = _render_sweep_highlight_js(2)
     assert "/*SELECTED_SWEEP*/" not in js
     assert "/*DIM_OPACITY*/" not in js
     assert "/*HOVER_WIDTH*/" not in js
@@ -28,14 +28,14 @@ def test_render_sweep_highlight_js_substitutes_selected_sweep() -> None:
 
 def test_render_sweep_highlight_js_default_no_selection() -> None:
     """``-1`` is the documented sentinel for no client-side selection."""
-    js = render_sweep_highlight_js(-1)
+    js = _render_sweep_highlight_js(-1)
     assert "-1" in js
     assert "/*SELECTED_SWEEP*/" not in js
 
 
 def test_render_fetch_figure_js_substitutes_all_placeholders() -> None:
     """Every placeholder token is replaced; the body carries the inputs."""
-    js = render_fetch_figure_js(
+    js = _render_fetch_figure_js(
         token="abcdef",
         post_js="POST_JS_BODY",
         api_url="http://example.test",

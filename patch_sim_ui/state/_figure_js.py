@@ -19,17 +19,17 @@ _ASSETS_DIR = pathlib.Path(__file__).parents[2] / "assets"
 #: ``rx.call_script()`` after every figure render in multi-sweep mode.
 #: Placeholder tokens (``/*DIM_OPACITY*/``, ``/*HOVER_WIDTH*/``,
 #: ``/*DIM_WIDTH*/``, ``/*SELECTED_SWEEP*/``) are substituted at call time
-#: in :func:`render_sweep_highlight_js`.
+#: in :func:`_render_sweep_highlight_js`.
 _SWEEP_HIGHLIGHT_JS: str = (_ASSETS_DIR / "sweep_highlight.js").read_text()
 
 #: Client-side fetch-and-swap for side-channel figure delivery.  Placeholder
 #: tokens (``/*API_URL*/``, ``/*TOKEN*/``, ``/*DARK_AXIS_STYLE*/``,
 #: ``/*POST_JS*/``) are substituted per call in
-#: :func:`render_fetch_figure_js`.
+#: :func:`_render_fetch_figure_js`.
 _FETCH_FIGURE_JS: str = (_ASSETS_DIR / "fetch_figure.js").read_text()
 
 
-def render_sweep_highlight_js(selected_sweep: int) -> str:
+def _render_sweep_highlight_js(selected_sweep: int) -> str:
     """Return the sweep-highlight JS with styling constants substituted.
 
     Args:
@@ -49,7 +49,7 @@ def render_sweep_highlight_js(selected_sweep: int) -> str:
     )
 
 
-def render_fetch_figure_js(token: str, post_js: str, api_url: str) -> str:
+def _render_fetch_figure_js(token: str, post_js: str, api_url: str) -> str:
     """Return the fetch-and-swap JS with all placeholder tokens substituted.
 
     Args:
