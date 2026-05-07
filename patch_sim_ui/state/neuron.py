@@ -381,6 +381,6 @@ class NeuronState(rx.State):
         return dataclasses.replace(baseline, **scalar_overrides)
 
 
-# Register NeuronConfig scalar fields as NeuronState vars
+# Register Neuron scalar fields as NeuronState vars
 for _nc_name, _nc_default in presets.NEURON_CONFIG_SCALAR_DEFAULTS.items():
     NeuronState.add_var(_nc_name, float, _nc_default)
