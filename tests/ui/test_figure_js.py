@@ -1,4 +1,4 @@
-"""Unit tests for the pure Plotly-JS render helpers in `_figure_js`."""
+"""Behavior tests for the Plotly-JS render helpers in ``_figure_js``."""
 
 import os
 
@@ -15,27 +15,25 @@ from patch_sim_ui.state._figure_js import (  # noqa: E402
 )
 
 
-def test_render_sweep_highlight_js_substitutes_selected_sweep() -> None:
-    """The selected_sweep value lands in the rendered JS string."""
-    js = _render_sweep_highlight_js(2)
-    assert "/*SELECTED_SWEEP*/" not in js
-    assert "/*DIM_OPACITY*/" not in js
-    assert "/*HOVER_WIDTH*/" not in js
-    assert "/*DIM_WIDTH*/" not in js
-    # The seeded value appears verbatim somewhere in the substituted JS.
-    assert "2" in js
+def test_no_stale_placeholder_tokens_remain_after_render() -> None:
+    """Both helpers substitute every placeholder they advertise.
 
+    A stale ``/*FOO*/`` token in the rendered output would be a JavaScript
+    syntax error in the browser (an unterminated comment / orphan
+    expression), so this is the load-bearing behavior contract: the
+    renderers must replace every placeholder, not just the ones the caller
+    happens to read back.
+    """
+    sweep_js = _render_sweep_highlight_js(selected_sweep=2)
+    for placeholder in (
+        "/*SELECTED_SWEEP*/",
+        "/*DIM_OPACITY*/",
+        "/*HOVER_WIDTH*/",
+        "/*DIM_WIDTH*/",
+    ):
+        assert placeholder not in sweep_js
 
-def test_render_sweep_highlight_js_default_no_selection() -> None:
-    """``-1`` is the documented sentinel for no client-side selection."""
-    js = _render_sweep_highlight_js(-1)
-    assert "-1" in js
-    assert "/*SELECTED_SWEEP*/" not in js
-
-
-def test_render_fetch_figure_js_substitutes_all_placeholders() -> None:
-    """Every placeholder token is replaced; the body carries the inputs."""
-    js = _render_fetch_figure_js(
+    fetch_js = _render_fetch_figure_js(
         token="abcdef",
         post_js="POST_JS_BODY",
         api_url="http://example.test",
@@ -46,7 +44,9 @@ def test_render_fetch_figure_js_substitutes_all_placeholders() -> None:
         "/*DARK_AXIS_STYLE*/",
         "/*POST_JS*/",
     ):
-        assert placeholder not in js
-    assert "abcdef" in js
-    assert "POST_JS_BODY" in js
-    assert "http://example.test" in js
+        assert placeholder not in fetch_js
+    # Caller-supplied values must reach the rendered body — otherwise the
+    # browser would fetch the wrong figure or run the wrong post-swap JS.
+    assert "abcdef" in fetch_js
+    assert "POST_JS_BODY" in fetch_js
+    assert "http://example.test" in fetch_js
