@@ -7,6 +7,7 @@ from typing import Any, AsyncGenerator
 import reflex as rx
 
 import patch_sim
+import patch_sim.channels
 from patch_sim.constants import (
     DEFAULT_G_CAV13,
     DEFAULT_G_ICAL,
@@ -352,10 +353,14 @@ class NeuronState(rx.State):
         )
 
         na_factory = (
-            preset_cfg.na_channel_factory if preset_cfg else patch_sim.make_na_channel
+            preset_cfg.na_channel_factory
+            if preset_cfg
+            else patch_sim.channels.make_na_channel
         )
         k_factory = (
-            preset_cfg.k_channel_factory if preset_cfg else patch_sim.make_k_channel
+            preset_cfg.k_channel_factory
+            if preset_cfg
+            else patch_sim.channels.make_k_channel
         )
 
         scalar_kwargs = {

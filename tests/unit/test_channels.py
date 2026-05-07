@@ -9,7 +9,6 @@ import math
 import numpy as np
 import pytest
 
-import patch_sim
 from patch_sim.calcium import CalciumDynamics
 from patch_sim.channels import (
     GatingVariable,
@@ -585,13 +584,6 @@ def test_multiple_optional_channels_coexist():
     assert "q" in result.dtype.names
 
 
-def test_public_api_exports():
-    """GatingVariable and IonChannel and make_ih_channel are exported."""
-    assert hasattr(patch_sim, "GatingVariable")
-    assert hasattr(patch_sim, "IonChannel")
-    assert hasattr(patch_sim, "make_ih_channel")
-
-
 # ---------------------------------------------------------------------------
 # IKa rate functions
 # ---------------------------------------------------------------------------
@@ -736,11 +728,6 @@ def test_ika_and_ih_coexist():
     assert "r" in result.dtype.names
 
 
-def test_public_api_exports_ika():
-    """make_ika_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_ika_channel")
-
-
 # ---------------------------------------------------------------------------
 # IKv31 (Kv3.1-type K+)
 # ---------------------------------------------------------------------------
@@ -803,11 +790,6 @@ def test_current_clamp_with_ikv31():
     result = simulate_current_clamp(neuron=neuron, current_external=stimulus)
     assert "IKv31" in result.dtype.names
     assert "nk" in result.dtype.names
-
-
-def test_public_api_exports_ikv31():
-    """make_ikv31_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_ikv31_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -1100,11 +1082,6 @@ def test_current_clamp_inap_slow_inactivation_gating_in_bounds():
     assert result["sNaP"].max() <= 1.0
 
 
-def test_public_api_exports_inap():
-    """make_inap_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_inap_channel")
-
-
 # ---------------------------------------------------------------------------
 # INaR rate functions
 # ---------------------------------------------------------------------------
@@ -1335,11 +1312,6 @@ def test_all_additional_channels_coexist():
         assert gate in result.dtype.names
 
 
-def test_public_api_exports_inar():
-    """make_inar_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_inar_channel")
-
-
 # ---------------------------------------------------------------------------
 # I_M rate functions
 # ---------------------------------------------------------------------------
@@ -1453,11 +1425,6 @@ def test_current_clamp_im_gating_in_bounds():
     assert result["w"].max() <= 1.0
 
 
-def test_public_api_exports_im():
-    """make_im_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_im_channel")
-
-
 # ---------------------------------------------------------------------------
 # I_K_ATP rate functions (kATP gate; voltage-driven proxy for the
 # metabolically gated Kir6.x channel; #324)
@@ -1538,11 +1505,6 @@ def test_make_katp_channel_custom_params():
     assert ch.g_max == pytest.approx(1.0)
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.POTASSIUM
-
-
-def test_public_api_exports_katp():
-    """make_katp_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_katp_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -1659,11 +1621,6 @@ def test_current_clamp_ikir_gating_in_bounds():
     assert result["kir"].max() <= 1.0
 
 
-def test_public_api_exports_ikir():
-    """make_ikir_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_ikir_channel")
-
-
 # ---------------------------------------------------------------------------
 # Calcium-sensitive gating variable infrastructure
 # ---------------------------------------------------------------------------
@@ -1736,11 +1693,6 @@ def test_existing_channels_unaffected_by_calcium_gating_infra():
     assert "IKa" in result.dtype.names
     assert result["r"].min() >= 0.0
     assert result["r"].max() <= 1.0
-
-
-def test_calcium_gating_variable_exported():
-    """GatingVariable is in the patch_sim public API."""
-    assert hasattr(patch_sim, "GatingVariable")
 
 
 # ---------------------------------------------------------------------------
@@ -1871,11 +1823,6 @@ def test_current_clamp_ikca_gating_in_bounds():
     assert result["q"].max() <= 1.0
 
 
-def test_public_api_exports_ikca():
-    """make_ikca_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_ikca_channel")
-
-
 # ---------------------------------------------------------------------------
 # ICaL — L-type Ca²⁺ channel
 # ---------------------------------------------------------------------------
@@ -1986,11 +1933,6 @@ def test_voltage_clamp_with_ical_extra_columns():
     assert "ICaL" in result.dtype.names
     assert "d" in result.dtype.names
     assert "f" in result.dtype.names
-
-
-def test_public_api_exports_ical():
-    """make_ical_channel is exported from patch_sim."""
-    assert hasattr(patch_sim, "make_ical_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -2105,11 +2047,6 @@ def test_voltage_clamp_with_icat_extra_columns():
     assert "ft" in result.dtype.names
 
 
-def test_public_api_exports_icat():
-    """make_icat_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_icat_channel")
-
-
 def test_make_trn_icat_channel_defaults():
     """make_trn_icat_channel() produces a channel with the expected defaults."""
     from patch_sim.constants import DEFAULT_G_ICAT
@@ -2190,11 +2127,6 @@ def test_trn_icat_tau_ft_is_sigmoid_in_voltage():
         f"tau_ft must be strictly increasing in V across [-90, 0] mV; "
         f"got non-monotonic samples taus={taus}"
     )
-
-
-def test_public_api_exports_trn_icat():
-    """make_trn_icat_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_trn_icat_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -2307,8 +2239,3 @@ def test_voltage_clamp_with_ican_extra_columns():
     assert "ICaN" in result.dtype.names
     assert "dn" in result.dtype.names
     assert "fn" in result.dtype.names
-
-
-def test_public_api_exports_ican():
-    """make_ican_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_ican_channel")
