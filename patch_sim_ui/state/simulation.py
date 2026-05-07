@@ -8,7 +8,6 @@ substates (NeuronState, ProtocolState, VisibilityState, AnalysisState, LogState)
 import asyncio
 import json
 import logging
-import pathlib
 import time
 import uuid
 from typing import Any, AsyncGenerator
@@ -35,6 +34,10 @@ from patch_sim_ui.state._common import (
     _LOG_SCROLL_JS,
     _PLOTLY_GD_JS,
 )
+from patch_sim_ui.state._figure_js import (
+    render_fetch_figure_js,
+    render_sweep_highlight_js,
+)
 from patch_sim_ui.state._sweep_executor import _compute_simulation, _SimResult
 from patch_sim_ui.state.analysis import AnalysisState
 from patch_sim_ui.state.log import LogState
@@ -44,27 +47,6 @@ from patch_sim_ui.state.visibility import VisibilityState
 from patch_sim_ui.sweep import Sweep
 
 logger = logging.getLogger(__name__)
-
-# ------------------------------------------------------------------ #
-# Module-level helpers used only by SimulationState                  #
-# ------------------------------------------------------------------ #
-
-# Client-side sweep highlight / selection module.  Injected via
-# rx.call_script() after every figure render in multi-sweep mode.
-# Loaded from assets/sweep_highlight.js at import time; placeholder tokens
-# (/*DIM_OPACITY*/, /*HOVER_WIDTH*/, /*DIM_WIDTH*/, /*SELECTED_SWEEP*/) are
-# substituted at call time in _sweep_highlight_js().
-_SWEEP_HIGHLIGHT_JS: str = (
-    pathlib.Path(__file__).parents[2] / "assets" / "sweep_highlight.js"
-).read_text()
-
-# Client-side fetch-and-swap for side-channel figure delivery.  Loaded once
-# at import; placeholder tokens (/*API_URL*/, /*TOKEN*/, /*DARK_AXIS_STYLE*/,
-# /*POST_JS*/) are substituted per call in _build_fetch_figure_js().
-_FETCH_FIGURE_JS: str = (
-    pathlib.Path(__file__).parents[2] / "assets" / "fetch_figure.js"
-).read_text()
-
 
 #: Debounce window (seconds) for slider-driven membrane test requests.
 _MT_DEBOUNCE_S: float = 0.3
@@ -368,12 +350,7 @@ class SimulationState(rx.State):
         post_js = "".join(post_parts)
 
         api_url = _get_config().api_url.rstrip("/")
-        return (
-            _FETCH_FIGURE_JS.replace("/*API_URL*/", api_url)
-            .replace("/*TOKEN*/", token)
-            .replace("/*DARK_AXIS_STYLE*/", json.dumps(constants.DARK_AXIS_STYLE))
-            .replace("/*POST_JS*/", post_js)
-        )
+        return render_fetch_figure_js(token, post_js, api_url)
 
     def _sweep_highlight_js(self) -> str:
         """Return the sweep highlight JS with styling constants substituted.
@@ -381,14 +358,7 @@ class SimulationState(rx.State):
         Returns:
             A self-executing JS function string.
         """
-        return (
-            _SWEEP_HIGHLIGHT_JS.replace(
-                "/*DIM_OPACITY*/", str(constants.HIGHLIGHT_DIM_OPACITY)
-            )
-            .replace("/*HOVER_WIDTH*/", str(constants.HIGHLIGHT_HOVER_WIDTH))
-            .replace("/*DIM_WIDTH*/", str(constants.HIGHLIGHT_DIM_WIDTH))
-            .replace("/*SELECTED_SWEEP*/", str(self.selected_sweep))
-        )
+        return render_sweep_highlight_js(self.selected_sweep)
 
     def _rebuild_figure_and_fetch_js(
         self, stored_traces: list[Sweep], vis_st: "VisibilityState"
