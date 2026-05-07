@@ -1,4 +1,4 @@
-"""Tests for the core HH channel factory functions in core_channels.py."""
+"""Tests for the core HH channel factory functions in patch_sim.channels."""
 
 import math
 
