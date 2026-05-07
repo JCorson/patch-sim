@@ -7,9 +7,15 @@ neurons with optional additional channels.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Callable
 
-from .additional_channels import (
+from .calcium import CalciumDynamics
+from .channels import (
+    GoldmanSpec,
+    IonChannel,
+    IonSpecies,
+    NernstSpec,
+    make_cav13_channel,
     make_ical_channel,
     make_ican_channel,
     make_icat_channel,
@@ -21,9 +27,14 @@ from .additional_channels import (
     make_im_channel,
     make_inap_channel,
     make_inar_channel,
+    make_k_channel,
+    make_k_leak_channel,
+    make_katp_channel,
+    make_mainen_sejnowski_kv_channel,
+    make_na_channel,
+    make_na_leak_channel,
+    make_sk_channel,
 )
-from .calcium import CalciumDynamics
-from .channels import GoldmanSpec, IonChannel, IonSpecies, NernstSpec
 from .constants import (
     DEFAULT_C_M,
     DEFAULT_CA_IN,
@@ -41,12 +52,6 @@ from .constants import (
     DEFAULT_T_REF,
     DEFAULT_V_REST,
 )
-from .core_channels import (
-    make_k_channel,
-    make_k_leak_channel,
-    make_na_channel,
-    make_na_leak_channel,
-)
 from .neuron import Neuron
 
 
@@ -57,12 +62,10 @@ class ChannelConfig:
     Attributes:
         factory: Channel factory function (e.g. ``make_ih_channel``).
         g_max: Maximum conductance in mS/cm².
-        extra_kwargs: Additional keyword arguments forwarded to *factory*.
     """
 
     factory: Callable[..., IonChannel]
     g_max: float
-    extra_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -105,6 +108,17 @@ class NeuronConfig:
             channels carry no Ca²⁺.  ``None`` (default) falls back to
             auto-detection: a default ``CalciumDynamics()`` is created whenever
             at least one channel carries Ca²⁺, and ``None`` is passed otherwise.
+        area_cm2: Total membrane surface area in cm².  Forwarded onto the
+            built :class:`~patch_sim.Neuron` as a physical attribute.  Not
+            consumed by the ODE solver — single-compartment HH dynamics are
+            scale-invariant in the per-area units used elsewhere — but read
+            by the analysis layer (e.g. :func:`~patch_sim.run_membrane_test`)
+            to report passive properties in absolute units (MΩ, pF) alongside
+            the per-area values.  ``None`` (default) means only per-area
+            density values are reported.  cm² is the natural unit here for
+            consistency with mS/cm², µF/cm², µA/cm² used elsewhere in the
+            model; representative values fall in the ``1e-6`` to ``3e-4``
+            cm² range for typical mammalian neurons.
     """
 
     g_Na: float = DEFAULT_G_NA
@@ -132,17 +146,21 @@ class NeuronConfig:
     )
     channels: tuple[ChannelConfig, ...] = ()
     calcium_dynamics: CalciumDynamics | None = None
+    area_cm2: float | None = None
 
     def __post_init__(self) -> None:
-        """Validate Q10 and T_ref on construction.
+        """Validate Q10, T_ref, and area_cm2 on construction.
 
         Raises:
-            ValueError: If Q10 is not positive or T_ref is not positive.
+            ValueError: If Q10 is not positive, T_ref is not positive, or
+                ``area_cm2`` is provided and not strictly positive.
         """
         if self.Q10 <= 0:
             raise ValueError("Q10 must be positive.")
         if self.T_ref <= 0:
             raise ValueError("T_ref must be positive (in Kelvin).")
+        if self.area_cm2 is not None and self.area_cm2 <= 0:
+            raise ValueError("area_cm2 must be positive when provided.")
 
 
 #: Maps short channel names to their factory functions.
@@ -150,14 +168,18 @@ CHANNEL_REGISTRY: dict[str, Callable[..., IonChannel]] = {
     "ih": make_ih_channel,
     "ika": make_ika_channel,
     "ikv31": make_ikv31_channel,
+    "mskv": make_mainen_sejnowski_kv_channel,
     "inap": make_inap_channel,
     "inar": make_inar_channel,
     "im": make_im_channel,
+    "katp": make_katp_channel,
     "ikir": make_ikir_channel,
     "ikca": make_ikca_channel,
     "ical": make_ical_channel,
+    "cav13": make_cav13_channel,
     "icat": make_icat_channel,
     "ican": make_ican_channel,
+    "sk": make_sk_channel,
 }
 
 
@@ -193,9 +215,7 @@ def make_neuron(config: NeuronConfig) -> Neuron:
     Returns:
         A fully constructed :class:`~patch_sim.Neuron` instance.
     """
-    built_channels = tuple(
-        cc.factory(g_max=cc.g_max, **cc.extra_kwargs) for cc in config.channels
-    )
+    built_channels = tuple(cc.factory(g_max=cc.g_max) for cc in config.channels)
     if config.calcium_dynamics is not None:
         if not _needs_calcium(built_channels):
             raise ValueError(
@@ -229,4 +249,5 @@ def make_neuron(config: NeuronConfig) -> Neuron:
         k_leak_channel_factory=config.k_leak_channel_factory,
         additional_channels=built_channels,
         calcium_dynamics=calcium_dynamics,
+        area_cm2=config.area_cm2,
     )

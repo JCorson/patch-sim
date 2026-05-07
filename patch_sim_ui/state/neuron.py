@@ -7,7 +7,9 @@ from typing import Any, AsyncGenerator
 import reflex as rx
 
 import patch_sim
+import patch_sim.channels
 from patch_sim.constants import (
+    DEFAULT_G_CAV13,
     DEFAULT_G_ICAL,
     DEFAULT_G_ICAN,
     DEFAULT_G_ICAT,
@@ -17,8 +19,11 @@ from patch_sim.constants import (
     DEFAULT_G_IKIR,
     DEFAULT_G_IKV31,
     DEFAULT_G_IM,
+    DEFAULT_G_KATP,
+    DEFAULT_G_MSKV,
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
+    DEFAULT_G_SK,
 )
 from patch_sim_ui import presets
 from patch_sim_ui.channels import ADDITIONAL_CHANNELS
@@ -79,10 +84,10 @@ def _make_neuron_float_setter(field_name: str):
     """Factory returning an async generator setter that chains a membrane test.
 
     Wraps :func:`~patch_sim_ui.state._common._set_float` and then yields
-    ``SimulationState.run_membrane_test`` so that any change to a neuron
-    parameter automatically refreshes the displayed passive properties.  Uses
-    ``yield`` (not ``return``) because Reflex only chains events yielded from
-    generators; returning an event from a sync handler has no effect.
+    ``SimulationState.run_membrane_test_debounced`` so that any change to a
+    neuron parameter automatically refreshes the displayed passive properties.
+    Uses ``yield`` (not ``return``) because Reflex only chains events yielded
+    from generators; returning an event from a sync handler has no effect.
 
     The fingerprint-based cache inside ``run_membrane_test`` ensures the
     simulation only re-runs when passive-relevant parameters (g_NaL, g_KL,
@@ -92,8 +97,9 @@ def _make_neuron_float_setter(field_name: str):
         field_name: Name of the ``NeuronState`` attribute to update.
 
     Returns:
-        An async generator event handler that accepts ``str | list[float] | float``,
-        updates the field, and yields ``run_membrane_test``.
+        An async generator event handler that accepts
+        ``str | list[float] | float``, updates the field, and yields
+        ``run_membrane_test_debounced``.
     """
 
     async def setter(self, value: "str | list[float] | float"):
@@ -127,22 +133,30 @@ class NeuronState(rx.State):
     ika_g_max: float = DEFAULT_G_IKA
     ikv31_enabled: bool = False
     ikv31_g_max: float = DEFAULT_G_IKV31
+    mskv_enabled: bool = False
+    mskv_g_max: float = DEFAULT_G_MSKV
     inap_enabled: bool = False
     inap_g_max: float = DEFAULT_G_NAP
     inar_enabled: bool = False
     inar_g_max: float = DEFAULT_G_NAR
     im_enabled: bool = False
     im_g_max: float = DEFAULT_G_IM
+    katp_enabled: bool = False
+    katp_g_max: float = DEFAULT_G_KATP
     ikir_enabled: bool = False
     ikir_g_max: float = DEFAULT_G_IKIR
     ikca_enabled: bool = False
     ikca_g_max: float = DEFAULT_G_IKCA
     ical_enabled: bool = False
     ical_g_max: float = DEFAULT_G_ICAL
+    cav13_enabled: bool = False
+    cav13_g_max: float = DEFAULT_G_CAV13
     icat_enabled: bool = False
     icat_g_max: float = DEFAULT_G_ICAT
     ican_enabled: bool = False
     ican_g_max: float = DEFAULT_G_ICAN
+    sk_enabled: bool = False
+    sk_g_max: float = DEFAULT_G_SK
 
     # ------------------------------------------------------------------ #
     # Preset label                                                        #
@@ -313,31 +327,62 @@ class NeuronState(rx.State):
             A :class:`patch_sim.Neuron` configured with the current conductances,
             ion concentrations, and any enabled auxiliary channels.
         """
-        channels = tuple(
-            patch_sim.ChannelConfig(factory, g_max=getattr(self, f"{name}_g_max"))
-            for name, factory in patch_sim.CHANNEL_REGISTRY.items()
-            if getattr(self, f"{name}_enabled")
-        )
-
         # Use the core Na⁺/K⁺ channel factories from the active preset so
         # that presets with non-default kinetics (e.g. Pospischil, STN) are
         # honoured.  Fall back to HH52 defaults for unknown preset names.
         preset_cfg = patch_sim.NEURON_PRESETS.get(self.active_neuron_type)
+
+        # Map channel-name → preset-specific factory variant, so presets that
+        # use a non-canonical factory (e.g. Thalamic Relay's slow-inactivating
+        # ICaT) keep their kinetics through UI round-trip.  Channels not in
+        # the preset fall back to the canonical CHANNEL_REGISTRY factory.
+        preset_factory_overrides: dict[str, Any] = {}
+        if preset_cfg is not None:
+            for cc in preset_cfg.channels:
+                name = presets._FACTORY_TO_NAME.get(cc.factory)
+                if name is not None:
+                    preset_factory_overrides[name] = cc.factory
+
+        channels = tuple(
+            patch_sim.ChannelConfig(
+                preset_factory_overrides.get(name, factory),
+                g_max=getattr(self, f"{name}_g_max"),
+            )
+            for name, factory in patch_sim.CHANNEL_REGISTRY.items()
+            if getattr(self, f"{name}_enabled")
+        )
+
         na_factory = (
-            preset_cfg.na_channel_factory if preset_cfg else patch_sim.make_na_channel
+            preset_cfg.na_channel_factory
+            if preset_cfg
+            else patch_sim.channels.make_na_channel
         )
         k_factory = (
-            preset_cfg.k_channel_factory if preset_cfg else patch_sim.make_k_channel
+            preset_cfg.k_channel_factory
+            if preset_cfg
+            else patch_sim.channels.make_k_channel
         )
 
         scalar_kwargs = {
             name: getattr(self, name) for name in presets.NEURON_CONFIG_SCALAR_FIELDS
         }
+        # area_cm2 and calcium_dynamics are sourced from the active preset's
+        # NeuronConfig.  area_cm2 is a static physical attribute of the cell,
+        # not user-editable.  calcium_dynamics carries the preset's tuned
+        # alpha_ca/tau_ca/ca_init — without forwarding them every preset
+        # would silently use NeuronConfig's auto-instantiated default
+        # (alpha_ca=1e-4, tau_ca=200 ms), which is dramatically off for
+        # presets that tune these for fast Ca clearance (e.g. TRN at
+        # tau_ca=20 ms — 10× faster than default).
+        area_cm2 = preset_cfg.area_cm2 if preset_cfg else None
+        calcium_dynamics = preset_cfg.calcium_dynamics if preset_cfg else None
         config = patch_sim.NeuronConfig(
             **scalar_kwargs,
             channels=channels,
             na_channel_factory=na_factory,
             k_channel_factory=k_factory,
+            area_cm2=area_cm2,
+            calcium_dynamics=calcium_dynamics,
         )
         return patch_sim.make_neuron(config=config)
 

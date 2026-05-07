@@ -4,17 +4,26 @@ Verifies that the three auxiliary channel behaviors — voltage sag (Ih),
 subthreshold amplification (INaP), and spike-frequency adaptation (IM) —
 are present after the conductance reductions in PR #206, and that the
 reduced conductances prevent spontaneous tonic firing.
+
+Also pins the regular-spiking AP shape (half-width, peak, threshold, AHP)
+against literature-cited tolerance bands from McCormick et al. (1985) and
+Connors & Gutnick (1990).  All four shape bands are now satisfied with the
+Pospischil Na + Mainen-Sejnowski Kv kinetic pair adopted in #311 (the
+slower M-S Kv broadens the AP into the 1.0–2.5 ms half-width band that the
+Pospischil Traub-Miles n^4 form alone could not reach).
 """
 
 import numpy as np
 import pytest
 
+from patch_sim.analysis.ap_metrics import analyze_aps_from_result
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
 from patch_sim.constants import CORTICAL_PYRAMIDAL
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESETS
 from patch_sim.protocols import step_current
+from tests.integration._ap_shape import assert_ap_shape
 
 # ---------------------------------------------------------------------------
 # Shared fixture and helpers
@@ -243,3 +252,188 @@ def test_suprathreshold_fires_action_potentials(cp_neuron: Neuron) -> None:
     # At least one AP must be detected.
     n_aps = _count_action_potentials(voltage)
     assert n_aps >= 1, f"Expected at least 1 AP, detected {n_aps}"
+
+
+# ---------------------------------------------------------------------------
+# AP shape — regular-spiking phenotype, McCormick et al. (1985);
+# Connors & Gutnick (1990).  Each metric has its own test so future biology
+# fixes can flip xfail markers one at a time without rewriting a single
+# multi-assertion test.
+# ---------------------------------------------------------------------------
+
+# Suprathreshold step shared by the AP-shape battery: 5 µA/cm² for 800 ms,
+# matching the existing test_spike_frequency_adaptation stimulus.  This
+# stimulus reliably produces tens of APs across the step, giving a stable
+# mean for half-width / peak / threshold / AHP without being so strong that
+# it pins voltage at the Na⁺ reversal.
+_AP_SHAPE_STEP_DURATION_MS = 800.0
+_AP_SHAPE_STEP_CURRENT = 5.0
+_RS_REFERENCE = "McCormick et al. 1985 / Connors & Gutnick 1990"
+
+
+@pytest.fixture
+def cp_ap_shape_result(cp_neuron: Neuron):
+    """AP-shape analysis of cortical pyramidal under the standard suprathreshold step.
+
+    Cached per-test via the ``cp_neuron`` fixture so that each shape-band
+    test does not re-run the simulation.
+    """
+    protocol = step_current(
+        duration=_AP_SHAPE_STEP_DURATION_MS,
+        current_amplitude=_AP_SHAPE_STEP_CURRENT,
+    )
+    result = simulate_current_clamp(cp_neuron, current_external=protocol)
+    return analyze_aps_from_result(result)
+
+
+def test_cp_ap_threshold_in_rs_range(cp_ap_shape_result) -> None:
+    """Mean AP threshold falls in the literature RS-pyramidal range.
+
+    McCormick et al. (1985) report single-spike threshold around −55 to
+    −40 mV for L5 regular-spiking pyramidal cells in slice.  The metric
+    here is the *mean* threshold across an 800 ms suprathreshold train
+    (~120 spikes); the train-mean is intrinsically more positive than
+    the single-spike threshold because slow K (IM) and — since #327 —
+    slow Na inactivation (sNa, Fleidervish & Gutnick 1996) accumulate
+    across the train, raising threshold for later spikes.  Upper edge
+    widened to −35 mV to accept the ~3–5 mV positive drift from this
+    biology while still excluding clearly pathological values.
+    """
+    assert_ap_shape(
+        cp_ap_shape_result,
+        reference=_RS_REFERENCE,
+        threshold_mv=(-55.0, -35.0),
+    )
+
+
+def test_cp_ap_half_width_in_rs_range(cp_ap_shape_result) -> None:
+    """Mean AP half-width matches the regular-spiking phenotype (1.0–2.5 ms).
+
+    RS pyramidal APs at ~32–37 °C are markedly broader than fast-spiking
+    interneuron APs.  Reaching the McCormick et al. (1985) band of 1.0+ ms
+    required swapping the Pospischil Traub-Miles n^4 delayed rectifier for
+    the high-threshold, slow-deactivation Mainen-Sejnowski (1996) Kv
+    channel as the sole K conductance, with Q10 = 1.0 to match the slice
+    recording temperatures used by McCormick (issue #311).
+    """
+    assert_ap_shape(
+        cp_ap_shape_result,
+        reference=_RS_REFERENCE,
+        half_width_ms=(1.0, 2.5),
+    )
+
+
+def test_cp_ap_peak_voltage_in_rs_range(cp_ap_shape_result) -> None:
+    """Mean AP peak voltage falls within the RS-pyramidal range (+20 to +45 mV)."""
+    assert_ap_shape(
+        cp_ap_shape_result,
+        reference=_RS_REFERENCE,
+        peak_mv=(20.0, 45.0),
+    )
+
+
+def test_cp_ap_ahp_depth_in_rs_range(cp_ap_shape_result) -> None:
+    """Mean AHP depth falls within the RS-pyramidal range (−50 to −70 mV)."""
+    assert_ap_shape(
+        cp_ap_shape_result,
+        reference=_RS_REFERENCE,
+        ahp_mv=(-70.0, -50.0),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Slow Na inactivation engagement and depol-block recovery — issue #327.
+# ---------------------------------------------------------------------------
+
+
+def test_cp_inap_slow_inactivation_engages_during_drive(cp_neuron: Neuron) -> None:
+    """The sNaP gate closes during +12 µA/cm² × 200 ms drive (#327 mechanism).
+
+    Direct mechanism check for #327: the Magistretti & Alonso 1999 slow
+    inactivation gate added to ``make_inap_channel`` must be doing real
+    work during sustained suprathreshold drive.  By the end of the step,
+    sNaP should have lost at least half its rest availability so the
+    persistent Na⁺ contribution to the depol-block plateau is suppressed.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(200.0)
+    n_post = _ms_to_samples(50.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, 12.0),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(cp_neuron, current_external=current)
+    sNaP_at_rest = float(result["sNaP"][n_pre - 1])
+    sNaP_at_step_end = float(result["sNaP"][n_pre + n_step - 1])
+    fraction_inactivated = 1.0 - sNaP_at_step_end / sNaP_at_rest
+    assert fraction_inactivated > 0.5, (
+        f"sNaP did not meaningfully inactivate: rest={sNaP_at_rest:.3f}, "
+        f"step end={sNaP_at_step_end:.3f}, "
+        f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.5)"
+    )
+
+
+def test_cp_fast_na_slow_inactivation_engages_during_drive(
+    cp_neuron: Neuron,
+) -> None:
+    """The sNa12 gate (fast Na slow inactivation) closes during +12 µA/cm² × 200 ms.
+
+    Direct mechanism check for #327: the Fleidervish & Gutnick 1996 slow
+    voltage-dependent inactivation gate baked into ``make_nav12_channel``
+    must lose at least half its rest availability by the end of a sustained
+    suprathreshold step, abolishing the residual fast-Na h-tail that would
+    otherwise pin the cell on a depolarisation plateau.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(200.0)
+    n_post = _ms_to_samples(50.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, 12.0),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(cp_neuron, current_external=current)
+    sNa_at_rest = float(result["sNa12"][n_pre - 1])
+    sNa_at_step_end = float(result["sNa12"][n_pre + n_step - 1])
+    fraction_inactivated = 1.0 - sNa_at_step_end / sNa_at_rest
+    assert fraction_inactivated > 0.5, (
+        f"sNa12 did not meaningfully inactivate: rest={sNa_at_rest:.3f}, "
+        f"step end={sNa_at_step_end:.3f}, "
+        f"fraction inactivated={fraction_inactivated:.2f} (expected > 0.5)"
+    )
+
+
+def test_cp_recovers_from_sustained_suprathreshold_drive(
+    cp_neuron: Neuron,
+) -> None:
+    """Cortical pyramidal repolarises after +12 µA/cm² × 200 ms (#327 regression).
+
+    Without slow Na inactivation the cell can hang on a depol-block
+    plateau under sustained drive.  With sNaP (Magistretti & Alonso 1999,
+    baked into ``make_inap_channel``) and Nav1.2 sNa12 (Fleidervish &
+    Gutnick 1996, baked into ``make_nav12_channel``), the cell must
+    escape the plateau within the post-stim window and settle below
+    −50 mV during the last 200 ms of a 700 ms post-stimulus epoch.
+    """
+    n_pre = _ms_to_samples(100.0)
+    n_step = _ms_to_samples(200.0)
+    n_post = _ms_to_samples(700.0)
+    current = np.concatenate(
+        [
+            np.zeros(n_pre),
+            np.full(n_step, 12.0),
+            np.zeros(n_post + 1),
+        ]
+    )
+    result = simulate_current_clamp(cp_neuron, current_external=current)
+    tail = np.asarray(result["voltage"][-_ms_to_samples(200.0) :])
+    mean_v = float(tail.mean())
+    assert mean_v < -50.0, (
+        f"Cortical pyramidal failed to recover from +12 µA/cm² × 200 ms; "
+        f"mean V in last 200 ms = {mean_v:.2f} mV"
+    )

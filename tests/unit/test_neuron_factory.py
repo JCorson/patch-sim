@@ -5,11 +5,11 @@ Covers automatic calcium-dynamics detection and custom configuration.
 
 import pytest
 
-from patch_sim.additional_channels import make_ical_channel, make_icat_channel
 from patch_sim.calcium import CalciumDynamics
-from patch_sim.channels import IonChannel
+from patch_sim.channels import IonChannel, make_ical_channel, make_icat_channel
 from patch_sim.constants import (
     CA1_PYRAMIDAL,
+    DOPAMINERGIC,
     PURKINJE,
     STN,
     THALAMIC_RELAY,
@@ -30,6 +30,7 @@ _CALCIUM_PRESETS = {
     CA1_PYRAMIDAL,
     STN,
     TRN,
+    DOPAMINERGIC,
 }
 
 _NON_CALCIUM_PRESETS = set(NEURON_PRESET_NAMES) - _CALCIUM_PRESETS
@@ -125,7 +126,7 @@ def test_make_neuron_additional_channels_attached() -> None:
 
 def test_make_neuron_passes_na_factory() -> None:
     """make_neuron forwards na_channel_factory from NeuronConfig to Neuron."""
-    from patch_sim.core_channels import make_na_channel
+    from patch_sim.channels import make_na_channel
 
     calls: list[float] = []
 
@@ -143,7 +144,7 @@ def test_make_neuron_passes_na_factory() -> None:
 
 def test_make_neuron_passes_k_factory() -> None:
     """make_neuron forwards k_channel_factory from NeuronConfig to Neuron."""
-    from patch_sim.core_channels import make_k_channel
+    from patch_sim.channels import make_k_channel
 
     def alt_k(g_max: float) -> IonChannel:
         """Alternate K factory."""
@@ -156,7 +157,7 @@ def test_make_neuron_passes_k_factory() -> None:
 
 def test_make_neuron_passes_na_leak_factory() -> None:
     """make_neuron forwards na_leak_channel_factory from NeuronConfig to Neuron."""
-    from patch_sim.core_channels import make_na_leak_channel
+    from patch_sim.channels import make_na_leak_channel
 
     def alt_nal(g_max: float) -> IonChannel:
         """Alternate Na leak factory."""
@@ -169,7 +170,7 @@ def test_make_neuron_passes_na_leak_factory() -> None:
 
 def test_make_neuron_passes_k_leak_factory() -> None:
     """make_neuron forwards k_leak_channel_factory from NeuronConfig to Neuron."""
-    from patch_sim.core_channels import make_k_leak_channel
+    from patch_sim.channels import make_k_leak_channel
 
     def alt_kl(g_max: float) -> IonChannel:
         """Alternate K leak factory."""
@@ -182,7 +183,7 @@ def test_make_neuron_passes_k_leak_factory() -> None:
 
 def test_neuron_config_default_factories_are_hh52() -> None:
     """NeuronConfig default factories are the standard HH functions."""
-    from patch_sim.core_channels import (
+    from patch_sim.channels import (
         make_k_channel,
         make_k_leak_channel,
         make_na_channel,
@@ -221,6 +222,62 @@ def test_neuron_config_non_positive_t_ref_raises(T_ref: float) -> None:
     """NeuronConfig rejects non-positive T_ref at construction time."""
     with pytest.raises(ValueError, match="T_ref"):
         NeuronConfig(T_ref=T_ref)
+
+
+# ---------------------------------------------------------------------------
+# area_cm2 (analysis-layer metadata, not consumed by ODE solver)
+# ---------------------------------------------------------------------------
+
+
+def test_neuron_config_area_cm2_defaults_to_none() -> None:
+    """NeuronConfig.area_cm2 is ``None`` by default."""
+    assert NeuronConfig().area_cm2 is None
+
+
+def test_neuron_config_area_cm2_accepts_positive_value() -> None:
+    """A positive area_cm2 is preserved on the config."""
+    cfg = NeuronConfig(area_cm2=20e-6)
+    assert cfg.area_cm2 == pytest.approx(20e-6)
+
+
+@pytest.mark.parametrize("area", [0.0, -1e-6])
+def test_neuron_config_non_positive_area_raises(area: float) -> None:
+    """NeuronConfig rejects non-positive area_cm2 at construction time."""
+    with pytest.raises(ValueError, match="area_cm2"):
+        NeuronConfig(area_cm2=area)
+
+
+def test_make_neuron_propagates_area_cm2() -> None:
+    """make_neuron forwards area_cm2 from NeuronConfig onto the built Neuron."""
+    cfg = NeuronConfig(area_cm2=20e-6)
+    model = make_neuron(cfg)
+    assert model.area_cm2 == pytest.approx(20e-6)
+
+
+def test_make_neuron_default_area_cm2_is_none() -> None:
+    """A default-constructed NeuronConfig produces a Neuron with area_cm2=None."""
+    model = make_neuron(NeuronConfig())
+    assert model.area_cm2 is None
+
+
+def test_make_neuron_area_cm2_does_not_affect_dynamics_inputs() -> None:
+    """area_cm2 is not consumed by the ODE: density parameters are unaffected.
+
+    Two neurons built from identical density parameters but different
+    ``area_cm2`` values should expose identical g_Na, g_K, g_NaL, g_KL, C_m
+    on the built :class:`Neuron`.  Only ``area_cm2`` itself differs.
+    """
+    cfg_no_area = NeuronConfig(g_Na=120.0, g_K=36.0, C_m=1.0)
+    cfg_with_area = NeuronConfig(g_Na=120.0, g_K=36.0, C_m=1.0, area_cm2=20e-6)
+    n1 = make_neuron(cfg_no_area)
+    n2 = make_neuron(cfg_with_area)
+    assert n1.g_Na == pytest.approx(n2.g_Na)
+    assert n1.g_K == pytest.approx(n2.g_K)
+    assert n1.g_NaL == pytest.approx(n2.g_NaL)
+    assert n1.g_KL == pytest.approx(n2.g_KL)
+    assert n1.C_m == pytest.approx(n2.C_m)
+    assert n1.area_cm2 is None
+    assert n2.area_cm2 == pytest.approx(20e-6)
 
 
 # ---------------------------------------------------------------------------

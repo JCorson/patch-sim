@@ -19,8 +19,11 @@ from patch_sim.clamp_simulations import (
 )
 from patch_sim.constants import (
     ACTION_POTENTIAL,
+    DOPAMINERGIC,
     PURKINJE,
     REPETITIVE_FIRING,
+    STN,
+    TRN,
 )
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import (
@@ -35,7 +38,25 @@ from patch_sim.presets import (
 # - test_subthreshold_response_preset: no stimulus is subthreshold for a pacemaker
 # - test_fi_curve_preset: the zero-current (first) sweep produces spontaneous APs
 # Dedicated Purkinje tests live in tests/integration/test_purkinje.py.
-_QUIESCENT_PRESET_NAMES = [p for p in NEURON_PRESET_NAMES if p != PURKINJE]
+#
+# TRN is excluded for the same reason after issue #295: with Ih added, the cell
+# fires tonically at ~3 Hz at zero current (consistent with HP92/B&M93 slice
+# recordings).  The HP92 rebound-burst phenotype is exercised by
+# ``test_trn_step_release_produces_hp92_rebound_burst``.
+#
+# DOPAMINERGIC is excluded after issue #304 — the post-fix preset is a tonic
+# pacemaker (~4 Hz at zero current, Putzier+Drion Cav1.3 + INaP_SNc + SK
+# mechanism).  The autonomous-firing phenotype is exercised by
+# ``test_da_spontaneous_pacemaking`` in tests/integration/test_dopaminergic.py.
+#
+# STN is excluded post-#305: the autonomous-pacemaker preset fires
+# spontaneously at ~11 Hz from v_rest = −60 mV (Bevan & Wilson 1999).  The
+# tonic-pacemaker phenotype and conditional rebound-burst phenotype are
+# exercised by tests/integration/test_stn.py and
+# ``test_stn_conditional_burst_mode_under_hyperpolarising_step_release``.
+_QUIESCENT_PRESET_NAMES = [
+    p for p in NEURON_PRESET_NAMES if p not in (PURKINJE, TRN, DOPAMINERGIC, STN)
+]
 
 # ---------------------------------------------------------------------------
 # Shared helpers

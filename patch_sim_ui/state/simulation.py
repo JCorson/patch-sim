@@ -3,29 +3,28 @@
 SimulationState owns simulation results, sweep collections, continuous mode,
 and the figure computed var.  Cross-cutting state lives in the sibling
 substates (NeuronState, ProtocolState, VisibilityState, AnalysisState, LogState).
+
+Pure analysis-formatting helpers, the synchronous sweep executor, and the
+Plotly JS asset loaders live in private sibling modules:
+
+* :mod:`patch_sim_ui.state._analysis_format` — display-formatting helpers
+* :mod:`patch_sim_ui.state._sweep_executor` — :func:`_compute_simulation`
+  and the :class:`_SimResult` carrier
+* :mod:`patch_sim_ui.state._figure_js` — Plotly JS template loaders
 """
 
 import asyncio
-import dataclasses
 import json
 import logging
-import pathlib
 import time
 import uuid
 from typing import Any, AsyncGenerator
 
-import numpy as np
 import reflex as rx
 from reflex.config import get_config as _get_config
 
 import patch_sim
-import patch_sim.clamp_simulations
-from patch_sim.analysis.fi_curve import _fi_point_from_ap_result
-from patch_sim.analysis.hyperpolarization import _sag_point_from_ap_result
-from patch_sim.constants import (
-    CURRENT_CLAMP,
-    VOLTAGE_CLAMP,
-)
+from patch_sim.constants import CURRENT_CLAMP
 from patch_sim_ui import constants, presets
 from patch_sim_ui.api import traces
 from patch_sim_ui.channels import (
@@ -41,6 +40,11 @@ from patch_sim_ui.state._common import (
     _LOG_SCROLL_JS,
     _PLOTLY_GD_JS,
 )
+from patch_sim_ui.state._figure_js import (
+    _render_fetch_figure_js,
+    _render_sweep_highlight_js,
+)
+from patch_sim_ui.state._sweep_executor import _compute_simulation, _SimResult
 from patch_sim_ui.state.analysis import AnalysisState
 from patch_sim_ui.state.log import LogState
 from patch_sim_ui.state.neuron import NeuronState
@@ -50,824 +54,8 @@ from patch_sim_ui.sweep import Sweep
 
 logger = logging.getLogger(__name__)
 
-# ------------------------------------------------------------------ #
-# Module-level helpers used only by SimulationState                  #
-# ------------------------------------------------------------------ #
-
-# Client-side sweep highlight / selection module.  Injected via
-# rx.call_script() after every figure render in multi-sweep mode.
-# Loaded from assets/sweep_highlight.js at import time; placeholder tokens
-# (/*DIM_OPACITY*/, /*HOVER_WIDTH*/, /*DIM_WIDTH*/, /*SELECTED_SWEEP*/) are
-# substituted at call time in _sweep_highlight_js().
-_SWEEP_HIGHLIGHT_JS: str = (
-    pathlib.Path(__file__).parents[2] / "assets" / "sweep_highlight.js"
-).read_text()
-
-# Client-side fetch-and-swap for side-channel figure delivery.  Loaded once
-# at import; placeholder tokens (/*API_URL*/, /*TOKEN*/, /*DARK_AXIS_STYLE*/,
-# /*POST_JS*/) are substituted per call in _build_fetch_figure_js().
-_FETCH_FIGURE_JS: str = (
-    pathlib.Path(__file__).parents[2] / "assets" / "fetch_figure.js"
-).read_text()
-
-
 #: Debounce window (seconds) for slider-driven membrane test requests.
 _MT_DEBOUNCE_S: float = 0.3
-
-#: Number of voltage points used for the pre-computed Boltzmann fit curve.
-_GV_FIT_POINTS = 200
-
-
-# ------------------------------------------------------------------ #
-# Analysis computation helpers                                       #
-# ------------------------------------------------------------------ #
-
-
-def _fmt_optional(value: "float | None", fmt: str) -> str:
-    """Format a float value, or return an em-dash when the value is None.
-
-    Args:
-        value: The float to format, or None.
-        fmt: Python format spec string (e.g. ``".1f"``).
-
-    Returns:
-        A formatted string or ``"—"`` when value is None.
-    """
-    return f"{value:{fmt}}" if value is not None else "\u2014"
-
-
-def _format_spike_dict(index: int, spike: "patch_sim.SpikeMetrics") -> dict[str, Any]:
-    """Serialise a single :class:`~patch_sim.SpikeMetrics` to a display dict.
-
-    Args:
-        index: Display index to assign (may differ from spike.index in
-            multi-sweep mode where spikes are renumbered globally).
-        spike: The spike to serialise.
-
-    Returns:
-        A dict with pre-formatted string values for each metric column
-        (``index``, ``threshold_voltage``, ``peak_voltage``, ``rise_time``,
-        ``half_width``, ``ahp_depth``).
-    """
-    return {
-        "index": index,
-        "threshold_voltage": f"{spike.threshold_voltage:.1f}",
-        "peak_voltage": f"{spike.peak_voltage:.1f}",
-        "rise_time": f"{spike.rise_time:.2f}",
-        "half_width": f"{spike.half_width:.2f}",
-        "ahp_depth": _fmt_optional(spike.ahp_depth, ".1f"),
-    }
-
-
-def _format_ca_transient_dict(
-    index: int, transient: "patch_sim.CalciumTransient"
-) -> dict[str, Any]:
-    """Serialise a single :class:`~patch_sim.CalciumTransient` to a display dict.
-
-    The ``decay_tau`` column carries a trailing ``*`` when the τ value came
-    from the 1/e fallback rather than a converged ``curve_fit``, so the user
-    can tell when the decay-fit convergence failed.
-
-    Args:
-        index: Display index to assign.
-        transient: The transient to serialise.
-
-    Returns:
-        A dict with pre-formatted string values for each metric column
-        (``index``, ``sweep_index``, ``peak_time``, ``peak_concentration``,
-        ``time_to_peak``, ``decay_tau``, ``amplitude``).  All concentrations
-        are in µM and all times in ms.  ``sweep_index`` is 0 for
-        single-sweep results; multi-sweep callers overwrite it with a
-        1-based sweep number.
-    """
-    if transient.decay_tau is None:
-        decay_str = "—"
-    elif transient.decay_fit_converged:
-        decay_str = f"{transient.decay_tau:.1f}"
-    else:
-        decay_str = f"{transient.decay_tau:.1f}*"
-
-    return {
-        "index": index,
-        "sweep_index": 0,
-        "peak_time": f"{transient.peak_time:.1f}",
-        "peak_concentration": f"{transient.peak_concentration:.3f}",
-        "time_to_peak": f"{transient.time_to_peak:.2f}",
-        "decay_tau": decay_str,
-        "amplitude": f"{transient.amplitude:.3f}",
-    }
-
-
-def _serialise_ca_transient_summary(
-    result: "patch_sim.CalciumTransientAnalysisResult",
-) -> dict[str, Any]:
-    """Serialise the aggregate part of a calcium-transient analysis.
-
-    Args:
-        result: The analysis result to summarise.
-
-    Returns:
-        A dict with pre-formatted string values for the metrics-panel
-        aggregate row.  All concentrations are in µM and all times in ms.
-    """
-    return {
-        "transient_count": str(result.transient_count),
-        "baseline_concentration": _fmt_optional(result.baseline_concentration, ".3f"),
-        "mean_peak_concentration": _fmt_optional(result.mean_peak_concentration, ".3f"),
-        "mean_time_to_peak": _fmt_optional(result.mean_time_to_peak, ".2f"),
-        "mean_decay_tau": _fmt_optional(result.mean_decay_tau, ".1f"),
-        "mean_amplitude": _fmt_optional(result.mean_amplitude, ".3f"),
-    }
-
-
-def _compute_ca_transient_data(
-    result: "patch_sim.SimulationResult",
-) -> "tuple[list[dict[str, Any]], dict[str, Any]]":
-    """Compute serialised calcium-transient analysis from a single-sweep result.
-
-    Returns empty ``([], {})`` when the simulation result has no ``ca_i``
-    field (i.e. calcium dynamics were not active) or when no transients
-    were detected.
-
-    Args:
-        result: A single-sweep :class:`~patch_sim.SimulationResult`.
-
-    Returns:
-        A 2-tuple ``(metrics, summary)`` where ``metrics`` is a list of
-        per-transient display dicts and ``summary`` is the aggregate summary
-        dict.  Both are empty when no transients were detected.
-    """
-    analysis = patch_sim.analyze_calcium_transients_from_result(result)
-    if analysis is None or analysis.transient_count == 0:
-        return [], {}
-
-    metrics = [
-        _format_ca_transient_dict(i, t) for i, t in enumerate(analysis.transients)
-    ]
-    summary = _serialise_ca_transient_summary(analysis)
-    return metrics, summary
-
-
-def _compute_multi_sweep_ca_transient_data(
-    sweeps: "list[Sweep]",
-) -> "tuple[list[dict[str, Any]], dict[str, Any]]":
-    """Pool calcium-transient analysis across a multi-sweep simulation result.
-
-    Used for both multi-sweep current clamp and multi-sweep voltage clamp:
-    each sweep that exposes a ``ca_i`` trace is analysed in isolation, and
-    each per-transient display dict carries its 1-based ``sweep_index`` (in
-    protocol order) so the UI can identify which sweep produced which
-    transient.  Aggregate summary statistics are pooled across all sweeps.
-
-    Args:
-        sweeps: Ordered list of :class:`Sweep` objects.
-
-    Returns:
-        A 2-tuple ``(metrics, summary)`` of pre-formatted display dicts.  Both
-        are empty when no sweep has a ``ca_i`` field or when no transients
-        were detected across the pool.
-    """
-    pooled: list[tuple[int, patch_sim.CalciumTransient]] = []
-    baselines: list[float] = []
-    for sweep_idx, sweep in enumerate(sweeps):
-        ca_trace = sweep.additional_gating.get("ca_i")
-        if not ca_trace:
-            continue
-        time_arr = np.array(sweep.time)
-        ca_arr = np.array(ca_trace)
-        analysis = patch_sim.analyze_calcium_transients(time_arr, ca_arr)
-        if analysis.baseline_concentration is not None:
-            baselines.append(analysis.baseline_concentration)
-        pooled.extend((sweep_idx, t) for t in analysis.transients)
-
-    if not pooled:
-        return [], {}
-
-    metrics: list[dict[str, Any]] = []
-    for i, (sweep_idx, transient) in enumerate(pooled):
-        entry = _format_ca_transient_dict(i, transient)
-        # 1-based sweep number for direct display in the UI table.
-        entry["sweep_index"] = sweep_idx + 1
-        metrics.append(entry)
-
-    peak_vals = [t.peak_concentration for _, t in pooled]
-    ttp_vals = [t.time_to_peak for _, t in pooled]
-    amp_vals = [t.amplitude for _, t in pooled]
-    tau_vals = [t.decay_tau for _, t in pooled if t.decay_tau is not None]
-
-    summary: dict[str, Any] = {
-        "transient_count": str(len(pooled)),
-        "baseline_concentration": _fmt_optional(
-            float(np.mean(baselines)) if baselines else None, ".3f"
-        ),
-        "mean_peak_concentration": f"{float(np.mean(peak_vals)):.3f}",
-        "mean_time_to_peak": f"{float(np.mean(ttp_vals)):.2f}",
-        "mean_decay_tau": _fmt_optional(
-            float(np.mean(tau_vals)) if tau_vals else None, ".1f"
-        ),
-        "mean_amplitude": f"{float(np.mean(amp_vals)):.3f}",
-    }
-    return metrics, summary
-
-
-def _serialise_sfa_curve(curve: "patch_sim.SFACurve") -> dict[str, Any]:
-    """Serialise a single :class:`~patch_sim.SFACurve` to a plain dict.
-
-    Args:
-        curve: The SFA curve to serialise.
-
-    Returns:
-        A dict with ``spike_indices``, ``instantaneous_frequencies``,
-        ``adaptation_index``, and ``label`` keys suitable for UI state transfer.
-    """
-    return {
-        "spike_indices": curve.spike_indices,
-        "instantaneous_frequencies": curve.instantaneous_frequencies,
-        "adaptation_index": curve.adaptation_index,
-        "label": curve.label,
-    }
-
-
-def _build_phase_plane_data(sweeps: "list[Sweep]") -> dict[str, Any]:
-    """Serialise current-clamp sweeps into phase-plane data for AnalysisState.
-
-    Only sweeps that have a non-empty ``dvdt`` field are included.  Voltage
-    clamp sweeps are silently skipped because their voltage is prescribed and
-    dV/dt carries no physiological information.
-
-    Args:
-        sweeps: The current sweep list from SimulationState.
-
-    Returns:
-        A dict with a ``"sweeps"`` key whose value is a list of dicts, each
-        containing ``"voltage"``, ``"dvdt"``, ``"label"``, and ``"color"``.
-        Returns an empty dict when no eligible sweeps exist.
-    """
-    eligible = [
-        {
-            "voltage": s.voltage,
-            "dvdt": s.dvdt,
-            "label": s.label,
-            "color": s.color,
-        }
-        for s in sweeps
-        if s.clamp_mode == CURRENT_CLAMP and s.dvdt
-    ]
-    return {"sweeps": eligible} if eligible else {}
-
-
-def _compute_cc_multi_sweep_analysis(
-    sweeps: "list[Sweep]",
-    min_stimulus: float,
-    max_stimulus: float,
-    stimulus_step: float,
-    pre_stimulus_duration: float,
-    stimulus_duration: float,
-) -> "tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]":  # noqa: E501
-    """Compute AP metrics, F-I, SFA, and hyperpolarization data from multi-sweep CC.
-
-    Runs spike detection once per sweep and derives all outputs from those
-    results, avoiding redundant :func:`analyze_aps` calls.
-
-    When all current steps are negative (``max_stimulus <= 0``),
-    hyperpolarization sag and rebound analysis is returned in place of F-I data
-    (which is not meaningful for negative currents).
-
-    Args:
-        sweeps: Ordered list of :class:`Sweep` objects from the simulation.
-        min_stimulus: Minimum injected current step (µA/cm²).
-        max_stimulus: Maximum injected current step (µA/cm²).
-        stimulus_step: Step size between current commands (µA/cm²).
-        pre_stimulus_duration: Duration before the step begins (ms).
-        stimulus_duration: Duration of the current step (ms).
-
-    Returns:
-        A 5-tuple ``(ap_metrics, ap_summary, fi_data, sfa_data, hyp_data)``
-        where ``ap_metrics`` is a list of per-spike dicts (pooled and
-        renumbered across all sweeps), ``ap_summary`` is an aggregate dict,
-        ``fi_data`` is a serialised :class:`~patch_sim.FIAnalysisResult` dict
-        (empty when all steps are negative), ``sfa_data`` is a serialised SFA
-        dict with one curve per sweep that had at least two spikes, and
-        ``hyp_data`` is a serialised
-        :class:`~patch_sim.HyperpolarizationAnalysisResult` dict (empty when
-        any step is positive).  ``ap_metrics`` and ``ap_summary`` are empty
-        when no spikes are detected.
-    """
-    n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
-    current_steps = list(np.linspace(min_stimulus, max_stimulus, n_steps))
-
-    time_arr = np.array(sweeps[0].time)
-    stim_start = pre_stimulus_duration
-    stim_end = pre_stimulus_duration + stimulus_duration
-
-    # Run analyze_aps once per sweep; reuse results for both AP metrics and F-I.
-    per_sweep_ap = [
-        patch_sim.analyze_aps(time_arr, np.array(s.voltage)) for s in sweeps
-    ]
-
-    # --- AP metrics (pooled across all sweeps) ---
-    all_spikes = [spike for ap in per_sweep_ap for spike in ap.spikes]
-
-    if all_spikes:
-        ap_metrics: list[dict[str, Any]] = [
-            _format_spike_dict(i, s) for i, s in enumerate(all_spikes)
-        ]
-        thresh_vals = [s.threshold_voltage for s in all_spikes]
-        peak_vals = [s.peak_voltage for s in all_spikes]
-        rise_vals = [s.rise_time for s in all_spikes]
-        hw_vals = [s.half_width for s in all_spikes]
-        ahp_vals = [s.ahp_depth for s in all_spikes if s.ahp_depth is not None]
-        ap_summary: dict[str, Any] = {
-            "spike_count": str(len(all_spikes)),
-            "mean_threshold_voltage": f"{float(np.mean(thresh_vals)):.1f}",
-            "mean_peak_voltage": f"{float(np.mean(peak_vals)):.1f}",
-            "mean_rise_time": f"{float(np.mean(rise_vals)):.2f}",
-            "mean_half_width": f"{float(np.mean(hw_vals)):.2f}",
-            "mean_ahp_depth": (
-                f"{float(np.mean(ahp_vals)):.1f}" if ahp_vals else "\u2014"
-            ),
-            # mean_isi and firing_rate omitted: shown per-sweep in the F-I curve.
-        }
-    else:
-        ap_metrics = []
-        ap_summary = {}
-
-    # --- SFA data (one curve per sweep with >= 2 spikes) ---
-    sfa_curves = [
-        patch_sim.compute_sfa(ap_result, label=f"{i_step:.1f} µA/cm²")
-        for ap_result, i_step in zip(per_sweep_ap, current_steps)
-    ]
-    sfa_data: dict[str, Any] = {
-        "curves": [_serialise_sfa_curve(c) for c in sfa_curves if c is not None]
-    }
-    if not sfa_data["curves"]:
-        sfa_data = {}
-
-    # Detect whether all steps are hyperpolarizing (negative).  When true,
-    # F-I analysis is skipped in favour of sag/rebound analysis.
-    is_hyperpolarizing = max_stimulus < 0.0
-
-    # --- F-I / hyperpolarization data ---
-    if len(sweeps) != len(current_steps):
-        logger.warning(
-            "Multi-sweep analysis skipped: %d sweeps but %d current steps derived "
-            "from protocol (min=%.3g, max=%.3g, step=%.3g)",
-            len(sweeps),
-            len(current_steps),
-            min_stimulus,
-            max_stimulus,
-            stimulus_step,
-        )
-        if ap_summary:
-            ap_summary["rheobase"] = "\u2014"
-        return ap_metrics, ap_summary, {}, sfa_data, {}
-
-    if is_hyperpolarizing:
-        time_arr = np.array(sweeps[0].time)
-        sag_points: list[patch_sim.SagPoint] = [
-            _sag_point_from_ap_result(
-                time_arr,
-                np.array(s.voltage),
-                ap_result,
-                i_step,
-                stim_start,
-                stim_end,
-            )
-            for s, ap_result, i_step in zip(sweeps, per_sweep_ap, current_steps)
-        ]
-        sag_points.sort(key=lambda p: p.current_step)
-        hyp_result = patch_sim.HyperpolarizationAnalysisResult(points=sag_points)
-        hyp_data: dict[str, Any] = {
-            "current_steps": hyp_result.current_steps,
-            "sag_amplitudes": hyp_result.sag_amplitudes,
-            "rebound_spike_counts": hyp_result.rebound_spike_counts,
-        }
-        return ap_metrics, ap_summary, {}, sfa_data, hyp_data
-
-    fi_points: list[patch_sim.FIPoint] = [
-        _fi_point_from_ap_result(ap_result, i_step, stim_start, stim_end)
-        for ap_result, i_step in zip(per_sweep_ap, current_steps)
-    ]
-
-    fi_points.sort(key=lambda p: p.current_step)
-    fi_result = patch_sim.FIAnalysisResult(points=fi_points)
-    rheobase = patch_sim.estimate_rheobase(fi_result)
-    fi_data: dict[str, Any] = {
-        "current_steps": fi_result.current_steps,
-        "mean_firing_rates": fi_result.mean_firing_rates,
-        "initial_firing_rates": fi_result.initial_firing_rates,
-        "steady_state_firing_rates": fi_result.steady_state_firing_rates,
-    }
-    if ap_summary:
-        ap_summary["rheobase"] = f"{rheobase:.2f}" if rheobase is not None else "\u2014"
-    return ap_metrics, ap_summary, fi_data, sfa_data, {}
-
-
-def _compute_iv_data(
-    sweeps: "list[Sweep]",
-    min_stimulus: float,
-    max_stimulus: float,
-    stimulus_step: float,
-    pre_stimulus_duration: float,
-    stimulus_duration: float,
-) -> "tuple[dict[str, Any], patch_sim.IVAnalysisResult | None]":
-    """Compute I-V analysis data from multi-sweep voltage clamp results.
-
-    Derives voltage step values from the protocol parameters, extracts total
-    current arrays from each sweep, and calls :func:`patch_sim.analyze_iv`.
-    The serialised dict is suitable for use as a Reflex state variable; the
-    raw :class:`~patch_sim.IVAnalysisResult` is also returned so callers can
-    derive further analyses (e.g. the g-V curve) without re-running the
-    simulation.
-
-    Args:
-        sweeps: Ordered list of :class:`Sweep` objects from the simulation.
-        min_stimulus: Minimum voltage step command (mV).
-        max_stimulus: Maximum voltage step command (mV).
-        stimulus_step: Step size between voltage commands (mV).
-        pre_stimulus_duration: Duration before the step begins (ms).
-        stimulus_duration: Duration of the voltage step (ms).
-
-    Returns:
-        A 2-tuple ``(iv_data, iv_result)`` where *iv_data* is a dict with keys
-        ``voltages``, ``peak_inward_currents``, ``peak_outward_currents``, and
-        ``steady_state_currents`` (each a list of floats sorted by voltage) and
-        *iv_result* is the underlying :class:`~patch_sim.IVAnalysisResult`.
-        Both are empty / ``None`` when fewer than two sweeps are provided or
-        when the sweep count does not match the number of voltage steps.
-    """
-    if len(sweeps) < 2:
-        return {}, None
-
-    n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
-    voltage_steps = list(np.linspace(min_stimulus, max_stimulus, n_steps))
-
-    if len(sweeps) != len(voltage_steps):
-        return {}, None
-
-    time_arr = np.array(sweeps[0].time)
-    currents = [np.array(s.total_current) for s in sweeps]
-
-    stim_start = pre_stimulus_duration
-    stim_end = pre_stimulus_duration + stimulus_duration
-
-    iv_result = patch_sim.analyze_iv(
-        time_arr, currents, voltage_steps, stim_start, stim_end
-    )
-    iv_data: dict[str, Any] = {
-        "voltages": iv_result.voltage_steps,
-        "peak_inward_currents": iv_result.peak_inward_currents,
-        "peak_outward_currents": iv_result.peak_outward_currents,
-        "steady_state_currents": iv_result.steady_state_currents,
-    }
-    return iv_data, iv_result
-
-
-def _compute_tau_v_data(
-    sweeps: "list[Sweep]",
-    min_stimulus: float,
-    max_stimulus: float,
-    stimulus_step: float,
-    pre_stimulus_duration: float,
-    stimulus_duration: float,
-) -> "dict[str, Any]":
-    """Compute serialised τ-V analysis data from multi-sweep voltage clamp results.
-
-    Derives voltage step values from the protocol parameters, extracts total
-    current arrays from each sweep, and calls :func:`patch_sim.analyze_tau_v`.
-    The serialised dict is suitable for use as a Reflex state variable.
-
-    Args:
-        sweeps: Ordered list of :class:`Sweep` objects from the simulation.
-        min_stimulus: Minimum voltage step command (mV).
-        max_stimulus: Maximum voltage step command (mV).
-        stimulus_step: Step size between voltage commands (mV).
-        pre_stimulus_duration: Duration before the step begins (ms).
-        stimulus_duration: Duration of the voltage step (ms).
-
-    Returns:
-        A dict with keys ``voltages``, ``tau_activation``,
-        ``tau_inactivation``, ``tau_inactivation_slow``, and
-        ``has_double_exp`` (each a list of floats / nullable floats / bools
-        sorted by voltage), or an empty dict when fewer than two sweeps are
-        available or the sweep count does not match the voltage steps.
-    """
-    if len(sweeps) < 2:
-        return {}
-
-    n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
-    voltage_steps = list(np.linspace(min_stimulus, max_stimulus, n_steps))
-
-    if len(sweeps) != len(voltage_steps):
-        return {}
-
-    time_arr = np.array(sweeps[0].time)
-    currents = [np.array(s.total_current) for s in sweeps]
-
-    stim_start = pre_stimulus_duration
-    stim_end = pre_stimulus_duration + stimulus_duration
-
-    tau_v_result = patch_sim.analyze_tau_v(
-        time_arr, currents, voltage_steps, stim_start, stim_end
-    )
-
-    if not tau_v_result.points:
-        return {}
-
-    return {
-        "voltages": tau_v_result.voltage_steps,
-        "tau_activation": tau_v_result.tau_activation_values,
-        "tau_inactivation": tau_v_result.tau_inactivation_values,
-        "tau_inactivation_slow": tau_v_result.tau_inactivation_slow_values,
-        "has_double_exp": [p.inactivation_is_double for p in tau_v_result.points],
-    }
-
-
-def _compute_gv_data(
-    iv_result: "patch_sim.IVAnalysisResult",
-    reversal_potential: float,
-) -> "dict[str, Any]":
-    """Compute g-V analysis data from an I-V result and a reversal potential.
-
-    Calls :func:`patch_sim.compute_gv` to derive normalised conductance and fit
-    a Boltzmann sigmoid.  A dense voltage array (:data:`_GV_FIT_POINTS` points)
-    spanning the range of included steps is pre-computed so the plotting
-    function can draw a smooth fit curve without importing scipy.
-
-    Args:
-        iv_result: Pre-computed I-V analysis result.
-        reversal_potential: Reversal potential for the dominant inward current
-            carrier (mV), used to compute driving force at each step.
-
-    Returns:
-        A dict with keys ``voltages``, ``g_normalized``,
-        ``reversal_potential``, ``boltzmann_converged``, ``v_half``, ``k``,
-        ``fit_voltages``, and ``fit_g_normalized``.  Returns an empty dict when
-        no valid conductance points can be extracted.
-    """
-    gv_result = patch_sim.compute_gv(iv_result, reversal_potential)
-    if not gv_result.points:
-        return {}
-
-    fit = gv_result.boltzmann
-    fit_voltages: list[float] = []
-    fit_gn: list[float] = []
-    if fit.converged and len(gv_result.voltage_steps) >= 2:
-        v_min = min(gv_result.voltage_steps)
-        v_max = max(gv_result.voltage_steps)
-        v_arr = np.linspace(v_min, v_max, _GV_FIT_POINTS)
-        fit_voltages = v_arr.tolist()
-        fit_gn = [float(patch_sim.boltzmann(v, fit.v_half, fit.k)) for v in v_arr]
-
-    return {
-        "voltages": gv_result.voltage_steps,
-        "g_normalized": gv_result.g_normalized_values,
-        "reversal_potential": gv_result.reversal_potential,
-        "boltzmann_converged": fit.converged,
-        "v_half": fit.v_half,
-        "k": fit.k,
-        "fit_voltages": fit_voltages,
-        "fit_g_normalized": fit_gn,
-    }
-
-
-# ------------------------------------------------------------------ #
-# Simulation computation helpers                                      #
-# ------------------------------------------------------------------ #
-
-
-@dataclasses.dataclass(frozen=True)
-class _SimResult:
-    """Output of a complete simulation run, ready to apply to state.
-
-    Produced by :func:`_compute_simulation` and consumed by
-    :meth:`SimulationState._do_apply_simulation`.  All fields have
-    empty defaults so callers only set what is relevant for the current
-    clamp mode.
-    """
-
-    sweeps: list[Sweep]
-    sim_token: str
-    iv_data: dict[str, Any] = dataclasses.field(default_factory=dict)
-    gv_data: dict[str, Any] = dataclasses.field(default_factory=dict)
-    tau_v_data: dict[str, Any] = dataclasses.field(default_factory=dict)
-    ap_metrics: list[dict[str, Any]] = dataclasses.field(default_factory=list)
-    ap_summary: dict[str, Any] = dataclasses.field(default_factory=dict)
-    ap_is_multi_sweep: bool = False
-    ca_transient_metrics: list[dict[str, Any]] = dataclasses.field(default_factory=list)
-    ca_transient_summary: dict[str, Any] = dataclasses.field(default_factory=dict)
-    fi_data: dict[str, Any] = dataclasses.field(default_factory=dict)
-    sfa_data: dict[str, Any] = dataclasses.field(default_factory=dict)
-    hyperpolarization_data: dict[str, Any] = dataclasses.field(default_factory=dict)
-    phase_plane_data: dict[str, Any] = dataclasses.field(default_factory=dict)
-
-
-def _compute_simulation(
-    neuron: "patch_sim.Neuron",
-    protocols: "list[tuple[np.ndarray, str]]",
-    mode: str,
-    stored_traces: "list[Sweep]",
-    show_hover: bool,
-    min_stimulus: float,
-    max_stimulus: float,
-    stimulus_step: float,
-    pre_stimulus_duration: float,
-    stimulus_duration: float,
-) -> _SimResult:
-    """Run the simulation synchronously and compute all analysis.
-
-    Designed to be called via ``run_in_executor`` in production (no state
-    mutation) and directly in tests.  Raises :exc:`ValueError` on invalid
-    protocol parameters so the caller can propagate the error to
-    :attr:`~SimulationState.error_message`.
-
-    Args:
-        neuron: Built neuron model.
-        protocols: List of ``(stimulus_array, label)`` tuples from
-            :meth:`~patch_sim_ui.state.protocol.ProtocolState._build_protocols`.
-        mode: ``"Current Clamp"`` or ``"Voltage Clamp"``.
-        stored_traces: Snapshot of current stored traces for figure building.
-        show_hover: Whether hover tooltips are enabled.
-        min_stimulus: Minimum stimulus value for analysis range.
-        max_stimulus: Maximum stimulus value for analysis range.
-        stimulus_step: Stimulus step size for analysis range.
-        pre_stimulus_duration: Pre-stimulus duration (ms) for analysis windows.
-        stimulus_duration: Stimulus duration (ms) for analysis windows.
-
-    Returns:
-        A :class:`_SimResult` containing sweeps, figure token, and all
-        analysis data ready for :meth:`~SimulationState._do_apply_simulation`.
-    """
-    sim_fn = (
-        patch_sim.simulate_current_clamp
-        if mode == CURRENT_CLAMP
-        else patch_sim.simulate_voltage_clamp
-    )
-    is_multi = len(protocols) > 1
-
-    if is_multi:
-        new_sweeps: list[Sweep] = []
-        for sweep_result, (protocol, label) in zip(
-            patch_sim.simulate_batch(neuron, [p for p, _ in protocols], sim_fn),
-            protocols,
-        ):
-            color_index = len(new_sweeps) % len(constants.SWEEP_COLORS)
-            new_sweeps.append(
-                Sweep.from_result(
-                    sweep_result,
-                    protocol,
-                    label,
-                    constants.SWEEP_COLORS[color_index],
-                    mode,
-                )
-            )
-
-        fig = build_figure(
-            current_sweeps=new_sweeps,
-            visibility=TraceVisibility(),
-            clamp_mode=mode,
-            stored_traces=stored_traces,
-            show_hover=show_hover,
-        )
-        sim_token = uuid.uuid4().hex
-        traces.put(sim_token, fig)
-
-        if mode == VOLTAGE_CLAMP:
-            iv_data, iv_result = _compute_iv_data(
-                new_sweeps,
-                min_stimulus,
-                max_stimulus,
-                stimulus_step,
-                pre_stimulus_duration,
-                stimulus_duration,
-            )
-            if iv_result is not None:
-                na_channel = next(
-                    (
-                        ch
-                        for ch in neuron.core_channels
-                        if isinstance(ch.reversal_spec, patch_sim.NernstSpec)
-                        and ch.reversal_spec.species is patch_sim.IonSpecies.SODIUM
-                    ),
-                    None,
-                )
-                gv_data = (
-                    _compute_gv_data(iv_result, na_channel.reversal_potential(neuron))
-                    if na_channel is not None
-                    else {}
-                )
-            else:
-                gv_data = {}
-            tau_v_data = _compute_tau_v_data(
-                new_sweeps,
-                min_stimulus,
-                max_stimulus,
-                stimulus_step,
-                pre_stimulus_duration,
-                stimulus_duration,
-            )
-            ms_ca_metrics, ms_ca_summary = _compute_multi_sweep_ca_transient_data(
-                new_sweeps
-            )
-            return _SimResult(
-                sweeps=new_sweeps,
-                sim_token=sim_token,
-                iv_data=iv_data,
-                gv_data=gv_data,
-                tau_v_data=tau_v_data,
-                ca_transient_metrics=ms_ca_metrics,
-                ca_transient_summary=ms_ca_summary,
-            )
-
-        ms_metrics, ms_summary, ms_fi, ms_sfa, ms_hyp = (
-            _compute_cc_multi_sweep_analysis(
-                new_sweeps,
-                min_stimulus,
-                max_stimulus,
-                stimulus_step,
-                pre_stimulus_duration,
-                stimulus_duration,
-            )
-        )
-        ms_ca_metrics, ms_ca_summary = _compute_multi_sweep_ca_transient_data(
-            new_sweeps
-        )
-        return _SimResult(
-            sweeps=new_sweeps,
-            sim_token=sim_token,
-            ap_metrics=ms_metrics,
-            ap_summary=ms_summary,
-            ap_is_multi_sweep=True,
-            ca_transient_metrics=ms_ca_metrics,
-            ca_transient_summary=ms_ca_summary,
-            fi_data=ms_fi,
-            sfa_data=ms_sfa,
-            hyperpolarization_data=ms_hyp,
-            phase_plane_data=_build_phase_plane_data(new_sweeps),
-        )
-
-    # Single sweep
-    stimulus, _ = protocols[0]
-    result = sim_fn(neuron, stimulus)
-    sweep = Sweep.from_result(result, stimulus, "", "", mode)
-
-    fig = build_figure(
-        current_sweeps=[sweep],
-        visibility=TraceVisibility(),
-        clamp_mode=mode,
-        stored_traces=stored_traces,
-        show_hover=show_hover,
-    )
-    sim_token = uuid.uuid4().hex
-    traces.put(sim_token, fig)
-
-    if mode == CURRENT_CLAMP:
-        ap_result = patch_sim.analyze_aps_from_result(result)
-        sfa_curve = patch_sim.compute_sfa(ap_result)
-        ca_metrics, ca_summary = _compute_ca_transient_data(result)
-        return _SimResult(
-            sweeps=[sweep],
-            sim_token=sim_token,
-            ap_metrics=[_format_spike_dict(s.index, s) for s in ap_result.spikes],
-            ap_summary={
-                "spike_count": str(ap_result.spike_count),
-                "mean_threshold_voltage": _fmt_optional(
-                    ap_result.mean_threshold_voltage, ".1f"
-                ),
-                "mean_peak_voltage": _fmt_optional(ap_result.mean_peak_voltage, ".1f"),
-                "mean_rise_time": _fmt_optional(ap_result.mean_rise_time, ".2f"),
-                "mean_half_width": _fmt_optional(ap_result.mean_half_width, ".2f"),
-                "mean_ahp_depth": _fmt_optional(ap_result.mean_ahp_depth, ".1f"),
-                "mean_isi": _fmt_optional(ap_result.mean_isi, ".1f"),
-                "firing_rate": _fmt_optional(ap_result.firing_rate, ".1f"),
-                "adaptation_index": (
-                    f"{sfa_curve.adaptation_index:.2f}"
-                    if sfa_curve is not None
-                    else "—"
-                ),
-                "rheobase": (
-                    f"≤ {min_stimulus:.2f}" if ap_result.spike_count >= 1 else "—"
-                ),
-            },
-            ca_transient_metrics=ca_metrics,
-            ca_transient_summary=ca_summary,
-            sfa_data=(
-                {"curves": [_serialise_sfa_curve(sfa_curve)]}
-                if sfa_curve is not None
-                else {}
-            ),
-            phase_plane_data=_build_phase_plane_data([sweep]),
-        )
-
-    # Single VC sweep — IV/GV require multi-sweep, but calcium transients can
-    # still appear (e.g. a depolarising VC step opens Ca channels).
-    ca_metrics, ca_summary = _compute_ca_transient_data(result)
-    return _SimResult(
-        sweeps=[sweep],
-        sim_token=sim_token,
-        ca_transient_metrics=ca_metrics,
-        ca_transient_summary=ca_summary,
-    )
 
 
 class SimulationState(rx.State):
@@ -1168,12 +356,7 @@ class SimulationState(rx.State):
         post_js = "".join(post_parts)
 
         api_url = _get_config().api_url.rstrip("/")
-        return (
-            _FETCH_FIGURE_JS.replace("/*API_URL*/", api_url)
-            .replace("/*TOKEN*/", token)
-            .replace("/*DARK_AXIS_STYLE*/", json.dumps(constants.DARK_AXIS_STYLE))
-            .replace("/*POST_JS*/", post_js)
-        )
+        return _render_fetch_figure_js(token, post_js, api_url)
 
     def _sweep_highlight_js(self) -> str:
         """Return the sweep highlight JS with styling constants substituted.
@@ -1181,14 +364,7 @@ class SimulationState(rx.State):
         Returns:
             A self-executing JS function string.
         """
-        return (
-            _SWEEP_HIGHLIGHT_JS.replace(
-                "/*DIM_OPACITY*/", str(constants.HIGHLIGHT_DIM_OPACITY)
-            )
-            .replace("/*HOVER_WIDTH*/", str(constants.HIGHLIGHT_HOVER_WIDTH))
-            .replace("/*DIM_WIDTH*/", str(constants.HIGHLIGHT_DIM_WIDTH))
-            .replace("/*SELECTED_SWEEP*/", str(self.selected_sweep))
-        )
+        return _render_sweep_highlight_js(self.selected_sweep)
 
     def _rebuild_figure_and_fetch_js(
         self, stored_traces: list[Sweep], vis_st: "VisibilityState"
@@ -1292,6 +468,8 @@ class SimulationState(rx.State):
         analysis_st.ap_is_multi_sweep = result.ap_is_multi_sweep
         analysis_st.ca_transient_metrics = result.ca_transient_metrics
         analysis_st.ca_transient_summary = result.ca_transient_summary
+        analysis_st.burst_metrics = result.burst_metrics
+        analysis_st.burst_summary = result.burst_summary
         analysis_st.fi_data = result.fi_data
         analysis_st.sfa_data = result.sfa_data
         analysis_st.hyperpolarization_data = result.hyperpolarization_data
@@ -1630,24 +808,49 @@ class SimulationState(rx.State):
                 )
                 return
             analysis_st = await self.get_state(AnalysisState)
+            em_dash = "—"
+            density_r_units = "kΩ·cm²"
+            density_c_units = "µF/cm²"
             if props is None:
-                analysis_st.mt_input_resistance = "\u2014"
-                analysis_st.mt_time_constant = "\u2014"
-                analysis_st.mt_membrane_capacitance = "\u2014"
+                analysis_st.mt_input_resistance = em_dash
+                analysis_st.mt_time_constant = em_dash
+                analysis_st.mt_membrane_capacitance = em_dash
+                analysis_st.mt_r_units = density_r_units
+                analysis_st.mt_c_units = density_c_units
+                analysis_st.mt_units_mode = "density"
                 analysis_st.mt_fit_converged = False
             else:
-                analysis_st.mt_input_resistance = f"{props.input_resistance:.2f}"
                 analysis_st.mt_time_constant = f"{props.time_constant:.2f}"
-                analysis_st.mt_membrane_capacitance = (
-                    f"{props.membrane_capacitance:.2f}"
-                    if props.membrane_capacitance is not None
-                    else "\u2014"
-                )
                 analysis_st.mt_fit_converged = props.fit_converged
+                if props.input_resistance_mohm is not None:
+                    analysis_st.mt_input_resistance = (
+                        f"{props.input_resistance_mohm:.2f}"
+                    )
+                    analysis_st.mt_r_units = "MΩ"
+                    analysis_st.mt_units_mode = "absolute"
+                else:
+                    analysis_st.mt_input_resistance = f"{props.input_resistance:.2f}"
+                    analysis_st.mt_r_units = density_r_units
+                    analysis_st.mt_units_mode = "density"
+                if props.membrane_capacitance_pf is not None:
+                    analysis_st.mt_membrane_capacitance = (
+                        f"{props.membrane_capacitance_pf:.2f}"
+                    )
+                    analysis_st.mt_c_units = "pF"
+                elif props.membrane_capacitance is not None:
+                    analysis_st.mt_membrane_capacitance = (
+                        f"{props.membrane_capacitance:.2f}"
+                    )
+                    analysis_st.mt_c_units = density_c_units
+                else:
+                    analysis_st.mt_membrane_capacitance = em_dash
+                    analysis_st.mt_c_units = density_c_units
             analysis_st.mt_neuron_fingerprint = fingerprint
             logger.info(
-                "run_membrane_test: R_in=%s kΩ·cm², τ_m=%s ms, C_m=%s µF/cm²",
+                "run_membrane_test: R_in=%s %s, τ_m=%s ms, C_m=%s %s",
                 analysis_st.mt_input_resistance,
+                analysis_st.mt_r_units,
                 analysis_st.mt_time_constant,
                 analysis_st.mt_membrane_capacitance,
+                analysis_st.mt_c_units,
             )

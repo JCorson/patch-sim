@@ -36,14 +36,20 @@ DEFAULT_G_IH: float = 0.1  # HCN/Ih maximum conductance in mS/cm²
 DEFAULT_IH_P_NA: float = 0.289
 DEFAULT_G_IKA: float = 5.0  # A-type K+ maximum conductance in mS/cm²
 DEFAULT_G_IKV31: float = 40.0  # Kv3.1-type K+ maximum conductance in mS/cm²
+DEFAULT_G_MSKV: float = 1.8  # Mainen-Sejnowski Kv max conductance, mS/cm² (#311)
 DEFAULT_G_NAP: float = 0.5  # Persistent Na+ maximum conductance in mS/cm²
+# SNc-specific INaP (Drion 2011 V½=-65 mV); see make_snc_inap_channel.
+DEFAULT_G_NAP_SNC: float = 0.04
 DEFAULT_G_NAR: float = 0.3  # Resurgent Na+ maximum conductance in mS/cm²
 DEFAULT_G_IM: float = 0.5  # Muscarinic K+ maximum conductance in mS/cm²
 DEFAULT_G_IKIR: float = 0.2  # Inward rectifier K+ maximum conductance in mS/cm²
 DEFAULT_G_IKCA: float = 1.0  # Calcium-activated K+ maximum conductance in mS/cm²
 DEFAULT_G_ICAL: float = 0.5  # L-type Ca2+ maximum conductance in mS/cm²
+DEFAULT_G_CAV13: float = 0.1  # Cav1.3 LVA L-type Ca2+ maximum conductance in mS/cm²
 DEFAULT_G_ICAT: float = 0.3  # T-type Ca2+ maximum conductance in mS/cm²
 DEFAULT_G_ICAN: float = 0.3  # N-type Ca2+ maximum conductance in mS/cm²
+DEFAULT_G_SK: float = 1.0  # Small-conductance Ca2+-activated K+ in mS/cm²
+DEFAULT_G_KATP: float = 0.5  # ATP-sensitive K+ maximum conductance in mS/cm²
 
 # Calcium dynamics defaults
 DEFAULT_ALPHA_CA: float = 1e-4  # mM / (µA/cm² · ms)

@@ -4,6 +4,7 @@ Provides tools for extracting quantitative metrics from simulation results.
 
 Modules:
     ap_metrics: Action potential detection and metric extraction.
+    burst_metrics: Burst detection and burst-metric extraction.
     calcium_transients: Calcium transient detection and decay-τ fitting.
     derivatives: General-purpose derivative utilities (e.g. dV/dt).
     fi_curve: F-I curve construction from current clamp multi-sweep results.
@@ -20,6 +21,12 @@ from .ap_metrics import (
     SpikeMetrics,
     analyze_aps,
     analyze_aps_from_result,
+)
+from .burst_metrics import (
+    BurstAnalysisResult,
+    BurstMetrics,
+    analyze_bursts,
+    analyze_bursts_from_result,
 )
 from .calcium_transients import (
     CalciumTransient,
@@ -59,6 +66,8 @@ from .membrane_test import (
 from .passive_properties import (
     PassiveProperties,
     analyze_passive_properties,
+    density_to_absolute_c_m,
+    density_to_absolute_r_in,
     is_subthreshold,
 )
 from .sfa import SFAAnalysisResult, SFACurve, analyze_sfa, compute_sfa
@@ -77,6 +86,8 @@ from .tau_v import (
 __all__ = [
     "analyze_aps",
     "analyze_aps_from_result",
+    "analyze_bursts",
+    "analyze_bursts_from_result",
     "analyze_calcium_transients",
     "analyze_calcium_transients_from_result",
     "analyze_fi",
@@ -93,6 +104,8 @@ __all__ = [
     "compute_sag_point",
     "compute_sfa",
     "compute_tau_v_point",
+    "density_to_absolute_c_m",
+    "density_to_absolute_r_in",
     "double_exp_decay",
     "estimate_rheobase",
     "is_subthreshold",
@@ -101,6 +114,8 @@ __all__ = [
     "single_exp_rise",
     "APAnalysisResult",
     "BoltzmannFit",
+    "BurstAnalysisResult",
+    "BurstMetrics",
     "CalciumTransient",
     "CalciumTransientAnalysisResult",
     "DoubleExponentialFit",

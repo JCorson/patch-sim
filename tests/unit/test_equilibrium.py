@@ -5,7 +5,14 @@ import warnings
 import pytest
 
 from patch_sim import find_coupled_equilibrium, find_zero_current_voltage
-from patch_sim.constants import DOPAMINERGIC, PURKINJE, THALAMIC_RELAY, TRN
+from patch_sim.constants import (
+    CORTICAL_PYRAMIDAL,
+    DOPAMINERGIC,
+    PURKINJE,
+    STN,
+    THALAMIC_RELAY,
+    TRN,
+)
 from patch_sim.equilibrium import _total_ionic_current
 from patch_sim.neuron import Neuron
 from patch_sim.neuron_factory import make_neuron
@@ -72,8 +79,27 @@ def test_find_zero_current_voltage_no_bracket() -> None:
 # converges on the non-physiological root near −37 mV rather than the resting
 # equilibrium.  Stability at v_rest is verified instead by the simulation-based
 # test_all_presets_stable_at_rest in tests/integration/test_current_clamp.py.
+#
+# CORTICAL_PYRAMIDAL is excluded: after the #311 fix replaced the Pospischil
+# delayed rectifier with the slow Mainen-Sejnowski Kv (closed at rest, opens
+# only above ~0 mV) as the sole K conductance, the cell has no active outward
+# current at depolarised voltages.  Pospischil Na's window current drives
+# I_total(V=-20 mV) negative, so the default bracket [-100, -20] no longer
+# spans a sign change at the resting equilibrium near -70 mV (additional
+# zero crossings appear between -65 and -50 mV).  The cell rests stably at
+# -70 mV in simulation, verified by test_no_spontaneous_firing in
+# tests/integration/test_cortical_pyramidal.py and test_all_presets_stable_at_rest.
+#
+# STN is excluded post-#305: the autonomous-pacemaker preset uses INaP and Ih
+# to destabilise rest near −60 mV, and the Mainen-Sejnowski Kv replaces the
+# Otsuka K factory as the sole delayed rectifier (closed at rest).  I_total
+# has no Brent-findable root in the default [−100, −20] mV bracket — the cell
+# fires spontaneously from v_rest = −60 mV.  See test_stn_spontaneous_pacemaking
+# in tests/integration/test_stn.py and test_all_presets_stable_at_rest.
 _EQUILIBRIUM_PRESET_NAMES = [
-    p for p in NEURON_PRESET_NAMES if p not in (TRN, PURKINJE, DOPAMINERGIC)
+    p
+    for p in NEURON_PRESET_NAMES
+    if p not in (TRN, PURKINJE, DOPAMINERGIC, CORTICAL_PYRAMIDAL, STN)
 ]
 
 

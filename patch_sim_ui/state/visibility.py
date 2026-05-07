@@ -100,22 +100,30 @@ class VisibilityState(rx.State):
     show_ika_gating: bool = True
     show_ikv31_current: bool = True
     show_ikv31_gating: bool = True
+    show_mskv_current: bool = True
+    show_mskv_gating: bool = True
     show_inap_current: bool = True
     show_inap_gating: bool = True
     show_inar_current: bool = True
     show_inar_gating: bool = True
     show_im_current: bool = True
     show_im_gating: bool = True
+    show_katp_current: bool = True
+    show_katp_gating: bool = True
     show_ikir_current: bool = True
     show_ikir_gating: bool = True
     show_ikca_current: bool = True
     show_ikca_gating: bool = True
     show_ical_current: bool = True
     show_ical_gating: bool = True
+    show_cav13_current: bool = True
+    show_cav13_gating: bool = True
     show_icat_current: bool = True
     show_icat_gating: bool = True
     show_ican_current: bool = True
     show_ican_gating: bool = True
+    show_sk_current: bool = True
+    show_sk_gating: bool = True
 
     # ------------------------------------------------------------------ #
     # Visibility setters                                                 #

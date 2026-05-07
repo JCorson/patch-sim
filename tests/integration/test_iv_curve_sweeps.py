@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 import patch_sim
+import patch_sim.channels
 import patch_sim.clamp_simulations
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 
@@ -252,7 +253,7 @@ def test_batch_with_calcium_channels() -> None:
     ProcessPoolExecutor) to raise AttributeError. This test runs an IV curve
     simulation with ICaL to verify the fix.
     """
-    ical = patch_sim.make_ical_channel()
+    ical = patch_sim.channels.make_ical_channel()
     cd = patch_sim.CalciumDynamics()
     neuron = patch_sim.Neuron(
         additional_channels=(ical,),

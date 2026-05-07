@@ -9,38 +9,13 @@ import math
 import numpy as np
 import pytest
 
-import patch_sim
-from patch_sim.additional_channels import (
-    _alpha_a,
-    _alpha_b,
-    _alpha_d,
-    _alpha_dn,
-    _alpha_dt,
-    _alpha_f,
-    _alpha_fn,
-    _alpha_ft,
-    _alpha_hr,
-    _alpha_kir,
-    _alpha_p,
-    _alpha_q,
-    _alpha_r,
-    _alpha_s,
-    _alpha_w,
-    _beta_a,
-    _beta_b,
-    _beta_d,
-    _beta_dn,
-    _beta_dt,
-    _beta_f,
-    _beta_fn,
-    _beta_ft,
-    _beta_hr,
-    _beta_kir,
-    _beta_p,
-    _beta_q,
-    _beta_r,
-    _beta_s,
-    _beta_w,
+from patch_sim.calcium import CalciumDynamics
+from patch_sim.channels import (
+    GatingVariable,
+    GoldmanSpec,
+    IonChannel,
+    IonSpecies,
+    NernstSpec,
     make_ical_channel,
     make_ican_channel,
     make_icat_channel,
@@ -51,15 +26,47 @@ from patch_sim.additional_channels import (
     make_im_channel,
     make_inap_channel,
     make_inar_channel,
+    make_katp_channel,
+    make_snc_inap_channel,
+    make_trn_icat_channel,
 )
-from patch_sim.calcium import CalciumDynamics
-from patch_sim.channels import (
-    GatingVariable,
-    GoldmanSpec,
-    IonChannel,
-    IonSpecies,
-    NernstSpec,
+from patch_sim.channels.auxiliary import (
+    _alpha_a,
+    _alpha_b,
+    _alpha_d,
+    _alpha_dn,
+    _alpha_dt,
+    _alpha_f,
+    _alpha_fn,
+    _alpha_ft,
+    _alpha_hr,
+    _alpha_kATP,
+    _alpha_kir,
+    _alpha_p,
+    _alpha_q,
+    _alpha_r,
+    _alpha_s,
+    _alpha_sNaP,
+    _alpha_w,
+    _beta_a,
+    _beta_b,
+    _beta_d,
+    _beta_dn,
+    _beta_dt,
+    _beta_f,
+    _beta_fn,
+    _beta_ft,
+    _beta_hr,
+    _beta_kATP,
+    _beta_kir,
+    _beta_p,
+    _beta_q,
+    _beta_r,
+    _beta_s,
+    _beta_sNaP,
+    _beta_w,
 )
+from patch_sim.channels.snc import _alpha_sNaP_snc, _beta_sNaP_snc
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from patch_sim.electrochemistry import nernst_potential
 from patch_sim.neuron import Neuron
@@ -577,13 +584,6 @@ def test_multiple_optional_channels_coexist():
     assert "q" in result.dtype.names
 
 
-def test_public_api_exports():
-    """GatingVariable and IonChannel and make_ih_channel are exported."""
-    assert hasattr(patch_sim, "GatingVariable")
-    assert hasattr(patch_sim, "IonChannel")
-    assert hasattr(patch_sim, "make_ih_channel")
-
-
 # ---------------------------------------------------------------------------
 # IKa rate functions
 # ---------------------------------------------------------------------------
@@ -728,11 +728,6 @@ def test_ika_and_ih_coexist():
     assert "r" in result.dtype.names
 
 
-def test_public_api_exports_ika():
-    """make_ika_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_ika_channel")
-
-
 # ---------------------------------------------------------------------------
 # IKv31 (Kv3.1-type K+)
 # ---------------------------------------------------------------------------
@@ -740,7 +735,7 @@ def test_public_api_exports_ika():
 
 def test_ikv31_gating_steady_state_in_bounds():
     """IKv31 gating variable nk_inf is in [0, 1] for physiological voltages."""
-    from patch_sim.additional_channels import _ikv31_alpha_nk, _ikv31_beta_nk
+    from patch_sim.channels.auxiliary import _ikv31_alpha_nk, _ikv31_beta_nk
 
     for V in range(-100, 61):
         alpha = _ikv31_alpha_nk(float(V), 0.0)
@@ -755,7 +750,7 @@ def test_ikv31_near_zero_activation_at_rest():
     The high activation threshold of Kv3.1 means virtually no outward current
     at rest — this is the key property that fixes issue #155.
     """
-    from patch_sim.additional_channels import _ikv31_alpha_nk, _ikv31_beta_nk
+    from patch_sim.channels.auxiliary import _ikv31_alpha_nk, _ikv31_beta_nk
 
     alpha = _ikv31_alpha_nk(-65.0, 0.0)
     beta = _ikv31_beta_nk(-65.0, 0.0)
@@ -765,7 +760,7 @@ def test_ikv31_near_zero_activation_at_rest():
 
 def test_ikv31_strong_activation_depolarized():
     """IKv31 nk_inf is well above 0.5 at 0 mV (depolarized)."""
-    from patch_sim.additional_channels import _ikv31_alpha_nk, _ikv31_beta_nk
+    from patch_sim.channels.auxiliary import _ikv31_alpha_nk, _ikv31_beta_nk
 
     alpha = _ikv31_alpha_nk(0.0, 0.0)
     beta = _ikv31_beta_nk(0.0, 0.0)
@@ -775,7 +770,7 @@ def test_ikv31_strong_activation_depolarized():
 
 def test_make_ikv31_channel_defaults():
     """make_ikv31_channel() produces a channel with the expected defaults."""
-    from patch_sim.additional_channels import make_ikv31_channel
+    from patch_sim.channels import make_ikv31_channel
     from patch_sim.constants import DEFAULT_G_IKV31
 
     ch = make_ikv31_channel()
@@ -788,18 +783,13 @@ def test_make_ikv31_channel_defaults():
 
 def test_current_clamp_with_ikv31():
     """Current clamp with IKv31 channel adds Kv31 and nk columns."""
-    from patch_sim.additional_channels import make_ikv31_channel
+    from patch_sim.channels import make_ikv31_channel
 
     neuron = Neuron(additional_channels=(make_ikv31_channel(),))
     stimulus = np.zeros(int(40_000 * 0.05))
     result = simulate_current_clamp(neuron=neuron, current_external=stimulus)
     assert "IKv31" in result.dtype.names
     assert "nk" in result.dtype.names
-
-
-def test_public_api_exports_ikv31():
-    """make_ikv31_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_ikv31_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -845,12 +835,66 @@ def test_inap_subthreshold_activation():
 
 
 # ---------------------------------------------------------------------------
+# INaP slow-inactivation rate functions (Magistretti & Alonso 1999)
+# ---------------------------------------------------------------------------
+
+
+def _sNaP_inf(V: float) -> float:
+    """INaP slow-inactivation steady-state availability at voltage V."""
+    a, b = _alpha_sNaP(V, 0.0), _beta_sNaP(V, 0.0)
+    return a / (a + b)
+
+
+def test_inap_slow_inactivation_steady_state_in_bounds():
+    """INaP slow-inactivation s_inf is in [0, 1] for physiological voltages."""
+    for V in np.linspace(-120.0, 0.0, 50):
+        a = _alpha_sNaP(V, 0.0)
+        b = _beta_sNaP(V, 0.0)
+        assert a >= 0, f"alpha_sNaP negative at V={V}"
+        assert b >= 0, f"beta_sNaP negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"sNaP steady state {ss} out of [0,1] at V={V}"
+
+
+def test_inap_slow_inactivation_decreases_with_depolarisation():
+    """Availability is highest at hyperpolarised voltages (inactivation)."""
+    assert _sNaP_inf(-80.0) > _sNaP_inf(-45.0) > _sNaP_inf(-10.0)
+
+
+def test_inap_slow_inactivation_half_voltage():
+    """V½ for sNaP sits at -45 mV (within Magistretti & Alonso 1999's spread)."""
+    assert _sNaP_inf(-45.0) == pytest.approx(0.5, abs=0.01)
+
+
+def test_inap_slow_inactivation_resting_availability():
+    """Near-rest availability is high enough to preserve pacemaking."""
+    # At -65 mV the gate must be near 1 so opting in does not silence cells
+    # whose firing depends on the resting INaP window current.
+    assert _sNaP_inf(-65.0) > 0.9
+    assert _sNaP_inf(-75.0) > 0.95
+
+
+def test_inap_slow_inactivation_blocks_depol_plateau():
+    """At depolarised plateau voltages sNaP closes, providing block escape."""
+    # The depol-block plateau in #324 hung at ≈ −15 mV; sNaP must close
+    # firmly there so g_INaP_eff = g_max * p * sNaP collapses.
+    assert _sNaP_inf(-15.0) < 0.05
+
+
+def test_inap_slow_inactivation_tau_is_slow():
+    """τ_sNaP at V½ stays distinctly slow vs the fast p activation (~6 ms)."""
+    a, b = _alpha_sNaP(-45.0, 0.0), _beta_sNaP(-45.0, 0.0)
+    tau = 1.0 / (a + b)
+    assert tau > 100.0, f"sNaP tau at V½ is {tau:.1f} ms, expected > 100 ms"
+
+
+# ---------------------------------------------------------------------------
 # make_inap_channel
 # ---------------------------------------------------------------------------
 
 
 def test_make_inap_channel_defaults():
-    """make_inap_channel() produces a channel with the expected defaults."""
+    """make_inap_channel() returns the (p, sNaP) two-gate INaP topology."""
     from patch_sim.constants import DEFAULT_G_NAP
 
     ch = make_inap_channel()
@@ -858,9 +902,11 @@ def test_make_inap_channel_defaults():
     assert ch.g_max == pytest.approx(DEFAULT_G_NAP)
     assert isinstance(ch.reversal_spec, NernstSpec)
     assert ch.reversal_spec.species is IonSpecies.SODIUM
-    assert len(ch.gating_variables) == 1
+    assert len(ch.gating_variables) == 2
     assert ch.gating_variables[0].name == "p"
     assert ch.gating_variables[0].power == 1
+    assert ch.gating_variables[1].name == "sNaP"
+    assert ch.gating_variables[1].power == 1
 
 
 def test_make_inap_channel_custom_params():
@@ -872,12 +918,106 @@ def test_make_inap_channel_custom_params():
 
 
 # ---------------------------------------------------------------------------
+# SNc INaP slow inactivation rate functions (sNaP_snc gate; Magistretti &
+# Alonso 1999 V½ shifted to match the Drion 2011 SNc fit).  Always-on gate
+# added in #330.
+# ---------------------------------------------------------------------------
+
+
+def _sNaP_snc_inf(V: float) -> float:
+    """Steady-state availability of the SNc INaP slow inactivation gate.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Steady-state availability of the sNaP_snc gate at voltage V, in [0, 1].
+    """
+    a, b = _alpha_sNaP_snc(V, 0.0), _beta_sNaP_snc(V, 0.0)
+    return a / (a + b)
+
+
+def test_snc_inap_slow_inactivation_steady_state_in_bounds():
+    """The sNaP_snc rates are positive and steady state in [0, 1] across V."""
+    for V in (-120.0, -100.0, -75.0, -55.0, -45.0, -30.0, -15.0, 0.0, 30.0):
+        a = _alpha_sNaP_snc(V, 0.0)
+        b = _beta_sNaP_snc(V, 0.0)
+        assert a >= 0, f"alpha_sNaP_snc negative at V={V}"
+        assert b >= 0, f"beta_sNaP_snc negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"sNaP_snc steady state {ss} out of [0,1] at V={V}"
+
+
+def test_snc_inap_slow_inactivation_decreases_with_depolarisation():
+    """The sNaP_snc availability decreases monotonically with depolarisation."""
+    assert _sNaP_snc_inf(-80.0) > _sNaP_snc_inf(-55.0) > _sNaP_snc_inf(-15.0)
+
+
+def test_snc_inap_slow_inactivation_half_voltage():
+    """V½ for sNaP_snc sits at -55 mV (Drion 2011 shift from M&A 1999)."""
+    assert _sNaP_snc_inf(-55.0) == pytest.approx(0.5, abs=0.01)
+
+
+def test_snc_inap_slow_inactivation_resting_availability():
+    """SNc DA cycles through −90 to −55 mV; sNaP_snc must stay open in the trough.
+
+    The looser lower bound at v_rest = −55 mV (vs entorhinal sNaP at 0.94
+    at −65 mV) is expected: SNc rests more depolarised, and the SNc-shifted
+    V½ tracks.  The cycle hyperpolarised end (≈ −75 mV) is what matters
+    for recovery between spikes, and there sNaP_snc > 0.94.
+    """
+    assert _sNaP_snc_inf(-75.0) > 0.94
+    assert _sNaP_snc_inf(-55.0) == pytest.approx(0.5, abs=0.01)
+
+
+def test_snc_inap_slow_inactivation_blocks_depol_plateau():
+    """At depolarised plateau voltages sNaP_snc closes, providing block escape."""
+    # At ≈ −15 mV the slow gate must close firmly so the residual SNc
+    # persistent Na current (g_NaP_SNc * pSNc * sNaP_snc) collapses.
+    assert _sNaP_snc_inf(-15.0) < 0.05
+
+
+def test_snc_inap_slow_inactivation_tau_is_slow():
+    """τ_sNaP_snc at V½ stays distinctly slow vs the fast pSNc activation (~5 ms)."""
+    a, b = _alpha_sNaP_snc(-55.0, 0.0), _beta_sNaP_snc(-55.0, 0.0)
+    tau = 1.0 / (a + b)
+    assert tau > 100.0, f"sNaP_snc tau at V½ is {tau:.1f} ms, expected > 100 ms"
+
+
+# ---------------------------------------------------------------------------
+# make_snc_inap_channel
+# ---------------------------------------------------------------------------
+
+
+def test_make_snc_inap_channel_defaults():
+    """make_snc_inap_channel() exposes pSNc and sNaP_snc gates by default."""
+    from patch_sim.constants import DEFAULT_G_NAP_SNC
+
+    ch = make_snc_inap_channel()
+    assert ch.name == "NaP_SNc"
+    assert ch.g_max == pytest.approx(DEFAULT_G_NAP_SNC)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.SODIUM
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "pSNc"
+    assert ch.gating_variables[0].power == 1
+    assert ch.gating_variables[1].name == "sNaP_snc"
+    assert ch.gating_variables[1].power == 1
+
+
+def test_make_snc_inap_channel_custom_params():
+    """make_snc_inap_channel accepts custom g_max."""
+    ch = make_snc_inap_channel(g_max=0.05)
+    assert ch.g_max == pytest.approx(0.05)
+
+
+# ---------------------------------------------------------------------------
 # INaP integration tests
 # ---------------------------------------------------------------------------
 
 
 def test_current_clamp_with_inap_extra_columns():
-    """Current clamp with NaP channel adds INaP and p columns."""
+    """Current clamp with INaP channel exposes both p and sNaP gating columns."""
     neuron = Neuron(additional_channels=(make_inap_channel(),))
     stim = step_current(
         duration=20.0,
@@ -890,6 +1030,7 @@ def test_current_clamp_with_inap_extra_columns():
     assert result.dtype.names is not None
     assert "INaP" in result.dtype.names
     assert "p" in result.dtype.names
+    assert "sNaP" in result.dtype.names
 
 
 def test_voltage_clamp_with_inap_extra_columns():
@@ -924,9 +1065,21 @@ def test_current_clamp_inap_gating_in_bounds():
     assert result["p"].max() <= 1.0
 
 
-def test_public_api_exports_inap():
-    """make_inap_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_inap_channel")
+def test_current_clamp_inap_slow_inactivation_gating_in_bounds():
+    """Both p and sNaP gates stay in [0, 1] during current clamp."""
+    neuron = Neuron(additional_channels=(make_inap_channel(),))
+    stim = step_current(
+        duration=30.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=20.0,
+        sampling_frequency=40000.0,
+    )
+    result = simulate_current_clamp(neuron, stim)
+    assert result["p"].min() >= 0.0
+    assert result["p"].max() <= 1.0
+    assert result["sNaP"].min() >= 0.0
+    assert result["sNaP"].max() <= 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -1092,6 +1245,34 @@ def test_inap_and_inar_coexist():
     assert "hr" in result.dtype.names
 
 
+def test_inap_slow_inactivation_and_inar_no_gate_collision():
+    """INaP slow inactivation and INaR coexist with distinct gate columns.
+
+    Regression test for the gate-naming hazard noted in the channel
+    docstring: the gating-state dictionary is keyed by gate name only, so
+    INaP's slow inactivation gate must be named ``sNaP`` (not ``s``) to
+    avoid aliasing with :func:`make_inar_channel`'s activation gate.
+    """
+    neuron = Neuron(
+        additional_channels=(
+            make_inap_channel(),
+            make_inar_channel(),
+        )
+    )
+    stim = step_current(
+        duration=20.0,
+        current_amplitude=10.0,
+        step_start=5.0,
+        step_duration=10.0,
+        sampling_frequency=40000.0,
+    )
+    result = simulate_current_clamp(neuron, stim)
+    assert result.dtype.names is not None
+    # Both gates present and distinct
+    assert "sNaP" in result.dtype.names
+    assert "s" in result.dtype.names
+
+
 def test_all_additional_channels_coexist():
     """All seven additional channels (Ih, IKa, INaP, INaR, IM, IKir, IKCa) coexist."""
     from patch_sim.calcium import CalciumDynamics
@@ -1129,11 +1310,6 @@ def test_all_additional_channels_coexist():
         assert col in result.dtype.names
     for gate in ("r", "a", "b", "p", "s", "hr", "w", "kir", "q"):
         assert gate in result.dtype.names
-
-
-def test_public_api_exports_inar():
-    """make_inar_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_inar_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -1249,9 +1425,86 @@ def test_current_clamp_im_gating_in_bounds():
     assert result["w"].max() <= 1.0
 
 
-def test_public_api_exports_im():
-    """make_im_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_im_channel")
+# ---------------------------------------------------------------------------
+# I_K_ATP rate functions (kATP gate; voltage-driven proxy for the
+# metabolically gated Kir6.x channel; #324)
+# ---------------------------------------------------------------------------
+
+
+def _kATP_inf(V: float) -> float:
+    """Steady-state K_ATP activation at voltage V."""
+    a, b = _alpha_kATP(V, 0.0), _beta_kATP(V, 0.0)
+    return a / (a + b)
+
+
+def test_katp_steady_state_in_bounds():
+    """The kATP rates are positive and steady state in [0, 1] across V."""
+    for V in np.linspace(-120.0, 30.0, 50):
+        a = _alpha_kATP(V, 0.0)
+        b = _beta_kATP(V, 0.0)
+        assert a >= 0, f"alpha_kATP negative at V={V}"
+        assert b >= 0, f"beta_kATP negative at V={V}"
+        ss = a / (a + b)
+        assert 0.0 <= ss <= 1.0, f"kATP steady state {ss} out of [0,1] at V={V}"
+
+
+def test_katp_increases_with_depolarisation():
+    """The kATP activation rises monotonically with depolarisation."""
+    assert _kATP_inf(-65.0) < _kATP_inf(-25.0) < _kATP_inf(0.0)
+
+
+def test_katp_half_voltage():
+    """V½ for kATP sits at -25 mV (Hahn & McIntyre 2010 fit)."""
+    assert _kATP_inf(-25.0) == pytest.approx(0.5, abs=0.01)
+
+
+def test_katp_subthreshold_closed():
+    """Subthreshold kATP availability is near zero so rest is uncorrupted."""
+    # Autonomous tonic firing cycles around -60 mV; kATP must stay closed
+    # at and below the autonomous threshold so background firing is not
+    # silenced by an unwanted outward K+ leak.
+    assert _kATP_inf(-65.0) < 0.02
+
+
+def test_katp_plateau_open():
+    """At the depol-block plateau kATP opens strongly to provide block escape."""
+    # The plateau sits ≈ −15 mV; kATP must open enough there to dominate
+    # the residual fast-Na inward drive.
+    assert _kATP_inf(-15.0) > 0.7
+
+
+def test_katp_tau_is_slow():
+    """The τ_kATP at V½ stays distinctly slow vs spike kinetics."""
+    a, b = _alpha_kATP(-25.0, 0.0), _beta_kATP(-25.0, 0.0)
+    tau = 1.0 / (a + b)
+    assert tau > 200.0, f"kATP tau at V½ is {tau:.1f} ms, expected > 200 ms"
+
+
+# ---------------------------------------------------------------------------
+# make_katp_channel
+# ---------------------------------------------------------------------------
+
+
+def test_make_katp_channel_defaults():
+    """make_katp_channel() produces a channel with the expected defaults."""
+    from patch_sim.constants import DEFAULT_G_KATP
+
+    ch = make_katp_channel()
+    assert ch.name == "KATP"
+    assert ch.g_max == pytest.approx(DEFAULT_G_KATP)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
+    assert len(ch.gating_variables) == 1
+    assert ch.gating_variables[0].name == "kATP"
+    assert ch.gating_variables[0].power == 1
+
+
+def test_make_katp_channel_custom_params():
+    """make_katp_channel accepts custom g_max."""
+    ch = make_katp_channel(g_max=1.0)
+    assert ch.g_max == pytest.approx(1.0)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.POTASSIUM
 
 
 # ---------------------------------------------------------------------------
@@ -1368,11 +1621,6 @@ def test_current_clamp_ikir_gating_in_bounds():
     assert result["kir"].max() <= 1.0
 
 
-def test_public_api_exports_ikir():
-    """make_ikir_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_ikir_channel")
-
-
 # ---------------------------------------------------------------------------
 # Calcium-sensitive gating variable infrastructure
 # ---------------------------------------------------------------------------
@@ -1447,11 +1695,6 @@ def test_existing_channels_unaffected_by_calcium_gating_infra():
     assert result["r"].max() <= 1.0
 
 
-def test_calcium_gating_variable_exported():
-    """GatingVariable is in the patch_sim public API."""
-    assert hasattr(patch_sim, "GatingVariable")
-
-
 # ---------------------------------------------------------------------------
 # I_KCa rate functions
 # ---------------------------------------------------------------------------
@@ -1471,7 +1714,7 @@ def test_ikca_gating_steady_state_in_bounds():
 
 def test_ikca_activation_increases_with_calcium():
     """IKCa q_inf is higher at higher [Ca²⁺]ᵢ at a fixed voltage."""
-    from patch_sim.additional_channels import _ikca_q_inf
+    from patch_sim.channels.auxiliary import _ikca_q_inf
 
     V = -20.0
     assert _ikca_q_inf(V, 1e-2) > _ikca_q_inf(V, 1e-3) > _ikca_q_inf(V, 1e-4)
@@ -1479,7 +1722,7 @@ def test_ikca_activation_increases_with_calcium():
 
 def test_ikca_activation_increases_with_depolarisation():
     """IKCa q_inf is higher at depolarised voltages at fixed [Ca²⁺]ᵢ."""
-    from patch_sim.additional_channels import _ikca_q_inf
+    from patch_sim.channels.auxiliary import _ikca_q_inf
 
     ca = 1e-3
     assert _ikca_q_inf(20.0, ca) > _ikca_q_inf(-20.0, ca) > _ikca_q_inf(-80.0, ca)
@@ -1487,7 +1730,7 @@ def test_ikca_activation_increases_with_depolarisation():
 
 def test_ikca_zero_calcium_gives_zero_activation():
     """IKCa q_inf is zero when [Ca²⁺]ᵢ is zero, regardless of voltage."""
-    from patch_sim.additional_channels import _ikca_q_inf
+    from patch_sim.channels.auxiliary import _ikca_q_inf
 
     for V in np.linspace(-120.0, 60.0, 10):
         assert _ikca_q_inf(V, 0.0) == 0.0, f"q_inf non-zero at V={V} with ca=0"
@@ -1578,11 +1821,6 @@ def test_current_clamp_ikca_gating_in_bounds():
     result = simulate_current_clamp(neuron, stim)
     assert result["q"].min() >= 0.0
     assert result["q"].max() <= 1.0
-
-
-def test_public_api_exports_ikca():
-    """make_ikca_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_ikca_channel")
 
 
 # ---------------------------------------------------------------------------
@@ -1697,11 +1935,6 @@ def test_voltage_clamp_with_ical_extra_columns():
     assert "f" in result.dtype.names
 
 
-def test_public_api_exports_ical():
-    """make_ical_channel is exported from patch_sim."""
-    assert hasattr(patch_sim, "make_ical_channel")
-
-
 # ---------------------------------------------------------------------------
 # ICaT — T-type Ca²⁺ channel
 # ---------------------------------------------------------------------------
@@ -1814,9 +2047,86 @@ def test_voltage_clamp_with_icat_extra_columns():
     assert "ft" in result.dtype.names
 
 
-def test_public_api_exports_icat():
-    """make_icat_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_icat_channel")
+def test_make_trn_icat_channel_defaults():
+    """make_trn_icat_channel() produces a channel with the expected defaults."""
+    from patch_sim.constants import DEFAULT_G_ICAT
+
+    ch = make_trn_icat_channel()
+    assert ch.name == "CaT"
+    assert ch.g_max == pytest.approx(DEFAULT_G_ICAT)
+    assert isinstance(ch.reversal_spec, NernstSpec)
+    assert ch.reversal_spec.species is IonSpecies.CALCIUM
+    assert len(ch.gating_variables) == 2
+    assert ch.gating_variables[0].name == "dt"
+    assert ch.gating_variables[0].power == 2
+    assert ch.gating_variables[1].name == "ft"
+    assert ch.gating_variables[1].power == 1
+    assert ch.carries_calcium
+
+
+def _trn_icat_ft_inf_at(V: float) -> float:
+    """Compute the TRN ICaT ft_inf at voltage V from the channel rate functions.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Steady-state inactivation probability ft_inf = alpha / (alpha + beta).
+    """
+    ch = make_trn_icat_channel()
+    ft_var = next(gv for gv in ch.gating_variables if gv.name == "ft")
+    alpha = ft_var.alpha(V, 0.0)
+    beta = ft_var.beta(V, 0.0)
+    return alpha / (alpha + beta)
+
+
+def _trn_icat_tau_ft_at(V: float) -> float:
+    """Compute the TRN ICaT tau_ft at voltage V from the channel rate functions.
+
+    Args:
+        V: Membrane voltage in mV.
+
+    Returns:
+        Time constant tau_ft = 1 / (alpha + beta) in ms.
+    """
+    ch = make_trn_icat_channel()
+    ft_var = next(gv for gv in ch.gating_variables if gv.name == "ft")
+    alpha = ft_var.alpha(V, 0.0)
+    beta = ft_var.beta(V, 0.0)
+    return 1.0 / (alpha + beta)
+
+
+def test_trn_icat_ft_inf_matches_destexhe_at_key_voltages():
+    """TRN ICaT ft_inf preserves the Destexhe (1994) shape (half=-80, slope=-9).
+
+    The TRN factory changes only tau_ft; ft_inf is bit-identical to the
+    global ICaT default to keep ft_inf-at-rest invariants for the TRN preset
+    (issue #295).
+    """
+    assert _trn_icat_ft_inf_at(-80.0) == pytest.approx(0.50, abs=0.02)
+    assert _trn_icat_ft_inf_at(-90.0) == pytest.approx(0.75, abs=0.02)
+    assert _trn_icat_ft_inf_at(-60.0) == pytest.approx(0.10, abs=0.02)
+
+
+def test_trn_icat_tau_ft_is_sigmoid_in_voltage():
+    """TRN ICaT tau_ft increases monotonically from ~20 ms to ~200 ms.
+
+    Sigmoid-shaped tau is the core invariant that distinguishes the TRN
+    factory from the cosh-shaped Destexhe (1994) default: small at
+    hyperpolarised V (rest stability) and large at LTS-plateau V (sustained
+    plateau for 5–15 Na⁺ spikes per Huguenard & Prince 1992).
+    """
+    tau_at_minus_90 = _trn_icat_tau_ft_at(-90.0)
+    tau_at_0 = _trn_icat_tau_ft_at(0.0)
+    assert tau_at_minus_90 == pytest.approx(20.0, abs=2.0)
+    assert tau_at_0 == pytest.approx(200.0, abs=2.0)
+
+    voltages = np.linspace(-90.0, 0.0, 19)
+    taus = np.array([_trn_icat_tau_ft_at(float(v)) for v in voltages])
+    assert np.all(np.diff(taus) > 0.0), (
+        f"tau_ft must be strictly increasing in V across [-90, 0] mV; "
+        f"got non-monotonic samples taus={taus}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1929,8 +2239,3 @@ def test_voltage_clamp_with_ican_extra_columns():
     assert "ICaN" in result.dtype.names
     assert "dn" in result.dtype.names
     assert "fn" in result.dtype.names
-
-
-def test_public_api_exports_ican():
-    """make_ican_channel is exported from the patch_sim public API."""
-    assert hasattr(patch_sim, "make_ican_channel")

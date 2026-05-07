@@ -26,6 +26,10 @@ class AnalysisState(rx.State):
     ca_transient_metrics: list[dict[str, Any]] = []
     # Aggregate calcium-transient summary statistics (em-dash for None).
     ca_transient_summary: dict[str, Any] = {}
+    # Per-burst metrics (serialized).
+    burst_metrics: list[dict[str, Any]] = []
+    # Aggregate burst summary statistics (em-dash for None).
+    burst_summary: dict[str, Any] = {}
     fi_data: dict[str, Any] = {}  # Serialized FIAnalysisResult for the UI
     iv_data: dict[str, Any] = {}  # Serialized IVAnalysisResult for the UI
     gv_data: dict[str, Any] = {}  # Serialized GVAnalysisResult for the UI
@@ -36,9 +40,12 @@ class AnalysisState(rx.State):
 
     # Membrane test results — persisted across protocol/simulation changes.
     # Only invalidated when neuron parameters change (neuron_fingerprint mismatch).
-    mt_input_resistance: str = ""  # R_in formatted as string (kΩ·cm²)
+    mt_input_resistance: str = ""  # R_in formatted as string (mode-aware)
     mt_time_constant: str = ""  # τ_m formatted as string (ms)
-    mt_membrane_capacitance: str = ""  # C_m formatted as string (µF/cm²)
+    mt_membrane_capacitance: str = ""  # C_m formatted as string (mode-aware)
+    mt_r_units: str = "kΩ·cm²"  # units suffix for mt_input_resistance
+    mt_c_units: str = "µF/cm²"  # units suffix for mt_membrane_capacitance
+    mt_units_mode: str = "density"  # "density" or "absolute"
     mt_neuron_fingerprint: str = ""  # fingerprint used to detect stale cache
     mt_fit_converged: bool = True  # False when exponential fit did not converge
 
@@ -53,6 +60,8 @@ class AnalysisState(rx.State):
         self.ap_is_multi_sweep = False
         self.ca_transient_metrics = []
         self.ca_transient_summary = {}
+        self.burst_metrics = []
+        self.burst_summary = {}
         self.fi_data = {}
         self.iv_data = {}
         self.gv_data = {}
@@ -80,6 +89,18 @@ class AnalysisState(rx.State):
     def has_ca_transient_metrics(self) -> bool:
         """Return True when calcium-transient analysis results are available."""
         return len(self.ca_transient_metrics) > 0
+
+    @rx.var
+    def has_burst_summary(self) -> bool:
+        """Return True when a burst-analysis summary is available for display.
+
+        The summary is emitted whenever the spike train was long enough to
+        run the burst analyser (≥1 spike) — even a zero-burst result still
+        carries the threshold and method, so the UI can show that the
+        analysis ran.  ``burst_metrics`` is a separate list (one entry per
+        detected burst) and is empty when ``burst_count == 0``.
+        """
+        return len(self.burst_summary) > 0
 
     @rx.var
     def has_ap_or_fi(self) -> bool:

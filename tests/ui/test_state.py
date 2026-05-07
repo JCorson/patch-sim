@@ -24,13 +24,17 @@ pytest.importorskip("reflex")
 from patch_sim import NEURON_PRESETS  # noqa: E402
 from patch_sim.constants import (
     ACTION_POTENTIAL,
+    CA1_PYRAMIDAL,
     CORTICAL_PYRAMIDAL,
     DOPAMINERGIC,
     FAST_SPIKING_INTERNEURON,
+    HYPERPOLARIZATION_STEPS,
     PURKINJE,
     REPETITIVE_FIRING,
     SQUID_GIANT_AXON,
+    STN,
     THALAMIC_RELAY,
+    TRN,
 )
 from patch_sim_ui import constants  # noqa: E402
 from patch_sim_ui.log_handler import UILogRecord  # noqa: E402
@@ -395,12 +399,21 @@ async def test_load_neuron_preset_purkinje_cell() -> None:
 
 
 async def test_load_neuron_preset_dopaminergic_neuron() -> None:
-    """load_neuron_preset enables Ih and IM channels for Dopaminergic Neuron."""
+    """load_neuron_preset enables the SNc DA pacemaker channel set.
+
+    The Putzier+Drion minimal SNc DA preset uses Cav1.3, SK, INaP and Ih.
+    IM and Mainen-Sejnowski Kv are not characteristic of SNc DA neurons and
+    are not enabled by this preset.
+    """
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
     assert ns.ih_enabled is True
-    assert ns.im_enabled is True
+    assert ns.cav13_enabled is True
+    assert ns.sk_enabled is True
+    assert ns.inap_enabled is True
+    assert ns.im_enabled is False
+    assert ns.mskv_enabled is False
 
 
 async def test_load_neuron_preset_thalamic_relay() -> None:
@@ -410,6 +423,125 @@ async def test_load_neuron_preset_thalamic_relay() -> None:
         [_ async for _ in ns.load_neuron_preset(THALAMIC_RELAY)]
     assert ns.icat_enabled is True
     assert ns.ih_enabled is True
+
+
+# ---------------------------------------------------------------------------
+# _build_neuron forwards preset.calcium_dynamics
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "preset_name",
+    [TRN, THALAMIC_RELAY, STN, PURKINJE, CA1_PYRAMIDAL],
+)
+async def test_build_neuron_forwards_preset_calcium_dynamics(preset_name: str) -> None:
+    """_build_neuron must propagate the preset's CalciumDynamics to the Neuron.
+
+    Without this, every preset would silently use NeuronConfig's default
+    auto-instantiated CalciumDynamics (alpha_ca=1e-4, tau_ca=200 ms),
+    masking each preset's tuned values.  For TRN this collapses the HP92
+    rebound burst (preset wants alpha_ca=1.2e-5 / tau_ca=20 ms — 8.3× and
+    10× different from defaults).  This test asserts the bug class is
+    fixed at the build-neuron level rather than only verifying the
+    downstream simulation behaviour.
+
+    Args:
+        preset_name: Name of a preset that overrides calcium_dynamics.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(preset_name)]
+    neuron = ns._build_neuron()
+
+    expected = NEURON_PRESETS[preset_name].calcium_dynamics
+    assert expected is not None, (
+        f"Test fixture mismatch: {preset_name} preset must have "
+        f"calcium_dynamics set for this regression test to apply"
+    )
+    actual = neuron.calcium_dynamics
+    assert actual is not None, (
+        f"{preset_name}: built neuron has no calcium_dynamics — "
+        f"_build_neuron is dropping the preset's tuned values."
+    )
+    assert actual.alpha_ca == pytest.approx(expected.alpha_ca), (
+        f"{preset_name}: built neuron alpha_ca={actual.alpha_ca} but "
+        f"preset alpha_ca={expected.alpha_ca}"
+    )
+    assert actual.tau_ca == pytest.approx(expected.tau_ca), (
+        f"{preset_name}: built neuron tau_ca={actual.tau_ca} but "
+        f"preset tau_ca={expected.tau_ca}"
+    )
+
+
+async def test_trn_hyperpolarization_burst_via_ui_build_neuron() -> None:
+    """End-to-end TRN HP92 rebound burst exercised via the UI's _build_neuron path.
+
+    Loads the TRN preset into a NeuronState, builds a neuron via the UI's
+    own ``_build_neuron`` method (the same code the live Reflex app uses
+    when the user clicks Run), then runs the HYPERPOLARIZATION_STEPS
+    protocol via :func:`simulate_batch` and asserts each deeper sweep
+    (-3 to -5 µA/cm²) produces a 5+ spike rebound burst at 200–600 Hz.
+
+    This covers the regression discovered when the user reported only ~2
+    visible spikes per sweep in the UI: the previous version of
+    ``_build_neuron`` silently dropped the preset's calcium_dynamics and
+    used the auto-instantiated default (alpha_ca=1e-4, tau_ca=200 ms),
+    which collapsed the burst after the first spike.  An assertion-only
+    fix in the simulation domain is insufficient — the UI build path must
+    be exercised end-to-end.
+    """
+    import patch_sim
+    from patch_sim.clamp_simulations import simulate_batch, simulate_current_clamp
+    from patch_sim.presets import build_protocol_from_preset
+
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(TRN)]
+    neuron = ns._build_neuron()
+
+    # Sanity: assert the preset's tuned calcium dynamics survived the
+    # build-neuron step (this is what the parametrised regression test
+    # above exercises in isolation).
+    assert neuron.calcium_dynamics is not None
+    assert neuron.calcium_dynamics.alpha_ca == pytest.approx(1.2e-5)
+    assert neuron.calcium_dynamics.tau_ca == pytest.approx(20.0)
+
+    # Run the multi-sweep protocol via simulate_batch (the same call site
+    # the UI uses for multi-sweep current-clamp runs).
+    protocol = build_protocol_from_preset(HYPERPOLARIZATION_STEPS, neuron_preset=TRN)
+    results = list(
+        simulate_batch(neuron, [sweep for sweep in protocol], simulate_current_clamp)
+    )
+
+    # The deeper sweeps (indices 0, 1, 2 — currents -5, -4, -3 µA/cm²)
+    # must each produce a 5–15 spike, 200–600 Hz rebound burst.
+    for sweep_idx in (0, 1, 2):
+        result = results[sweep_idx]
+        time_arr = np.asarray(result["time"])
+        v_arr = np.asarray(result["voltage"])
+        ap_result = patch_sim.analyze_aps(time_arr, v_arr)
+        analysis = patch_sim.analyze_bursts(
+            ap_result, total_duration_ms=float(time_arr[-1] - time_arr[0])
+        )
+
+        assert analysis.burst_count >= 1, (
+            f"UI-build-path sweep {sweep_idx}: expected ≥1 LTS rebound "
+            f"burst, got burst_count={analysis.burst_count}, "
+            f"total APs={ap_result.spike_count}.  This regression points "
+            f"at _build_neuron — most likely a preset attribute "
+            f"(calcium_dynamics, channel factory, etc.) is not being "
+            f"propagated to the built Neuron."
+        )
+        burst = analysis.bursts[0]
+        assert 5 <= burst.spike_count <= 15, (
+            f"UI-build-path sweep {sweep_idx}: expected 5–15 spikes "
+            f"(Huguenard & Prince 1992), got {burst.spike_count}"
+        )
+        assert burst.intra_burst_frequency is not None
+        assert 200.0 <= burst.intra_burst_frequency <= 600.0, (
+            f"UI-build-path sweep {sweep_idx}: expected 200–600 Hz "
+            f"intra-burst, got {burst.intra_burst_frequency:.1f} Hz"
+        )
 
 
 async def test_load_neuron_preset_unknown_name_is_ignored() -> None:
@@ -528,7 +660,7 @@ async def test_protocol_preset_with_no_adjustment_entry_uses_base_params() -> No
 
 
 async def test_protocol_preset_dopaminergic_repetitive_firing_long_duration() -> None:
-    """Dopaminergic Neuron + Repetitive Firing sets stimulus_duration to 480 ms."""
+    """Dopaminergic Neuron + Repetitive Firing sets stimulus_duration to 3000 ms."""
     ps = _make_protocol_state()
     mock_neuron = MagicMock()
     mock_neuron.active_neuron_type = DOPAMINERGIC
@@ -536,7 +668,7 @@ async def test_protocol_preset_dopaminergic_repetitive_firing_long_duration() ->
         ProtocolState, "get_state", new=_make_get_state_fn({NeuronState: mock_neuron})
     ):
         [_ async for _ in ps.load_protocol_preset(REPETITIVE_FIRING)]
-    assert ps.stimulus_duration == pytest.approx(480.0)
+    assert ps.stimulus_duration == pytest.approx(3000.0)
 
 
 # ---------------------------------------------------------------------------
@@ -1079,9 +1211,11 @@ async def test_load_neuron_preset_reapplies_active_protocol_overrides() -> None:
     """Switching neuron type re-applies the active protocol preset with new overrides.
 
     Load 'Repetitive Firing' (Squid defaults: duration=180 ms), then switch to
-    SNc Dopaminergic which has a longer 480 ms duration override and lower
-    2.0 µA/cm² stimulus (Canavier/Komendantov threshold is ~1 µA/cm²).
-    The protocol params should update automatically.
+    SNc Dopaminergic which has a longer 3000 ms duration override and lower
+    0.3 µA/cm² stimulus (post-#318 review the cell is a Cav1.3+SK tonic
+    pacemaker; ≳1 µA/cm² drives depolarisation block, mid-range drive can
+    produce abortive doublets).  The protocol params should update
+    automatically.
     """
     ns = _make_neuron_state()
     ps = _make_protocol_state()
@@ -1094,8 +1228,8 @@ async def test_load_neuron_preset_reapplies_active_protocol_overrides() -> None:
         new=_make_get_state_fn({ProtocolState: ps, SimulationState: sim_st}),
     ):
         [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
-    assert ps.stimulus_duration == pytest.approx(480.0)
-    assert ps.min_stimulus == pytest.approx(2.0)
+    assert ps.stimulus_duration == pytest.approx(3000.0)
+    assert ps.min_stimulus == pytest.approx(0.3)
 
 
 async def test_load_neuron_preset_no_active_protocol_skips_override() -> None:
@@ -1367,6 +1501,8 @@ def _prime_analysis(an_st: AnalysisState) -> None:
     an_st.ap_is_multi_sweep = True
     an_st.ca_transient_metrics = [{"peak_concentration": "1.0"}]
     an_st.ca_transient_summary = {"transient_count": "1"}
+    an_st.burst_metrics = [{"start_time": "10.0"}]
+    an_st.burst_summary = {"burst_count": "1"}
     an_st.fi_data = {"current_steps": [0.1]}
     an_st.iv_data = {"voltage_steps": [-70.0]}
     an_st.gv_data = {"conductance": [0.5]}
@@ -1387,6 +1523,8 @@ def _assert_analysis_cleared(an_st: AnalysisState) -> None:
     assert an_st.ap_is_multi_sweep is False
     assert an_st.ca_transient_metrics == []
     assert an_st.ca_transient_summary == {}
+    assert an_st.burst_metrics == []
+    assert an_st.burst_summary == {}
     assert an_st.fi_data == {}
     assert an_st.iv_data == {}
     assert an_st.gv_data == {}
@@ -1513,3 +1651,418 @@ def test_analysis_state_clear_results_resets_simulation_fields() -> None:
     _assert_analysis_cleared(an_st)
     assert an_st.mt_input_resistance == "50 kΩ·cm²"
     assert an_st.mt_neuron_fingerprint == "xyz"
+
+
+# ---------------------------------------------------------------------------
+# Cell-area metadata flowing through NeuronState (#222)
+# ---------------------------------------------------------------------------
+
+
+def test_build_neuron_carries_area_for_cortical_pyramidal() -> None:
+    """A built Neuron carries the cortical pyramidal preset's area_cm2."""
+    ns = _make_neuron_state()
+    ns.active_neuron_type = CORTICAL_PYRAMIDAL
+    neuron = ns._build_neuron()
+    assert neuron.area_cm2 == pytest.approx(20e-6)
+
+
+def test_build_neuron_has_no_area_for_squid() -> None:
+    """The squid preset has no area_cm2 — built Neuron exposes ``None``."""
+    ns = _make_neuron_state()
+    ns.active_neuron_type = SQUID_GIANT_AXON
+    neuron = ns._build_neuron()
+    assert neuron.area_cm2 is None
+
+
+# ---------------------------------------------------------------------------
+# _build_neuron preserves slow-inactivation gates from preset factories
+# ---------------------------------------------------------------------------
+
+
+async def test_build_neuron_preserves_inap_slow_inactivation_for_stn() -> None:
+    """STN _build_neuron preserves the INaP sNaP slow inactivation gate (#324).
+
+    Regression: previously _build_neuron rebuilt channels from
+    CHANNEL_REGISTRY in a way that silently disabled INaP slow
+    inactivation in the UI.  Visible consequence: STN at +5 µA/cm² ×
+    200 ms exits the deepest depol block but settles into a damped
+    quasi-plateau around −30 mV instead of autonomous tonic firing.
+    Now that make_inap_channel always emits the sNaP gate, the
+    round-trip preserves it by construction; this test pins that
+    contract.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(STN)]
+    neuron = ns._build_neuron()
+
+    inap = next((ch for ch in neuron.additional_channels if ch.name == "NaP"), None)
+    assert inap is not None, "STN preset must include INaP channel"
+    gate_names = {g.name for g in inap.gating_variables}
+    assert "sNaP" in gate_names, (
+        f"INaP slow-inactivation gate sNaP missing from UI-built STN neuron; "
+        f"gates present: {sorted(gate_names)}.  Either make_inap_channel "
+        f"stopped emitting sNaP, or _build_neuron is overriding the preset's "
+        f"INaP factory."
+    )
+
+
+async def test_stn_recovers_from_depol_block_via_ui_build_neuron() -> None:
+    """End-to-end #324 regression via UI _build_neuron path.
+
+    Loads the STN preset into a NeuronState (the path the live Reflex app
+    uses on Run), builds the neuron through ``_build_neuron``, drives
+    +5 µA/cm² × 200 ms and asserts the membrane resumes autonomous tonic
+    firing during the post-stim window (max V > 0 mV — APs present, mean V
+    < −40 mV — not stuck on a quasi-plateau).
+
+    Without this test, an integration test that bypasses _build_neuron
+    happily passes while the live UI silently loses sNaP and stalls
+    around −30 mV.
+    """
+    from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(STN)]
+    neuron = ns._build_neuron()
+
+    def n_samples(ms: float) -> int:
+        """Convert ms to simulation samples."""
+        return int(ms * SIM_SAMPLING_FREQ / 1000.0)
+
+    current = np.concatenate(
+        [
+            np.zeros(n_samples(10.0)),
+            np.full(n_samples(200.0), 5.0),
+            np.zeros(n_samples(700.0) + 1),
+        ]
+    )
+    result = simulate_current_clamp(neuron, current_external=current)
+    post = np.asarray(result["voltage"][n_samples(10.0) + n_samples(200.0) :])
+    last_200ms = post[-n_samples(200.0) :]
+
+    assert post.max() > 0.0, (
+        f"STN failed to fire post-stim via UI build path: post-stim max V "
+        f"= {post.max():.2f} mV (expected APs > 0 mV)"
+    )
+    assert last_200ms.mean() < -40.0, (
+        f"STN settled on quasi-plateau via UI build path: mean V last 200 ms "
+        f"= {last_200ms.mean():.2f} mV (expected < −40 mV for autonomous firing)"
+    )
+
+
+async def test_build_neuron_preserves_inap_slow_inactivation_for_cp() -> None:
+    """Cortical pyramidal _build_neuron preserves INaP slow inactivation (#327).
+
+    Mirror of the STN regression for cortical pyramidal: ``_build_neuron``
+    must forward the preset's INaP factory so that the sNaP gate added in
+    #327 round-trips through the UI build path.  make_inap_channel now
+    always emits the sNaP gate; this test pins that the round-trip
+    preserves it.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
+    neuron = ns._build_neuron()
+
+    inap = next((ch for ch in neuron.additional_channels if ch.name == "NaP"), None)
+    assert inap is not None, "Cortical pyramidal preset must include INaP channel"
+    gate_names = {g.name for g in inap.gating_variables}
+    assert "sNaP" in gate_names, (
+        f"INaP slow-inactivation gate sNaP missing from UI-built cortical "
+        f"pyramidal neuron; gates present: {sorted(gate_names)}.  Either "
+        f"make_inap_channel stopped emitting sNaP, or _build_neuron is "
+        f"overriding the preset's INaP factory."
+    )
+
+
+async def test_build_neuron_preserves_nav12_sNa_for_cortical_pyramidal() -> None:
+    """Cortical pyramidal _build_neuron preserves the Nav1.2 sNa12 gate (#327).
+
+    ``_build_neuron`` forwards ``preset_cfg.na_channel_factory`` directly,
+    so ``make_nav12_channel`` must round-trip and yield a 3-gate Na channel
+    including the sNa12 slow inactivation gate.  Without this, the cortical
+    pyramidal cell would lose the fast-Na slow-inactivation gate via the
+    UI path even though the preset itself wires it on.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
+    neuron = ns._build_neuron()
+
+    na = next((ch for ch in neuron.core_channels if ch.name == "Na"), None)
+    assert na is not None, "Cortical pyramidal preset must include core Na channel"
+    gate_names = {g.name for g in na.gating_variables}
+    assert "sNa12" in gate_names, (
+        f"Nav1.2 sNa12 gate missing from UI-built cortical pyramidal "
+        f"neuron; gates present: {sorted(gate_names)}.  _build_neuron is "
+        f"not forwarding the make_nav12_channel factory."
+    )
+
+
+async def test_cp_recovers_from_depol_block_via_ui_build_neuron() -> None:
+    """End-to-end #327 regression via UI _build_neuron path.
+
+    Loads the cortical pyramidal preset into a NeuronState (the path the
+    live Reflex app uses on Run), builds the neuron through
+    ``_build_neuron``, drives +12 µA/cm² × 200 ms and asserts the
+    membrane settles below −50 mV in the last 200 ms of a 700 ms post-stim
+    epoch.
+
+    Without this test, an integration test that bypasses _build_neuron
+    happily passes while the live UI silently loses sNa or sNaP.
+    """
+    from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
+    neuron = ns._build_neuron()
+
+    def n_samples(ms: float) -> int:
+        """Convert ms to simulation samples."""
+        return int(ms * SIM_SAMPLING_FREQ / 1000.0)
+
+    current = np.concatenate(
+        [
+            np.zeros(n_samples(100.0)),
+            np.full(n_samples(200.0), 12.0),
+            np.zeros(n_samples(700.0) + 1),
+        ]
+    )
+    result = simulate_current_clamp(neuron, current_external=current)
+    last_200ms = np.asarray(result["voltage"][-n_samples(200.0) :])
+    assert last_200ms.mean() < -50.0, (
+        f"Cortical pyramidal failed to recover via UI build path: mean V "
+        f"last 200 ms = {last_200ms.mean():.2f} mV (expected < −50 mV)"
+    )
+
+
+async def test_build_neuron_preserves_inap_slow_inactivation_for_ca1() -> None:
+    """CA1 pyramidal _build_neuron preserves INaP slow inactivation (#328).
+
+    Mirror of the cortical pyramidal regression for CA1: ``_build_neuron``
+    must forward the preset's INaP factory so that the sNaP gate added in
+    #328 round-trips through the UI build path.  make_inap_channel now
+    always emits the sNaP gate; this test pins that the round-trip
+    preserves it.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(CA1_PYRAMIDAL)]
+    neuron = ns._build_neuron()
+
+    inap = next((ch for ch in neuron.additional_channels if ch.name == "NaP"), None)
+    assert inap is not None, "CA1 pyramidal preset must include INaP channel"
+    gate_names = {g.name for g in inap.gating_variables}
+    assert "sNaP" in gate_names, (
+        f"INaP slow-inactivation gate sNaP missing from UI-built CA1 "
+        f"pyramidal neuron; gates present: {sorted(gate_names)}.  Either "
+        f"make_inap_channel stopped emitting sNaP, or _build_neuron is "
+        f"overriding the preset's INaP factory."
+    )
+
+
+async def test_build_neuron_preserves_nav12_sNa_for_ca1() -> None:
+    """CA1 pyramidal _build_neuron preserves the Nav1.2 sNa12 gate (#328).
+
+    ``_build_neuron`` forwards ``preset_cfg.na_channel_factory`` directly,
+    so ``make_nav12_channel`` must round-trip and yield a 3-gate Na channel
+    including the sNa12 slow inactivation gate.  Without this, the CA1
+    pyramidal cell would lose the fast-Na slow-inactivation gate via the
+    UI path even though the preset itself wires it on.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(CA1_PYRAMIDAL)]
+    neuron = ns._build_neuron()
+
+    na = next((ch for ch in neuron.core_channels if ch.name == "Na"), None)
+    assert na is not None, "CA1 pyramidal preset must include core Na channel"
+    gate_names = {g.name for g in na.gating_variables}
+    assert "sNa12" in gate_names, (
+        f"Nav1.2 sNa12 gate missing from UI-built CA1 pyramidal neuron; "
+        f"gates present: {sorted(gate_names)}.  _build_neuron is not "
+        f"forwarding the make_nav12_channel factory."
+    )
+
+
+async def test_ca1_recovers_from_depol_block_via_ui_build_neuron() -> None:
+    """End-to-end #328 regression via UI _build_neuron path.
+
+    Loads the CA1 pyramidal preset into a NeuronState (the path the
+    live Reflex app uses on Run), builds the neuron through
+    ``_build_neuron``, drives +30 µA/cm² × 200 ms and asserts the
+    membrane settles below −50 mV in the last 200 ms of a 700 ms post-stim
+    epoch.
+
+    Without this test, an integration test that bypasses _build_neuron
+    happily passes while the live UI silently loses sNa or sNaP.
+    """
+    from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(CA1_PYRAMIDAL)]
+    neuron = ns._build_neuron()
+
+    def n_samples(ms: float) -> int:
+        """Convert ms to simulation samples."""
+        return int(ms * SIM_SAMPLING_FREQ / 1000.0)
+
+    current = np.concatenate(
+        [
+            np.zeros(n_samples(100.0)),
+            np.full(n_samples(200.0), 30.0),
+            np.zeros(n_samples(700.0) + 1),
+        ]
+    )
+    result = simulate_current_clamp(neuron, current_external=current)
+    last_200ms = np.asarray(result["voltage"][-n_samples(200.0) :])
+    assert last_200ms.mean() < -50.0, (
+        f"CA1 pyramidal failed to recover via UI build path: mean V "
+        f"last 200 ms = {last_200ms.mean():.2f} mV (expected < −50 mV)"
+    )
+
+
+async def test_build_neuron_preserves_inap_slow_inactivation_for_purkinje() -> None:
+    """Purkinje _build_neuron preserves INaP slow inactivation (#329).
+
+    Mirror of the cortical pyramidal / CA1 regression for Purkinje:
+    ``_build_neuron`` must forward the preset's INaP factory so that the
+    sNaP gate added in #329 round-trips through the UI build path.
+    make_inap_channel now always emits the sNaP gate; this test pins
+    that the round-trip preserves it.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(PURKINJE)]
+    neuron = ns._build_neuron()
+
+    inap = next((ch for ch in neuron.additional_channels if ch.name == "NaP"), None)
+    assert inap is not None, "Purkinje preset must include INaP channel"
+    gate_names = {g.name for g in inap.gating_variables}
+    assert "sNaP" in gate_names, (
+        f"INaP slow-inactivation gate sNaP missing from UI-built Purkinje "
+        f"neuron; gates present: {sorted(gate_names)}.  Either "
+        f"make_inap_channel stopped emitting sNaP, or _build_neuron is "
+        f"overriding the preset's INaP factory."
+    )
+
+
+async def test_build_neuron_preserves_purkinje_sNa_for_purkinje() -> None:
+    """Purkinje _build_neuron preserves the always-on Purkinje-Na sNa gate (#329).
+
+    ``_build_neuron`` forwards ``preset_cfg.na_channel_factory`` directly,
+    so ``make_purkinje_na_channel`` must round-trip and yield a 3-gate
+    Na channel including the Carter & Bean 2009 sNa slow inactivation
+    gate.  This pins the channel-factory contract: a regression that
+    dropped sNa from the factory itself would silently lose depol-block
+    recovery via the UI path.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(PURKINJE)]
+    neuron = ns._build_neuron()
+
+    na = next((ch for ch in neuron.core_channels if ch.name == "Na"), None)
+    assert na is not None, "Purkinje preset must include core Na channel"
+    gate_names = {g.name for g in na.gating_variables}
+    assert "sNa" in gate_names, (
+        f"Purkinje sNa gate missing from UI-built Purkinje neuron; "
+        f"gates present: {sorted(gate_names)}.  make_purkinje_na_channel "
+        f"is no longer producing the Carter & Bean 2009 slow-inactivation "
+        f"gate."
+    )
+
+
+async def test_purkinje_recovers_from_depol_block_via_ui_build_neuron() -> None:
+    """End-to-end #329 regression via UI _build_neuron path.
+
+    Loads the Purkinje preset into a NeuronState (the path the live
+    Reflex app uses on Run), builds the neuron through ``_build_neuron``,
+    drives +10 µA/cm² × 200 ms and asserts the membrane settles below
+    −50 mV in the last 200 ms of a 700 ms post-stim epoch.
+
+    Without this test, an integration test that bypasses _build_neuron
+    happily passes while the live UI silently loses sNa or sNaP.
+    """
+    from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(PURKINJE)]
+    neuron = ns._build_neuron()
+
+    def n_samples(ms: float) -> int:
+        """Convert ms to simulation samples."""
+        return int(ms * SIM_SAMPLING_FREQ / 1000.0)
+
+    current = np.concatenate(
+        [
+            np.zeros(n_samples(100.0)),
+            np.full(n_samples(200.0), 10.0),
+            np.zeros(n_samples(700.0) + 1),
+        ]
+    )
+    result = simulate_current_clamp(neuron, current_external=current)
+    last_200ms = np.asarray(result["voltage"][-n_samples(200.0) :])
+    assert last_200ms.mean() < -50.0, (
+        f"Purkinje failed to recover via UI build path: mean V "
+        f"last 200 ms = {last_200ms.mean():.2f} mV (expected < −50 mV)"
+    )
+
+
+async def test_build_neuron_preserves_snc_inap_slow_inactivation_for_dopaminergic() -> (
+    None
+):
+    """Dopaminergic _build_neuron preserves the always-on sNaP_snc gate (#330).
+
+    ``_build_neuron`` forwards ``ChannelConfig.factory`` directly, so
+    ``make_snc_inap_channel`` must round-trip and yield a 2-gate INaP_SNc
+    channel including the Khaliq & Bean 2010 / Magistretti & Alonso 1999
+    sNaP_snc slow-inactivation gate.  This pins the channel-factory contract:
+    a regression that dropped sNaP_snc from the factory would silently lose
+    biological accuracy via the UI path.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
+    neuron = ns._build_neuron()
+
+    inap = next((ch for ch in neuron.additional_channels if ch.name == "NaP_SNc"), None)
+    assert inap is not None, "Dopaminergic preset must include INaP_SNc channel"
+    gate_names = {g.name for g in inap.gating_variables}
+    assert "sNaP_snc" in gate_names, (
+        f"INaP_SNc slow-inactivation gate sNaP_snc missing from UI-built "
+        f"dopaminergic neuron; gates present: {sorted(gate_names)}.  "
+        f"make_snc_inap_channel is no longer producing the slow-inactivation "
+        f"gate."
+    )
+
+
+async def test_build_neuron_preserves_dopaminergic_sNa_da_for_dopaminergic() -> None:
+    """Dopaminergic _build_neuron preserves the always-on sNa_da gate (#330).
+
+    ``_build_neuron`` forwards ``preset_cfg.na_channel_factory`` directly,
+    so ``make_dopaminergic_na_channel`` must round-trip and yield a 3-gate
+    Na channel including the Khaliq & Bean 2010 sNa_da slow-inactivation
+    gate.  This pins the channel-factory contract: a regression that
+    dropped sNa_da from the factory would silently lose biological accuracy
+    via the UI path.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
+    neuron = ns._build_neuron()
+
+    na = next((ch for ch in neuron.core_channels if ch.name == "Na"), None)
+    assert na is not None, "Dopaminergic preset must include core Na channel"
+    gate_names = {g.name for g in na.gating_variables}
+    assert "sNa_da" in gate_names, (
+        f"Dopaminergic sNa_da gate missing from UI-built dopaminergic "
+        f"neuron; gates present: {sorted(gate_names)}.  "
+        f"make_dopaminergic_na_channel is no longer producing the Khaliq "
+        f"& Bean 2010 slow-inactivation gate."
+    )

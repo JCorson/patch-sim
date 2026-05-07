@@ -4,8 +4,9 @@ import dataclasses
 
 import pytest
 
-from patch_sim.channels import IonChannel, IonSpecies
-from patch_sim.core_channels import (
+from patch_sim.channels import (
+    IonChannel,
+    IonSpecies,
     make_k_channel,
     make_k_leak_channel,
     make_na_channel,
@@ -70,8 +71,7 @@ def test_all_gating_variables_no_additional(hh_model: Neuron) -> None:
 def test_all_gating_variables_with_additional() -> None:
     """all_gating_variables includes gating vars from additional channels."""
     # Rename the gating variable to avoid name collision with the core K channel
-    from patch_sim.channels import GatingVariable, NernstSpec
-    from patch_sim.core_channels import alpha_n, beta_n
+    from patch_sim.channels import GatingVariable, NernstSpec, alpha_n, beta_n
 
     gv_new = GatingVariable(
         name="kextra_activation", power=4, alpha=alpha_n, beta=beta_n
@@ -435,3 +435,24 @@ def test_non_positive_t_ref_raises(T_ref: float) -> None:
     """Non-positive T_ref must raise ValueError."""
     with pytest.raises(ValueError, match="T_ref"):
         Neuron(T_ref=T_ref)
+
+
+def test_default_area_cm2_is_none() -> None:
+    """A default-constructed Neuron has ``area_cm2 is None``.
+
+    Surface area is optional analysis-layer metadata; the ODE solver does
+    not depend on it.
+    """
+    assert Neuron().area_cm2 is None
+
+
+def test_custom_area_cm2_is_preserved() -> None:
+    """A positive area_cm2 supplied at construction is preserved on the Neuron."""
+    assert Neuron(area_cm2=20e-6).area_cm2 == pytest.approx(20e-6)
+
+
+@pytest.mark.parametrize("area", [0.0, -1e-6])
+def test_non_positive_area_cm2_raises(area: float) -> None:
+    """Non-positive area_cm2 must raise ValueError when explicitly supplied."""
+    with pytest.raises(ValueError, match="area_cm2"):
+        Neuron(area_cm2=area)

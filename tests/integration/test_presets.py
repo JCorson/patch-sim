@@ -9,13 +9,27 @@ import numpy as np
 import pytest
 
 import patch_sim
-from patch_sim.additional_channels import (
+from patch_sim.analysis.membrane_test import run_membrane_test
+from patch_sim.channels import (
+    make_dopaminergic_k_channel,
+    make_dopaminergic_na_channel,
     make_icat_channel,
     make_ih_channel,
+    make_ikca_channel,
     make_inap_channel,
     make_inar_channel,
+    make_mainen_sejnowski_kv_channel,
+    make_nav11_channel,
+    make_nav12_channel,
+    make_pospischil_k_channel,
+    make_purkinje_k_channel,
+    make_purkinje_na_channel,
+    make_thalamic_relay_k_channel,
+    make_thalamic_relay_na_channel,
+    make_trn_icat_channel,
+    make_trn_k_channel,
+    make_trn_na_channel,
 )
-from patch_sim.analysis.membrane_test import run_membrane_test
 from patch_sim.constants import (
     ACTION_POTENTIAL,
     CA1_PYRAMIDAL,
@@ -28,18 +42,6 @@ from patch_sim.constants import (
     STN,
     THALAMIC_RELAY,
     TRN,
-)
-from patch_sim.core_channels import (
-    make_dopaminergic_k_channel,
-    make_dopaminergic_na_channel,
-    make_pospischil_k_channel,
-    make_pospischil_na_channel,
-    make_purkinje_k_channel,
-    make_purkinje_na_channel,
-    make_thalamic_relay_k_channel,
-    make_thalamic_relay_na_channel,
-    make_trn_k_channel,
-    make_trn_na_channel,
 )
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import (
@@ -128,7 +130,7 @@ def _protocol_total_samples(preset_name: str, neuron_name: str | None) -> int:
 def test_neuron_protocol_adjustments_change_stimulus_duration() -> None:
     """Neuron adjustments that change stimulus_duration produce a different length.
 
-    The SNc Dopaminergic Neuron adjusts Repetitive Firing from 180 ms to 480 ms —
+    The SNc Dopaminergic Neuron adjusts Repetitive Firing from 180 ms to 3000 ms —
     the longer duration must result in a longer stimulus array.
     """
     base_samples = _protocol_total_samples(REPETITIVE_FIRING, None)
@@ -171,7 +173,7 @@ def test_repetitive_firing_adjusted_for_all_configured_neurons(
 def test_caller_overrides_take_precedence_over_neuron_adjustments() -> None:
     """Caller-supplied overrides win over both the base preset and neuron adjustments.
 
-    Dopaminergic Neuron sets stimulus_duration=480; override to 50 ms.
+    Dopaminergic Neuron sets stimulus_duration=3000; override to 50 ms.
     The resulting array should match a plain 50 ms stimulus.
     """
     base_50 = build_protocol_from_preset(
@@ -212,21 +214,29 @@ def test_build_protocol_from_preset_exported_from_patch_sim() -> None:
 
 
 def test_cortical_pyramidal_uses_pospischil_na_factory() -> None:
-    """Cortical Pyramidal preset wires the Pospischil Na⁺ channel factory."""
+    """Cortical Pyramidal preset wires the Nav1.2-flavoured Na⁺ channel factory.
+
+    make_nav12_channel always includes the sNa12 slow inactivation gate
+    (#327 depol-block recovery) — no factory wrapping needed.
+    """
     config = NEURON_PRESETS[CORTICAL_PYRAMIDAL]
-    assert config.na_channel_factory is make_pospischil_na_channel
+    assert config.na_channel_factory is make_nav12_channel
 
 
-def test_cortical_pyramidal_uses_pospischil_k_factory() -> None:
-    """Cortical Pyramidal preset wires the Pospischil K⁺ channel factory."""
+def test_cortical_pyramidal_uses_mainen_sejnowski_kv_via_channels() -> None:
+    """Cortical Pyramidal includes Mainen-Sejnowski Kv via channels list (#311)."""
     config = NEURON_PRESETS[CORTICAL_PYRAMIDAL]
-    assert config.k_channel_factory is make_pospischil_k_channel
+    factories = {ch.factory for ch in config.channels}
+    assert make_mainen_sejnowski_kv_channel in factories
+    # Pospischil K is no longer the primary K channel — replaced by M-S Kv as
+    # the sole delayed rectifier (g_K=0).
+    assert config.g_K == 0.0
 
 
-def test_fsi_uses_pospischil_na_factory() -> None:
-    """FSI preset wires the Pospischil Na⁺ channel factory (issue #231)."""
+def test_fsi_uses_nav11_factory() -> None:
+    """FSI preset wires the Nav1.1-flavoured Na⁺ channel factory (issue #231)."""
     config = NEURON_PRESETS[FAST_SPIKING_INTERNEURON]
-    assert config.na_channel_factory is make_pospischil_na_channel
+    assert config.na_channel_factory is make_nav11_channel
 
 
 def test_fsi_uses_pospischil_k_factory() -> None:
@@ -235,10 +245,14 @@ def test_fsi_uses_pospischil_k_factory() -> None:
     assert config.k_channel_factory is make_pospischil_k_channel
 
 
-def test_ca1_uses_pospischil_na_factory() -> None:
-    """CA1 preset wires the Pospischil Na⁺ channel factory (issue #231)."""
+def test_ca1_uses_nav12_factory() -> None:
+    """CA1 preset wires the Nav1.2-flavoured Na⁺ channel factory (issue #231).
+
+    make_nav12_channel always includes the sNa12 slow inactivation gate
+    (#328 depol-block recovery) — no factory wrapping needed.
+    """
     config = NEURON_PRESETS[CA1_PYRAMIDAL]
-    assert config.na_channel_factory is make_pospischil_na_channel
+    assert config.na_channel_factory is make_nav12_channel
 
 
 def test_ca1_uses_pospischil_k_factory() -> None:
@@ -283,10 +297,13 @@ def test_thalamic_relay_t_ref_is_mccormick_huguenard_recording_temp() -> None:
         (FAST_SPIKING_INTERNEURON, 0.4, 1.0, 0.4, 1.0),  # g_total=1.5  τ_m≈0.67 ms
         (CORTICAL_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
         (PURKINJE, 18.0, 28.0, 18.0, 28.0),  # g_total=0.044 τ_m≈22.7 ms
-        (DOPAMINERGIC, 2.5, 4.5, 2.5, 4.5),  # g_total=0.3  τ_m≈3.3 ms
+        # DOPAMINERGIC post-#318 review: g_total = g_NaL + g_KL = 0.040 mS/cm²
+        # (split 0.012 / 0.028 to keep V_leak ≈ −45 mV) gives τ_m ≈ 25 ms,
+        # within the SNc DA literature band (20–30 ms; Wolfart et al. 2001).
+        (DOPAMINERGIC, 20.0, 30.0, 20.0, 30.0),
         (THALAMIC_RELAY, 5.0, 9.0, 5.0, 9.0),  # g_total=0.15  τ_m≈6.7 ms
         (CA1_PYRAMIDAL, 17.0, 23.0, 17.0, 23.0),  # g_total=0.05 τ_m≈20 ms
-        (STN, 2.5, 5.5, 2.5, 5.5),  # g_total=0.25 τ_m≈4 ms
+        (STN, 22.0, 28.0, 22.0, 28.0),  # g_total=0.04 τ_m≈25 ms
         (TRN, 10.0, 15.0, 10.0, 15.0),  # g_total=0.07 τ_m≈14.3 ms
     ],
 )
@@ -353,8 +370,12 @@ def test_trn_icat_ft_inf_at_vrest_enables_burst_firing() -> None:
     and burst character on depolarising steps that define TRN firing.
     Previously (K_out=7.8 mM, E_K ≈ −77 mV) v_rest settled at −66 mV where
     ft_inf ≈ 0.17 — too inactivated for reliable burst firing.
+
+    The TRN preset uses :func:`make_trn_icat_channel` (issue #295), whose
+    ``ft_inf`` is bit-identical to the Destexhe (1994) default — the
+    sigmoid-tau modification touches only ``tau_ft``.
     """
-    channel = make_icat_channel()
+    channel = make_trn_icat_channel()
     ft_var = next(gv for gv in channel.gating_variables if gv.name == "ft")
     v_rest = NEURON_PRESETS[TRN].v_rest
     alpha = ft_var.alpha(v_rest, 0.0)
@@ -394,6 +415,53 @@ def test_trn_t_ref_is_huguenard_recording_temp() -> None:
     """
     config = NEURON_PRESETS[TRN]
     assert config.T_ref == pytest.approx(309.15)
+
+
+def test_trn_includes_ikca_channel() -> None:
+    """TRN preset must wire IKCa for Ca²⁺-driven AHP shaping (issue #286).
+
+    Huguenard & Prince (1992) describe IKCa as the dominant K⁺ current
+    converting ICaT-mediated Ca²⁺ entry into outward current that shapes
+    inter-spike intervals during tonic firing and contributes to LTS-burst
+    termination.  Without IKCa there is no biophysical mechanism to convert
+    [Ca²⁺]ᵢ rises into inter-burst pauses — confirmed by Pospischil 2008
+    (Biol. Cybern. 99:427) Table 2 RE column.
+
+    This test asserts only that an IKCa channel is wired into the TRN preset
+    with a positive g_max; the full HP92 rebound-burst phenotype (5–15
+    spike, 200–600 Hz) is verified separately in
+    ``test_trn_step_release_produces_hp92_rebound_burst``.
+    """
+    config = NEURON_PRESETS[TRN]
+    ikca_configs = [c for c in config.channels if c.factory is make_ikca_channel]
+    assert len(ikca_configs) == 1, (
+        f"TRN preset must include exactly one IKCa channel, found {len(ikca_configs)}"
+    )
+    assert ikca_configs[0].g_max > 0.0, (
+        f"TRN IKCa g_max must be positive, got {ikca_configs[0].g_max}"
+    )
+
+
+def test_trn_uses_trn_icat_factory() -> None:
+    """TRN preset must wire :func:`make_trn_icat_channel` (sigmoid tau, issue #295).
+
+    The default :func:`make_icat_channel` cosh-shaped tau collapses the LTS
+    plateau in 5–10 ms, which is too fast to fit the 5–15 Na⁺ spikes of the
+    HP92 rebound burst.  The TRN factory replaces only the inactivation
+    time constant with a sigmoid shape; ft_inf is bit-identical.
+    """
+    config = NEURON_PRESETS[TRN]
+    icat_configs = [c for c in config.channels if c.factory is make_trn_icat_channel]
+    assert len(icat_configs) == 1, (
+        f"TRN preset must wire exactly one make_trn_icat_channel; "
+        f"found {len(icat_configs)}"
+    )
+    assert icat_configs[0].g_max > 0.0
+    legacy_icat_configs = [c for c in config.channels if c.factory is make_icat_channel]
+    assert len(legacy_icat_configs) == 0, (
+        "TRN preset must not also wire the default make_icat_channel — the "
+        "sigmoid-tau factory is the sole ICaT source for TRN."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -448,8 +516,11 @@ def test_purkinje_has_nap_channel() -> None:
 def test_purkinje_has_nar_channel() -> None:
     """Purkinje preset includes an INaR (resurgent Na⁺) channel.
 
-    INaR enables the fast repriming and high-frequency burst firing that
-    characterises complex spikes in cerebellar Purkinje cells.
+    INaR enables the fast repriming and high-frequency repetitive firing
+    that characterises climbing-fibre-driven complex spikes in cerebellar
+    Purkinje cells.  Climbing-fibre input is not modelled in this
+    single-compartment preset; INaR contributes here only by shaping
+    intrinsic tonic spiking.
     Ref: Raman & Bean (1997), Neuron 19:881.
     """
     config = NEURON_PRESETS[PURKINJE]
@@ -554,3 +625,74 @@ def test_dopaminergic_t_ref_is_komendantov_recording_temp() -> None:
     Komendantov (2004) recorded at 35 °C = 308.15 K.
     """
     assert NEURON_PRESETS[DOPAMINERGIC].T_ref == pytest.approx(308.15)
+
+
+# ---------------------------------------------------------------------------
+# Cell surface area metadata
+# ---------------------------------------------------------------------------
+
+
+# Representative areas from the issue table (cm²).  Squid axon is intentionally
+# left as None because the HH52 preparation is reported per-area.
+_EXPECTED_AREAS_CM2: dict[str, float | None] = {
+    SQUID_GIANT_AXON: None,
+    FAST_SPIKING_INTERNEURON: 3e-6,
+    CORTICAL_PYRAMIDAL: 20e-6,
+    PURKINJE: 250e-6,
+    DOPAMINERGIC: 50e-6,
+    THALAMIC_RELAY: 12e-6,
+    CA1_PYRAMIDAL: 25e-6,
+    STN: 7e-6,
+    TRN: 7e-6,
+}
+
+
+@pytest.mark.parametrize(
+    ("preset_name", "expected_area"),
+    list(_EXPECTED_AREAS_CM2.items()),
+)
+def test_presets_have_expected_area_cm2(
+    preset_name: str, expected_area: float | None
+) -> None:
+    """Each preset carries the area_cm2 listed in the issue table."""
+    config = NEURON_PRESETS[preset_name]
+    if expected_area is None:
+        assert config.area_cm2 is None
+    else:
+        assert config.area_cm2 == pytest.approx(expected_area)
+
+
+@pytest.mark.parametrize(
+    "preset_name",
+    [name for name, area in _EXPECTED_AREAS_CM2.items() if area is not None],
+)
+def test_preset_with_area_yields_finite_absolute_passive_properties(
+    preset_name: str,
+) -> None:
+    """Each preset with area_cm2 set produces finite absolute MΩ / pF outputs.
+
+    The membrane test should return well-defined R_n in MΩ and C in pF for
+    every preset that opts into the absolute-units pathway.  Hard physiological
+    bounds are intentionally lax (presets vary by orders of magnitude) — this
+    test guards against silent regressions where the conversion returns
+    None / inf / negative values.
+    """
+    config = NEURON_PRESETS[preset_name]
+    neuron = make_neuron(config)
+    props = run_membrane_test(neuron)
+    assert props is not None
+    assert props.input_resistance_mohm is not None
+    assert props.membrane_capacitance_pf is not None
+    assert props.input_resistance_mohm > 0
+    assert props.membrane_capacitance_pf > 0
+    # 0.5–10000 MΩ and 0.1–1000 pF cover every plausible single-compartment
+    # preparation; tighter bands would break on legitimate preset edits.
+    assert 0.5 < props.input_resistance_mohm < 10000.0
+    assert 0.1 < props.membrane_capacitance_pf < 1000.0
+    # τ_m identity: τ [ms] = R_n [MΩ] × C [pF] / 1000.  This is exact (the
+    # absolute values are derived from the same density values via the same
+    # area), so this is a tight regression guard with biological meaning.
+    tau_from_absolute = (
+        props.input_resistance_mohm * props.membrane_capacitance_pf / 1000.0
+    )
+    assert tau_from_absolute == pytest.approx(props.time_constant, rel=1e-9)

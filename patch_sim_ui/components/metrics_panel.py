@@ -136,6 +136,117 @@ def _ca_transient_table() -> rx.Component:
     )
 
 
+def _burst_row(burst: dict) -> rx.Component:
+    """Render one row of the per-burst detail table.
+
+    The ``Sweep`` cell shows the 1-based sweep number for multi-sweep
+    runs; for single-sweep runs the underlying ``sweep_index`` is 0 and
+    the cell is blank.
+
+    Args:
+        burst: Dictionary with pre-formatted string values for each metric.
+
+    Returns:
+        A table row with per-burst metric cells.
+    """
+    return rx.table.row(
+        rx.table.cell(rx.text(burst["index"].to(int) + 1, size="1")),
+        rx.table.cell(
+            rx.cond(
+                burst["sweep_index"].to(int) > 0,
+                rx.text(burst["sweep_index"].to(int), size="1"),
+                # Non-breaking space keeps row baseline aligned across the
+                # table grid when this cell would otherwise be empty.
+                rx.text(" ", size="1"),
+            ),
+        ),
+        rx.table.cell(rx.text(burst["start_time"].to(str), size="1")),
+        rx.table.cell(rx.text(burst["end_time"].to(str), size="1")),
+        rx.table.cell(rx.text(burst["duration"].to(str), size="1")),
+        rx.table.cell(rx.text(burst["spike_count"].to(str), size="1")),
+        rx.table.cell(rx.text(burst["intra_burst_frequency"].to(str), size="1")),
+        rx.table.cell(rx.text(burst["mean_intra_burst_isi"].to(str), size="1")),
+    )
+
+
+def _burst_summary() -> rx.Component:
+    """Render the burst-analysis summary statistics section.
+
+    Reads from :attr:`AnalysisState.burst_summary`.  Frequencies are in
+    Hz, durations and intervals in ms, and the duty cycle is shown as a
+    fraction of the recording window.  The applied ISI threshold and how
+    it was chosen are surfaced so the user can interpret the result.
+
+    Returns:
+        A compact grid of labelled metric values.
+    """
+    s = AnalysisState.burst_summary
+    return rx.box(
+        rx.heading("Bursts", size="1", margin_bottom="2"),
+        rx.grid(
+            rx.text("Bursts", size="1", color="gray"),
+            rx.text(s["burst_count"].to(str), size="1", align="left"),
+            rx.text("Spikes/burst", size="1", color="gray"),
+            rx.text(s["mean_spikes_per_burst"].to(str), size="1", align="left"),
+            rx.text("Intra freq", size="1", color="gray"),
+            rx.text(
+                s["mean_intra_burst_frequency"].to(str) + " Hz",
+                size="1",
+                align="left",
+            ),
+            rx.text("IBI", size="1", color="gray"),
+            rx.text(
+                s["mean_inter_burst_interval"].to(str) + " ms", size="1", align="left"
+            ),
+            rx.text("Duty cycle", size="1", color="gray"),
+            rx.text(s["duty_cycle"].to(str), size="1", align="left"),
+            rx.text("ISI threshold", size="1", color="gray"),
+            rx.text(s["isi_threshold_ms"].to(str) + " ms", size="1", align="left"),
+            rx.text("Method", size="1", color="gray"),
+            rx.text(s["threshold_method"].to(str), size="1", align="left"),
+            columns="2",
+            spacing="2",
+            width="100%",
+        ),
+        padding="3",
+        border_bottom="1px solid var(--gray-4)",
+        width="100%",
+    )
+
+
+def _burst_table() -> rx.Component:
+    """Render the scrollable per-burst detail table.
+
+    Returns:
+        A flex-growing scroll area containing the per-burst metrics table.
+    """
+    return rx.scroll_area(
+        rx.table.root(
+            rx.table.header(
+                rx.table.row(
+                    rx.table.column_header_cell(rx.text("#", size="1")),
+                    rx.table.column_header_cell(rx.text("Sweep", size="1")),
+                    rx.table.column_header_cell(rx.text("Start (ms)", size="1")),
+                    rx.table.column_header_cell(rx.text("End (ms)", size="1")),
+                    rx.table.column_header_cell(rx.text("Dur (ms)", size="1")),
+                    rx.table.column_header_cell(rx.text("Spikes", size="1")),
+                    rx.table.column_header_cell(rx.text("Freq (Hz)", size="1")),
+                    rx.table.column_header_cell(rx.text("ISI (ms)", size="1")),
+                ),
+            ),
+            rx.table.body(
+                rx.foreach(AnalysisState.burst_metrics, _burst_row),
+            ),
+            size="1",
+            variant="surface",
+            width="100%",
+        ),
+        padding="3",
+        flex_grow="1",
+        min_height="0",
+    )
+
+
 def _ap_summary() -> rx.Component:
     """Render the AP summary statistics section.
 
@@ -328,19 +439,27 @@ def _ap_phase_plane_plot() -> rx.Component:
 def _ap_analysis_tab() -> rx.Component:
     """Render the Analysis sub-tab within the CC pane.
 
-    Shows AP summary statistics, the calcium-transient summary (when calcium
-    dynamics were active), the F-I curve (multi-sweep), the SFA curve, and
-    the V vs dV/dt phase-plane when data are available.  Displays a
-    placeholder when no data exists yet.
+    Shows AP summary statistics, the burst summary (when ≥1 spike was
+    detected), the calcium-transient summary (when calcium dynamics were
+    active), the F-I curve (multi-sweep), the SFA curve, and the V vs
+    dV/dt phase-plane when data are available.  Displays a placeholder
+    when no data exists yet.
 
     Returns:
         The analysis sub-tab content as a scrollable flex column.
     """
     return rx.cond(
-        AnalysisState.has_ap_or_fi | AnalysisState.has_ca_transient_metrics,
+        AnalysisState.has_ap_or_fi
+        | AnalysisState.has_ca_transient_metrics
+        | AnalysisState.has_burst_summary,
         rx.scroll_area(
             rx.flex(
                 rx.cond(AnalysisState.has_ap_metrics, _ap_summary(), rx.box()),
+                rx.cond(
+                    AnalysisState.has_burst_summary,
+                    _burst_summary(),
+                    rx.box(),
+                ),
                 rx.cond(
                     AnalysisState.has_ca_transient_metrics,
                     _ca_transient_summary(),
@@ -380,30 +499,49 @@ def _ap_analysis_tab() -> rx.Component:
 def _membrane_test_section() -> rx.Component:
     """Render the always-visible passive membrane properties section.
 
-    Displays R_in (kΩ·cm²), τₘ (ms), and Cₘ (µF/cm²) from the dedicated
-    membrane test run on a single compact row.  Shown in both current clamp
-    and voltage clamp modes whenever membrane test results are available.
+    Displays R_in, τₘ, and Cₘ from the dedicated membrane test on a single
+    compact row.  The displayed units depend on whether the active preset
+    declares a cell surface area: absolute MΩ / pF when present, per-area
+    kΩ·cm² / µF/cm² otherwise.  τₘ is always in ms and is invariant to the
+    conversion.
+
+    A tooltip explains the active mode.
 
     Returns:
         A single-row hstack of labelled passive property values, or an empty
         box when no membrane test results are available.
     """
     s = AnalysisState
+    tooltip_text = rx.cond(
+        s.mt_units_mode == "absolute",
+        (
+            "R_n in megaohms; C in picofarads; τ_m = R_n × C. Computed from "
+            "the active preset's cell surface area."
+        ),
+        (
+            "Per-area passive properties (kΩ·cm², µF/cm²). The active preset "
+            "has no surface area declared, so absolute R_n (MΩ) and C (pF) "
+            "are not available."
+        ),
+    )
     return rx.cond(
         AnalysisState.has_membrane_test,
-        rx.hstack(
-            rx.text("R_in", size="1", color="gray"),
-            rx.text(s.mt_input_resistance + " kΩ·cm²", size="1"),
-            rx.text("τ_m", size="1", color="gray", padding_left="2"),
-            rx.text(s.mt_time_constant + " ms", size="1"),
-            rx.text("C_m", size="1", color="gray", padding_left="2"),
-            rx.text(s.mt_membrane_capacitance + " µF/cm²", size="1"),
-            padding_x="3",
-            padding_y="2",
-            border_bottom="1px solid var(--gray-4)",
-            width="100%",
-            align="center",
-            wrap="nowrap",
+        rx.tooltip(
+            rx.hstack(
+                rx.text("R_in", size="1", color="gray"),
+                rx.text(s.mt_input_resistance + " " + s.mt_r_units, size="1"),
+                rx.text("τ_m", size="1", color="gray", padding_left="2"),
+                rx.text(s.mt_time_constant + " ms", size="1"),
+                rx.text("C_m", size="1", color="gray", padding_left="2"),
+                rx.text(s.mt_membrane_capacitance + " " + s.mt_c_units, size="1"),
+                padding_x="3",
+                padding_y="2",
+                border_bottom="1px solid var(--gray-4)",
+                width="100%",
+                align="center",
+                wrap="nowrap",
+            ),
+            content=tooltip_text,
         ),
         rx.box(),
     )
@@ -422,6 +560,43 @@ def _ap_spikes_tab() -> rx.Component:
         rx.flex(
             rx.text(
                 "No spikes detected.",
+                size="1",
+                color="gray",
+                text_align="center",
+            ),
+            padding="4",
+            justify="center",
+        ),
+    )
+
+
+def _ap_bursts_tab() -> rx.Component:
+    """Render the Bursts sub-tab showing the per-burst detail table.
+
+    Returns:
+        The per-burst table wrapped in a flex column, or a placeholder when
+        no bursts were detected (and no spike-train was long enough to run
+        the burst analyser).
+    """
+    return rx.cond(
+        AnalysisState.has_burst_summary,
+        rx.cond(
+            AnalysisState.burst_metrics.length() > 0,
+            _burst_table(),
+            rx.flex(
+                rx.text(
+                    "No bursts detected.",
+                    size="1",
+                    color="gray",
+                    text_align="center",
+                ),
+                padding="4",
+                justify="center",
+            ),
+        ),
+        rx.flex(
+            rx.text(
+                "Burst analysis requires at least two spikes.",
                 size="1",
                 color="gray",
                 text_align="center",
@@ -459,9 +634,10 @@ def _ap_metrics_tab() -> rx.Component:
     """Render the full AP Metrics panel with three sub-tabs.
 
     Sub-tabs:
-    - **Analysis**: AP summary statistics, calcium-transient summary, F-I
-      curve, SFA curve, phase plane.
+    - **Analysis**: AP summary statistics, burst summary, calcium-transient
+      summary, F-I curve, SFA curve, phase plane.
     - **Spikes**: Per-spike detail table.
+    - **Bursts**: Per-burst detail table.
     - **Calcium**: Per-transient detail table (only relevant when calcium
       dynamics are active).
 
@@ -472,6 +648,7 @@ def _ap_metrics_tab() -> rx.Component:
         rx.tabs.list(
             rx.tabs.trigger("Analysis", value="analysis", size="1"),
             rx.tabs.trigger("Spikes", value="spikes", size="1"),
+            rx.tabs.trigger("Bursts", value="bursts", size="1"),
             rx.tabs.trigger("Calcium", value="calcium", size="1"),
             size="1",
             width="100%",
@@ -485,6 +662,12 @@ def _ap_metrics_tab() -> rx.Component:
         rx.tabs.content(
             _ap_spikes_tab(),
             value="spikes",
+            height="100%",
+            overflow="hidden",
+        ),
+        rx.tabs.content(
+            _ap_bursts_tab(),
+            value="bursts",
             height="100%",
             overflow="hidden",
         ),
