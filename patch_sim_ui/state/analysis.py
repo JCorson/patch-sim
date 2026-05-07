@@ -12,6 +12,7 @@ from patch_sim_ui.plotting import (
     build_iv_figure,
     build_phase_plane_figure,
     build_sfa_figure,
+    build_tau_v_figure,
 )
 
 
@@ -32,6 +33,7 @@ class AnalysisState(rx.State):
     fi_data: dict[str, Any] = {}  # Serialized FIAnalysisResult for the UI
     iv_data: dict[str, Any] = {}  # Serialized IVAnalysisResult for the UI
     gv_data: dict[str, Any] = {}  # Serialized GVAnalysisResult for the UI
+    tau_v_data: dict[str, Any] = {}  # Serialized TauVAnalysisResult for the UI
     sfa_data: dict[str, Any] = {}  # Serialized SFAAnalysisResult for the UI
     hyperpolarization_data: dict[str, Any] = {}  # Serialized sag/rebound analysis
     phase_plane_data: dict[str, Any] = {}  # Serialized V vs dV/dt sweep data
@@ -63,6 +65,7 @@ class AnalysisState(rx.State):
         self.fi_data = {}
         self.iv_data = {}
         self.gv_data = {}
+        self.tau_v_data = {}
         self.sfa_data = {}
         self.hyperpolarization_data = {}
         self.phase_plane_data = {}
@@ -124,6 +127,11 @@ class AnalysisState(rx.State):
         return len(self.gv_data) > 0
 
     @rx.var
+    def has_tau_v_data(self) -> bool:
+        """Return True when τ-V analysis results are available for display."""
+        return len(self.tau_v_data) > 0
+
+    @rx.var
     def fi_figure(self) -> go.Figure:
         """Return a Plotly F-I curve figure.
 
@@ -152,6 +160,16 @@ class AnalysisState(rx.State):
         if not self.gv_data:
             return go.Figure()
         return build_gv_figure(self.gv_data)
+
+    @rx.var
+    def tau_v_figure(self) -> go.Figure:
+        """Return a Plotly τ-V figure with activation and inactivation traces.
+
+        Returns an empty figure when no τ-V data is available.
+        """
+        if not self.tau_v_data:
+            return go.Figure()
+        return build_tau_v_figure(self.tau_v_data)
 
     @rx.var
     def has_sfa_data(self) -> bool:

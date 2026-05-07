@@ -163,3 +163,15 @@ def test_trace_display_renders_without_error():
     from patch_sim_ui.components.trace_display import trace_display
 
     trace_display()
+
+
+def test_tau_v_plot_helper_renders_without_error():
+    """The private _tau_v_plot helper instantiates without raising.
+
+    The component is wrapped in an ``rx.cond`` against
+    ``AnalysisState.has_tau_v_data`` so that it only appears once a τ-V
+    analysis has been computed; this smoke-tests its construction.
+    """
+    from patch_sim_ui.components.metrics_panel import _tau_v_plot
+
+    _tau_v_plot()

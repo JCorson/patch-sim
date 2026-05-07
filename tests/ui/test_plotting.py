@@ -17,6 +17,7 @@ from patch_sim_ui.plotting import (
     TraceVisibility,
     _build_hover_tables,
     build_figure,
+    build_tau_v_figure,
     compute_trace_visibility_map,
 )
 
@@ -1033,3 +1034,55 @@ def test_sweep_dvdt_empty_when_voltage_absent() -> None:
         result[n] = base[n]
     s = Sweep.from_result(result, _make_stimulus(), "", "", "Current Clamp")
     assert s.dvdt == []
+
+
+# ---------------------------------------------------------------------------
+# build_tau_v_figure
+# ---------------------------------------------------------------------------
+
+
+def test_build_tau_v_figure_returns_figure_with_two_traces_when_no_double_exp():
+    """Without any double-exp fits the figure has activation + inactivation."""
+    tau_v_data = {
+        "voltages": [-40.0, -20.0, 0.0, 20.0],
+        "tau_activation": [1.2, 0.8, 0.5, 0.3],
+        "tau_inactivation": [None, 5.0, 4.0, 3.5],
+        "tau_inactivation_slow": [None, None, None, None],
+        "has_double_exp": [False, False, False, False],
+    }
+    fig = build_tau_v_figure(tau_v_data)
+    assert isinstance(fig, go.Figure)
+    assert len(fig.data) == 2
+    trace_names = {trace.name for trace in fig.data}
+    assert "τ activation" in trace_names
+    assert "τ inactivation" in trace_names
+
+
+def test_build_tau_v_figure_includes_slow_trace_when_any_double_exp_accepted():
+    """When at least one step has double-exp, a third (slow) trace appears."""
+    tau_v_data = {
+        "voltages": [-40.0, -20.0, 0.0],
+        "tau_activation": [1.2, 0.8, 0.5],
+        "tau_inactivation": [3.0, 2.5, 2.0],
+        "tau_inactivation_slow": [None, 25.0, None],
+        "has_double_exp": [False, True, False],
+    }
+    fig = build_tau_v_figure(tau_v_data)
+    assert len(fig.data) == 3
+    trace_names = {trace.name for trace in fig.data}
+    assert "τ inactivation (slow)" in trace_names
+
+
+def test_build_tau_v_figure_uses_log_y_axis_and_voltage_x_axis():
+    """The τ-V figure uses a log y-axis and a Voltage (mV) x-axis."""
+    tau_v_data = {
+        "voltages": [-40.0, -20.0],
+        "tau_activation": [1.0, 0.5],
+        "tau_inactivation": [4.0, 3.0],
+        "tau_inactivation_slow": [None, None],
+        "has_double_exp": [False, False],
+    }
+    fig = build_tau_v_figure(tau_v_data)
+    assert fig.layout.yaxis.type == "log"
+    assert "Voltage" in str(fig.layout.xaxis.title.text)
+    assert "τ" in str(fig.layout.yaxis.title.text)

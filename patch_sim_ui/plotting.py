@@ -1215,3 +1215,81 @@ def build_gv_figure(gv_data: dict) -> go.Figure:
         ),
     )
     return fig
+
+
+def build_tau_v_figure(tau_v_data: dict) -> go.Figure:
+    """Build a Plotly \u03c4-V figure with activation and inactivation traces.
+
+    Renders up to three traces against command voltage:
+        - \u03c4_activation (green, lines + markers).
+        - \u03c4_inactivation fast (purple, lines + markers).
+        - \u03c4_inactivation slow (light purple, dashed; only when at least one
+          step had a double-exponential inactivation fit accepted).
+
+    The y-axis uses a logarithmic scale because \u03c4 commonly spans an order
+    of magnitude across voltages.  ``connectgaps=False`` is set on each
+    trace so that sweeps where the fit failed (``None`` \u03c4) appear as gaps
+    rather than being interpolated across, making missing data visible at
+    a glance.
+
+    Args:
+        tau_v_data: Dict with keys ``voltages``, ``tau_activation``,
+            ``tau_inactivation``, ``tau_inactivation_slow``, and
+            ``has_double_exp``.  Each list runs parallel to ``voltages``.
+
+    Returns:
+        A Plotly :class:`go.Figure` ready to be serialised and sent to the UI.
+    """
+    voltages = tau_v_data["voltages"]
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=voltages,
+            y=tau_v_data["tau_activation"],
+            mode="lines+markers",
+            name="\u03c4 activation",
+            line=dict(color="#16a085"),
+            marker=dict(size=6),
+            connectgaps=False,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=voltages,
+            y=tau_v_data["tau_inactivation"],
+            mode="lines+markers",
+            name="\u03c4 inactivation",
+            line=dict(color="#8e44ad"),
+            marker=dict(size=6),
+            connectgaps=False,
+        )
+    )
+    has_double = tau_v_data.get("has_double_exp", [])
+    if any(has_double):
+        fig.add_trace(
+            go.Scatter(
+                x=voltages,
+                y=tau_v_data.get("tau_inactivation_slow", []),
+                mode="lines+markers",
+                name="\u03c4 inactivation (slow)",
+                line=dict(color="#bb8fce", dash="dash"),
+                marker=dict(size=6, symbol="diamond"),
+                connectgaps=False,
+            )
+        )
+    fig.update_layout(
+        **_ANALYSIS_FIGURE_LAYOUT,
+        xaxis_title="Voltage (mV)",
+        yaxis_title="\u03c4 (ms)",
+        yaxis_type="log",
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            font=dict(size=10),
+        ),
+    )
+    return fig

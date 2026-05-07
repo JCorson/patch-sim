@@ -706,6 +706,26 @@ def _gv_plot() -> rx.Component:
     )
 
 
+def _tau_v_plot() -> rx.Component:
+    """Render the τ-V (activation/inactivation time constants) plot.
+
+    Returns:
+        A bordered flex container with the τ-V Plotly figure embedded
+        below the g-V curve.
+    """
+    return rx.flex(
+        rx.plotly(
+            data=AnalysisState.tau_v_figure,
+            width="100%",
+        ),
+        direction="column",
+        width="100%",
+        flex_shrink="0",
+        border_top="1px solid var(--gray-4)",
+        padding="1",
+    )
+
+
 def _iv_curve_tab() -> rx.Component:
     """Render the I-V Curve tab content.
 
@@ -739,6 +759,11 @@ def _iv_curve_tab() -> rx.Component:
                 rx.cond(
                     AnalysisState.has_gv_data,
                     _gv_plot(),
+                    rx.box(),
+                ),
+                rx.cond(
+                    AnalysisState.has_tau_v_data,
+                    _tau_v_plot(),
                     rx.box(),
                 ),
                 direction="column",

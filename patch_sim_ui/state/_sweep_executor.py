@@ -28,6 +28,7 @@ from patch_sim_ui.state._analysis_format import (
     _compute_iv_data,
     _compute_multi_sweep_burst_data,
     _compute_multi_sweep_ca_transient_data,
+    _compute_tau_v_data,
     _fmt_optional,
     _format_spike_dict,
     _serialise_sfa_curve,
@@ -49,6 +50,7 @@ class _SimResult:
     sim_token: str
     iv_data: dict[str, Any] = dataclasses.field(default_factory=dict)
     gv_data: dict[str, Any] = dataclasses.field(default_factory=dict)
+    tau_v_data: dict[str, Any] = dataclasses.field(default_factory=dict)
     ap_metrics: list[dict[str, Any]] = dataclasses.field(default_factory=list)
     ap_summary: dict[str, Any] = dataclasses.field(default_factory=dict)
     ap_is_multi_sweep: bool = False
@@ -159,6 +161,14 @@ def _compute_simulation(
                 )
             else:
                 gv_data = {}
+            tau_v_data = _compute_tau_v_data(
+                new_sweeps,
+                min_stimulus,
+                max_stimulus,
+                stimulus_step,
+                pre_stimulus_duration,
+                stimulus_duration,
+            )
             ms_ca_metrics, ms_ca_summary = _compute_multi_sweep_ca_transient_data(
                 new_sweeps
             )
@@ -167,6 +177,7 @@ def _compute_simulation(
                 sim_token=sim_token,
                 iv_data=iv_data,
                 gv_data=gv_data,
+                tau_v_data=tau_v_data,
                 ca_transient_metrics=ms_ca_metrics,
                 ca_transient_summary=ms_ca_summary,
             )
