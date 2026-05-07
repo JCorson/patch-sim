@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
+from patch_sim.channels import alpha_h, alpha_m, alpha_n, beta_h, beta_m, beta_n
 from patch_sim.clamp_simulations import simulate_voltage_clamp
-from patch_sim.core_channels import alpha_h, alpha_m, alpha_n, beta_h, beta_m, beta_n
 from patch_sim.neuron import Neuron
 
 

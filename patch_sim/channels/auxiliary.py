@@ -1,19 +1,10 @@
-"""Concrete additional ion channel implementations.
+"""Cell-agnostic auxiliary ion channel factories.
 
-These channels can be added to a :class:`~patch_sim.Neuron` via the
-``additional_channels`` argument to extend the classic three-channel model
-with additional biophysical mechanisms.
+These channels can be added to any neuron model via ``additional_channels``.
+They are cell-type-agnostic (not tuned for a specific neuron type).
 """
 
-from .channels import (
-    GatingVariable,
-    GoldmanSpec,
-    IonChannel,
-    IonSpecies,
-    NernstSpec,
-)
-from .constants import (
-    DEFAULT_G_CAV13,
+from ..constants import (
     DEFAULT_G_ICAL,
     DEFAULT_G_ICAN,
     DEFAULT_G_ICAT,
@@ -25,14 +16,36 @@ from .constants import (
     DEFAULT_G_IM,
     DEFAULT_G_KATP,
     DEFAULT_G_NAP,
-    DEFAULT_G_NAP_SNC,
     DEFAULT_G_NAR,
     DEFAULT_G_SK,
     DEFAULT_IH_P_NA,
 )
-from .electrochemistry import boltzmann_cosh_rates
-from .rates import CalciumDependentFn, VoltageOnlyFn
-from .utils import safe_cosh, safe_exp
+from ..electrochemistry import boltzmann_cosh_rates
+from ..rates import CalciumDependentFn, VoltageOnlyFn
+from ..utils import safe_cosh, safe_exp
+from .base import (
+    GatingVariable,
+    GoldmanSpec,
+    IonChannel,
+    IonSpecies,
+    NernstSpec,
+)
+
+__all__ = [
+    "make_ika_channel",
+    "make_ikv31_channel",
+    "make_ih_channel",
+    "make_inap_channel",
+    "make_inar_channel",
+    "make_im_channel",
+    "make_katp_channel",
+    "make_ikir_channel",
+    "make_ikca_channel",
+    "make_ical_channel",
+    "make_icat_channel",
+    "make_ican_channel",
+    "make_sk_channel",
+]
 
 
 def _alpha_r_impl(V: float, ca_i: float) -> float:
@@ -374,111 +387,6 @@ def make_inap_channel(g_max: float = DEFAULT_G_NAP) -> IonChannel:
     s_var = GatingVariable(name="sNaP", power=1, alpha=_alpha_sNaP, beta=_beta_sNaP)
     return IonChannel(
         name="NaP",
-        g_max=g_max,
-        gating_variables=(p_var, s_var),
-        reversal_spec=NernstSpec(IonSpecies.SODIUM),
-    )
-
-
-# ---------------------------------------------------------------------------
-# INaP_SNc — SNc-specific persistent Na⁺ (Drion et al. 2011)
-# ---------------------------------------------------------------------------
-# Drion et al. 2011 (PLOS Comp Biol) reconciles Putzier 2009 (Cav1.3 essential)
-# with Guzman/Surmeier 2009 (Cav1.3 dispensable, INaP essential): the two
-# subthreshold negative-slope conductances are interchangeable drivers of SNc
-# DA pacemaking, and an honest model needs both.  The Drion fit places SNc
-# INaP V½ at −65 mV (well below firing threshold), so this channel carries a
-# subthreshold ramp-up current rather than a near-threshold amplifier.
-# This is structurally distinct from the Magistretti & Alonso 1999 entorhinal
-# fit (V½ = −52.6 mV) used by ``make_inap_channel``, which is preserved for
-# cortical/hippocampal presets.
-#
-# Activation gate ``pSNc`` is paired with an always-on slow inactivation gate
-# ``sNaP_snc`` (V½ = −55 mV, slope 7 mV, inverted Boltzmann; τ_scale 200 ms /
-# τ_floor 20 ms).  Magistretti & Alonso (1999) §"Slow inactivation" report
-# the entorhinal INaP slow gate at V½ in the −47 to −54 mV range; the SNc
-# Drion fit shifts INaP activation V½ ~12 mV more hyperpolarised (−65 mV
-# vs −52.6 mV).  Applying the same shift strictly would place the slow gate
-# at ≈ −57 mV; V½ = −55 mV is chosen as a round number just past the
-# hyperpolarised edge of the Magistretti-Alonso band, preserving the
-# activation/slow-inactivation overlap that underlies the INaP escape from
-# sustained depolarisation.  Slow inactivation in SNc
-# DA Na⁺ currents is documented by Khaliq & Bean (2010) and Tucker, Hagiwara
-# & Williams (2012); the gate makes the cell biologically more accurate.
-# Always on because ``make_snc_inap_channel`` is dedicated to the SNc
-# Dopaminergic preset — there is no other caller whose calibration could be
-# perturbed by enabling the gate.
-#
-# Gate name ``sNaP_snc`` mirrors the SNc-specific ``pSNc`` namespacing and
-# avoids colliding with the bare ``sNaP`` of ``make_inap_channel`` should a
-# hypothetical preset combine the two factories.
-#
-# Reference:
-#   Drion, Massotte, Sepulchre, Seutin (2011), PLOS Comp Biol 7:e1002050
-#     (activation kinetics).
-#   Magistretti & Alonso (1999), J. Gen. Physiol. 114:491
-#     (slow inactivation V½/slope band).
-#   Khaliq & Bean (2010), J. Neurosci. 30:7401 (slow Na inactivation, SNc).
-#   Tucker, Hagiwara & Williams (2012), J. Neurophysiol. 108:2492.
-_alpha_p_snc, _beta_p_snc = boltzmann_cosh_rates(
-    half=-65.0, slope=5.0, tau_scale=5.0, tau_floor=0.1
-)
-
-_alpha_sNaP_snc, _beta_sNaP_snc = boltzmann_cosh_rates(
-    half=-55.0,
-    slope=7.0,
-    tau_scale=200.0,
-    tau_floor=20.0,
-    inverted=True,
-)
-
-
-def make_snc_inap_channel(
-    g_max: float = DEFAULT_G_NAP_SNC,
-) -> IonChannel:
-    """Create an SNc-specific INaP (persistent Na⁺) channel.
-
-    Drion et al. 2011 fit SNc DA INaP at V½ = −65 mV (slope k = 5 mV), well
-    below firing threshold.  In this regime INaP carries a subthreshold
-    ramp-up current that, together with Cav1.3, drives the inter-spike
-    depolarisation in the Putzier+Drion reconciliation of SNc pacemaking.
-
-    The channel exposes two gates: activation ``pSNc`` (power 1) and slow
-    voltage-dependent inactivation ``sNaP_snc`` (power 1; V½ = −55 mV,
-    slope 7 mV, inverted Boltzmann).  The slow gate is always on, mirroring
-    the Khaliq & Bean (2010) and Tucker, Hagiwara & Williams (2012)
-    observations of slow Na inactivation in SNc DA neurons.  Both gate
-    columns are SNc-namespaced (``pSNc``, ``sNaP_snc``) so they do not
-    collide with the ``p``/``sNaP`` gates of :func:`make_inap_channel`.
-
-    The reversal potential is computed dynamically from the neuron's Na⁺
-    concentrations using the Nernst equation.
-
-    References:
-        - Drion et al. (2011), PLOS Comp Biol 7:e1002050 (activation V½).
-        - Magistretti & Alonso (1999), J. Gen. Physiol. 114:491 (slow
-          inactivation V½/slope band).
-        - Khaliq & Bean (2010), J. Neurosci. 30:7401 (slow Na inactivation
-          in SNc DA — primary source for the sNaP_snc gate).
-        - Tucker, Hagiwara & Williams (2012), J. Neurophysiol. 108:2492.
-
-    Args:
-        g_max: Maximum conductance in mS/cm². Must be non-negative.
-            Defaults to :data:`~patch_sim.constants.DEFAULT_G_NAP_SNC`.
-
-    Returns:
-        An :class:`~patch_sim.channels.IonChannel` representing the SNc INaP
-        current.
-    """
-    p_var = GatingVariable(name="pSNc", power=1, alpha=_alpha_p_snc, beta=_beta_p_snc)
-    s_var = GatingVariable(
-        name="sNaP_snc",
-        power=1,
-        alpha=_alpha_sNaP_snc,
-        beta=_beta_sNaP_snc,
-    )
-    return IonChannel(
-        name="NaP_SNc",
         g_max=g_max,
         gating_variables=(p_var, s_var),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
@@ -938,84 +846,6 @@ def make_ical_channel(
 
 
 # ---------------------------------------------------------------------------
-# Cav1.3 — LVA L-type Ca²⁺ channel (Putzier 2009 SNc pacemaker driver)
-# ---------------------------------------------------------------------------
-# Cav1.3 (α1D) is the low-voltage-activated isoform of the L-type Ca²⁺ family.
-# Activation midpoint sits well below the canonical Cav1.2 ICaL, so a small
-# persistent window current flows at sub-threshold voltages near the SNc DA
-# pacemaker potential.  This window current is the slow inward driver of the
-# inter-spike depolarisation that ramps from the post-AP AHP back to threshold
-# (Putzier et al. 2009).  Inactivation is slow (τ ≈ 200 ms) and incomplete, so
-# the residual window persists through the inter-spike interval.
-#
-# Activation kinetics use Putzier et al. 2009 dynamic-clamp Boltzmann fit:
-# half = −31.1 mV, slope k = 5.35 mV.  Putzier's central thesis is that this
-# specific V½ is what drives pacemaking — shifting V½ by ±20 mV abolishes
-# rescue, demonstrating that the negative-slope conductance window at this V½
-# is the load-bearing mechanism (not Ca²⁺ flux per se).
-#
-# References:
-#   Putzier, Kullmann, Roeper (2009), J. Neurosci. 29:15414 — Cav1.3 V½
-#       drives SNc pacemaking; dynamic-clamp Boltzmann fit V½ = -31.1 mV,
-#       k = 5.35 mV
-#   Xu & Lipscombe (2001), J. Neurosci. 21:5944 — Cav1.3 vs Cav1.2 kinetics
-#   Wolfart et al. (2001), J. Neurosci. 21:3443 — SNc Cav1.3/SK pairing
-_alpha_dL13, _beta_dL13 = boltzmann_cosh_rates(
-    half=-31.1, slope=5.35, tau_scale=2.0, tau_floor=0.5
-)
-_alpha_fL13, _beta_fL13 = boltzmann_cosh_rates(
-    half=-50.0, slope=-8.0, tau_scale=200.0, tau_floor=20.0
-)
-
-
-def make_cav13_channel(
-    g_max: float = DEFAULT_G_CAV13,
-) -> IonChannel:
-    """Create a Cav1.3 (LVA L-type Ca²⁺) ion channel.
-
-    Cav1.3 is the low-voltage-activated isoform of the neuronal L-type Ca²⁺
-    family.  Activation follows the Putzier et al. 2009 dynamic-clamp
-    Boltzmann fit (half = −31.1 mV, slope k = 5.35 mV) — the specific V½ at
-    which a persistent sub-threshold window current drives SNc autonomous
-    pacemaking.  Putzier's central result is that shifting V½ by ±20 mV
-    abolishes pacemaker rescue, so this V½ is load-bearing.
-
-    Inactivation is slow (τ ≈ 200 ms) and incomplete (half ≈ −50 mV, slope
-    −8 mV), so the residual window persists through the full inter-spike
-    interval.  Two gating variables: ``dL13`` (activation, power 1) and
-    ``fL13`` (inactivation, power 1).  Activation power is 1 (not 2 as in
-    HVA Cav1.2) — Putzier-class models treat the LVA L-type as a single-gate
-    activator since the steepness is set by the Boltzmann slope, not gate
-    multiplication.
-
-    Because Cav1.3 carries Ca²⁺, ``carries_calcium=True`` is set so the
-    simulation loop accumulates its contribution for the Ca²⁺ ODE and
-    :meth:`~patch_sim.channels.IonChannel.compute_current` uses live ``ca_i``
-    for a dynamic E_Ca.
-
-    The reversal potential is computed dynamically from the neuron's Ca²⁺
-    concentrations using the Nernst equation.
-
-    Args:
-        g_max: Maximum conductance in mS/cm². Must be non-negative.
-            Defaults to :data:`~patch_sim.constants.DEFAULT_G_CAV13`.
-
-    Returns:
-        An :class:`~patch_sim.channels.IonChannel` representing the Cav1.3
-        current.
-    """
-    d_var = GatingVariable(name="dL13", power=1, alpha=_alpha_dL13, beta=_beta_dL13)
-    f_var = GatingVariable(name="fL13", power=1, alpha=_alpha_fL13, beta=_beta_fL13)
-    return IonChannel(
-        name="Cav1.3",
-        g_max=g_max,
-        gating_variables=(d_var, f_var),
-        reversal_spec=NernstSpec(IonSpecies.CALCIUM),
-        carries_calcium=True,
-    )
-
-
-# ---------------------------------------------------------------------------
 # ICaT — T-type Ca²⁺ channel (low-voltage activated, transient)
 # ---------------------------------------------------------------------------
 
@@ -1052,212 +882,6 @@ def make_icat_channel(
     """
     dt_var = GatingVariable(name="dt", power=2, alpha=_alpha_dt, beta=_beta_dt)
     ft_var = GatingVariable(name="ft", power=1, alpha=_alpha_ft, beta=_beta_ft)
-    return IonChannel(
-        name="CaT",
-        g_max=g_max,
-        gating_variables=(dt_var, ft_var),
-        reversal_spec=NernstSpec(IonSpecies.CALCIUM),
-        carries_calcium=True,
-    )
-
-
-# Thalamic-relay-specific ICaT inactivation: 5× slower than the Destexhe
-# (1994) global default (tau_scale=20 ms).  McCormick & Huguenard (1992) report
-# tau_h_T ≈ 25–40 ms in the depolarised range used during the LTS plateau,
-# which is necessary to sustain the plateau long enough for 3–7 Na⁺ spikes
-# (issue #287).  Activation kinetics (dt half-point, slope, and tau) are
-# unchanged from the global ICaT.
-_alpha_ft_tc, _beta_ft_tc = boltzmann_cosh_rates(
-    half=-80.0, slope=-9.0, tau_scale=100.0, tau_floor=2.0
-)
-
-
-def make_thalamic_relay_icat_channel(
-    g_max: float = DEFAULT_G_ICAT,
-) -> IonChannel:
-    """Create the Thalamic-Relay-tuned ICaT (T-type Ca²⁺) channel.
-
-    Variant of :func:`make_icat_channel` with slower inactivation kinetics
-    (``ft`` tau_scale = 100 ms vs the global default 20 ms) that match the
-    McCormick & Huguenard (1992) recordings of guinea-pig dorsal LGN relay
-    neurons.  The slower inactivation sustains the low-threshold spike (LTS)
-    plateau long enough to support a multi-spike burst (3–7 Na⁺ spikes at
-    200–500 Hz) on hyperpolarising-step release — the defining feature of
-    TC burst mode (Sherman & Guillery 1996; Llinás & Jahnsen 1982).
-
-    Activation half-point and slope are unchanged from the global ICaT
-    (-56 mV / 6.2 mV).  Inactivation half-point also unchanged (-80 mV /
-    -9 mV slope).
-
-    The reversal potential is computed dynamically from the neuron's Ca²⁺
-    concentrations using the Nernst equation.
-
-    Reference: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384;
-    Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (TC).
-
-    Args:
-        g_max: Maximum conductance in mS/cm². Must be non-negative.
-            Defaults to :data:`~patch_sim.constants.DEFAULT_G_ICAT`.
-
-    Returns:
-        An :class:`~patch_sim.channels.IonChannel` representing the
-        Thalamic-Relay ICaT current.
-    """
-    dt_var = GatingVariable(name="dt", power=2, alpha=_alpha_dt, beta=_beta_dt)
-    ft_var = GatingVariable(name="ft", power=1, alpha=_alpha_ft_tc, beta=_beta_ft_tc)
-    return IonChannel(
-        name="CaT",
-        g_max=g_max,
-        gating_variables=(dt_var, ft_var),
-        reversal_spec=NernstSpec(IonSpecies.CALCIUM),
-        carries_calcium=True,
-    )
-
-
-# ---------------------------------------------------------------------------
-# TRN-specific ICaT — sigmoid-shaped inactivation tau
-# ---------------------------------------------------------------------------
-# Huguenard & Prince (1992), J. Neurosci. 12:3804 record TRN low-threshold
-# spike (LTS) bursts of 5–15 Na⁺ spikes at 200–600 Hz on hyperpolarising-step
-# release.  Reproducing that spike count requires the LTS plateau to last
-# long enough to fit 5+ Na⁺/K⁺ AP cycles, which means an ICaT inactivation
-# tau in the 100–250 ms range at LTS-plateau voltages (V > −56 mV).
-#
-# The default Destexhe (1994) cosh-shaped tau peaks at the half-inactivation
-# voltage (−80 mV → 20 ms) and decays at depolarised V (≈4 ms at −40 mV,
-# floored at 2 ms by −20 mV), so the LTS plateau collapses in 5–10 ms — too
-# fast.  Increasing g_T to compensate is not viable: the window-current slope
-# conductance grows linearly and beyond g_T ≈ 4 mS/cm² the cell autonomously
-# bursts at rest.
-#
-# This factory replaces the cosh tau with a sigmoid tau that is small at
-# hyperpolarised V (rest stability — fast equilibration of ft prevents
-# positive-feedback runaway from the window current) and large at LTS-plateau
-# V (sustained plateau for 5+ Na⁺ spikes).  ``ft_inf(V)`` is bit-identical to
-# the Destexhe default so the existing ft_inf-at-rest invariants are
-# preserved.
-_TRN_FT_HALF: float = -80.0  # Half-inactivation voltage for ft in mV
-_TRN_FT_SLOPE: float = -9.0  # Inactivation slope for ft in mV (Destexhe 1994)
-# tau_ft sigmoid parameters.  TAU_MIN matches the Destexhe (1994) cosh-tau
-# value at v_rest, preserving rest dynamics.  TAU_MAX is set so the LTS
-# plateau (V > −56 mV after ICaT activation) can sustain 5+ Na⁺/K⁺ AP cycles
-# (200–600 Hz).  V_HALF and TAU_SLOPE position a smooth transition between
-# the rest and plateau regimes around the ICaT activation knee.
-_TRN_FT_TAU_MIN: float = 20.0  # ft tau at hyperpolarised V in ms
-_TRN_FT_TAU_MAX: float = 200.0  # ft tau at LTS-plateau V in ms
-_TRN_FT_TAU_VHALF: float = -50.0  # Sigmoid midpoint for tau_ft in mV
-_TRN_FT_TAU_SLOPE: float = 5.0  # Sigmoid slope for tau_ft in mV
-
-
-def _trn_ft_inf(V: float) -> float:
-    """Steady-state inactivation of the TRN ICaT ``ft`` gate at voltage V.
-
-    Bit-identical to the Destexhe (1994) default used by
-    :func:`make_icat_channel`: half-point −80 mV, slope −9 mV.  At V = −80 mV
-    (TRN v_rest), ``ft_inf = 0.50`` — half de-inactivated, enabling the
-    post-inhibitory rebound burst.
-
-    Args:
-        V: Membrane voltage in mV.
-
-    Returns:
-        Steady-state inactivation probability in [0, 1].
-    """
-    return 1.0 / (1.0 + safe_exp(-(V - _TRN_FT_HALF) / _TRN_FT_SLOPE))
-
-
-def _trn_tau_ft(V: float) -> float:
-    """Sigmoid voltage-dependent time constant for the TRN ICaT ``ft`` gate.
-
-    Small at hyperpolarised V (≈ ``_TRN_FT_TAU_MIN`` = 20 ms) and large at
-    depolarised V (≈ ``_TRN_FT_TAU_MAX`` = 200 ms), with a smooth sigmoid
-    transition centred at V = −50 mV (slope 5 mV).  This shape preserves
-    rest stability at −80 mV (fast ft equilibration) while sustaining the
-    LTS plateau long enough for 5+ Na⁺ spikes (slow ft inactivation at
-    plateau voltages of −30 to −10 mV).
-
-    Args:
-        V: Membrane voltage in mV.
-
-    Returns:
-        Time constant in ms.
-    """
-    sigmoid = 1.0 / (1.0 + safe_exp(-(V - _TRN_FT_TAU_VHALF) / _TRN_FT_TAU_SLOPE))
-    return _TRN_FT_TAU_MIN + (_TRN_FT_TAU_MAX - _TRN_FT_TAU_MIN) * sigmoid
-
-
-def _alpha_ft_trn_impl(V: float, ca_i: float) -> float:
-    """Forward rate for the TRN ICaT inactivation gate ft.
-
-    Derived as ``alpha_ft = ft_inf / tau_ft``.
-
-    Args:
-        V: Membrane voltage in mV.
-        ca_i: Intracellular Ca²⁺ concentration in mM (ignored).
-
-    Returns:
-        Forward rate alpha_ft in 1/ms.
-    """
-    return _trn_ft_inf(V) / _trn_tau_ft(V)
-
-
-_alpha_ft_trn = VoltageOnlyFn(_alpha_ft_trn_impl)
-
-
-def _beta_ft_trn_impl(V: float, ca_i: float) -> float:
-    """Backward rate for the TRN ICaT inactivation gate ft.
-
-    Derived as ``beta_ft = (1 - ft_inf) / tau_ft``.
-
-    Args:
-        V: Membrane voltage in mV.
-        ca_i: Intracellular Ca²⁺ concentration in mM (ignored).
-
-    Returns:
-        Backward rate beta_ft in 1/ms.
-    """
-    return (1.0 - _trn_ft_inf(V)) / _trn_tau_ft(V)
-
-
-_beta_ft_trn = VoltageOnlyFn(_beta_ft_trn_impl)
-
-
-def make_trn_icat_channel(
-    g_max: float = DEFAULT_G_ICAT,
-) -> IonChannel:
-    """Create the TRN-tuned ICaT (T-type Ca²⁺) channel.
-
-    Variant of :func:`make_icat_channel` whose inactivation time constant
-    ``tau_ft(V)`` is sigmoid-shaped rather than cosh-shaped: small (20 ms) at
-    hyperpolarised V and large (200 ms) at LTS-plateau V, with a smooth
-    transition centred at −50 mV.  This sustains the low-threshold spike
-    plateau long enough to support the 5–15 Na⁺ spike, 200–600 Hz rebound
-    burst that defines TRN burst mode (Huguenard & Prince 1992) while
-    preserving rest stability at −80 mV.
-
-    Activation half-point and slope are unchanged from the global ICaT
-    (−56 mV / 6.2 mV).  Inactivation half-point and slope are unchanged
-    (−80 mV / −9 mV), so ``ft_inf(V)`` is bit-identical to the Destexhe
-    (1994) default — the existing ft_inf-at-rest invariants for the TRN
-    preset continue to hold.
-
-    The reversal potential is computed dynamically from the neuron's Ca²⁺
-    concentrations using the Nernst equation.
-
-    Reference: Huguenard & Prince (1992), J. Neurosci. 12:3804;
-    Destexhe et al. (1994), J. Neurophysiol. 72:803;
-    Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (RE).
-
-    Args:
-        g_max: Maximum conductance in mS/cm². Must be non-negative.
-            Defaults to :data:`~patch_sim.constants.DEFAULT_G_ICAT`.
-
-    Returns:
-        An :class:`~patch_sim.channels.IonChannel` representing the
-        TRN ICaT current.
-    """
-    dt_var = GatingVariable(name="dt", power=2, alpha=_alpha_dt, beta=_beta_dt)
-    ft_var = GatingVariable(name="ft", power=1, alpha=_alpha_ft_trn, beta=_beta_ft_trn)
     return IonChannel(
         name="CaT",
         g_max=g_max,

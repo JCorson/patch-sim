@@ -9,7 +9,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable
 
-from .additional_channels import (
+from .calcium import CalciumDynamics
+from .channels import (
+    GoldmanSpec,
+    IonChannel,
+    IonSpecies,
+    NernstSpec,
     make_cav13_channel,
     make_ical_channel,
     make_ican_channel,
@@ -22,11 +27,14 @@ from .additional_channels import (
     make_im_channel,
     make_inap_channel,
     make_inar_channel,
+    make_k_channel,
+    make_k_leak_channel,
     make_katp_channel,
+    make_mainen_sejnowski_kv_channel,
+    make_na_channel,
+    make_na_leak_channel,
     make_sk_channel,
 )
-from .calcium import CalciumDynamics
-from .channels import GoldmanSpec, IonChannel, IonSpecies, NernstSpec
 from .constants import (
     DEFAULT_C_M,
     DEFAULT_CA_IN,
@@ -43,13 +51,6 @@ from .constants import (
     DEFAULT_T,
     DEFAULT_T_REF,
     DEFAULT_V_REST,
-)
-from .core_channels import (
-    make_k_channel,
-    make_k_leak_channel,
-    make_mainen_sejnowski_kv_channel,
-    make_na_channel,
-    make_na_leak_channel,
 )
 from .neuron import Neuron
 

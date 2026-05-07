@@ -10,7 +10,7 @@ from dataclasses import Field
 from dataclasses import fields as dc_fields
 from typing import Any
 
-from patch_sim.additional_channels import (
+from patch_sim.channels import (
     make_snc_inap_channel,
     make_thalamic_relay_icat_channel,
     make_trn_icat_channel,

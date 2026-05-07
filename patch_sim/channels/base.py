@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from .electrochemistry import nernst_potential
-from .rates import Rate
+from ..electrochemistry import nernst_potential
+from ..rates import Rate
 
 # Minimum ca_i passed to nernst_potential for Ca²⁺ channels.  Prevents log(0)
 # when the RK4 floor clips ca_i to 0.0 mid-substep.
@@ -207,7 +207,7 @@ class IonChannel:
         Returns:
             Reversal potential in mV.
         """
-        from .electrochemistry import goldman_potential, nernst_potential
+        from ..electrochemistry import goldman_potential, nernst_potential
 
         spec = self.reversal_spec
         if isinstance(spec, NernstSpec):

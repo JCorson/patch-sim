@@ -9,7 +9,15 @@ from dataclasses import dataclass, field
 from functools import cached_property
 
 from .calcium import CalciumDynamics
-from .channels import GatingVariable, IonChannel, IonSpecies
+from .channels import (
+    GatingVariable,
+    IonChannel,
+    IonSpecies,
+    make_k_channel,
+    make_k_leak_channel,
+    make_na_channel,
+    make_na_leak_channel,
+)
 from .constants import (
     DEFAULT_C_M,
     DEFAULT_CA_IN,
@@ -26,12 +34,6 @@ from .constants import (
     DEFAULT_T,
     DEFAULT_T_REF,
     DEFAULT_V_REST,
-)
-from .core_channels import (
-    make_k_channel,
-    make_k_leak_channel,
-    make_na_channel,
-    make_na_leak_channel,
 )
 
 logger = logging.getLogger(__name__)

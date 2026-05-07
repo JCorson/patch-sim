@@ -9,15 +9,27 @@ import numpy as np
 import pytest
 
 import patch_sim
-from patch_sim.additional_channels import (
+from patch_sim.analysis.membrane_test import run_membrane_test
+from patch_sim.channels import (
+    make_dopaminergic_k_channel,
+    make_dopaminergic_na_channel,
     make_icat_channel,
     make_ih_channel,
     make_ikca_channel,
     make_inap_channel,
     make_inar_channel,
+    make_mainen_sejnowski_kv_channel,
+    make_nav11_channel,
+    make_nav12_channel,
+    make_pospischil_k_channel,
+    make_purkinje_k_channel,
+    make_purkinje_na_channel,
+    make_thalamic_relay_k_channel,
+    make_thalamic_relay_na_channel,
     make_trn_icat_channel,
+    make_trn_k_channel,
+    make_trn_na_channel,
 )
-from patch_sim.analysis.membrane_test import run_membrane_test
 from patch_sim.constants import (
     ACTION_POTENTIAL,
     CA1_PYRAMIDAL,
@@ -30,20 +42,6 @@ from patch_sim.constants import (
     STN,
     THALAMIC_RELAY,
     TRN,
-)
-from patch_sim.core_channels import (
-    make_dopaminergic_k_channel,
-    make_dopaminergic_na_channel,
-    make_mainen_sejnowski_kv_channel,
-    make_nav11_channel,
-    make_nav12_channel,
-    make_pospischil_k_channel,
-    make_purkinje_k_channel,
-    make_purkinje_na_channel,
-    make_thalamic_relay_k_channel,
-    make_thalamic_relay_na_channel,
-    make_trn_k_channel,
-    make_trn_na_channel,
 )
 from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import (

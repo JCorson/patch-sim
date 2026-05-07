@@ -19,6 +19,7 @@ import reflex as rx
 from reflex.config import get_config as _get_config
 
 import patch_sim
+import patch_sim.channels
 import patch_sim.clamp_simulations
 from patch_sim.analysis.fi_curve import _fi_point_from_ap_result
 from patch_sim.analysis.hyperpolarization import _sag_point_from_ap_result
@@ -894,8 +895,9 @@ def _compute_simulation(
                     (
                         ch
                         for ch in neuron.core_channels
-                        if isinstance(ch.reversal_spec, patch_sim.NernstSpec)
-                        and ch.reversal_spec.species is patch_sim.IonSpecies.SODIUM
+                        if isinstance(ch.reversal_spec, patch_sim.channels.NernstSpec)
+                        and ch.reversal_spec.species
+                        is patch_sim.channels.IonSpecies.SODIUM
                     ),
                     None,
                 )

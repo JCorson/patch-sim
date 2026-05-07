@@ -8,6 +8,7 @@ plausible.  Unit tests with synthetic data live in tests/unit/test_gv_curve.py.
 import numpy as np
 
 import patch_sim
+import patch_sim.channels
 from patch_sim.analysis.gv_curve import compute_gv
 from patch_sim.analysis.iv_curve import analyze_iv
 
@@ -47,8 +48,8 @@ def test_gv_curve_integration_hh_neuron(hh_model):
     na_channel = next(
         ch
         for ch in hh_model.core_channels
-        if isinstance(ch.reversal_spec, patch_sim.NernstSpec)
-        and ch.reversal_spec.species is patch_sim.IonSpecies.SODIUM
+        if isinstance(ch.reversal_spec, patch_sim.channels.NernstSpec)
+        and ch.reversal_spec.species is patch_sim.channels.IonSpecies.SODIUM
     )
     e_na = na_channel.reversal_potential(hh_model)
     result = compute_gv(iv, reversal_potential=e_na)

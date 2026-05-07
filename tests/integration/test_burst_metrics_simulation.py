@@ -161,7 +161,7 @@ def test_thalamic_relay_step_release_produces_multi_spike_lts_burst() -> None:
     the ICaT-driven calcium plateau.  Sustained hyperpolarisation
     de-inactivates the ICaT ``ft`` gate; on release the LTS depolarises the
     membrane and the TC-tuned slow ICaT inactivation
-    (:func:`~patch_sim.additional_channels.make_thalamic_relay_icat_channel`)
+    (:func:`~patch_sim.channels.thalamic.make_thalamic_relay_icat_channel`)
     sustains the plateau long enough for several Na⁺ spikes to fire.
 
     Verifies issue #287: prior to the fix, the TC preset produced only a
@@ -210,7 +210,7 @@ def test_trn_step_release_produces_hp92_rebound_burst() -> None:
     depolarising drive on release — Bal & McCormick 1993) and the
     sigmoid-shaped ICaT inactivation tau (sustains the LTS plateau long
     enough to fit 5+ spikes —
-    :func:`~patch_sim.additional_channels.make_trn_icat_channel`).
+    :func:`~patch_sim.channels.trn.make_trn_icat_channel`).
 
     Verifies issue #295: prior to the fix, the cosh-shaped Destexhe (1994)
     ICaT inactivation tau collapsed the LTS plateau in ~5–10 ms (too fast

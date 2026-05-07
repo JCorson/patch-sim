@@ -10,8 +10,11 @@ from typing import Any
 
 import numpy as np
 
-from .additional_channels import (
+from .calcium import CalciumDynamics
+from .channels import (
     make_cav13_channel,
+    make_dopaminergic_k_channel,
+    make_dopaminergic_na_channel,
     make_ical_channel,
     make_ican_channel,
     make_icat_channel,
@@ -23,12 +26,23 @@ from .additional_channels import (
     make_inap_channel,
     make_inar_channel,
     make_katp_channel,
+    make_mainen_sejnowski_kv_channel,
+    make_nav11_channel,
+    make_nav12_channel,
+    make_pospischil_k_channel,
+    make_purkinje_k_channel,
+    make_purkinje_na_channel,
     make_sk_channel,
     make_snc_inap_channel,
+    make_stn_k_channel,
+    make_stn_na_channel,
     make_thalamic_relay_icat_channel,
+    make_thalamic_relay_k_channel,
+    make_thalamic_relay_na_channel,
     make_trn_icat_channel,
+    make_trn_k_channel,
+    make_trn_na_channel,
 )
-from .calcium import CalciumDynamics
 from .constants import (
     ACTION_POTENTIAL,
     CA1_PYRAMIDAL,
@@ -49,22 +63,6 @@ from .constants import (
     THALAMIC_RELAY,
     TRN,
     VOLTAGE_CLAMP,
-)
-from .core_channels import (
-    make_dopaminergic_k_channel,
-    make_dopaminergic_na_channel,
-    make_mainen_sejnowski_kv_channel,
-    make_nav11_channel,
-    make_nav12_channel,
-    make_pospischil_k_channel,
-    make_purkinje_k_channel,
-    make_purkinje_na_channel,
-    make_stn_k_channel,
-    make_stn_na_channel,
-    make_thalamic_relay_k_channel,
-    make_thalamic_relay_na_channel,
-    make_trn_k_channel,
-    make_trn_na_channel,
 )
 from .neuron_factory import ChannelConfig, NeuronConfig
 
