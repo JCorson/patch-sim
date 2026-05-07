@@ -24,7 +24,7 @@ from patch_sim.constants import CURRENT_CLAMP, VOLTAGE_CLAMP
 os.environ.setdefault("PYTEST_CURRENT_TEST", "test_simulation_helpers.py::setup")
 pytest.importorskip("reflex")
 
-from patch_sim_ui.state.simulation import (  # noqa: E402
+from patch_sim_ui.state._analysis_format import (  # noqa: E402
     _build_phase_plane_data,
     _compute_burst_data,
     _compute_cc_multi_sweep_analysis,
