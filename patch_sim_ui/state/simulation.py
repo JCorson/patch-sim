@@ -3,6 +3,14 @@
 SimulationState owns simulation results, sweep collections, continuous mode,
 and the figure computed var.  Cross-cutting state lives in the sibling
 substates (NeuronState, ProtocolState, VisibilityState, AnalysisState, LogState).
+
+Pure analysis-formatting helpers, the synchronous sweep executor, and the
+Plotly JS asset loaders live in private sibling modules:
+
+* :mod:`patch_sim_ui.state._analysis_format` — display-formatting helpers
+* :mod:`patch_sim_ui.state._sweep_executor` — :func:`_compute_simulation`
+  and the :class:`_SimResult` carrier
+* :mod:`patch_sim_ui.state._figure_js` — Plotly JS template loaders
 """
 
 import asyncio
@@ -16,8 +24,6 @@ import reflex as rx
 from reflex.config import get_config as _get_config
 
 import patch_sim
-import patch_sim.channels
-import patch_sim.clamp_simulations
 from patch_sim.constants import CURRENT_CLAMP
 from patch_sim_ui import constants, presets
 from patch_sim_ui.api import traces
