@@ -903,8 +903,12 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         #                       rebound burst)
         #   g_KCa = 0.3 mS/cm² (Huguenard & Prince 1992, TRN)
         #   g_h   = 0.020 mS/cm² (slightly below the ≈0.025 reported by
-        #                          Bal & McCormick 1993 for cat TRN; tuned to
-        #                          set tonic firing rate to ~3 Hz)
+        #                          Bal & McCormick 1993 for cat TRN; pre-#308
+        #                          this set tonic rate to ~3 Hz alongside the
+        #                          inherited HH52 Na/K defaults — at the new
+        #                          (g_Na, g_K) the rate is ~10 Hz, still well
+        #                          inside the test-accepted 1–15 Hz band and
+        #                          the HP92 spontaneous-firing range)
         #
         # Refs: Huguenard & Prince (1992), J. Neurosci. 12:3804 (TRN
         #       low-threshold-spike biophysics; IKCa identified as the burst-
@@ -968,14 +972,14 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
         # burst (required by ``test_trn_step_release_produces_hp92_rebound_burst``).
         #
         # PACEMAKER MODE.  With Ih and the elevated g_T, the cell is no longer
-        # silent at zero current — it fires tonically at ~3 Hz, consistent
+        # silent at zero current — it fires tonically at ~10 Hz, consistent
         # with the spontaneous firing observed in TRN slice recordings (HP92,
-        # B&M93).  v_rest = −80 mV is the configured initial condition; the
-        # cell rapidly leaves this point and settles into tonic firing with
-        # mean V around −77 mV.  Excluded from
-        # ``test_all_presets_stable_at_rest`` for the same reason as Purkinje
-        # (autonomous oscillator with no stable zero-current equilibrium).
-        # The HP92 rebound-burst phenotype is exercised by
+        # B&M93; their rates fall in the 1–15 Hz band).  v_rest = −80 mV is
+        # the configured initial condition; the cell rapidly leaves this point
+        # and settles into tonic firing with mean V around −70 mV.  Excluded
+        # from ``test_all_presets_stable_at_rest`` for the same reason as
+        # Purkinje (autonomous oscillator with no stable zero-current
+        # equilibrium).  The HP92 rebound-burst phenotype is exercised by
         # ``test_trn_step_release_produces_hp92_rebound_burst``.
         #
         # g_NaL + g_KL = 0.07 mS/cm² gives τ_m ≈ 14.3 ms and
@@ -1435,7 +1439,15 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
             "min_stimulus": 0.01,
             "max_stimulus": 0.01,
         },
-        # 5 µA/cm² at 2 ms evokes a single AP with HP92 kinetics.
+        # TRN is a tonic pacemaker post-#308 retune (~10 Hz spontaneous from
+        # v_rest = −80 mV with ICaT half-deinactivated), so within the 22 ms
+        # ACTION_POTENTIAL window the cell fires several APs regardless of
+        # injected current — there is no "single-AP" pulse for this preset.
+        # Excluded from ``test_action_potential_preset`` via
+        # ``_QUIESCENT_PRESET_NAMES`` because the strict "exactly 1 AP"
+        # assertion does not apply to a pacemaker.  Stimulus parameters are
+        # kept at the pre-#308 values (5 µA/cm² × 2 ms) so users still see a
+        # stim-evoked perturbation on top of the spontaneous tonic train.
         ACTION_POTENTIAL: {
             "min_stimulus": 5.0,
             "max_stimulus": 5.0,
