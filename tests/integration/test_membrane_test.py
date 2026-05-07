@@ -47,8 +47,8 @@ def test_run_membrane_test_always_subthreshold() -> None:
     when the neuron is built with the correct channel kinetics for that preset,
     guaranteeing that the protocol always returns valid passive properties.
     """
-    for name, preset_config in patch_sim.NEURON_PRESETS.items():
-        neuron = patch_sim.make_neuron(preset_config)
+    for name, factory in patch_sim.NEURON_PRESETS.items():
+        neuron = factory()
         props = run_membrane_test(neuron)
         assert props is not None, (
             f"Preset '{name}': expected PassiveProperties but got None "

@@ -36,7 +36,6 @@ from patch_sim.constants import (
     STN,
     THALAMIC_RELAY,
 )
-from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import (
     NEURON_PRESET_NAMES,
     NEURON_PRESETS,
@@ -58,8 +57,7 @@ def _run_hyperpolarization_sweeps(
     Returns:
         A :class:`HyperpolarizationAnalysisResult` from the final multi-sweep run.
     """
-    config = NEURON_PRESETS[preset_name]
-    neuron = make_neuron(config)
+    neuron = NEURON_PRESETS[preset_name]()
 
     base = dict(PROTOCOL_PRESETS[HYPERPOLARIZATION_STEPS])
     adjustments = NEURON_PROTOCOL_ADJUSTMENTS.get(preset_name, {}).get(
@@ -136,8 +134,7 @@ def test_hyperpolarization_preset_is_structurally_plausible(
         f"{preset_name}: expected at least one SagPoint, got 0"
     )
 
-    config = NEURON_PRESETS[preset_name]
-    v_rest = config.v_rest if config.v_rest is not None else -65.0
+    v_rest = NEURON_PRESETS[preset_name]().v_rest
 
     for pt in result.points:
         assert np.isfinite(pt.peak_voltage), (

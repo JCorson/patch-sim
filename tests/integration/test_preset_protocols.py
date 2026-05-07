@@ -25,7 +25,6 @@ from patch_sim.constants import (
     STN,
     TRN,
 )
-from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import (
     NEURON_PRESET_NAMES,
     NEURON_PRESETS,
@@ -150,7 +149,7 @@ def test_action_potential_preset(preset_name: str) -> None:
     Args:
         preset_name: Name of the neuron preset under test.
     """
-    neuron = make_neuron(NEURON_PRESETS[preset_name])
+    neuron = NEURON_PRESETS[preset_name]()
     protocol = build_protocol_from_preset(ACTION_POTENTIAL, neuron_preset=preset_name)
     result = simulate_current_clamp(neuron, current_external=protocol[0])
 
@@ -183,7 +182,7 @@ def test_subthreshold_response_preset(preset_name: str) -> None:
     Args:
         preset_name: Name of the neuron preset under test.
     """
-    neuron = make_neuron(NEURON_PRESETS[preset_name])
+    neuron = NEURON_PRESETS[preset_name]()
     protocol = build_protocol_from_preset(
         "Subthreshold Response", neuron_preset=preset_name
     )
@@ -220,7 +219,7 @@ def test_repetitive_firing_preset(preset_name: str) -> None:
     Args:
         preset_name: Name of the neuron preset under test.
     """
-    neuron = make_neuron(NEURON_PRESETS[preset_name])
+    neuron = NEURON_PRESETS[preset_name]()
     protocol = build_protocol_from_preset(REPETITIVE_FIRING, neuron_preset=preset_name)
     result = simulate_current_clamp(neuron, current_external=protocol[0])
 
@@ -255,7 +254,7 @@ def test_fi_curve_preset(preset_name: str) -> None:
     Args:
         preset_name: Name of the neuron preset under test.
     """
-    neuron = make_neuron(NEURON_PRESETS[preset_name])
+    neuron = NEURON_PRESETS[preset_name]()
     protocol = build_protocol_from_preset("F-I Curve", neuron_preset=preset_name)
 
     assert len(protocol) >= 2, f"{preset_name}: F-I Curve must have ≥2 sweeps"
@@ -295,7 +294,7 @@ def test_frequency_response_preset(preset_name: str) -> None:
     Args:
         preset_name: Name of the neuron preset under test.
     """
-    neuron = make_neuron(NEURON_PRESETS[preset_name])
+    neuron = NEURON_PRESETS[preset_name]()
     protocol = build_protocol_from_preset(
         "Frequency Response", neuron_preset=preset_name
     )
@@ -331,7 +330,7 @@ def test_iv_curve_preset(preset_name: str) -> None:
     Args:
         preset_name: Name of the neuron preset under test.
     """
-    neuron = make_neuron(NEURON_PRESETS[preset_name])
+    neuron = NEURON_PRESETS[preset_name]()
     protocol = build_protocol_from_preset("I-V Curve", neuron_preset=preset_name)
 
     assert len(protocol) >= 1, f"{preset_name}: I-V Curve must have ≥1 sweep"
@@ -363,7 +362,7 @@ def test_na_channel_activation_preset(preset_name: str) -> None:
     Args:
         preset_name: Name of the neuron preset under test.
     """
-    neuron = make_neuron(NEURON_PRESETS[preset_name])
+    neuron = NEURON_PRESETS[preset_name]()
     protocol = build_protocol_from_preset(
         "Na+ Channel Activation", neuron_preset=preset_name
     )

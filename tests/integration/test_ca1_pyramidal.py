@@ -17,7 +17,6 @@ from patch_sim.analysis.ap_metrics import analyze_aps_from_result
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
 from patch_sim.constants import CA1_PYRAMIDAL
 from patch_sim.neuron import Neuron
-from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESETS
 from patch_sim.protocols import step_current
 from tests.integration._ap_shape import assert_ap_shape
@@ -38,7 +37,7 @@ _CA1_REFERENCE = "Spruston & Johnston 2008 / Migliore et al. 1999 / Storm 1990"
 @pytest.fixture
 def ca1_neuron() -> Neuron:
     """CA1 pyramidal neuron instance for all tests in this module."""
-    return make_neuron(NEURON_PRESETS[CA1_PYRAMIDAL])
+    return NEURON_PRESETS[CA1_PYRAMIDAL]()
 
 
 @pytest.fixture

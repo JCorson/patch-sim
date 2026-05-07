@@ -453,7 +453,7 @@ async def test_build_neuron_forwards_preset_calcium_dynamics(preset_name: str) -
         [_ async for _ in ns.load_neuron_preset(preset_name)]
     neuron = ns._build_neuron()
 
-    expected = NEURON_PRESETS[preset_name].calcium_dynamics
+    expected = NEURON_PRESETS[preset_name]().calcium_dynamics
     assert expected is not None, (
         f"Test fixture mismatch: {preset_name} preset must have "
         f"calcium_dynamics set for this regression test to apply"
@@ -1363,11 +1363,11 @@ def test_neuron_config_to_ui_state_covers_all_scalar_fields(
     Args:
         preset_name: Name of the preset to test.
     """
-    config = NEURON_PRESETS[preset_name]
-    state = neuron_config_to_ui_state(config)
+    neuron = NEURON_PRESETS[preset_name]()
+    state = neuron_config_to_ui_state(neuron)
     for name in NEURON_CONFIG_SCALAR_FIELDS:
         assert name in state, f"neuron_config_to_ui_state missing key: {name}"
-        assert state[name] == pytest.approx(getattr(config, name)), (
+        assert state[name] == pytest.approx(getattr(neuron, name)), (
             f"neuron_config_to_ui_state value mismatch for: {name}"
         )
 

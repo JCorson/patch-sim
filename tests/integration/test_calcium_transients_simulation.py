@@ -17,7 +17,6 @@ from patch_sim.channels import GatingVariable, IonChannel, IonSpecies, NernstSpe
 from patch_sim.clamp_simulations import simulate_current_clamp
 from patch_sim.constants import PURKINJE
 from patch_sim.neuron import Neuron
-from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESETS
 from patch_sim.protocols import step_current
 from patch_sim.rates import VoltageOnlyFn
@@ -48,7 +47,7 @@ def test_purkinje_preset_produces_calcium_transients() -> None:
     on integration details), only that the analysis recovers at least
     one transient with a peak above baseline.
     """
-    neuron = make_neuron(NEURON_PRESETS[PURKINJE])
+    neuron = NEURON_PRESETS[PURKINJE]()
     assert neuron.calcium_dynamics is not None
 
     protocol = step_current(

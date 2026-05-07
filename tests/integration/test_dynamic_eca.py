@@ -17,7 +17,6 @@ import numpy as np
 
 from patch_sim import simulate_current_clamp
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ
-from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import CORTICAL_PYRAMIDAL, NEURON_PRESETS, PURKINJE
 
 
@@ -42,10 +41,9 @@ def test_non_ca_preset_invariant_to_ca_in() -> None:
     byte-identical voltage trace; otherwise the dynamic E_Ca plumbing has
     accidentally exposed ``Ca_in`` to a channel that should ignore it.
     """
-    config = NEURON_PRESETS[CORTICAL_PYRAMIDAL]
-    neuron_default = make_neuron(config)
-    neuron_perturbed = make_neuron(
-        dataclasses.replace(config, Ca_in=config.Ca_in * 100)
+    neuron_default = NEURON_PRESETS[CORTICAL_PYRAMIDAL]()
+    neuron_perturbed = dataclasses.replace(
+        neuron_default, Ca_in=neuron_default.Ca_in * 100
     )
     assert neuron_default.calcium_dynamics is None, (
         "Cortical Pyramidal must have no Ca dynamics for this invariance to hold"
@@ -80,7 +78,7 @@ def test_hyperpolarisation_suppresses_ca_influx() -> None:
     :mod:`tests.integration.test_calcium_calibration`.  A regression that
     re-enables Ca²⁺ influx at rest would break this bound by 10× or more.
     """
-    neuron = make_neuron(NEURON_PRESETS[PURKINJE])
+    neuron = NEURON_PRESETS[PURKINJE]()
     cd = neuron.calcium_dynamics
     assert cd is not None, "Purkinje must have Ca dynamics"
 

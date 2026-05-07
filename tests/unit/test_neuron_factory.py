@@ -44,8 +44,7 @@ _NON_CALCIUM_PRESETS = set(NEURON_PRESET_NAMES) - _CALCIUM_PRESETS
 @pytest.mark.parametrize("preset_name", NEURON_PRESET_NAMES)
 def test_make_neuron_each_preset(preset_name: str) -> None:
     """make_neuron returns a Neuron instance for every built-in preset."""
-    config = NEURON_PRESETS[preset_name]
-    model = make_neuron(config)
+    model = NEURON_PRESETS[preset_name]()
     assert isinstance(model, Neuron)
 
 
@@ -57,8 +56,7 @@ def test_make_neuron_each_preset(preset_name: str) -> None:
 @pytest.mark.parametrize("preset_name", sorted(_CALCIUM_PRESETS))
 def test_make_neuron_calcium_preset_gets_calcium_dynamics(preset_name: str) -> None:
     """Presets with calcium channels receive a CalciumDynamics instance."""
-    config = NEURON_PRESETS[preset_name]
-    model = make_neuron(config)
+    model = NEURON_PRESETS[preset_name]()
     assert isinstance(model.calcium_dynamics, CalciumDynamics), (
         f"Preset '{preset_name}' should have CalciumDynamics but got None"
     )
@@ -67,8 +65,7 @@ def test_make_neuron_calcium_preset_gets_calcium_dynamics(preset_name: str) -> N
 @pytest.mark.parametrize("preset_name", sorted(_NON_CALCIUM_PRESETS))
 def test_make_neuron_non_calcium_preset_no_calcium_dynamics(preset_name: str) -> None:
     """Presets without calcium channels have calcium_dynamics=None."""
-    config = NEURON_PRESETS[preset_name]
-    model = make_neuron(config)
+    model = NEURON_PRESETS[preset_name]()
     assert model.calcium_dynamics is None, (
         f"Preset '{preset_name}' should have no CalciumDynamics but got one"
     )

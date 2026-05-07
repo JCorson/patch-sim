@@ -24,7 +24,6 @@ from patch_sim.clamp_simulations import (
 )
 from patch_sim.constants import DOPAMINERGIC
 from patch_sim.neuron import Neuron
-from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESETS
 from patch_sim.protocols import step_current, step_voltage
 from tests.integration._ap_shape import assert_ap_shape
@@ -46,7 +45,7 @@ _DA_REFERENCE = "Grace & Bunney 1984 / Putzier 2009 / Drion 2011 / Tucker 2012"
 @pytest.fixture
 def da_neuron() -> Neuron:
     """Dopaminergic SNc neuron instance for all tests in this module."""
-    return make_neuron(NEURON_PRESETS[DOPAMINERGIC])
+    return NEURON_PRESETS[DOPAMINERGIC]()
 
 
 @pytest.fixture
