@@ -64,7 +64,260 @@ from .constants import (
     TRN,
     VOLTAGE_CLAMP,
 )
+from .neuron import Neuron
 from .neuron_factory import ChannelConfig, NeuronConfig
+
+# ---------------------------------------------------------------------------
+# Neuron preset factories
+# ---------------------------------------------------------------------------
+
+
+def make_squid_giant_axon() -> Neuron:
+    """Original Hodgkin-Huxley (1952) squid giant axon (HH52).
+
+    Returns:
+        Neuron configured with HH52 squid-axon parameters and seawater K_out
+        (E_K ≈ −77 mV).  Q10=1.0 (no thermal correction — this preset *is* the
+        room-temperature squid axon model).
+    """
+    return Neuron(
+        K_out=7.8,
+        Q10=1.0,
+    )
+
+
+def make_fast_spiking_interneuron() -> Neuron:
+    """Cortical fast-spiking interneuron (Erisir 1999, Pospischil 2008).
+
+    Returns:
+        Neuron configured with Pospischil Na/K kinetics, Nav1.1 slow
+        inactivation, and IKv3.1 to drive non-adapting high-frequency firing.
+    """
+    return Neuron(
+        g_Na=88.0,
+        g_K=30.0,
+        g_NaL=0.3115,
+        g_KL=1.1885,
+        T_ref=307.15,
+        na_channel_factory=make_nav11_channel,
+        k_channel_factory=make_pospischil_k_channel,
+        additional_channels=(make_ikv31_channel(g_max=20.0),),
+        area_cm2=3e-6,
+    )
+
+
+def make_cortical_pyramidal() -> Neuron:
+    """Cortical RS pyramidal cell (Pospischil 2008, Mainen-Sejnowski 1996).
+
+    Returns:
+        Neuron configured with Nav1.2 + Pospischil-K core, slow Na inactivation
+        for depol-block recovery, and Mainen-Sejnowski Kv as the dominant K.
+    """
+    return Neuron(
+        g_Na=70.0,
+        g_K=0.0,
+        v_rest=-70.0,
+        K_out=3.32,
+        g_NaL=0.000391,
+        g_KL=0.049609,
+        Q10=1.0,
+        T_ref=307.15,
+        na_channel_factory=make_nav12_channel,
+        k_channel_factory=make_pospischil_k_channel,
+        additional_channels=(
+            make_ih_channel(g_max=0.3),
+            make_inap_channel(g_max=0.1),
+            make_im_channel(g_max=0.075),
+            make_mainen_sejnowski_kv_channel(g_max=1.8),
+        ),
+        area_cm2=20e-6,
+    )
+
+
+def make_purkinje() -> Neuron:
+    """Cerebellar Purkinje cell (De Schutter & Bower 1994, Carter & Bean 2009).
+
+    Returns:
+        Neuron configured as an autonomous tonic pacemaker with INaP/Ih
+        rhythmic drive and Carter-Bean slow Na inactivation for depol-block
+        recovery.
+    """
+    return Neuron(
+        v_rest=-65.0,
+        g_Na=30.0,
+        g_K=10.0,
+        g_NaL=0.0,
+        g_KL=0.044,
+        T_ref=305.15,
+        na_channel_factory=make_purkinje_na_channel,
+        k_channel_factory=make_purkinje_k_channel,
+        additional_channels=(
+            make_ical_channel(g_max=1.0),
+            make_icat_channel(g_max=0.5),
+            make_ikca_channel(g_max=2.0),
+            make_inap_channel(g_max=0.1),
+            make_inar_channel(g_max=0.1),
+            make_ih_channel(g_max=1.0),
+        ),
+        calcium_dynamics=CalciumDynamics(alpha_ca=1.5e-5, tau_ca=20.0, ca_rest=1e-4),
+        area_cm2=250e-6,
+    )
+
+
+def make_dopaminergic() -> Neuron:
+    """Substantia nigra pars compacta dopaminergic neuron (Putzier+Drion).
+
+    Returns:
+        Neuron configured as an autonomous ~7 Hz pacemaker driven by Cav1.3 +
+        INaP_SNc + SK, with Komendantov Na/K kinetics.
+    """
+    return Neuron(
+        v_rest=-55.0,
+        g_Na=10.0,
+        g_K=0.5,
+        g_NaL=0.012,
+        g_KL=0.028,
+        Q10=1.0,
+        T_ref=308.15,
+        na_channel_factory=make_dopaminergic_na_channel,
+        k_channel_factory=make_dopaminergic_k_channel,
+        additional_channels=(
+            make_cav13_channel(g_max=0.04),
+            make_sk_channel(g_max=1.75),
+            make_snc_inap_channel(g_max=0.012),
+            make_ih_channel(g_max=0.20),
+        ),
+        calcium_dynamics=CalciumDynamics(
+            alpha_ca=5.0e-5, tau_ca=30.0, ca_rest=1e-4, ca_init=1.0e-4
+        ),
+        area_cm2=50e-6,
+    )
+
+
+def make_thalamic_relay() -> Neuron:
+    """Thalamocortical relay neuron (McCormick & Huguenard 1992).
+
+    Returns:
+        Neuron configured with M&H92 / Pospischil Na/K core, slow-inactivating
+        TC-tuned ICaT, and Ih to deliver the LTS-rebound burst phenotype.
+    """
+    return Neuron(
+        g_Na=45.0,
+        g_K=10.0,
+        v_rest=-69.2550,
+        g_NaL=0.0,
+        g_KL=0.19,
+        T_ref=309.15,
+        na_channel_factory=make_thalamic_relay_na_channel,
+        k_channel_factory=make_thalamic_relay_k_channel,
+        additional_channels=(
+            make_thalamic_relay_icat_channel(g_max=2.5),
+            make_ih_channel(g_max=1.0),
+        ),
+        calcium_dynamics=CalciumDynamics(
+            alpha_ca=2.6e-5, tau_ca=20.0, ca_rest=1e-4, ca_init=6.9107e-4
+        ),
+        area_cm2=12e-6,
+    )
+
+
+def make_ca1_pyramidal() -> Neuron:
+    """CA1 hippocampal pyramidal cell (Pospischil, Migliore, Storm).
+
+    Returns:
+        Neuron configured with Nav1.2 + Pospischil-K core, IKa/IM/Ih, three
+        Ca²⁺ channels feeding IKCa-driven SFA, and slow Na inactivation for
+        depol-block recovery.
+    """
+    return Neuron(
+        g_Na=60.0,
+        g_K=3.0,
+        g_NaL=0.020854,
+        g_KL=0.029146,
+        Q10=1.0,
+        T_ref=307.15,
+        na_channel_factory=make_nav12_channel,
+        k_channel_factory=make_pospischil_k_channel,
+        additional_channels=(
+            make_ika_channel(g_max=0.5),
+            make_im_channel(g_max=0.75),
+            make_ih_channel(g_max=0.05),
+            make_ical_channel(g_max=0.5),
+            make_ican_channel(g_max=0.3),
+            make_icat_channel(g_max=0.3),
+            make_ikca_channel(g_max=2.0),
+            make_inap_channel(g_max=0.1),
+        ),
+        calcium_dynamics=CalciumDynamics(
+            alpha_ca=5e-6, tau_ca=100.0, ca_rest=1e-4, ca_init=2.5845e-4
+        ),
+        area_cm2=25e-6,
+    )
+
+
+def make_stn() -> Neuron:
+    """Subthalamic nucleus pacemaker (Otsuka 2004, Wigmore & Lacey 2000).
+
+    Returns:
+        Neuron configured as an autonomous tonic pacemaker with INaP + Ih
+        rhythmic drive, Kv3.1-like delayed rectifier, conditional ICaT-driven
+        burst mode, and a three-mechanism depol-block recovery (sNaP, sNa,
+        K_ATP).
+    """
+    return Neuron(
+        g_Na=14.0,
+        g_K=0.0,
+        v_rest=-60.0,
+        Na_out=145.0,
+        K_out=5.0,
+        g_NaL=0.0,
+        g_KL=0.04,
+        Q10=1.0,
+        T_ref=308.15,
+        na_channel_factory=make_stn_na_channel,
+        k_channel_factory=make_stn_k_channel,
+        additional_channels=(
+            make_icat_channel(g_max=5.0),
+            make_ical_channel(g_max=0.5),
+            make_ika_channel(g_max=3.0),
+            make_ikca_channel(g_max=1.0),
+            make_ih_channel(g_max=1.0),
+            make_inap_channel(g_max=0.05),
+            make_ikv31_channel(g_max=1.0),
+            make_katp_channel(g_max=0.5),
+        ),
+        calcium_dynamics=CalciumDynamics(
+            alpha_ca=1.1e-5, tau_ca=20.0, ca_rest=1e-4, ca_init=7.325e-4
+        ),
+        area_cm2=7e-6,
+    )
+
+
+def make_trn() -> Neuron:
+    """Thalamic reticular neuron (Huguenard & Prince 1992, Bal & McCormick 1993).
+
+    Returns:
+        Neuron configured with HP92/Pospischil RE core, TRN-tuned ICaT, IKCa,
+        and Ih to deliver the HP92 LTS-rebound multi-spike burst phenotype.
+    """
+    return Neuron(
+        v_rest=-80.0,
+        g_Na=50.0,
+        g_K=24.0,
+        g_NaL=0.0066,
+        g_KL=0.0634,
+        T_ref=309.15,
+        na_channel_factory=make_trn_na_channel,
+        k_channel_factory=make_trn_k_channel,
+        additional_channels=(
+            make_trn_icat_channel(g_max=2.85),
+            make_ikca_channel(g_max=0.3),
+            make_ih_channel(g_max=0.020),
+        ),
+        calcium_dynamics=CalciumDynamics(alpha_ca=1.2e-5, tau_ca=20.0, ca_rest=1e-4),
+        area_cm2=7e-6,
+    )
+
 
 # ---------------------------------------------------------------------------
 # Neuron presets
