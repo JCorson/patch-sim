@@ -1004,17 +1004,22 @@ NEURON_PRESETS: dict[str, NeuronConfig] = {
             ChannelConfig(make_ikca_channel, g_max=0.3),
             ChannelConfig(make_ih_channel, g_max=0.020),
         ),
-        # alpha_ca/tau_ca calibrated so peak ca_i stays in the 0.1–5 µM
-        # physiological band under REPETITIVE_FIRING (3 µA/cm², 200 ms;
-        # peak ≈ 3.7 µM at g_T = 3.0).  Under HYPERPOLARIZATION_STEPS
-        # (LTS rebound burst) peak ca_i transiently rises into the
-        # 8–18 µM range — this is biologically expected for LTS-driven
-        # bursts in TRN soma (cf. Cueni et al. 2008, Nature Neurosci.
-        # 11:683 — TRN dendritic [Ca²⁺]ᵢ during LTS) and is required for
-        # IKCa-driven burst termination at the literature g_KCa = 0.3.
-        # Lower alpha_ca brings the rebound Ca into [0.1, 5] µM but
-        # collapses the burst phenotype (IKCa cannot terminate cleanly),
-        # so we accept the LTS-specific transient as a feature.
+        # alpha_ca/tau_ca held at the pre-#308 values: the retuned (g_Na=50,
+        # g_K=24) cell genuinely fires at much higher rate than the previous
+        # HH52-defaulted preset under any depolarising stimulus, so peak ca_i
+        # under REPETITIVE_FIRING (3 µA/cm², 200 ms; ~70 spikes) reaches
+        # ~9–10 µM — physiologically consistent with TRN somatic Ca during
+        # high-frequency burst trains (cf. Cueni et al. 2008, Nat. Neurosci.
+        # 11:683 on TRN dendritic [Ca²⁺]ᵢ during LTS).  Under
+        # HYPERPOLARIZATION_STEPS (LTS rebound burst) peak ca_i transiently
+        # rises into the 8–18 µM range, also expected for LTS-driven bursts.
+        # ``test_calcium_calibration.py`` uses a TRN-specific 12 µM upper
+        # bound to allow this realistic firing without flagging
+        # CalciumDynamics drift.  Lower alpha_ca brings the absolute Ca
+        # peak down but collapses the burst phenotype (IKCa cannot
+        # terminate cleanly), so the elevated Ca is the load-bearing
+        # mechanism for IKCa-driven burst termination at the literature
+        # g_KCa = 0.3.
         calcium_dynamics=CalciumDynamics(alpha_ca=1.2e-5, tau_ca=20.0, ca_rest=1e-4),
         area_cm2=7e-6,
     ),
