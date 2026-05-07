@@ -1,7 +1,9 @@
 """Neuron parameter state for the patch_sim web UI."""
 
+import dataclasses
 import hashlib
 import logging
+from collections.abc import Callable
 from typing import Any, AsyncGenerator
 
 import reflex as rx
@@ -9,6 +11,8 @@ import reflex as rx
 import patch_sim
 import patch_sim.channels
 from patch_sim.constants import (
+    CA1_PYRAMIDAL,
+    CORTICAL_PYRAMIDAL,
     DEFAULT_G_CAV13,
     DEFAULT_G_ICAL,
     DEFAULT_G_ICAN,
@@ -24,10 +28,44 @@ from patch_sim.constants import (
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
     DEFAULT_G_SK,
+    DOPAMINERGIC,
+    FAST_SPIKING_INTERNEURON,
+    PURKINJE,
+    SQUID_GIANT_AXON,
+    STN,
+    THALAMIC_RELAY,
+    TRN,
+)
+from patch_sim.presets import (
+    make_ca1_pyramidal,
+    make_cortical_pyramidal,
+    make_dopaminergic,
+    make_fast_spiking_interneuron,
+    make_purkinje,
+    make_squid_giant_axon,
+    make_stn,
+    make_thalamic_relay,
+    make_trn,
 )
 from patch_sim_ui import presets
 from patch_sim_ui.channels import ADDITIONAL_CHANNELS
 from patch_sim_ui.state._common import _set_float
+
+#: Maps preset display name → zero-arg factory returning a fully-configured
+#: :class:`~patch_sim.Neuron`.  Used by :meth:`NeuronState._build_neuron` to
+#: obtain the preset-tuned baseline before overlaying scalar slider values
+#: with :func:`dataclasses.replace`.
+_PRESET_FACTORIES: dict[str, Callable[[], "patch_sim.Neuron"]] = {
+    SQUID_GIANT_AXON: make_squid_giant_axon,
+    FAST_SPIKING_INTERNEURON: make_fast_spiking_interneuron,
+    CORTICAL_PYRAMIDAL: make_cortical_pyramidal,
+    PURKINJE: make_purkinje,
+    DOPAMINERGIC: make_dopaminergic,
+    THALAMIC_RELAY: make_thalamic_relay,
+    CA1_PYRAMIDAL: make_ca1_pyramidal,
+    STN: make_stn,
+    TRN: make_trn,
+}
 
 _NEURON_FLOAT_FIELDS: list[str] = list(presets.NEURON_CONFIG_SCALAR_FIELDS)
 
@@ -323,68 +361,24 @@ class NeuronState(rx.State):
     def _build_neuron(self) -> "patch_sim.Neuron":
         """Construct a Neuron from current state parameters.
 
+        Calls the active preset's factory to obtain a fully-configured
+        baseline (carrying the preset's core/auxiliary channels, calcium
+        dynamics, and area), then overlays the user's scalar slider values
+        via :func:`dataclasses.replace`.  Per the policy A design, channel
+        composition is not user-editable — channels are baked into the
+        preset and reused as-is.
+
         Returns:
-            A :class:`patch_sim.Neuron` configured with the current conductances,
-            ion concentrations, and any enabled auxiliary channels.
+            A :class:`patch_sim.Neuron` whose scalar fields reflect the
+            current sliders and whose channel composition matches the
+            active preset.
         """
-        # Use the core Na⁺/K⁺ channel factories from the active preset so
-        # that presets with non-default kinetics (e.g. Pospischil, STN) are
-        # honoured.  Fall back to HH52 defaults for unknown preset names.
-        preset_cfg = patch_sim.NEURON_PRESETS.get(self.active_neuron_type)
-
-        # Map channel-name → preset-specific factory variant, so presets that
-        # use a non-canonical factory (e.g. Thalamic Relay's slow-inactivating
-        # ICaT) keep their kinetics through UI round-trip.  Channels not in
-        # the preset fall back to the canonical CHANNEL_REGISTRY factory.
-        preset_factory_overrides: dict[str, Any] = {}
-        if preset_cfg is not None:
-            for cc in preset_cfg.channels:
-                name = presets._FACTORY_TO_NAME.get(cc.factory)
-                if name is not None:
-                    preset_factory_overrides[name] = cc.factory
-
-        channels = tuple(
-            patch_sim.ChannelConfig(
-                preset_factory_overrides.get(name, factory),
-                g_max=getattr(self, f"{name}_g_max"),
-            )
-            for name, factory in patch_sim.CHANNEL_REGISTRY.items()
-            if getattr(self, f"{name}_enabled")
-        )
-
-        na_factory = (
-            preset_cfg.na_channel_factory
-            if preset_cfg
-            else patch_sim.channels.make_na_channel
-        )
-        k_factory = (
-            preset_cfg.k_channel_factory
-            if preset_cfg
-            else patch_sim.channels.make_k_channel
-        )
-
-        scalar_kwargs = {
+        factory = _PRESET_FACTORIES.get(self.active_neuron_type)
+        baseline = factory() if factory is not None else patch_sim.Neuron()
+        scalar_overrides = {
             name: getattr(self, name) for name in presets.NEURON_CONFIG_SCALAR_FIELDS
         }
-        # area_cm2 and calcium_dynamics are sourced from the active preset's
-        # NeuronConfig.  area_cm2 is a static physical attribute of the cell,
-        # not user-editable.  calcium_dynamics carries the preset's tuned
-        # alpha_ca/tau_ca/ca_init — without forwarding them every preset
-        # would silently use NeuronConfig's auto-instantiated default
-        # (alpha_ca=1e-4, tau_ca=200 ms), which is dramatically off for
-        # presets that tune these for fast Ca clearance (e.g. TRN at
-        # tau_ca=20 ms — 10× faster than default).
-        area_cm2 = preset_cfg.area_cm2 if preset_cfg else None
-        calcium_dynamics = preset_cfg.calcium_dynamics if preset_cfg else None
-        config = patch_sim.NeuronConfig(
-            **scalar_kwargs,
-            channels=channels,
-            na_channel_factory=na_factory,
-            k_channel_factory=k_factory,
-            area_cm2=area_cm2,
-            calcium_dynamics=calcium_dynamics,
-        )
-        return patch_sim.make_neuron(config=config)
+        return dataclasses.replace(baseline, **scalar_overrides)
 
 
 # Register NeuronConfig scalar fields as NeuronState vars
