@@ -43,7 +43,7 @@ from patch_sim_ui.presets import (  # noqa: E402
     DEFAULT_PROTOCOL_PRESET,
     NEURON_CONFIG_SCALAR_DEFAULTS,
     NEURON_CONFIG_SCALAR_FIELDS,
-    neuron_config_to_ui_state,
+    neuron_to_ui_state,
 )
 from patch_sim_ui.state import SimulationState  # noqa: E402
 from patch_sim_ui.state.analysis import AnalysisState  # noqa: E402
@@ -437,7 +437,7 @@ async def test_load_neuron_preset_thalamic_relay() -> None:
 async def test_build_neuron_forwards_preset_calcium_dynamics(preset_name: str) -> None:
     """_build_neuron must propagate the preset's CalciumDynamics to the Neuron.
 
-    Without this, every preset would silently use NeuronConfig's default
+    Without this, every preset would silently fall back to a default
     auto-instantiated CalciumDynamics (alpha_ca=1e-4, tau_ca=200 ms),
     masking each preset's tuned values.  For TRN this collapses the HP92
     rebound burst (preset wants alpha_ca=1.2e-5 / tau_ca=20 ms — 8.3× and
@@ -1310,22 +1310,22 @@ async def test_load_neuron_preset_syncs_figure_clamp_mode() -> None:
 
 
 # ---------------------------------------------------------------------------
-# NeuronState↔NeuronConfig sync regression tests (#232)
+# NeuronState↔Neuron sync regression tests (#232)
 # ---------------------------------------------------------------------------
 
 
 def test_neuron_state_mirrors_all_neuron_config_scalar_fields() -> None:
-    """Every NeuronConfig scalar field appears on NeuronState with the correct default.
+    """Every Neuron scalar field appears on NeuronState with the correct default.
 
-    This test fails if a new scalar field is added to NeuronConfig without
-    the corresponding entry flowing through to NeuronState.
+    This test fails if a new scalar field is added to Neuron without the
+    corresponding entry flowing through to NeuronState.
     """
     ns = _make_neuron_state()
     for name in NEURON_CONFIG_SCALAR_FIELDS:
         assert hasattr(ns, name), f"NeuronState missing field: {name}"
         assert getattr(ns, name) == pytest.approx(
             NEURON_CONFIG_SCALAR_DEFAULTS[name]
-        ), f"NeuronState.{name} default does not match NeuronConfig"
+        ), f"NeuronState.{name} default does not match Neuron"
 
 
 def test_build_neuron_forwards_all_neuron_config_scalar_fields() -> None:
@@ -1351,24 +1351,24 @@ def test_build_neuron_forwards_all_neuron_config_scalar_fields() -> None:
 
 
 @pytest.mark.parametrize("preset_name", list(NEURON_PRESETS))
-def test_neuron_config_to_ui_state_covers_all_scalar_fields(
+def test_neuron_to_ui_state_covers_all_scalar_fields(
     preset_name: str,
 ) -> None:
-    """neuron_config_to_ui_state() returns a key for every scalar field.
+    """neuron_to_ui_state() returns a key for every scalar field.
 
     Parametrized over all presets so that value-forwarding bugs on specific
-    presets are caught, not just field presence.  Fails if a new NeuronConfig
+    presets are caught, not just field presence.  Fails if a new Neuron
     scalar field is missing from the returned dict or has a wrong value.
 
     Args:
         preset_name: Name of the preset to test.
     """
     neuron = NEURON_PRESETS[preset_name]()
-    state = neuron_config_to_ui_state(neuron)
+    state = neuron_to_ui_state(neuron)
     for name in NEURON_CONFIG_SCALAR_FIELDS:
-        assert name in state, f"neuron_config_to_ui_state missing key: {name}"
+        assert name in state, f"neuron_to_ui_state missing key: {name}"
         assert state[name] == pytest.approx(getattr(neuron, name)), (
-            f"neuron_config_to_ui_state value mismatch for: {name}"
+            f"neuron_to_ui_state value mismatch for: {name}"
         )
 
 
@@ -1381,7 +1381,7 @@ async def test_initialize_defaults_applies_sga_q10() -> None:
     """initialize_defaults sets Q10 to the SGA preset value (1.0).
 
     Core regression for issue #235: the SGA preset overrides Q10 to 1.0 but
-    NeuronConfig.Q10 defaults to 3.0, so without initialize_defaults the app
+    Neuron.Q10 defaults to 3.0, so without initialize_defaults the app
     starts with the wrong Q10.
     """
     ns = _make_neuron_state()
@@ -1682,14 +1682,13 @@ def test_build_neuron_has_no_area_for_squid() -> None:
 async def test_build_neuron_preserves_inap_slow_inactivation_for_stn() -> None:
     """STN _build_neuron preserves the INaP sNaP slow inactivation gate (#324).
 
-    Regression: previously _build_neuron rebuilt channels from
-    CHANNEL_REGISTRY in a way that silently disabled INaP slow
+    Regression: previously _build_neuron rebuilt channels from a per-name
+    factory registry in a way that silently disabled INaP slow
     inactivation in the UI.  Visible consequence: STN at +5 µA/cm² ×
     200 ms exits the deepest depol block but settles into a damped
     quasi-plateau around −30 mV instead of autonomous tonic firing.
-    Now that make_inap_channel always emits the sNaP gate, the
-    round-trip preserves it by construction; this test pins that
-    contract.
+    Under policy A, _build_neuron preserves the preset's exact channel
+    tuple via dataclasses.replace; this test pins that contract.
     """
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
@@ -2019,12 +2018,13 @@ async def test_build_neuron_preserves_snc_inap_slow_inactivation_for_dopaminergi
 ):
     """Dopaminergic _build_neuron preserves the always-on sNaP_snc gate (#330).
 
-    ``_build_neuron`` forwards ``ChannelConfig.factory`` directly, so
-    ``make_snc_inap_channel`` must round-trip and yield a 2-gate INaP_SNc
-    channel including the Khaliq & Bean 2010 / Magistretti & Alonso 1999
-    sNaP_snc slow-inactivation gate.  This pins the channel-factory contract:
-    a regression that dropped sNaP_snc from the factory would silently lose
-    biological accuracy via the UI path.
+    Under policy A, ``_build_neuron`` reuses the preset's own
+    ``additional_channels`` tuple via ``dataclasses.replace``, so the SNc
+    INaP channel produced by ``make_snc_inap_channel`` round-trips with
+    its 2-gate Khaliq & Bean 2010 / Magistretti & Alonso 1999 sNaP_snc
+    slow-inactivation gate intact.  This pins the channel-factory
+    contract: a regression that dropped sNaP_snc from the factory would
+    silently lose biological accuracy via the UI path.
     """
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):

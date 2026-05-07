@@ -42,7 +42,7 @@ _NEURON_CONFIG_SCALAR_META: tuple[Field[Any], ...] = tuple(
 )
 
 #: Ordered tuple of Neuron scalar field names — the single source of
-#: truth that drives NeuronState field declarations, neuron_config_to_ui_state,
+#: truth that drives NeuronState field declarations, neuron_to_ui_state,
 #: and _build_neuron kwargs.
 NEURON_CONFIG_SCALAR_FIELDS: tuple[str, ...] = tuple(
     f.name for f in _NEURON_CONFIG_SCALAR_META
@@ -76,22 +76,23 @@ _DEFAULT_G_MAX: dict[str, float] = {
 
 # Map from IonChannel.name to ChannelMeta.id for all channels used by presets.
 #
-# Most channels: current_name = f"I{name}" equals current_key, so the id
-# can be found via current_key[1:] == name (e.g. name="h", current_key="Ih").
-# A few channels: name itself equals current_key (e.g. name="Kv", current_key="Kv").
-# Variant channels: mapped explicitly (e.g. "NaP_SNc" → "inap").
+# Channels whose current_key starts with "I" (the convention for *current*
+# names like "Ih", "IKv31", "ICaT") have an IonChannel.name equal to the key
+# with the leading "I" stripped (e.g. name="h" for current_key="Ih").
+# Channels whose current_key does not start with "I" (e.g. "Kv", "Cav1.3",
+# "SK") have an IonChannel.name equal to the key directly.
+# Variant channels with a divergent name (e.g. SNc INaP -> "NaP_SNc") are
+# mapped explicitly so they collapse onto the canonical UI toggle.
 _CHANNEL_NAME_TO_ID: dict[str, str] = {}
 for _ch_meta in ADDITIONAL_CHANNELS:
-    # Try f"I{name}" == current_key → name = current_key[1:]
     if _ch_meta.current_key.startswith("I"):
         _CHANNEL_NAME_TO_ID[_ch_meta.current_key[1:]] = _ch_meta.id
-    # Also try name == current_key directly (e.g. "Kv", "Cav1.3", "SK").
-    _CHANNEL_NAME_TO_ID[_ch_meta.current_key] = _ch_meta.id
-# SNc variant of INaP uses a different channel name; map it to the same toggle.
+    else:
+        _CHANNEL_NAME_TO_ID[_ch_meta.current_key] = _ch_meta.id
 _CHANNEL_NAME_TO_ID["NaP_SNc"] = "inap"
 
 
-def neuron_config_to_ui_state(neuron: Neuron) -> dict[str, Any]:
+def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
     """Convert a :class:`~patch_sim.Neuron` to a flat NeuronState dict.
 
     Produces a mapping whose keys exactly match ``NeuronState`` field names so
@@ -132,8 +133,7 @@ def neuron_config_to_ui_state(neuron: Neuron) -> dict[str, Any]:
 
 # Flat UI-state dicts derived from core Neuron presets.
 NEURON_UI_PRESETS: dict[str, dict[str, Any]] = {
-    name: neuron_config_to_ui_state(factory())
-    for name, factory in NEURON_PRESETS.items()
+    name: neuron_to_ui_state(factory()) for name, factory in NEURON_PRESETS.items()
 }
 
 #: Default neuron preset applied on app startup and reset.
