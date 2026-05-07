@@ -22,11 +22,14 @@ import pytest  # noqa: E402
 pytest.importorskip("reflex")
 
 from patch_sim_ui.state import SimulationState  # noqa: E402
+from patch_sim_ui.state._sweep_executor import (  # noqa: E402
+    _compute_simulation,
+    _SimResult,
+)
 from patch_sim_ui.state.analysis import AnalysisState  # noqa: E402
 from patch_sim_ui.state.log import LogState  # noqa: E402
 from patch_sim_ui.state.neuron import NeuronState  # noqa: E402
 from patch_sim_ui.state.protocol import ProtocolState  # noqa: E402
-from patch_sim_ui.state.simulation import _compute_simulation, _SimResult  # noqa: E402
 from patch_sim_ui.state.visibility import VisibilityState  # noqa: E402
 
 # ---------------------------------------------------------------------------

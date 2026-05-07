@@ -673,17 +673,13 @@ def test_compute_gv_data_empty_when_no_points() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Module identity check (used by Phase 2 of the refactor)
+# Module identity check
 # ---------------------------------------------------------------------------
 
 
-def test_helpers_currently_live_in_simulation_module() -> None:
-    """Document the current location so the move in the next commit is explicit.
+def test_helpers_live_in_analysis_format_module() -> None:
+    """Pure helpers live in ``patch_sim_ui.state._analysis_format``."""
+    from patch_sim_ui.state import _analysis_format
 
-    This test asserts the helpers are exported from
-    :mod:`patch_sim_ui.state.simulation`.  It is updated alongside the move
-    that lifts the helpers into ``patch_sim_ui.state._analysis_format``.
-    """
-    from patch_sim_ui.state import simulation
-
-    assert simulation._fmt_optional(None, ".0f") == "—"
+    assert _analysis_format._fmt_optional(None, ".0f") == "—"
+    assert _analysis_format._GV_FIT_POINTS == 200
