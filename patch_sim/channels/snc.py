@@ -243,7 +243,7 @@ def make_dopaminergic_na_channel(g_max: float) -> IonChannel:
     Canavier (1999) / Komendantov et al. (2004) rate functions (α_m =
     0.32*(V+54)/..., α_n = 0.032*(V+52)/...) for SNc DA neurons at ~35 °C.
 
-    Intended as the ``na_channel_factory`` of the SNc Dopaminergic preset.
+    Used as the SNc Dopaminergic preset's Na⁺ channel.
     Compared with the default HH52 Na⁺ channel (fitted to squid axon at
     22 °C), these kinetics give m_inf ≈ 5.6% at the −60 mV resting potential
     and prevent the ~5.2× Q10 overcorrection that distorts Na⁺ inactivation
@@ -309,7 +309,7 @@ def make_dopaminergic_k_channel(g_max: float) -> IonChannel:
     Canavier (1999) / Komendantov et al. (2004) α_n = 0.032*(V+52)/...
     rate function for SNc DA neurons at ~35 °C.
 
-    Intended as the ``k_channel_factory`` of the SNc Dopaminergic preset.
+    Used as the SNc Dopaminergic preset's K⁺ channel.
 
     Reference: Canavier (1999), J. Comput. Neurosci. 6:49;
     Komendantov et al. (2004), J. Neurophysiol. 91:346.

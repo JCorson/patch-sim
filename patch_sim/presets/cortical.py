@@ -83,8 +83,9 @@ def make_cortical_pyramidal() -> Neuron:
         Pospischil et al. (2008) Traub-Miles Na⁺ kinetics (VT = −56.2 mV,
         via ``make_nav12_channel``) provide the fast spike upstroke.
         Mainen & Sejnowski (1996) Kv kinetics (``make_mainen_sejnowski_kv_channel``)
-        serve as the sole active delayed rectifier; the Pospischil K factory is
-        present but set to g_K=0.  The M-S Kv is essentially closed at rest
+        serve as the sole delayed rectifier; the HH-style core ``"K"`` channel
+        is omitted from the preset's ``channels`` tuple entirely (#311 / #320).
+        The M-S Kv is essentially closed at rest
         (n_inf 50 % point near +4 mV) and deactivates on a τ ~1–2 ms scale —
         this slow-K balance is what broadens the AP into the 1.0–2.5 ms
         McCormick et al. (1985) half-width band.  A fast K (Pospischil n⁴)

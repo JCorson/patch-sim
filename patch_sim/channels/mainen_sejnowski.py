@@ -121,11 +121,10 @@ def make_mainen_sejnowski_kv_channel(g_max: float = DEFAULT_G_MSKV) -> IonChanne
     its own at any g_K (issue #311).
 
     The channel name is ``"Kv"`` (not ``"K"``) and the gating-variable name
-    is ``"nKv"`` so the channel can be added via a preset's ``channels``
-    list without colliding with a primary delayed-rectifier produced by
-    ``k_channel_factory``.  In ``CORTICAL_PYRAMIDAL`` this M-S Kv is the
-    only active K conductance — Pospischil's K factory is kept wired up
-    for structural symmetry but pinned to ``g_K=0``.
+    is ``"nKv"`` so the channel can be added to a preset's ``channels`` tuple
+    without colliding with a primary delayed-rectifier named ``"K"``.  In
+    ``CORTICAL_PYRAMIDAL`` this M-S Kv is the only active K conductance —
+    the preset omits the HH-style core ``"K"`` channel entirely.
 
     Rate constants are pre-scaled from the published 23 °C kinetics to 34 °C
     using Q10 = 2.3, so the channel matches the ``CORTICAL_PYRAMIDAL``

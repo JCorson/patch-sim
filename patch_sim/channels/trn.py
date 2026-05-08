@@ -198,11 +198,11 @@ def make_trn_na_channel(g_max: float) -> IonChannel:
     Rate-equation half-points match Huguenard & Prince (1992) recordings
     of rat TRN cells at 36 °C.
 
-    Intended as the ``na_channel_factory`` of the TRN preset.  Compared with
-    the default HH52 Na⁺ channel (fitted to squid axon at 22 °C), the
-    Traub-Miles form with VT = −67 mV shifts the activation threshold ~13 mV
-    depolarised and slows inactivation, preventing the ~5.2× Q10 overcorrection
-    that caused premature Na⁺ inactivation.
+    Used as the TRN preset's Na⁺ channel.  Compared with the default HH52
+    Na⁺ channel (fitted to squid axon at 22 °C), the Traub-Miles form with
+    VT = −67 mV shifts the activation threshold ~13 mV depolarised and slows
+    inactivation, preventing the ~5.2× Q10 overcorrection that caused
+    premature Na⁺ inactivation.
 
     Reference: Huguenard & Prince (1992), J. Neurosci. 12:3804;
     Destexhe et al. (1994), J. Neurophysiol. 72:803;
@@ -235,7 +235,7 @@ def make_trn_k_channel(g_max: float) -> IonChannel:
     Rate-equation half-points match Huguenard & Prince (1992) recordings
     of rat TRN cells at 36 °C.
 
-    Intended as the ``k_channel_factory`` of the TRN preset.
+    Used as the TRN preset's K⁺ channel.
 
     Reference: Huguenard & Prince (1992), J. Neurosci. 12:3804;
     Destexhe et al. (1994), J. Neurophysiol. 72:803;

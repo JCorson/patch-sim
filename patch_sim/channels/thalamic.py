@@ -181,11 +181,11 @@ def make_thalamic_relay_na_channel(g_max: float) -> IonChannel:
     Rate-equation half-points match McCormick & Huguenard (1992) recordings
     of guinea-pig dorsal LGN relay neurons at 36 °C.
 
-    Intended as the ``na_channel_factory`` of the Thalamic Relay preset.
-    Compared with the default HH52 Na⁺ channel (fitted to squid axon at
-    22 °C), the Traub-Miles form with VT = −52 mV shifts the activation
-    threshold ~13 mV depolarised and slows inactivation, preventing the
-    ~5.2× Q10 overcorrection that caused premature Na⁺ inactivation.
+    Used as the Thalamic Relay preset's Na⁺ channel.  Compared with the
+    default HH52 Na⁺ channel (fitted to squid axon at 22 °C), the Traub-Miles
+    form with VT = −52 mV shifts the activation threshold ~13 mV depolarised
+    and slows inactivation, preventing the ~5.2× Q10 overcorrection that
+    caused premature Na⁺ inactivation.
 
     Reference: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384;
     Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (TC model).
@@ -226,7 +226,7 @@ def make_thalamic_relay_k_channel(g_max: float) -> IonChannel:
     Rate-equation half-points match McCormick & Huguenard (1992) recordings
     of guinea-pig dorsal LGN relay neurons at 36 °C.
 
-    Intended as the ``k_channel_factory`` of the Thalamic Relay preset.
+    Used as the Thalamic Relay preset's K⁺ channel.
 
     Reference: McCormick & Huguenard (1992), J. Neurophysiol. 68:1384;
     Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (TC model).

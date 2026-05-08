@@ -59,7 +59,7 @@ NEURON_CONFIG_SCALAR_DEFAULTS: dict[str, float] = {
 # Defaults for the HH-classic core (na, k, nal, kl) come from the Squid Giant
 # Axon preset; auxiliary channels use the per-channel defaults from the core
 # library's ``DEFAULT_G_*`` constants.
-_DEFAULT_G_MAX: dict[str, float] = {
+DEFAULT_G_MAX: dict[str, float] = {
     # HH-classic core channels — defaults match the Squid Giant Axon preset.
     "na": 120.0,
     "k": 36.0,
@@ -109,7 +109,7 @@ def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
 
     For each registered channel, the corresponding ``{id}_g_max`` key is set
     to the channel's preset-tuned ``g_max`` if present on *neuron*, otherwise
-    the registry default in :data:`_DEFAULT_G_MAX`.  Visibility (which slider
+    the registry default in :data:`DEFAULT_G_MAX`.  Visibility (which slider
     appears in the panel) is driven separately by :data:`PRESET_CHANNEL_IDS`,
     so the default fallback only matters when the user later switches to a
     preset that does include the channel.
@@ -126,7 +126,7 @@ def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
 
     # Initialise every channel slider to its registry default.
     for ch_meta in ADDITIONAL_CHANNELS:
-        state[ch_meta.g_max_field] = _DEFAULT_G_MAX[ch_meta.id]
+        state[ch_meta.g_max_field] = DEFAULT_G_MAX[ch_meta.id]
 
     # Override with preset-tuned values for channels present on the Neuron.
     # Variant factories (e.g. make_snc_inap_channel) produce channels with

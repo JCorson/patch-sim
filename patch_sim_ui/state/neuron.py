@@ -329,5 +329,5 @@ for _ch_meta in ADDITIONAL_CHANNELS:
     NeuronState.add_var(
         _ch_meta.g_max_field,
         float,
-        presets._DEFAULT_G_MAX[_ch_meta.id],
+        presets.DEFAULT_G_MAX[_ch_meta.id],
     )

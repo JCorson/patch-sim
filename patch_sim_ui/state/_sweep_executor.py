@@ -144,6 +144,10 @@ def _compute_simulation(
                 stimulus_duration,
             )
             if iv_result is not None:
+                # Pick the first *gated* Na⁺ channel — the leak channel "NaL"
+                # also has NernstSpec(SODIUM) but has no gating variables, so
+                # filtering on gating_variables avoids feeding E_NaL into the
+                # G-V analysis if a future preset listed NaL before Na.
                 na_channel = next(
                     (
                         ch
@@ -151,6 +155,7 @@ def _compute_simulation(
                         if isinstance(ch.reversal_spec, patch_sim.channels.NernstSpec)
                         and ch.reversal_spec.species
                         is patch_sim.channels.IonSpecies.SODIUM
+                        and ch.gating_variables
                     ),
                     None,
                 )

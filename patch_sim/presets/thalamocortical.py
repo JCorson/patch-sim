@@ -101,10 +101,10 @@ def make_thalamic_relay() -> Neuron:
         band while preserving the LTS burst phenotype.
 
     Passive properties:
-        g_NaL=0 / g_KL=0.19 mS/cm²: pure K⁺ background leak; τ_m ≈ 5.26 ms
-        and R_in ≈ 5.26 kΩ·cm².  The MH92 K⁺ kinetics produce negligible
-        window current at rest (n_inf ≈ 0.004), so the leak must be pure-K⁺
-        to balance the ICaT and Ih window inward currents.
+        Pure K⁺ background leak (g_KL=0.19 mS/cm², no Na-leak channel) gives
+        τ_m ≈ 5.26 ms and R_in ≈ 5.26 kΩ·cm².  The MH92 K⁺ kinetics produce
+        negligible window current at rest (n_inf ≈ 0.004), so the leak must
+        be pure-K⁺ to balance the ICaT and Ih window inward currents.
 
     Coupled equilibrium:
         v_rest and ca_init are the coupled (V, ca_i) equilibrium at rest:

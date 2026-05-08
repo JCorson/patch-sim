@@ -74,17 +74,17 @@ def make_stn() -> Neuron:
         during the AHP and drives slow depolarisation back to threshold,
         sustaining regular autonomous firing.  v_rest=−60 mV is the simulation
         starting point; this cell has no stable zero-current resting potential.
-        g_NaL=0 / g_KL=0.04 mS/cm²: a balanced Na+K leak that pins I_total=0
-        at v_rest prevents pacemaking; the pure-K⁺ leak lets the oscillator
-        operate freely.
+        Only a pure-K⁺ leak (g_KL=0.04 mS/cm²) is wired in; the Na-leak channel
+        is omitted entirely so that I_total at rest is not pinned to zero,
+        which lets the pacemaking oscillator operate freely.
 
     IKv3.1 delayed rectifier:
         IKv3.1 (Erisir 1999, V½ = −12.4 mV, n², τ_floor=0.2 ms) is the sole
         delayed rectifier.  Wigmore & Lacey (2000) directly characterised the
         dominant somatic K current in rat STN as Kv3.1-like (V½ near −13 mV,
         threshold ≈ −38 mV) and concluded it enables high-frequency spike
-        trains.  The Otsuka K factory is retained for structural symmetry but
-        set to g_K=0.
+        trains.  The HH-style core ``"K"`` channel is omitted from the
+        preset's ``channels`` tuple entirely (#320).
 
     Burst mode (conditional):
         Prominent ICaT (g=5.0 mS/cm²) supports post-inhibitory rebound bursts

@@ -64,8 +64,9 @@ def run_membrane_test(neuron: Neuron) -> PassiveProperties | None:
     contaminated by K⁺ channel deactivation sag.
 
     Passive channels are identified by ``ch.gating_variables == ()``; their
-    ``g_max``, ``C_m``, ion concentrations, and temperature are preserved so
-    R_in = 1 / Σ g_max and C_m match the configured membrane parameters.
+    ``g_max`` (along with the neuron's ``C_m``, ion concentrations, and
+    temperature) is preserved so R_in = 1 / Σ g_max and C_m match the
+    configured membrane parameters.
 
     When ``neuron.area_cm2`` is set, the returned :class:`PassiveProperties`
     carries absolute MΩ / pF counterparts alongside the per-area density
