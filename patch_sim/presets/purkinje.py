@@ -10,6 +10,7 @@ from patch_sim.channels import (
     make_ikca_channel,
     make_inap_channel,
     make_inar_channel,
+    make_k_leak_channel,
     make_purkinje_k_channel,
     make_purkinje_na_channel,
 )
@@ -125,14 +126,12 @@ def make_purkinje() -> Neuron:
     """
     return Neuron(
         v_rest=-65.0,
-        g_Na=30.0,
-        g_K=10.0,
-        g_NaL=0.0,
-        g_KL=0.044,
         T_ref=305.15,
-        na_channel_factory=make_purkinje_na_channel,
-        k_channel_factory=make_purkinje_k_channel,
-        additional_channels=(
+        channels=(
+            make_purkinje_na_channel(g_max=30.0),
+            make_purkinje_k_channel(g_max=10.0),
+            # K-leak only — no Na-leak.
+            make_k_leak_channel(g_max=0.044),
             make_ical_channel(g_max=1.0),
             make_icat_channel(g_max=0.5),
             make_ikca_channel(g_max=2.0),

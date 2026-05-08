@@ -3,14 +3,15 @@
 import pytest
 
 from patch_sim.neuron import Neuron
+from patch_sim.presets import make_squid_giant_axon
 
 
 @pytest.fixture
 def hh_model() -> Neuron:
     """HH52 squid giant axon neuron instance for all tests.
 
-    Uses K_out=7.8 mM (HH52 seawater value) explicitly so that tests written
-    against the classic squid axon remain correct even though DEFAULT_K_OUT
-    is 4.0 mM (physiological mammalian ACSF).
+    Returns the canonical squid preset so tests written against the classic
+    axon (K_out=7.8 mM, Q10=1.0, full HH52 channel set) remain correct even
+    though ``Neuron()`` itself has empty channels by default.
     """
-    return Neuron(K_out=7.8)
+    return make_squid_giant_axon()

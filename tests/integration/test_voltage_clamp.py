@@ -5,7 +5,7 @@ import pytest
 
 from patch_sim.channels import alpha_h, alpha_m, alpha_n, beta_h, beta_m, beta_n
 from patch_sim.clamp_simulations import simulate_voltage_clamp
-from patch_sim.neuron import Neuron
+from patch_sim.presets import make_squid_giant_axon
 
 
 def test_simulate_voltage_clamp_returns_structured_array(hh_model):
@@ -85,7 +85,7 @@ def test_voltage_clamp_constant_voltage(hh_model):
 def test_voltage_step_protocol():
     """Test voltage clamp with a step protocol."""
     # Create a custom model for testing
-    custom_model = Neuron()
+    custom_model = make_squid_giant_axon()
     time_step = 0.05  # ms
 
     # Create a voltage step protocol: hold at -80 mV, step to 0 mV, return to -80 mV
@@ -135,7 +135,7 @@ def test_voltage_step_protocol():
 def test_voltage_clamp_i_v_relationship():
     """Test the current-voltage relationship in voltage clamp."""
     # Create a custom model for testing
-    custom_model = Neuron()
+    custom_model = make_squid_giant_axon()
     time_step = 0.1  # ms for efficiency
 
     # Test voltage range
@@ -197,7 +197,7 @@ def test_voltage_clamp_i_v_relationship():
 def test_voltage_ramp_protocol():
     """Test voltage clamp with a voltage ramp protocol."""
     # Create a custom model for testing
-    custom_model = Neuron()
+    custom_model = make_squid_giant_axon()
     time_step = 0.05  # ms
 
     # Create a voltage ramp protocol from -80 mV to +40 mV over 20 ms

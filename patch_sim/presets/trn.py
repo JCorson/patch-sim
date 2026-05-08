@@ -6,6 +6,8 @@ from patch_sim.calcium import CalciumDynamics
 from patch_sim.channels import (
     make_ih_channel,
     make_ikca_channel,
+    make_k_leak_channel,
+    make_na_leak_channel,
     make_trn_icat_channel,
     make_trn_k_channel,
     make_trn_na_channel,
@@ -131,14 +133,12 @@ def make_trn() -> Neuron:
     """
     return Neuron(
         v_rest=-80.0,
-        g_Na=50.0,
-        g_K=24.0,
-        g_NaL=0.0066,
-        g_KL=0.0634,
         T_ref=309.15,
-        na_channel_factory=make_trn_na_channel,
-        k_channel_factory=make_trn_k_channel,
-        additional_channels=(
+        channels=(
+            make_trn_na_channel(g_max=50.0),
+            make_trn_k_channel(g_max=24.0),
+            make_na_leak_channel(g_max=0.0066),
+            make_k_leak_channel(g_max=0.0634),
             make_trn_icat_channel(g_max=2.85),
             make_ikca_channel(g_max=0.3),
             make_ih_channel(g_max=0.020),

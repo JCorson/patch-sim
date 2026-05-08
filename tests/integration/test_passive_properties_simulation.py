@@ -51,7 +51,7 @@ def _subthreshold_passive() -> tuple[patch_sim.SimulationResult, PassiveProperti
     Returns:
         Tuple of (simulation_result, passive_properties).
     """
-    neuron = patch_sim.Neuron(K_out=7.8)
+    neuron = patch_sim.presets.make_squid_giant_axon()
     result, stim_start, stim_end = _run_subthreshold_sim(neuron, -1.0)
     props = analyze_passive_properties(
         result["time"],
@@ -71,7 +71,7 @@ def _suprathreshold_result() -> patch_sim.SimulationResult:
     Returns:
         Simulation result for a spiking trace.
     """
-    neuron = patch_sim.Neuron(K_out=7.8)
+    neuron = patch_sim.presets.make_squid_giant_axon()
     stimulus = patch_sim.step_current(
         duration=_PRE_MS + _STIM_MS + _POST_MS,
         current_amplitude=20.0,

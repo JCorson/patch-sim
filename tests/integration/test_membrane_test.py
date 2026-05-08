@@ -63,8 +63,20 @@ def test_membrane_test_sensitive_to_g_leak() -> None:
     R_in = 1/(g_NaL+g_KL) exactly.  This test verifies the relationship holds
     and that R_in matches the analytical expectation.
     """
-    neuron_low_gl = Neuron(g_NaL=0.027, g_KL=0.123)  # total = 0.15
-    neuron_high_gl = Neuron(g_NaL=0.108, g_KL=0.492)  # total = 0.6
+    from patch_sim.channels import make_k_leak_channel, make_na_leak_channel
+
+    neuron_low_gl = Neuron(
+        channels=(
+            make_na_leak_channel(g_max=0.027),
+            make_k_leak_channel(g_max=0.123),
+        )
+    )  # total = 0.15
+    neuron_high_gl = Neuron(
+        channels=(
+            make_na_leak_channel(g_max=0.108),
+            make_k_leak_channel(g_max=0.492),
+        )
+    )  # total = 0.6
 
     props_low = run_membrane_test(neuron_low_gl)
     props_high = run_membrane_test(neuron_high_gl)

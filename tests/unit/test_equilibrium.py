@@ -47,8 +47,10 @@ def test_find_zero_current_voltage_invalid_range() -> None:
 
 def test_find_zero_current_voltage_no_bracket() -> None:
     """ValueError is raised when the range does not bracket a root."""
-    neuron = Neuron()
-    # A range entirely below any physiological resting potential
+    from patch_sim.presets import make_squid_giant_axon
+
+    # Squid HH52 rest is near −65 mV; [−100, −95] is well below any root.
+    neuron = make_squid_giant_axon()
     with pytest.raises(ValueError, match="do not bracket a root"):
         find_zero_current_voltage(neuron, v_min=-100.0, v_max=-95.0)
 

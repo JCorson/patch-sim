@@ -7,6 +7,8 @@ returns ``None`` for non-calcium neurons.  Unit tests with synthetic
 traces live in tests/unit/test_calcium_transients.py.
 """
 
+import dataclasses
+
 import numpy as np
 
 from patch_sim.analysis.calcium_transients import (
@@ -17,9 +19,16 @@ from patch_sim.channels import GatingVariable, IonChannel, IonSpecies, NernstSpe
 from patch_sim.clamp_simulations import simulate_current_clamp
 from patch_sim.constants import PURKINJE
 from patch_sim.neuron import Neuron
-from patch_sim.presets import NEURON_PRESETS
+from patch_sim.presets import NEURON_PRESETS, make_squid_giant_axon
 from patch_sim.protocols import step_current
 from patch_sim.rates import VoltageOnlyFn
+
+
+def _hh_with(*extras: IonChannel, **overrides: object) -> Neuron:
+    """Build an HH52 squid neuron with the given extra channels appended."""
+    base = make_squid_giant_axon()
+    return dataclasses.replace(base, channels=base.channels + extras, **overrides)
+
 
 # Mock calcium channel borrowed from the calcium simulation tests.
 _CA_GATE = GatingVariable(
@@ -103,10 +112,7 @@ def test_mock_ca_channel_step_produces_recoverable_transient() -> None:
     decay τ is in the same order of magnitude as ``tau_ca``.
     """
     cd = CalciumDynamics(alpha_ca=1e-3, tau_ca=200.0, ca_rest=1e-4)
-    neuron = Neuron(
-        calcium_dynamics=cd,
-        additional_channels=(_MOCK_CALCIUM_CHANNEL,),
-    )
+    neuron = _hh_with(_MOCK_CALCIUM_CHANNEL, calcium_dynamics=cd)
     protocol = step_current(
         duration=600.0,
         current_amplitude=0.0,

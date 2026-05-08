@@ -138,7 +138,7 @@ def _gating_derivatives(
     derivs: dict[str, float] = {}
     if neuron.calcium_dynamics is not None:
         i_ca_total = 0.0
-        for ch in neuron.all_channels:
+        for ch in neuron.channels:
             if ch.carries_calcium:
                 i_ca_total += ch.compute_current(V, gating_state, neuron, ca_i=ca_i)
             for gv in ch.gating_variables:
@@ -180,7 +180,7 @@ def _hh_derivatives(
         calcium_dynamics are configured.
     """
     I_total = 0.0
-    for ch in neuron.all_channels:
+    for ch in neuron.channels:
         I_total += ch.compute_current(V, gating_state, neuron, ca_i=ca_i)
     dV = (I_ext - I_total) / neuron.C_m
     derivs, dca_i = _gating_derivatives(neuron, V, gating_state, ca_i)
@@ -293,7 +293,7 @@ def _gating_derivatives_tabled(
     phi = neuron.q10_factor
     if neuron.calcium_dynamics is not None:
         i_ca_total = 0.0
-        for ch in neuron.all_channels:
+        for ch in neuron.channels:
             if ch.carries_calcium:
                 i_ca_total += ch.compute_current(V, gating_state, neuron, ca_i=ca_i)
             for gv in ch.gating_variables:
@@ -470,13 +470,13 @@ def _simulate_voltage_clamp_core(
         "simulate_voltage_clamp: start — %d steps, %.2f ms, %d channels",
         num_time_steps,
         duration_ms,
-        len(neuron.all_channels),
+        len(neuron.channels),
     )
 
     time_step, time_array = _setup_simulation(num_time_steps, SIM_SAMPLING_FREQ)
 
     ch_current_arrs: dict[str, np.ndarray] = {
-        ch.name: np.empty(num_time_steps) for ch in neuron.all_channels
+        ch.name: np.empty(num_time_steps) for ch in neuron.channels
     }
     I_total = np.empty(num_time_steps)
 
@@ -508,9 +508,9 @@ def _simulate_voltage_clamp_core(
     V0 = voltage_protocol[0]
     ch_currents_0 = [
         ch.compute_current(V0, gating_state, neuron, ca_i=ca_i)
-        for ch in neuron.all_channels
+        for ch in neuron.channels
     ]
-    for ch, i_ch in zip(neuron.all_channels, ch_currents_0):
+    for ch, i_ch in zip(neuron.channels, ch_currents_0):
         ch_current_arrs[ch.name][0] = i_ch
     I_total[0] = sum(ch_currents_0)
 
@@ -535,9 +535,9 @@ def _simulate_voltage_clamp_core(
 
         ch_currents_i = [
             ch.compute_current(V, gating_state, neuron, ca_i=ca_i)
-            for ch in neuron.all_channels
+            for ch in neuron.channels
         ]
-        for ch, i_ch in zip(neuron.all_channels, ch_currents_i):
+        for ch, i_ch in zip(neuron.channels, ch_currents_i):
             ch_current_arrs[ch.name][i] = i_ch
         I_total[i] = sum(ch_currents_i)
 
@@ -547,7 +547,7 @@ def _simulate_voltage_clamp_core(
         ("voltage", np.float64),
         ("Itotal", np.float64),
     ]
-    for ch in neuron.all_channels:
+    for ch in neuron.channels:
         fields.append((ch.current_name, np.float64))
     for gv in neuron.all_gating_variables:
         fields.append((gv.name, np.float64))
@@ -558,7 +558,7 @@ def _simulate_voltage_clamp_core(
     results["time"] = time_array
     results["voltage"] = voltage_protocol
     results["Itotal"] = I_total
-    for ch in neuron.all_channels:
+    for ch in neuron.channels:
         results[ch.current_name] = ch_current_arrs[ch.name]
     for gv in neuron.all_gating_variables:
         results[gv.name] = gating_arrs[gv.name]
@@ -601,7 +601,7 @@ def _simulate_current_clamp_core(
         "simulate_current_clamp: start — %d steps, %.2f ms, %d channels",
         num_time_steps,
         duration_ms,
-        len(neuron.all_channels),
+        len(neuron.channels),
     )
 
     time_step, time_array = _setup_simulation(num_time_steps, SIM_SAMPLING_FREQ)
@@ -610,7 +610,7 @@ def _simulate_current_clamp_core(
     V_arr[0] = initial_V
 
     ch_current_arrs: dict[str, np.ndarray] = {
-        ch.name: np.empty(num_time_steps) for ch in neuron.all_channels
+        ch.name: np.empty(num_time_steps) for ch in neuron.channels
     }
     I_total = np.empty(num_time_steps)
 
@@ -639,9 +639,9 @@ def _simulate_current_clamp_core(
     # Compute initial currents
     ch_currents_0 = [
         ch.compute_current(initial_V, gating_state, neuron, ca_i=ca_i)
-        for ch in neuron.all_channels
+        for ch in neuron.channels
     ]
-    for ch, i_ch in zip(neuron.all_channels, ch_currents_0):
+    for ch, i_ch in zip(neuron.channels, ch_currents_0):
         ch_current_arrs[ch.name][0] = i_ch
     I_total[0] = sum(ch_currents_0)
 
@@ -666,15 +666,15 @@ def _simulate_current_clamp_core(
 
         ch_currents_i = [
             ch.compute_current(V_new, gating_state, neuron, ca_i=ca_i)
-            for ch in neuron.all_channels
+            for ch in neuron.channels
         ]
-        for ch, i_ch in zip(neuron.all_channels, ch_currents_i):
+        for ch, i_ch in zip(neuron.channels, ch_currents_i):
             ch_current_arrs[ch.name][i] = i_ch
         I_total[i] = sum(ch_currents_i)
 
     # Assemble output structured array
     fields: list[tuple[str, type]] = [("time", np.float64), ("voltage", np.float64)]
-    for ch in neuron.all_channels:
+    for ch in neuron.channels:
         fields.append((ch.current_name, np.float64))
     fields.append(("Itotal", np.float64))
     for gv in neuron.all_gating_variables:
@@ -685,7 +685,7 @@ def _simulate_current_clamp_core(
     results = np.empty(num_time_steps, dtype=np.dtype(fields))
     results["time"] = time_array
     results["voltage"] = V_arr
-    for ch in neuron.all_channels:
+    for ch in neuron.channels:
         results[ch.current_name] = ch_current_arrs[ch.name]
     results["Itotal"] = I_total
     for gv in neuron.all_gating_variables:
@@ -825,7 +825,7 @@ def simulate_voltage_clamp_from_state(
         "simulate_voltage_clamp_from_state: start — %d steps, %.2f ms, %d channels",
         num_time_steps,
         duration_ms,
-        len(neuron.all_channels),
+        len(neuron.channels),
     )
     result = _simulate_voltage_clamp_core(
         neuron, voltage_protocol, dict(initial_gating_state), initial_ca_i
@@ -873,7 +873,7 @@ def simulate_current_clamp_from_state(
         "simulate_current_clamp_from_state: start — %d steps, %.2f ms, %d channels",
         num_time_steps,
         duration_ms,
-        len(neuron.all_channels),
+        len(neuron.channels),
     )
     result = _simulate_current_clamp_core(
         neuron, current_external, initial_V, dict(initial_gating_state), initial_ca_i

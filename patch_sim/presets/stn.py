@@ -11,8 +11,8 @@ from patch_sim.channels import (
     make_ikca_channel,
     make_ikv31_channel,
     make_inap_channel,
+    make_k_leak_channel,
     make_katp_channel,
-    make_stn_k_channel,
     make_stn_na_channel,
 )
 from patch_sim.constants import (
@@ -139,18 +139,16 @@ def make_stn() -> Neuron:
         IKCa/INaP/Ih/K_ATP auxiliary channels, and tuned CalciumDynamics.
     """
     return Neuron(
-        g_Na=14.0,
-        g_K=0.0,
         v_rest=-60.0,
         Na_out=145.0,
         K_out=5.0,
-        g_NaL=0.0,
-        g_KL=0.04,
         Q10=1.0,
         T_ref=308.15,
-        na_channel_factory=make_stn_na_channel,
-        k_channel_factory=make_stn_k_channel,
-        additional_channels=(
+        channels=(
+            make_stn_na_channel(g_max=14.0),
+            # K-leak only — no Na-leak, no HH-style core K (Kv3.1 is the
+            # delayed rectifier).  See preset docstring for rationale.
+            make_k_leak_channel(g_max=0.04),
             make_icat_channel(g_max=5.0),
             make_ical_channel(g_max=0.5),
             make_ika_channel(g_max=3.0),

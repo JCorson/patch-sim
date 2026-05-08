@@ -256,7 +256,8 @@ def test_make_k_leak_channel_structure() -> None:
 def test_na_channel_current_matches_inline(V: float) -> None:
     """Na channel compute_current equals g_Na * m³ * h * (V − E_Na)."""
     neuron = Neuron()
-    ch = make_na_channel(g_max=neuron.g_Na)
+    g_Na = 120.0
+    ch = make_na_channel(g_max=g_Na)
 
     m = alpha_m(V, 0.0) / (alpha_m(V, 0.0) + beta_m(V, 0.0))
     h = alpha_h(V, 0.0) / (alpha_h(V, 0.0) + beta_h(V, 0.0))
@@ -264,7 +265,7 @@ def test_na_channel_current_matches_inline(V: float) -> None:
 
     result = ch.compute_current(V, gating_state, neuron)
     E_Na = ch.reversal_potential(neuron)
-    expected = neuron.g_Na * (m**3) * h * (V - E_Na)
+    expected = g_Na * (m**3) * h * (V - E_Na)
     assert result == pytest.approx(expected)
 
 
@@ -272,14 +273,15 @@ def test_na_channel_current_matches_inline(V: float) -> None:
 def test_k_channel_current_matches_inline(V: float) -> None:
     """K channel compute_current equals g_K * n⁴ * (V − E_K)."""
     neuron = Neuron()
-    ch = make_k_channel(g_max=neuron.g_K)
+    g_K = 36.0
+    ch = make_k_channel(g_max=g_K)
 
     n = alpha_n(V, 0.0) / (alpha_n(V, 0.0) + beta_n(V, 0.0))
     gating_state = {"n": n}
 
     result = ch.compute_current(V, gating_state, neuron)
     E_K = ch.reversal_potential(neuron)
-    expected = neuron.g_K * (n**4) * (V - E_K)
+    expected = g_K * (n**4) * (V - E_K)
     assert result == pytest.approx(expected)
 
 
@@ -287,11 +289,12 @@ def test_k_channel_current_matches_inline(V: float) -> None:
 def test_na_leak_channel_current_matches_inline(V: float) -> None:
     """Na leak channel compute_current equals g_NaL * (V − E_Na)."""
     neuron = Neuron()
-    ch = make_na_leak_channel(g_max=neuron.g_NaL)
+    g_NaL = 0.054
+    ch = make_na_leak_channel(g_max=g_NaL)
 
     result = ch.compute_current(V, {}, neuron)
     E_Na = ch.reversal_potential(neuron)
-    expected = neuron.g_NaL * (V - E_Na)
+    expected = g_NaL * (V - E_Na)
     assert result == pytest.approx(expected)
 
 
@@ -299,11 +302,12 @@ def test_na_leak_channel_current_matches_inline(V: float) -> None:
 def test_k_leak_channel_current_matches_inline(V: float) -> None:
     """K leak channel compute_current equals g_KL * (V − E_K)."""
     neuron = Neuron()
-    ch = make_k_leak_channel(g_max=neuron.g_KL)
+    g_KL = 0.246
+    ch = make_k_leak_channel(g_max=g_KL)
 
     result = ch.compute_current(V, {}, neuron)
     E_K = ch.reversal_potential(neuron)
-    expected = neuron.g_KL * (V - E_K)
+    expected = g_KL * (V - E_K)
     assert result == pytest.approx(expected)
 
 
@@ -665,7 +669,8 @@ def test_make_pospischil_k_channel_structure() -> None:
 def test_nav12_channel_current_matches_inline(V: float) -> None:
     """nav12 Na channel compute_current equals g_Na * m³ * h * sNa12 * (V − E_Na)."""
     neuron = Neuron()
-    ch = make_nav12_channel(g_max=neuron.g_Na)
+    g_Na = 120.0
+    ch = make_nav12_channel(g_max=g_Na)
 
     m = pospischil_alpha_m(V, 0.0) / (
         pospischil_alpha_m(V, 0.0) + pospischil_beta_m(V, 0.0)
@@ -678,7 +683,7 @@ def test_nav12_channel_current_matches_inline(V: float) -> None:
 
     result = ch.compute_current(V, gating_state, neuron)
     E_Na = ch.reversal_potential(neuron)
-    expected = neuron.g_Na * (m**3) * h * s * (V - E_Na)
+    expected = g_Na * (m**3) * h * s * (V - E_Na)
     assert result == pytest.approx(expected)
 
 
@@ -686,7 +691,8 @@ def test_nav12_channel_current_matches_inline(V: float) -> None:
 def test_pospischil_k_channel_current_matches_inline(V: float) -> None:
     """Pospischil K channel compute_current equals g_K * n⁴ * (V − E_K)."""
     neuron = Neuron()
-    ch = make_pospischil_k_channel(g_max=neuron.g_K)
+    g_K = 36.0
+    ch = make_pospischil_k_channel(g_max=g_K)
 
     n = pospischil_alpha_n(V, 0.0) / (
         pospischil_alpha_n(V, 0.0) + pospischil_beta_n(V, 0.0)
@@ -695,7 +701,7 @@ def test_pospischil_k_channel_current_matches_inline(V: float) -> None:
 
     result = ch.compute_current(V, gating_state, neuron)
     E_K = ch.reversal_potential(neuron)
-    expected = neuron.g_K * (n**4) * (V - E_K)
+    expected = g_K * (n**4) * (V - E_K)
     assert result == pytest.approx(expected)
 
 
@@ -1138,16 +1144,23 @@ def test_make_stn_k_channel_structure() -> None:
     assert not ch.carries_calcium
 
 
-def test_stn_preset_uses_otsuka_factories() -> None:
-    """STN preset uses make_stn_na_channel and make_stn_k_channel factories."""
+def test_stn_preset_uses_otsuka_na_kinetics() -> None:
+    """STN preset's Na channel carries the Otsuka sNa slow-inactivation gate.
+
+    Replaces the pre-#320 factory-identity check; STN's K is now Kv3.1
+    (no HH-style core K), so we only assert the Na kinetics structurally.
+    """
     from patch_sim.constants import STN
     from patch_sim.presets import NEURON_PRESETS
 
     neuron = NEURON_PRESETS[STN]()
-    # make_stn_na_channel always includes the sNa slow inactivation gate
-    # (#324 depol-block recovery), so no factory wrapping is needed.
-    assert neuron.na_channel_factory is make_stn_na_channel
-    assert neuron.k_channel_factory is make_stn_k_channel
+    by_name = {ch.name: ch for ch in neuron.channels}
+    na = by_name["Na"]
+    gate_names = {gv.name for gv in na.gating_variables}
+    # sNa is the Otsuka slow-inactivation gate (#324) — unique to make_stn_na_channel
+    assert "sNa" in gate_names
+    # Stock Otsuka kinetics also expose m and h
+    assert {"m", "h"} <= gate_names
 
 
 # ---------------------------------------------------------------------------

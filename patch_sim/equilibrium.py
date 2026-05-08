@@ -40,8 +40,7 @@ def _total_ionic_current(neuron: "Neuron", V: float, ca_i: float) -> float:
         b = gv.beta(V, ca_i)
         gating_state[gv.name] = a / (a + b)
     return sum(
-        ch.compute_current(V, gating_state, neuron, ca_i=ca_i)
-        for ch in neuron.all_channels
+        ch.compute_current(V, gating_state, neuron, ca_i=ca_i) for ch in neuron.channels
     )
 
 
@@ -190,7 +189,7 @@ def find_coupled_equilibrium(
 
         i_ca: float = sum(
             ch.compute_current(V_ss, gating_state, neuron, ca_i=ca_i)
-            for ch in neuron.all_channels
+            for ch in neuron.channels
             if ch.carries_calcium
         )
         ca_i_new = max(cd.ca_rest - cd.alpha_ca * i_ca * cd.tau_ca, _CA_NERNST_FLOOR)

@@ -4,7 +4,9 @@ Covers IonChannel math, GatingVariable steady states, Ih kinetics,
 backward compatibility with no additional channels, and validation errors.
 """
 
+import dataclasses
 import math
+from typing import Any
 
 import numpy as np
 import pytest
@@ -70,8 +72,21 @@ from patch_sim.channels.snc import _alpha_sNaP_snc, _beta_sNaP_snc
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from patch_sim.electrochemistry import nernst_potential
 from patch_sim.neuron import Neuron
+from patch_sim.presets import make_squid_giant_axon
 from patch_sim.protocols import step_current, step_voltage
 from patch_sim.rates import CalciumDependentFn, VoltageOnlyFn
+
+
+def _hh_with(*extras: IonChannel, **overrides: Any) -> Neuron:
+    """Build an HH52 squid neuron with the given extra channels appended.
+
+    Used by tests that previously relied on ``Neuron(additional_channels=...)``
+    auto-supplying the HH52 core.  Extra ``overrides`` are applied via
+    :func:`dataclasses.replace` after the channels are assembled.
+    """
+    base = make_squid_giant_axon()
+    return dataclasses.replace(base, channels=base.channels + extras, **overrides)
+
 
 # ---------------------------------------------------------------------------
 # GatingVariable
@@ -250,10 +265,7 @@ def test_reversal_potentials_excludes_ca_channels() -> None:
     """
     ca_ch = _make_ca_channel(g_max=1.0)
     k_ch = _make_simple_channel(g_max=1.0)
-    neuron = Neuron(
-        additional_channels=(ca_ch, k_ch),
-        calcium_dynamics=CalciumDynamics(),
-    )
+    neuron = _hh_with(ca_ch, k_ch, calcium_dynamics=CalciumDynamics())
     cache = neuron.reversal_potentials
     # K⁺ channel must be in the cache.
     assert "test" in cache
@@ -268,10 +280,7 @@ def test_ikca_channel_in_reversal_potentials_cache() -> None:
     functions use ca_i; its reversal potential is a fixed K⁺ Nernst value.
     """
     ikca = make_ikca_channel(g_max=1.0)
-    neuron = Neuron(
-        additional_channels=(ikca,),
-        calcium_dynamics=CalciumDynamics(),
-    )
+    neuron = _hh_with(ikca, calcium_dynamics=CalciumDynamics())
     assert "KCa" in neuron.reversal_potentials
 
 
@@ -361,11 +370,11 @@ def test_hh_duplicate_additional_channel_names_raises():
     """Duplicate additional channel names on Neuron raise ValueError."""
     ch = make_ih_channel()
     with pytest.raises(ValueError, match="names must be unique"):
-        Neuron(additional_channels=(ch, ch))
+        _hh_with(ch, ch)
 
 
-def test_hh_builtin_channel_name_collision_raises():
-    """Additional channel named 'Na' collides with built-in and raises ValueError."""
+def test_hh_duplicate_with_existing_na_raises():
+    """Adding a second channel named 'Na' to a neuron that already has one raises."""
     gv = GatingVariable(
         name="r",
         power=1,
@@ -378,8 +387,8 @@ def test_hh_builtin_channel_name_collision_raises():
         gating_variables=(gv,),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
     )
-    with pytest.raises(ValueError, match="collides with a built-in"):
-        Neuron(additional_channels=(ch,))
+    with pytest.raises(ValueError, match="names must be unique"):
+        _hh_with(ch)
 
 
 # ---------------------------------------------------------------------------
@@ -468,18 +477,18 @@ def test_voltage_clamp_no_additional_channels_identical_columns(hh_model):
     assert set(result.dtype.names) == expected
 
 
-def test_current_clamp_no_additional_channels_values_unchanged():
-    """Voltage trace is unchanged when additional_channels is empty vs. default."""
+def test_current_clamp_empty_neuron_holds_v_rest():
+    """A Neuron with no channels has no membrane currents; voltage stays at v_rest."""
     stim = step_current(
-        duration=20.0,
-        current_amplitude=10.0,
-        step_start=5.0,
-        step_duration=10.0,
+        duration=5.0,
+        current_amplitude=0.0,
+        step_start=1.0,
+        step_duration=1.0,
         sampling_frequency=40000.0,
     )
-    result_default = simulate_current_clamp(Neuron(), stim)
-    result_empty = simulate_current_clamp(Neuron(additional_channels=()), stim)
-    np.testing.assert_array_equal(result_default["voltage"], result_empty["voltage"])
+    result = simulate_current_clamp(Neuron(), stim)
+    expected = np.full_like(result["voltage"], Neuron().v_rest)
+    np.testing.assert_allclose(result["voltage"], expected, atol=1e-12)
 
 
 # ---------------------------------------------------------------------------
@@ -489,7 +498,7 @@ def test_current_clamp_no_additional_channels_values_unchanged():
 
 def test_current_clamp_with_ih_extra_columns():
     """Current clamp with h channel adds Ih and r columns."""
-    neuron = Neuron(additional_channels=(make_ih_channel(),))
+    neuron = _hh_with(make_ih_channel())
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -505,7 +514,7 @@ def test_current_clamp_with_ih_extra_columns():
 
 def test_current_clamp_ih_gating_variable_in_bounds():
     """Ih gating variable r stays in [0, 1] during current clamp."""
-    neuron = Neuron(additional_channels=(make_ih_channel(),))
+    neuron = _hh_with(make_ih_channel())
     stim = step_current(
         duration=30.0,
         current_amplitude=10.0,
@@ -520,7 +529,7 @@ def test_current_clamp_ih_gating_variable_in_bounds():
 
 def test_voltage_clamp_with_ih_extra_columns():
     """Voltage clamp with h channel adds Ih and r columns."""
-    neuron = Neuron(additional_channels=(make_ih_channel(),))
+    neuron = _hh_with(make_ih_channel())
     prot = step_voltage(
         duration=20.0,
         voltage_amplitude=-40.0,
@@ -537,7 +546,7 @@ def test_voltage_clamp_with_ih_extra_columns():
 
 def test_voltage_clamp_total_current_includes_ih():
     """total_current includes Ih contribution: I_total == I_Na + I_K + I_L + I_Ih."""
-    neuron = Neuron(additional_channels=(make_ih_channel(),))
+    neuron = _hh_with(make_ih_channel())
     prot = step_voltage(
         duration=10.0,
         voltage_amplitude=-40.0,
@@ -568,7 +577,7 @@ def test_multiple_optional_channels_coexist():
         gating_variables=(gv2,),
         reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )
-    neuron = Neuron(additional_channels=(ch1, ch2))
+    neuron = _hh_with(ch1, ch2)
     stim = step_current(
         duration=10.0,
         current_amplitude=5.0,
@@ -659,7 +668,7 @@ def test_make_ika_channel_custom_params():
 
 def test_current_clamp_with_ika_extra_columns():
     """Current clamp with Ka channel adds IKa, a, and b columns."""
-    neuron = Neuron(additional_channels=(make_ika_channel(),))
+    neuron = _hh_with(make_ika_channel())
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -676,7 +685,7 @@ def test_current_clamp_with_ika_extra_columns():
 
 def test_current_clamp_ika_gating_in_bounds():
     """IKa gating variables a and b stay in [0, 1] during current clamp."""
-    neuron = Neuron(additional_channels=(make_ika_channel(),))
+    neuron = _hh_with(make_ika_channel())
     stim = step_current(
         duration=30.0,
         current_amplitude=10.0,
@@ -693,7 +702,7 @@ def test_current_clamp_ika_gating_in_bounds():
 
 def test_voltage_clamp_with_ika_extra_columns():
     """Voltage clamp with Ka channel adds IKa, a, and b columns."""
-    neuron = Neuron(additional_channels=(make_ika_channel(),))
+    neuron = _hh_with(make_ika_channel())
     prot = step_voltage(
         duration=20.0,
         voltage_amplitude=0.0,
@@ -711,7 +720,7 @@ def test_voltage_clamp_with_ika_extra_columns():
 
 def test_ika_and_ih_coexist():
     """Ka and h channels can coexist and each contributes its columns."""
-    neuron = Neuron(additional_channels=(make_ika_channel(), make_ih_channel()))
+    neuron = _hh_with(make_ika_channel(), make_ih_channel())
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -785,7 +794,7 @@ def test_current_clamp_with_ikv31():
     """Current clamp with IKv31 channel adds Kv31 and nk columns."""
     from patch_sim.channels import make_ikv31_channel
 
-    neuron = Neuron(additional_channels=(make_ikv31_channel(),))
+    neuron = _hh_with(make_ikv31_channel())
     stimulus = np.zeros(int(40_000 * 0.05))
     result = simulate_current_clamp(neuron=neuron, current_external=stimulus)
     assert "IKv31" in result.dtype.names
@@ -1018,7 +1027,7 @@ def test_make_snc_inap_channel_custom_params():
 
 def test_current_clamp_with_inap_extra_columns():
     """Current clamp with INaP channel exposes both p and sNaP gating columns."""
-    neuron = Neuron(additional_channels=(make_inap_channel(),))
+    neuron = _hh_with(make_inap_channel())
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -1035,7 +1044,7 @@ def test_current_clamp_with_inap_extra_columns():
 
 def test_voltage_clamp_with_inap_extra_columns():
     """Voltage clamp with NaP channel adds INaP and p columns."""
-    neuron = Neuron(additional_channels=(make_inap_channel(),))
+    neuron = _hh_with(make_inap_channel())
     prot = step_voltage(
         duration=20.0,
         voltage_amplitude=0.0,
@@ -1052,7 +1061,7 @@ def test_voltage_clamp_with_inap_extra_columns():
 
 def test_current_clamp_inap_gating_in_bounds():
     """INaP gating variable p stays in [0, 1] during current clamp."""
-    neuron = Neuron(additional_channels=(make_inap_channel(),))
+    neuron = _hh_with(make_inap_channel())
     stim = step_current(
         duration=30.0,
         current_amplitude=10.0,
@@ -1067,7 +1076,7 @@ def test_current_clamp_inap_gating_in_bounds():
 
 def test_current_clamp_inap_slow_inactivation_gating_in_bounds():
     """Both p and sNaP gates stay in [0, 1] during current clamp."""
-    neuron = Neuron(additional_channels=(make_inap_channel(),))
+    neuron = _hh_with(make_inap_channel())
     stim = step_current(
         duration=30.0,
         current_amplitude=10.0,
@@ -1176,7 +1185,7 @@ def test_make_inar_channel_custom_params():
 
 def test_current_clamp_with_inar_extra_columns():
     """Current clamp with NaR channel adds INaR, s, and hr columns."""
-    neuron = Neuron(additional_channels=(make_inar_channel(),))
+    neuron = _hh_with(make_inar_channel())
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -1193,7 +1202,7 @@ def test_current_clamp_with_inar_extra_columns():
 
 def test_voltage_clamp_with_inar_extra_columns():
     """Voltage clamp with NaR channel adds INaR, s, and hr columns."""
-    neuron = Neuron(additional_channels=(make_inar_channel(),))
+    neuron = _hh_with(make_inar_channel())
     prot = step_voltage(
         duration=20.0,
         voltage_amplitude=0.0,
@@ -1211,7 +1220,7 @@ def test_voltage_clamp_with_inar_extra_columns():
 
 def test_current_clamp_inar_gating_in_bounds():
     """INaR gating variables s and hr stay in [0, 1] during current clamp."""
-    neuron = Neuron(additional_channels=(make_inar_channel(),))
+    neuron = _hh_with(make_inar_channel())
     stim = step_current(
         duration=30.0,
         current_amplitude=10.0,
@@ -1228,7 +1237,7 @@ def test_current_clamp_inar_gating_in_bounds():
 
 def test_inap_and_inar_coexist():
     """NaP and NaR channels can coexist and each contributes columns."""
-    neuron = Neuron(additional_channels=(make_inap_channel(), make_inar_channel()))
+    neuron = _hh_with(make_inap_channel(), make_inar_channel())
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -1253,12 +1262,7 @@ def test_inap_slow_inactivation_and_inar_no_gate_collision():
     INaP's slow inactivation gate must be named ``sNaP`` (not ``s``) to
     avoid aliasing with :func:`make_inar_channel`'s activation gate.
     """
-    neuron = Neuron(
-        additional_channels=(
-            make_inap_channel(),
-            make_inar_channel(),
-        )
-    )
+    neuron = _hh_with(make_inap_channel(), make_inar_channel())
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -1277,16 +1281,14 @@ def test_all_additional_channels_coexist():
     """All seven additional channels (Ih, IKa, INaP, INaR, IM, IKir, IKCa) coexist."""
     from patch_sim.calcium import CalciumDynamics
 
-    neuron = Neuron(
-        additional_channels=(
-            make_ih_channel(),
-            make_ika_channel(),
-            make_inap_channel(),
-            make_inar_channel(),
-            make_im_channel(),
-            make_ikir_channel(),
-            make_ikca_channel(),
-        ),
+    neuron = _hh_with(
+        make_ih_channel(),
+        make_ika_channel(),
+        make_inap_channel(),
+        make_inar_channel(),
+        make_im_channel(),
+        make_ikir_channel(),
+        make_ikca_channel(),
         calcium_dynamics=CalciumDynamics(),
     )
     stim = step_current(
@@ -1379,7 +1381,7 @@ def test_make_im_channel_custom_params():
 
 def test_current_clamp_with_im_extra_columns():
     """Current clamp with M channel adds IM and w columns."""
-    neuron = Neuron(additional_channels=(make_im_channel(),))
+    neuron = _hh_with(make_im_channel())
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -1395,7 +1397,7 @@ def test_current_clamp_with_im_extra_columns():
 
 def test_voltage_clamp_with_im_extra_columns():
     """Voltage clamp with M channel adds IM and w columns."""
-    neuron = Neuron(additional_channels=(make_im_channel(),))
+    neuron = _hh_with(make_im_channel())
     prot = step_voltage(
         duration=20.0,
         voltage_amplitude=0.0,
@@ -1412,7 +1414,7 @@ def test_voltage_clamp_with_im_extra_columns():
 
 def test_current_clamp_im_gating_in_bounds():
     """IM gating variable w stays in [0, 1] during current clamp."""
-    neuron = Neuron(additional_channels=(make_im_channel(),))
+    neuron = _hh_with(make_im_channel())
     stim = step_current(
         duration=30.0,
         current_amplitude=10.0,
@@ -1575,7 +1577,7 @@ def test_make_ikir_channel_custom_params():
 
 def test_current_clamp_with_ikir_extra_columns():
     """Current clamp with Kir channel adds IKir and kir columns."""
-    neuron = Neuron(additional_channels=(make_ikir_channel(),))
+    neuron = _hh_with(make_ikir_channel())
     stim = step_current(
         duration=20.0,
         current_amplitude=10.0,
@@ -1591,7 +1593,7 @@ def test_current_clamp_with_ikir_extra_columns():
 
 def test_voltage_clamp_with_ikir_extra_columns():
     """Voltage clamp with Kir channel adds IKir and kir columns."""
-    neuron = Neuron(additional_channels=(make_ikir_channel(),))
+    neuron = _hh_with(make_ikir_channel())
     prot = step_voltage(
         duration=20.0,
         voltage_amplitude=0.0,
@@ -1608,7 +1610,7 @@ def test_voltage_clamp_with_ikir_extra_columns():
 
 def test_current_clamp_ikir_gating_in_bounds():
     """IKir gating variable kir stays in [0, 1] during current clamp."""
-    neuron = Neuron(additional_channels=(make_ikir_channel(),))
+    neuron = _hh_with(make_ikir_channel())
     stim = step_current(
         duration=30.0,
         current_amplitude=10.0,
@@ -1642,8 +1644,8 @@ def test_calcium_gating_variable_in_integrator():
     )
     from patch_sim.calcium import CalciumDynamics
 
-    neuron = Neuron(
-        additional_channels=(ch,),
+    neuron = _hh_with(
+        ch,
         calcium_dynamics=CalciumDynamics(),
     )
     stim = step_current(
@@ -1679,7 +1681,7 @@ def test_calcium_gating_variable_steady_state_depends_on_ca():
 
 def test_existing_channels_unaffected_by_calcium_gating_infra():
     """Voltage-only channels still work alongside Ca²⁺-sensitive gate infrastructure."""
-    neuron = Neuron(additional_channels=(make_ih_channel(), make_ika_channel()))
+    neuron = _hh_with(make_ih_channel(), make_ika_channel())
     stim = step_current(
         duration=10.0,
         current_amplitude=10.0,
@@ -1786,8 +1788,8 @@ def test_current_clamp_with_ikca():
     """Current clamp with KCa channel adds IKCa and q columns."""
     from patch_sim.calcium import CalciumDynamics
 
-    neuron = Neuron(
-        additional_channels=(make_ikca_channel(),),
+    neuron = _hh_with(
+        make_ikca_channel(),
         calcium_dynamics=CalciumDynamics(),
     )
     stim = step_current(
@@ -1807,8 +1809,8 @@ def test_current_clamp_ikca_gating_in_bounds():
     """IKCa gating variable q stays in [0, 1] during current clamp."""
     from patch_sim.calcium import CalciumDynamics
 
-    neuron = Neuron(
-        additional_channels=(make_ikca_channel(),),
+    neuron = _hh_with(
+        make_ikca_channel(),
         calcium_dynamics=CalciumDynamics(),
     )
     stim = step_current(
@@ -1872,8 +1874,8 @@ def test_current_clamp_with_ical_extra_columns():
     """Current clamp with CaL channel adds ICaL, d, and f columns."""
     from patch_sim.calcium import CalciumDynamics
 
-    neuron = Neuron(
-        additional_channels=(make_ical_channel(),),
+    neuron = _hh_with(
+        make_ical_channel(),
         calcium_dynamics=CalciumDynamics(),
     )
     stim = step_current(
@@ -1894,8 +1896,8 @@ def test_current_clamp_ical_gating_in_bounds():
     """ICaL gating variables d and f stay in [0, 1] during current clamp."""
     from patch_sim.calcium import CalciumDynamics
 
-    neuron = Neuron(
-        additional_channels=(make_ical_channel(),),
+    neuron = _hh_with(
+        make_ical_channel(),
         calcium_dynamics=CalciumDynamics(),
     )
     stim = step_current(
@@ -1916,8 +1918,8 @@ def test_voltage_clamp_with_ical_extra_columns():
     """Voltage clamp with CaL channel adds ICaL, d, and f columns."""
     from patch_sim.calcium import CalciumDynamics
 
-    neuron = Neuron(
-        additional_channels=(make_ical_channel(),),
+    neuron = _hh_with(
+        make_ical_channel(),
         calcium_dynamics=CalciumDynamics(),
     )
     prot = step_voltage(
@@ -1984,8 +1986,8 @@ def test_current_clamp_with_icat_extra_columns():
     """Current clamp with CaT channel adds ICaT, dt, and ft columns."""
     from patch_sim.calcium import CalciumDynamics
 
-    neuron = Neuron(
-        additional_channels=(make_icat_channel(),),
+    neuron = _hh_with(
+        make_icat_channel(),
         calcium_dynamics=CalciumDynamics(),
     )
     stim = step_current(
@@ -2006,8 +2008,8 @@ def test_current_clamp_icat_gating_in_bounds():
     """ICaT gating variables dt and ft stay in [0, 1] during current clamp."""
     from patch_sim.calcium import CalciumDynamics
 
-    neuron = Neuron(
-        additional_channels=(make_icat_channel(),),
+    neuron = _hh_with(
+        make_icat_channel(),
         calcium_dynamics=CalciumDynamics(),
     )
     stim = step_current(
@@ -2028,8 +2030,8 @@ def test_voltage_clamp_with_icat_extra_columns():
     """Voltage clamp with CaT channel adds ICaT, dt, and ft columns."""
     from patch_sim.calcium import CalciumDynamics
 
-    neuron = Neuron(
-        additional_channels=(make_icat_channel(),),
+    neuron = _hh_with(
+        make_icat_channel(),
         calcium_dynamics=CalciumDynamics(),
     )
     prot = step_voltage(
@@ -2178,8 +2180,8 @@ def test_current_clamp_with_ican_extra_columns():
     """Current clamp with CaN channel adds ICaN, dn, and fn columns."""
     from patch_sim.calcium import CalciumDynamics
 
-    neuron = Neuron(
-        additional_channels=(make_ican_channel(),),
+    neuron = _hh_with(
+        make_ican_channel(),
         calcium_dynamics=CalciumDynamics(),
     )
     stim = step_current(
@@ -2200,8 +2202,8 @@ def test_current_clamp_ican_gating_in_bounds():
     """ICaN gating variables dn and fn stay in [0, 1] during current clamp."""
     from patch_sim.calcium import CalciumDynamics
 
-    neuron = Neuron(
-        additional_channels=(make_ican_channel(),),
+    neuron = _hh_with(
+        make_ican_channel(),
         calcium_dynamics=CalciumDynamics(),
     )
     stim = step_current(
@@ -2222,8 +2224,8 @@ def test_voltage_clamp_with_ican_extra_columns():
     """Voltage clamp with CaN channel adds ICaN, dn, and fn columns."""
     from patch_sim.calcium import CalciumDynamics
 
-    neuron = Neuron(
-        additional_channels=(make_ican_channel(),),
+    neuron = _hh_with(
+        make_ican_channel(),
         calcium_dynamics=CalciumDynamics(),
     )
     prot = step_voltage(

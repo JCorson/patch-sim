@@ -5,6 +5,7 @@ from typing import Any
 from patch_sim.calcium import CalciumDynamics
 from patch_sim.channels import (
     make_ih_channel,
+    make_k_leak_channel,
     make_thalamic_relay_icat_channel,
     make_thalamic_relay_k_channel,
     make_thalamic_relay_na_channel,
@@ -123,15 +124,13 @@ def make_thalamic_relay() -> Neuron:
         Ih, and tuned CalciumDynamics.
     """
     return Neuron(
-        g_Na=45.0,
-        g_K=10.0,
         v_rest=-69.2550,
-        g_NaL=0.0,
-        g_KL=0.19,
         T_ref=309.15,
-        na_channel_factory=make_thalamic_relay_na_channel,
-        k_channel_factory=make_thalamic_relay_k_channel,
-        additional_channels=(
+        channels=(
+            make_thalamic_relay_na_channel(g_max=45.0),
+            make_thalamic_relay_k_channel(g_max=10.0),
+            # K-leak only — pure-K⁺ background.
+            make_k_leak_channel(g_max=0.19),
             make_thalamic_relay_icat_channel(g_max=2.5),
             make_ih_channel(g_max=1.0),
         ),
