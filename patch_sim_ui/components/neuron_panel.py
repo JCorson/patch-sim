@@ -288,7 +288,7 @@ def neuron_panel() -> rx.Component:
                 rx.accordion.root(
                     rx.accordion.item(
                         header=rx.text(
-                            "Channels (g_max in mS/cm²)",
+                            "Channels",
                             size="2",
                             weight="bold",
                             color="var(--gray-12)",
