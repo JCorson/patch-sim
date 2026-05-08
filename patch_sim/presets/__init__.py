@@ -31,7 +31,7 @@ from . import (
     purkinje,
     squid,
     stn,
-    thalamic,
+    thalamocortical,
     trn,
 )
 from .ca1 import make_ca1_pyramidal
@@ -46,7 +46,7 @@ from .protocols import (
 from .purkinje import make_purkinje
 from .squid import make_squid_giant_axon
 from .stn import make_stn
-from .thalamic import make_thalamic_relay
+from .thalamocortical import make_thalamic_relay
 from .trn import make_trn
 
 NEURON_PRESETS: dict[str, Callable[[], Neuron]] = {
@@ -67,7 +67,7 @@ NEURON_PROTOCOL_ADJUSTMENTS: dict[str, dict[str, dict[str, Any]]] = {
     CORTICAL_PYRAMIDAL: cortical.PROTOCOL_ADJUSTMENTS,
     PURKINJE: purkinje.PROTOCOL_ADJUSTMENTS,
     DOPAMINERGIC: dopaminergic.PROTOCOL_ADJUSTMENTS,
-    THALAMIC_RELAY: thalamic.PROTOCOL_ADJUSTMENTS,
+    THALAMIC_RELAY: thalamocortical.PROTOCOL_ADJUSTMENTS,
     CA1_PYRAMIDAL: ca1.PROTOCOL_ADJUSTMENTS,
     STN: stn.PROTOCOL_ADJUSTMENTS,
     TRN: trn.PROTOCOL_ADJUSTMENTS,
