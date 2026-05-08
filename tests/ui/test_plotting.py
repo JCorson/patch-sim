@@ -287,6 +287,56 @@ def test_build_figure_empty_sweeps_no_error() -> None:
     assert isinstance(fig, go.Figure)
 
 
+def test_build_figure_vc_skips_classic_columns_absent_from_simulation() -> None:
+    """build_figure must not crash when a preset omits IK / INaL / IKL columns.
+
+    Cortical Pyramidal and STN drop the HH-style core ``"K"`` channel since
+    #320, so their voltage-clamp results have no ``IK`` / ``IKL`` / ``INaL``
+    columns and no ``n`` gate.  The ``Sweep.from_result`` classifier then
+    leaves the corresponding classic attributes (``potassium_current``,
+    ``k_leak_current``, ``na_leak_current``, ``potassium_activation``) as
+    empty lists.  Default ``TraceVisibility`` has all five flags set to True;
+    before this regression fix, the multi-sweep hover-table path called
+    ``np.array([[], []], dtype=float)[:, indices]`` and raised
+    ``IndexError: index 0 is out of bounds for axis 1 with size 0``.
+
+    Regression for the runtime crash hit by the Na+ Channel Activation
+    protocol on Cortical Pyramidal in voltage-clamp mode (which produces
+    multiple sweeps, exercising the ``is_multi_sweep`` hover-table path).
+    """
+    n = _N
+    t = np.linspace(0.0, 50.0, n)
+    # Build a result that mirrors what Cortical Pyramidal produces in VC:
+    # INa is present, IK/INaL/IKL/n are not.
+    fields = [
+        ("time", np.float64),
+        ("voltage", np.float64),
+        ("Itotal", np.float64),
+        ("INa", np.float64),
+        ("m", np.float64),
+        ("h", np.float64),
+    ]
+    result = np.empty(n, dtype=np.dtype(fields))
+    result["time"] = t
+    result["voltage"] = np.full(n, -65.0)
+    result["Itotal"] = np.zeros(n)
+    result["INa"] = np.zeros(n)
+    result["m"] = np.full(n, 0.05)
+    result["h"] = np.full(n, 0.6)
+    # Two sweeps so build_figure takes the is_multi_sweep hover-table path.
+    sweep1 = Sweep.from_result(
+        result, _make_stimulus(n), "s1", "#888888", "Voltage Clamp"
+    )
+    sweep2 = Sweep.from_result(
+        result, _make_stimulus(n), "s2", "#999999", "Voltage Clamp"
+    )
+
+    fig = build_figure(
+        [sweep1, sweep2], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
+    assert isinstance(fig, go.Figure)
+
+
 # ---------------------------------------------------------------------------
 # build_figure — single-sweep trace counts
 # ---------------------------------------------------------------------------

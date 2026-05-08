@@ -203,18 +203,26 @@ def _build_hover_tables(
         return _fmt_table(header, row_groups)
 
     # --- Response subplot (row 1) ---
-    # Col spec: (header_label, source, data_key)
+    # Col spec: (header_label, source, data_key).  Classic-column attrs are
+    # ``[]`` when the corresponding simulation column is absent (e.g. Cortical
+    # Pyramidal omits the ``"K"`` channel since #320, so ``IK``/``potassium_current``
+    # has no data); skip such columns to avoid an IndexError when building
+    # hover tables.
+    def _has_classic(attr: str) -> bool:
+        """True if the first sweep has any samples for ``attr``."""
+        return bool(getattr(current_sweeps[0], attr))
+
     if is_vc:
         resp_cols: list[tuple[str, str, str]] = []
-        if visibility.total_current:
+        if visibility.total_current and _has_classic("total_current"):
             resp_cols.append(("I_total", "classic", "total_current"))
-        if visibility.sodium_current:
+        if visibility.sodium_current and _has_classic("sodium_current"):
             resp_cols.append(("I_Na", "classic", "sodium_current"))
-        if visibility.potassium_current:
+        if visibility.potassium_current and _has_classic("potassium_current"):
             resp_cols.append(("I_K", "classic", "potassium_current"))
-        if visibility.na_leak_current:
+        if visibility.na_leak_current and _has_classic("na_leak_current"):
             resp_cols.append(("I_NaL", "classic", "na_leak_current"))
-        if visibility.k_leak_current:
+        if visibility.k_leak_current and _has_classic("k_leak_current"):
             resp_cols.append(("I_KL", "classic", "k_leak_current"))
         for ch_name in add_current_keys:
             if visibility.additional_currents.get(ch_name, True):
@@ -225,12 +233,15 @@ def _build_hover_tables(
     resp_html = _build_rows_html(resp_cols, "additional_currents", ".2f")
 
     # --- Gating subplot (row 2) ---
+    # Classic gating attrs are ``[]`` when the corresponding gate is absent
+    # (e.g. Cortical Pyramidal omits the ``"K"`` channel and therefore the
+    # ``n`` gate); skip such columns for the same reason as the current cols.
     gating_cols: list[tuple[str, str, str]] = []
-    if visibility.potassium_activation:
+    if visibility.potassium_activation and _has_classic("potassium_activation"):
         gating_cols.append(("n", "classic", "potassium_activation"))
-    if visibility.sodium_activation:
+    if visibility.sodium_activation and _has_classic("sodium_activation"):
         gating_cols.append(("m", "classic", "sodium_activation"))
-    if visibility.sodium_inactivation:
+    if visibility.sodium_inactivation and _has_classic("sodium_inactivation"):
         gating_cols.append(("h", "classic", "sodium_inactivation"))
     for gv_name in add_gating_keys:
         if visibility.additional_gating.get(gv_name, True):
@@ -705,11 +716,24 @@ def build_figure(
         )
 
         # Carrier y values mirror the first sweep so autorange is unaffected.
+        # Pick the first non-empty gating attribute so presets that omit the
+        # ``n`` gate (e.g. Cortical Pyramidal, STN since #320) still produce
+        # a valid carrier; fall back to zeros if no gating column exists.
         if is_vc:
             carrier_y1 = np.asarray(first.total_current)[indices]
         else:
             carrier_y1 = np.asarray(first.voltage)[indices]
-        carrier_y_gating = np.asarray(first.potassium_activation)[indices]
+        for _gating_attr in (
+            "potassium_activation",
+            "sodium_activation",
+            "sodium_inactivation",
+        ):
+            _gating_data = getattr(first, _gating_attr)
+            if _gating_data:
+                carrier_y_gating = np.asarray(_gating_data)[indices]
+                break
+        else:
+            carrier_y_gating = np.zeros_like(carrier_x)
         carrier_y_stim = np.asarray(first.stimulus)[indices]
 
         transparent = dict(color="rgba(0,0,0,0)")
