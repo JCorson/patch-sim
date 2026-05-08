@@ -3,7 +3,6 @@
 import dataclasses
 import hashlib
 import logging
-from collections.abc import Callable
 from typing import Any, AsyncGenerator
 
 import reflex as rx
@@ -11,8 +10,6 @@ import reflex as rx
 import patch_sim
 import patch_sim.channels
 from patch_sim.constants import (
-    CA1_PYRAMIDAL,
-    CORTICAL_PYRAMIDAL,
     DEFAULT_G_CAV13,
     DEFAULT_G_ICAL,
     DEFAULT_G_ICAN,
@@ -28,44 +25,11 @@ from patch_sim.constants import (
     DEFAULT_G_NAP,
     DEFAULT_G_NAR,
     DEFAULT_G_SK,
-    DOPAMINERGIC,
-    FAST_SPIKING_INTERNEURON,
-    PURKINJE,
-    SQUID_GIANT_AXON,
-    STN,
-    THALAMIC_RELAY,
-    TRN,
 )
-from patch_sim.presets import (
-    make_ca1_pyramidal,
-    make_cortical_pyramidal,
-    make_dopaminergic,
-    make_fast_spiking_interneuron,
-    make_purkinje,
-    make_squid_giant_axon,
-    make_stn,
-    make_thalamic_relay,
-    make_trn,
-)
+from patch_sim.presets import NEURON_PRESETS
 from patch_sim_ui import presets
 from patch_sim_ui.channels import ADDITIONAL_CHANNELS
 from patch_sim_ui.state._common import _set_float
-
-#: Maps preset display name → zero-arg factory returning a fully-configured
-#: :class:`~patch_sim.Neuron`.  Used by :meth:`NeuronState._build_neuron` to
-#: obtain the preset-tuned baseline before overlaying scalar slider values
-#: with :func:`dataclasses.replace`.
-_PRESET_FACTORIES: dict[str, Callable[[], "patch_sim.Neuron"]] = {
-    SQUID_GIANT_AXON: make_squid_giant_axon,
-    FAST_SPIKING_INTERNEURON: make_fast_spiking_interneuron,
-    CORTICAL_PYRAMIDAL: make_cortical_pyramidal,
-    PURKINJE: make_purkinje,
-    DOPAMINERGIC: make_dopaminergic,
-    THALAMIC_RELAY: make_thalamic_relay,
-    CA1_PYRAMIDAL: make_ca1_pyramidal,
-    STN: make_stn,
-    TRN: make_trn,
-}
 
 _NEURON_FLOAT_FIELDS: list[str] = list(presets.NEURON_CONFIG_SCALAR_FIELDS)
 
@@ -373,7 +337,7 @@ class NeuronState(rx.State):
             current sliders and whose channel composition matches the
             active preset.
         """
-        factory = _PRESET_FACTORIES.get(self.active_neuron_type)
+        factory = NEURON_PRESETS.get(self.active_neuron_type)
         baseline = factory() if factory is not None else patch_sim.Neuron()
         scalar_overrides = {
             name: getattr(self, name) for name in presets.NEURON_CONFIG_SCALAR_FIELDS
