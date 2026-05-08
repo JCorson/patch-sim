@@ -2,7 +2,7 @@
 
 import reflex as rx
 
-from patch_sim_ui.channels import ADDITIONAL_CHANNELS
+from patch_sim_ui.channels import ADDITIONAL_CHANNELS, HH_CLASSIC_CHANNEL_IDS
 from patch_sim_ui.constants import CURRENT_CLAMP
 from patch_sim_ui.state import SimulationState
 from patch_sim_ui.state.log import LogState
@@ -95,17 +95,24 @@ def _channel_trace_group(
     )
 
 
-# HH-classic core channels keep their legacy show_sodium_current /
-# show_potassium_current / show_na_leak_current / show_k_leak_current
-# checkboxes (rendered explicitly in the popovers below); only auxiliary
-# channels are derived from the registry here.
-_LEGACY_CORE_IDS: frozenset[str] = frozenset({"na", "k", "nal", "kl"})
+# HH-classic core channel current trace specs — rendered as flat checkboxes
+# in the voltage-clamp popover's "Currents" section.  Their gating is shown
+# separately as per-gate toggles (n / m / h) elsewhere.
+_CORE_CURRENT_TRACE_SPECS = [
+    (
+        ch.current_label,
+        NeuronState.visible_channel_ids.contains(ch.id),
+        getattr(VisibilityState, ch.current_visibility_field),
+        getattr(VisibilityState, f"set_{ch.current_visibility_field}"),
+    )
+    for ch in ADDITIONAL_CHANNELS
+    if ch.id in HH_CLASSIC_CHANNEL_IDS
+]
 
-# (header, visible_var, current_label, current_var, current_handler,
-#  gating_label, gating_var, gating_handler)
-# Derived from the channel registry in patch_sim_ui.channels.
-# ``visible_var`` is gated on the same predicate as the neuron panel, so the
-# trace-visibility popover shows the same set of channels as the panel.
+# Per-channel auxiliary trace specs (current + joint gating checkbox) —
+# rendered as per-channel sub-groups in both popovers.  Excludes HH-classic
+# core channels whose currents go in the flat "Currents" section above and
+# whose gating uses the per-gate toggles.
 _ADDITIONAL_CHANNEL_TRACE_SPECS = [
     (
         ch.label,
@@ -118,8 +125,31 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
         getattr(VisibilityState, f"set_{ch.gating_visibility_field}"),
     )
     for ch in ADDITIONAL_CHANNELS
-    if ch.id not in _LEGACY_CORE_IDS
+    if ch.id not in HH_CLASSIC_CHANNEL_IDS
 ]
+
+
+def _core_current_section() -> rx.Component:
+    """Render the flat HH-classic core current checkboxes.
+
+    Each checkbox is wrapped in ``rx.cond`` so it only appears when the
+    active preset includes that channel (matching the per-aux-channel
+    sub-groups).
+
+    Returns:
+        A fragment containing the four core current checkboxes.
+    """
+    return rx.fragment(
+        *[
+            rx.cond(
+                visible_var,
+                _trace_checkbox(label, current_var, current_handler),
+            )
+            for label, visible_var, current_var, current_handler in (
+                _CORE_CURRENT_TRACE_SPECS
+            )
+        ]
+    )
 
 
 def _additional_channels_section(*, include_current: bool = True) -> rx.Component:
@@ -200,26 +230,7 @@ def _vc_popover_content() -> rx.Component:
             VisibilityState.show_total_current,
             VisibilityState.set_show_total_current,
         ),
-        _trace_checkbox(
-            "I_Na",
-            VisibilityState.show_sodium_current,
-            VisibilityState.set_show_sodium_current,
-        ),
-        _trace_checkbox(
-            "I_K",
-            VisibilityState.show_potassium_current,
-            VisibilityState.set_show_potassium_current,
-        ),
-        _trace_checkbox(
-            "I_NaL (Na⁺ leak)",
-            VisibilityState.show_na_leak_current,
-            VisibilityState.set_show_na_leak_current,
-        ),
-        _trace_checkbox(
-            "I_KL (K⁺ leak)",
-            VisibilityState.show_k_leak_current,
-            VisibilityState.set_show_k_leak_current,
-        ),
+        _core_current_section(),
         rx.separator(),
         _section_label("Gating Variables"),
         _trace_checkbox(

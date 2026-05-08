@@ -121,10 +121,10 @@ def test_from_result_classic_columns_are_populated() -> None:
     stim = _make_stimulus()
     s = Sweep.from_result(df, stim, "A", "#fff", "Current Clamp")
     assert len(s.voltage) == _N
-    assert len(s.sodium_current) == _N
-    assert len(s.potassium_current) == _N
-    assert len(s.na_leak_current) == _N
-    assert len(s.k_leak_current) == _N
+    assert len(s.channel_currents["INa"]) == _N
+    assert len(s.channel_currents["IK"]) == _N
+    assert len(s.channel_currents["INaL"]) == _N
+    assert len(s.channel_currents["IKL"]) == _N
     assert len(s.total_current) == _N
     assert len(s.potassium_activation) == _N
     assert len(s.sodium_activation) == _N
@@ -147,30 +147,33 @@ def test_from_result_stimulus_stored() -> None:
     assert s.stimulus == pytest.approx(stim.tolist())
 
 
-def test_from_result_no_extra_columns_gives_empty_dicts() -> None:
-    """With only classic columns both additional dicts are empty."""
+def test_from_result_no_extra_columns_gives_only_core_currents() -> None:
+    """With only classic columns the gating dict is empty and channel_currents.
+
+    holds the four HH-classic core entries (``INa``, ``IK``, ``INaL``, ``IKL``).
+    """
     s = Sweep.from_result(_make_result(), _make_stimulus(), "", "", "Current Clamp")
-    assert s.additional_currents == {}
+    assert set(s.channel_currents.keys()) == {"INa", "IK", "INaL", "IKL"}
     assert s.additional_gating == {}
 
 
-def test_from_result_i_prefix_goes_to_additional_currents() -> None:
-    """Extra columns starting with I are placed in additional_currents."""
+def test_from_result_i_prefix_goes_to_channel_currents() -> None:
+    """Extra columns starting with I are placed in channel_currents."""
     extra = {"Ih": list(np.ones(_N) * 0.5)}
     s = Sweep.from_result(
         _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
     )
-    assert "Ih" in s.additional_currents
-    assert s.additional_currents["Ih"] == pytest.approx([0.5] * _N)
+    assert "Ih" in s.channel_currents
+    assert s.channel_currents["Ih"] == pytest.approx([0.5] * _N)
 
 
 def test_from_result_i_prefix_key_is_column_name() -> None:
-    """The column name is used as-is as the key in additional_currents."""
+    """The column name is used as-is as the key in channel_currents."""
     extra = {"IKa": list(np.zeros(_N))}
     s = Sweep.from_result(
         _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
     )
-    assert list(s.additional_currents.keys()) == ["IKa"]
+    assert "IKa" in s.channel_currents
 
 
 def test_from_result_non_current_extra_goes_to_additional_gating() -> None:
@@ -180,7 +183,7 @@ def test_from_result_non_current_extra_goes_to_additional_gating() -> None:
         _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
     )
     assert "r" in s.additional_gating
-    assert "r" not in s.additional_currents
+    assert "r" not in s.channel_currents
     assert s.additional_gating["r"] == pytest.approx([0.4] * _N)
 
 
@@ -194,7 +197,7 @@ def test_from_result_multiple_extra_columns_classified() -> None:
     s = Sweep.from_result(
         _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
     )
-    assert set(s.additional_currents.keys()) == {"IKa"}
+    assert "IKa" in s.channel_currents
     assert set(s.additional_gating.keys()) == {"a", "b"}
 
 
@@ -236,18 +239,16 @@ def test_from_result_label_and_color_stored() -> None:
 
 
 def _all_flags_true() -> TraceVisibility:
-    """Return a TraceVisibility with all classic flags set to True.
+    """Return a TraceVisibility with every flag set to True.
 
     Returns:
-        A TraceVisibility instance with every flag enabled.
+        A TraceVisibility instance with every flag enabled.  Per-channel
+        and per-gate dict fields are left as empty defaults, which
+        ``build_figure`` interprets as "show all".
     """
     return TraceVisibility(
         voltage=True,
         total_current=True,
-        sodium_current=True,
-        potassium_current=True,
-        na_leak_current=True,
-        k_leak_current=True,
         potassium_activation=True,
         sodium_activation=True,
         sodium_inactivation=True,
@@ -665,10 +666,7 @@ def test_build_hover_tables_vc_all_current_flags_off_resp_returns_empty_strings(
     sweeps = [_make_sweep(label="A"), _make_sweep(label="B")]
     vis = TraceVisibility(
         total_current=False,
-        sodium_current=False,
-        potassium_current=False,
-        na_leak_current=False,
-        k_leak_current=False,
+        channel_currents={"INa": False, "IK": False, "INaL": False, "IKL": False},
     )
     args = {**_default_hover_args(sweeps, is_vc=True), "visibility": vis}
     resp, _, _ = _build_hover_tables(**args)
@@ -698,20 +696,26 @@ def test_compute_trace_visibility_map_cc_single_sweep_classic_fields() -> None:
     assert result["show_potassium_activation"] == [1]
     assert result["show_sodium_activation"] == [2]
     assert result["show_sodium_inactivation"] == [3]
-    assert "show_na_leak_current" not in result
-    assert "show_k_leak_current" not in result
+    assert "show_nal_current" not in result
+    assert "show_kl_current" not in result
 
 
 def test_compute_trace_visibility_map_vc_single_sweep_classic_fields() -> None:
-    """VC single sweep maps classic show_* fields to the correct indices."""
+    """VC single sweep maps the registry-derived show_* fields to indices."""
+    from patch_sim_ui.channels import ADDITIONAL_CURRENT_FIELD_MAP
+
     sweep = _make_sweep(mode="Voltage Clamp")
-    result = compute_trace_visibility_map([sweep], "Voltage Clamp")
-    # trace order: total(0), Na(1), K(2), NaL(3), KL(4), n(5), m(6), h(7), stim(8)
+    result = compute_trace_visibility_map(
+        [sweep],
+        "Voltage Clamp",
+        additional_current_field_map=ADDITIONAL_CURRENT_FIELD_MAP,
+    )
+    # trace order: total(0), INa(1), IK(2), INaL(3), IKL(4), n(5), m(6), h(7), stim(8)
     assert result["show_total_current"] == [0]
-    assert result["show_sodium_current"] == [1]
-    assert result["show_potassium_current"] == [2]
-    assert result["show_na_leak_current"] == [3]
-    assert result["show_k_leak_current"] == [4]
+    assert result["show_na_current"] == [1]
+    assert result["show_k_current"] == [2]
+    assert result["show_nal_current"] == [3]
+    assert result["show_kl_current"] == [4]
     assert result["show_potassium_activation"] == [5]
     assert result["show_sodium_activation"] == [6]
     assert result["show_sodium_inactivation"] == [7]

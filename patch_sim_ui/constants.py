@@ -36,17 +36,13 @@ CC_VOLTAGE_COLOR: str = "#1f77b4"
 # meaningful channel and gating-variable traces.
 STIMULUS_COLOR: str | None = "#888888"
 
-# Fixed colours per ion current channel (used in Voltage Clamp overlay plot).
-# Additional channel colours are derived from the channel registry.
+# Per-channel trace colours (used in the Voltage Clamp overlay plot).
+# Keys are simulation column names (``"INa"``, ``"IK"``, ``"Ih"``, …) so a
+# Sweep's ``channel_currents`` dict can be looked up directly.  The
+# ``"total_current"`` key keys the summed-current trace.
 CHANNEL_COLORS: dict[str, str] = {
-    # Classic HH channels
     "total_current": "#1f77b4",  # blue
-    "sodium_current": "#ff7f0e",  # orange
-    "potassium_current": "#2ca02c",  # green
-    "na_leak_current": "#7f7f7f",  # grey
-    "k_leak_current": "#bcbd22",  # olive
-    # Additional channels
-    **{ch.current_key: ch.current_color for ch in ADDITIONAL_CHANNELS},
+    **{ch.column_name: ch.current_color for ch in ADDITIONAL_CHANNELS},
 }
 
 # Gating variable name → unique colour (each variable gets its own distinct colour).

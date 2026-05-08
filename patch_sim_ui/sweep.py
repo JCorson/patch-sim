@@ -5,16 +5,13 @@ from pydantic import BaseModel
 
 from patch_sim.analysis.derivatives import compute_dvdt
 
-# Classic field names that are always present in simulation results.
-_CLASSIC_COLUMNS = frozenset(
+# Non-per-channel columns that are not stored in ``channel_currents``: time,
+# voltage, the summed total current, and the HH-classic per-gate variables.
+_RESERVED_COLUMNS = frozenset(
     {
         "time",
         "voltage",
         "Itotal",
-        "INa",
-        "IK",
-        "INaL",
-        "IKL",
         "n",
         "m",
         "h",
@@ -31,18 +28,17 @@ class Sweep(BaseModel):
         time: Time axis values in ms.
         voltage: Membrane voltage in mV.
         dvdt: Time derivative of membrane voltage in mV/ms.
-        sodium_current: I_Na in µA/cm².
-        potassium_current: I_K in µA/cm².
-        na_leak_current: I_NaL (Na⁺ leak) in µA/cm².
-        k_leak_current: I_KL (K⁺ leak) in µA/cm².
         total_current: Sum of ion currents in µA/cm².
         potassium_activation: Gating variable n (dimensionless, 0–1).
         sodium_activation: Gating variable m (dimensionless, 0–1).
         sodium_inactivation: Gating variable h (dimensionless, 0–1).
         stimulus: Stimulus waveform (current µA/cm² or voltage command mV).
         clamp_mode: CURRENT_CLAMP or VOLTAGE_CLAMP.
-        additional_currents: Extra channel currents keyed by channel name.
-        additional_gating: Extra gating variable traces keyed by variable name.
+        channel_currents: Per-channel currents keyed by simulation column
+            name (``"INa"``, ``"IK"``, ``"INaL"``, ``"IKL"``, ``"Ih"``,
+            ``"IKv31"``, …).  Channels absent from a preset are omitted.
+        additional_gating: Auxiliary-channel gating variable traces keyed by
+            variable name (e.g. ``"r"``, ``"a"``).
     """
 
     label: str
@@ -50,17 +46,13 @@ class Sweep(BaseModel):
     time: list[float]
     voltage: list[float]
     dvdt: list[float]
-    sodium_current: list[float]
-    potassium_current: list[float]
-    na_leak_current: list[float]
-    k_leak_current: list[float]
     total_current: list[float]
     potassium_activation: list[float]
     sodium_activation: list[float]
     sodium_inactivation: list[float]
     stimulus: list[float]
     clamp_mode: str
-    additional_currents: dict[str, list[float]] = {}
+    channel_currents: dict[str, list[float]] = {}
     additional_gating: dict[str, list[float]] = {}
 
     @classmethod
@@ -74,9 +66,9 @@ class Sweep(BaseModel):
     ) -> "Sweep":
         """Create a Sweep from a simulation result structured array.
 
-        Fields not in the classic set are classified as additional: fields
-        whose name ends with ``_current`` become ``additional_currents``; all
-        other extra fields become ``additional_gating``.
+        Per-channel current columns (anything starting with ``"I"`` other
+        than ``"Itotal"``) become entries in ``channel_currents``; remaining
+        non-reserved columns become ``additional_gating``.
 
         Args:
             result: Simulation result structured array with a ``"time"`` field.
@@ -94,13 +86,13 @@ class Sweep(BaseModel):
             """Return field as list, or empty list if field absent."""
             return result[name].tolist() if name in columns else []
 
-        additional_currents: dict[str, list[float]] = {}
+        channel_currents: dict[str, list[float]] = {}
         additional_gating: dict[str, list[float]] = {}
         for col in columns:
-            if col in _CLASSIC_COLUMNS:
+            if col in _RESERVED_COLUMNS:
                 continue
             if col.startswith("I"):
-                additional_currents[col] = result[col].tolist()
+                channel_currents[col] = result[col].tolist()
             else:
                 additional_gating[col] = result[col].tolist()
 
@@ -118,14 +110,10 @@ class Sweep(BaseModel):
             stimulus=stimulus.tolist(),
             voltage=_col("voltage"),
             dvdt=dvdt_arr.tolist(),
-            sodium_current=_col("INa"),
-            potassium_current=_col("IK"),
-            na_leak_current=_col("INaL"),
-            k_leak_current=_col("IKL"),
             total_current=_col("Itotal"),
             potassium_activation=_col("n"),
             sodium_activation=_col("m"),
             sodium_inactivation=_col("h"),
-            additional_currents=additional_currents,
+            channel_currents=channel_currents,
             additional_gating=additional_gating,
         )

@@ -9,32 +9,26 @@ from patch_sim_ui.channels import (
     ADDITIONAL_CHANNELS,
     ADDITIONAL_CURRENT_FIELD_MAP,
     ADDITIONAL_GATING_FIELD_MAP,
+    HH_CLASSIC_CHANNEL_IDS,
 )
 from patch_sim_ui.plotting import compute_trace_visibility_map
 from patch_sim_ui.state._common import _PLOTLY_GD_JS
 
-# HH-classic core channels keep their legacy show_sodium_current /
-# show_potassium_current / show_na_leak_current / show_k_leak_current
-# visibility names (hardcoded into the trace-plotting layer); the registry's
-# new na/k/nal/kl entries don't generate redundant show_* fields here.
-_LEGACY_CORE_IDS: frozenset[str] = frozenset({"na", "k", "nal", "kl"})
-
 _VISIBILITY_FIELDS: list[str] = [
     "show_voltage",
     "show_total_current",
-    "show_sodium_current",
-    "show_potassium_current",
-    "show_na_leak_current",
-    "show_k_leak_current",
+    # Per-channel current toggles, derived uniformly from the registry.
+    *[ch.current_visibility_field for ch in ADDITIONAL_CHANNELS],
+    # HH-classic core channels expose their gating via per-gate toggles
+    # (n / m / h) rather than the registry's joint show_<id>_gating field.
     "show_potassium_activation",
     "show_sodium_activation",
     "show_sodium_inactivation",
-    # Auxiliary channel visibility fields — one current + one gating per channel.
+    # Auxiliary-channel joint gating toggles.
     *[
-        field
+        ch.gating_visibility_field
         for ch in ADDITIONAL_CHANNELS
-        if ch.id not in _LEGACY_CORE_IDS
-        for field in (ch.current_visibility_field, ch.gating_visibility_field)
+        if ch.id not in HH_CLASSIC_CHANNEL_IDS
     ],
 ]
 
@@ -94,10 +88,10 @@ class VisibilityState(rx.State):
     # ------------------------------------------------------------------ #
     show_voltage: bool = True
     show_total_current: bool = True
-    show_sodium_current: bool = True
-    show_potassium_current: bool = True
-    show_na_leak_current: bool = False
-    show_k_leak_current: bool = False
+    show_na_current: bool = True
+    show_k_current: bool = True
+    show_nal_current: bool = False
+    show_kl_current: bool = False
     show_potassium_activation: bool = True
     show_sodium_activation: bool = True
     show_sodium_inactivation: bool = True

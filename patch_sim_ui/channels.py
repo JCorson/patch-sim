@@ -73,6 +73,24 @@ class ChannelMeta:
         return f"I_{self.current_key}"
 
     @property
+    def column_name(self) -> str:
+        """Simulation result column name for this channel's current.
+
+        Mirrors :attr:`patch_sim.channels.IonChannel.current_name` — the
+        ``f"I{IonChannel.name}"`` convention used throughout the simulator.
+        Aux registry entries already encode the leading ``I`` (e.g.
+        ``current_key="Ih"`` for ``IonChannel.name="h"``); HH-classic core
+        entries store the bare channel name (e.g. ``current_key="Na"``) and
+        get the ``I`` prefix added here.
+
+        Returns:
+            Simulation column name, e.g. ``"INa"`` or ``"Ih"``.
+        """
+        if self.current_key.startswith("I") and self.current_key != "I":
+            return self.current_key
+        return f"I{self.current_key}"
+
+    @property
     def gating_label(self) -> str:
         """Visibility checkbox label for the gating variable trace(s).
 
@@ -264,25 +282,29 @@ ADDITIONAL_CHANNELS: tuple[ChannelMeta, ...] = (
     ),
 )
 
-# HH-classic core channels keep their legacy show_sodium_current /
-# show_potassium_current / show_na_leak_current / show_k_leak_current
-# visibility names rather than the registry-derived show_na_current /
-# show_k_current / etc. — these maps therefore exclude the core IDs.
-_LEGACY_CORE_IDS: frozenset[str] = frozenset({"na", "k", "nal", "kl"})
+#: Channel ids whose gating variables are exposed via the per-gate visibility
+#: fields (``show_potassium_activation`` for ``n``, ``show_sodium_activation``
+#: for ``m``, ``show_sodium_inactivation`` for ``h``) rather than the joint
+#: ``show_<id>_gating`` field used for every other channel.  ``nal`` and
+#: ``kl`` are leak channels with no gating variables, included for completeness
+#: so callers can use a single set when they want to skip the four HH-classic
+#: core channels.
+HH_CLASSIC_CHANNEL_IDS: frozenset[str] = frozenset({"na", "k", "nal", "kl"})
 
-#: Maps auxiliary-channel current keys to their show_* visibility field names.
-#: Used by VisibilityState and SimulationState.
+#: Maps simulation result column names (e.g. ``"INa"``, ``"Ih"``) to their
+#: ``show_*_current`` visibility field names.  Used by VisibilityState and
+#: SimulationState to translate per-channel current keys into the
+#: corresponding bool flag.
 ADDITIONAL_CURRENT_FIELD_MAP: dict[str, str] = {
-    ch.current_key: ch.current_visibility_field
-    for ch in ADDITIONAL_CHANNELS
-    if ch.id not in _LEGACY_CORE_IDS
+    ch.column_name: ch.current_visibility_field for ch in ADDITIONAL_CHANNELS
 }
 
-#: Maps auxiliary-channel gating variable names to their show_* visibility field names.
-#: Used by VisibilityState and SimulationState.
+#: Maps gating variable names to their ``show_*_gating`` visibility field
+#: names.  HH-classic core channels are excluded — their gates ``n``, ``m``,
+#: ``h`` are wired to the per-gate fields above.
 ADDITIONAL_GATING_FIELD_MAP: dict[str, str] = {
     gv: ch.gating_visibility_field
     for ch in ADDITIONAL_CHANNELS
-    if ch.id not in _LEGACY_CORE_IDS
+    if ch.id not in HH_CLASSIC_CHANNEL_IDS
     for gv in ch.gating_vars
 }
