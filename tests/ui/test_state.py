@@ -39,10 +39,12 @@ from patch_sim.constants import (
 from patch_sim_ui import constants  # noqa: E402
 from patch_sim_ui.log_handler import UILogRecord  # noqa: E402
 from patch_sim_ui.presets import (  # noqa: E402
+    CHANNEL_NAME_TO_ID,
     DEFAULT_NEURON_PRESET,
     DEFAULT_PROTOCOL_PRESET,
     NEURON_CONFIG_SCALAR_DEFAULTS,
     NEURON_CONFIG_SCALAR_FIELDS,
+    PRESET_CHANNEL_IDS,
     neuron_to_ui_state,
 )
 from patch_sim_ui.state import SimulationState  # noqa: E402
@@ -2066,3 +2068,34 @@ async def test_build_neuron_preserves_dopaminergic_sNa_da_for_dopaminergic() -> 
         f"make_dopaminergic_na_channel is no longer producing the Khaliq "
         f"& Bean 2010 slow-inactivation gate."
     )
+
+
+# ---------------------------------------------------------------------------
+# PRESET_CHANNEL_IDS — preset-scoped UI channel sets
+# ---------------------------------------------------------------------------
+
+
+def test_preset_channel_ids_squid_is_empty() -> None:
+    """SQUID_GIANT_AXON has no auxiliary channels, so PRESET_CHANNEL_IDS is empty."""
+    assert PRESET_CHANNEL_IDS[SQUID_GIANT_AXON] == frozenset()
+
+
+def test_preset_channel_ids_fast_spiking_is_only_ikv31() -> None:
+    """FAST_SPIKING_INTERNEURON exposes only the IKv3.1 toggle."""
+    assert PRESET_CHANNEL_IDS[FAST_SPIKING_INTERNEURON] == frozenset({"ikv31"})
+
+
+@pytest.mark.parametrize("preset_name", list(NEURON_PRESETS))
+def test_preset_channel_ids_matches_factory_output(preset_name: str) -> None:
+    """PRESET_CHANNEL_IDS[name] must equal the UI ids derived from the factory.
+
+    Args:
+        preset_name: Name of the preset to validate.
+    """
+    factory = NEURON_PRESETS[preset_name]
+    expected = frozenset(
+        ui_id
+        for ch in factory().additional_channels
+        if (ui_id := CHANNEL_NAME_TO_ID.get(ch.name)) is not None
+    )
+    assert PRESET_CHANNEL_IDS[preset_name] == expected

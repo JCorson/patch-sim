@@ -136,6 +136,20 @@ NEURON_UI_PRESETS: dict[str, dict[str, Any]] = {
     name: neuron_to_ui_state(factory()) for name, factory in NEURON_PRESETS.items()
 }
 
+#: Maps preset name -> set of UI channel ids the preset's factory produces.
+#: Single source of truth for which auxiliary-channel rows render in the
+#: neuron panel and which trace-visibility checkboxes appear in the sweep
+#: manager.  Computed once at import time.  Unknown preset names default to
+#: an empty frozenset so the UI can render zero rows safely.
+PRESET_CHANNEL_IDS: dict[str, frozenset[str]] = {
+    name: frozenset(
+        ui_id
+        for ch in factory().additional_channels
+        if (ui_id := CHANNEL_NAME_TO_ID.get(ch.name)) is not None
+    )
+    for name, factory in NEURON_PRESETS.items()
+}
+
 #: Default neuron preset applied on app startup and reset.
 DEFAULT_NEURON_PRESET: str = SQUID_GIANT_AXON
 
