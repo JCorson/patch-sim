@@ -55,8 +55,17 @@ NEURON_CONFIG_SCALAR_DEFAULTS: dict[str, float] = {
     if isinstance(f.default, float)
 }
 
-# Default conductances for each auxiliary channel, keyed by channel name.
+# Default conductances for each channel slider, keyed by channel UI id.
+# Defaults for the HH-classic core (na, k, nal, kl) come from the Squid Giant
+# Axon preset; auxiliary channels use the per-channel defaults from the core
+# library's ``DEFAULT_G_*`` constants.
 _DEFAULT_G_MAX: dict[str, float] = {
+    # HH-classic core channels — defaults match the Squid Giant Axon preset.
+    "na": 120.0,
+    "k": 36.0,
+    "nal": 0.054,
+    "kl": 0.246,
+    # Auxiliary channels.
     "ih": DEFAULT_G_IH,
     "ika": DEFAULT_G_IKA,
     "ikv31": DEFAULT_G_IKV31,
@@ -74,18 +83,18 @@ _DEFAULT_G_MAX: dict[str, float] = {
     "sk": DEFAULT_G_SK,
 }
 
-# Map from IonChannel.name to ChannelMeta.id for all channels used by presets.
+# Map from IonChannel.name to ChannelMeta.id for every channel in the registry.
 #
 # Channels whose current_key starts with "I" (the convention for *current*
 # names like "Ih", "IKv31", "ICaT") have an IonChannel.name equal to the key
 # with the leading "I" stripped (e.g. name="h" for current_key="Ih").
-# Channels whose current_key does not start with "I" (e.g. "Kv", "Cav1.3",
-# "SK") have an IonChannel.name equal to the key directly.
-# Variant channels with a divergent name (e.g. SNc INaP -> "NaP_SNc") are
-# mapped explicitly so they collapse onto the canonical UI toggle.
+# Channels whose current_key does not start with "I" (e.g. "Na", "K", "NaL",
+# "KL", "Kv", "Cav1.3", "SK") have an IonChannel.name equal to the key
+# directly.  Variant channels with a divergent name (e.g. SNc INaP -> "NaP_SNc")
+# are mapped explicitly so they collapse onto the canonical UI toggle.
 CHANNEL_NAME_TO_ID: dict[str, str] = {}
 for _ch_meta in ADDITIONAL_CHANNELS:
-    if _ch_meta.current_key.startswith("I"):
+    if _ch_meta.current_key.startswith("I") and _ch_meta.current_key != "I":
         CHANNEL_NAME_TO_ID[_ch_meta.current_key[1:]] = _ch_meta.id
     else:
         CHANNEL_NAME_TO_ID[_ch_meta.current_key] = _ch_meta.id
@@ -98,7 +107,7 @@ def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
     Produces a mapping whose keys exactly match ``NeuronState`` field names so
     that it can be unpacked with ``setattr`` in ``load_neuron_preset``.
 
-    For each auxiliary channel, the corresponding ``{id}_g_max`` key is set
+    For each registered channel, the corresponding ``{id}_g_max`` key is set
     to the channel's preset-tuned ``g_max`` if present on *neuron*, otherwise
     the registry default in :data:`_DEFAULT_G_MAX`.  Visibility (which slider
     appears in the panel) is driven separately by :data:`PRESET_CHANNEL_IDS`,
@@ -115,7 +124,7 @@ def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
         name: getattr(neuron, name) for name in NEURON_CONFIG_SCALAR_FIELDS
     }
 
-    # Initialise every auxiliary-channel slider to its registry default.
+    # Initialise every channel slider to its registry default.
     for ch_meta in ADDITIONAL_CHANNELS:
         state[ch_meta.g_max_field] = _DEFAULT_G_MAX[ch_meta.id]
 
@@ -123,7 +132,7 @@ def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
     # Variant factories (e.g. make_snc_inap_channel) produce channels with
     # names that resolve via CHANNEL_NAME_TO_ID, so the lookup collapses
     # variants onto the same UI slider automatically.
-    for ch in neuron.additional_channels:
+    for ch in neuron.channels:
         ui_id = CHANNEL_NAME_TO_ID.get(ch.name)
         if ui_id is not None:
             state[f"{ui_id}_g_max"] = ch.g_max
@@ -137,14 +146,14 @@ NEURON_UI_PRESETS: dict[str, dict[str, Any]] = {
 }
 
 #: Maps preset name -> set of UI channel ids the preset's factory produces.
-#: Single source of truth for which auxiliary-channel rows render in the
-#: neuron panel and which trace-visibility checkboxes appear in the sweep
-#: manager.  Computed once at import time.  Unknown preset names default to
-#: an empty frozenset so the UI can render zero rows safely.
+#: Single source of truth for which channel rows render in the neuron panel
+#: and which trace-visibility checkboxes appear in the sweep manager.
+#: Computed once at import time.  Unknown preset names default to an empty
+#: frozenset so the UI can render zero rows safely.
 PRESET_CHANNEL_IDS: dict[str, frozenset[str]] = {
     name: frozenset(
         ui_id
-        for ch in factory().additional_channels
+        for ch in factory().channels
         if (ui_id := CHANNEL_NAME_TO_ID.get(ch.name)) is not None
     )
     for name, factory in NEURON_PRESETS.items()
@@ -161,5 +170,5 @@ DEFAULT_PROTOCOL_PRESET: str = ACTION_POTENTIAL
 # names exactly.
 PROTOCOL_NEURON_OVERRIDES: dict[str, dict[str, Any]] = {
     # Disable K⁺ channels so only Na⁺ current is visible.
-    NA_CHANNEL_ACTIVATION: {"g_K": 0.0},
+    NA_CHANNEL_ACTIVATION: {"k_g_max": 0.0},
 }

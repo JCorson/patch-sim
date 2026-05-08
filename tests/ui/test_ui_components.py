@@ -114,10 +114,12 @@ def test_cc_additional_channels_section_gating_only():
     from patch_sim_ui.channels import ADDITIONAL_CHANNELS
     from patch_sim_ui.components.sweep_manager import (
         _ADDITIONAL_CHANNEL_TRACE_SPECS,
+        _LEGACY_CORE_IDS,
         _channel_trace_group,
     )
 
-    for i, ch in enumerate(ADDITIONAL_CHANNELS):
+    aux = [ch for ch in ADDITIONAL_CHANNELS if ch.id not in _LEGACY_CORE_IDS]
+    for i, ch in enumerate(aux):
         spec = _ADDITIONAL_CHANNEL_TRACE_SPECS[i]
         comp = _channel_trace_group(*spec, include_current=False)
         assert not _label_present(comp, ch.current_label), (
@@ -137,10 +139,12 @@ def test_vc_additional_channels_section_includes_current():
     from patch_sim_ui.channels import ADDITIONAL_CHANNELS
     from patch_sim_ui.components.sweep_manager import (
         _ADDITIONAL_CHANNEL_TRACE_SPECS,
+        _LEGACY_CORE_IDS,
         _channel_trace_group,
     )
 
-    for i, ch in enumerate(ADDITIONAL_CHANNELS):
+    aux = [ch for ch in ADDITIONAL_CHANNELS if ch.id not in _LEGACY_CORE_IDS]
+    for i, ch in enumerate(aux):
         spec = _ADDITIONAL_CHANNEL_TRACE_SPECS[i]
         comp = _channel_trace_group(*spec, include_current=True)
         assert _label_present(comp, ch.current_label), (

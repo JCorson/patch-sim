@@ -12,10 +12,6 @@ from patch_sim_ui.channels import ADDITIONAL_CHANNELS
 # Slider ranges for neuron parameters
 PARAM_RANGES: dict[str, tuple[float, float, float]] = {
     # name: (min, max, step)
-    "g_Na": (0.0, 300.0, 1.0),
-    "g_K": (0.0, 100.0, 0.5),
-    "g_NaL": (0.0, 2.0, 0.01),
-    "g_KL": (0.0, 2.0, 0.01),
     "C_m": (0.1, 5.0, 0.1),
     "v_rest": (-90.0, -40.0, 1.0),
     "Na_out": (1.0, 500.0, 1.0),
@@ -25,7 +21,8 @@ PARAM_RANGES: dict[str, tuple[float, float, float]] = {
     "Ca_out": (0.1, 20.0, 0.1),
     "Ca_in": (0.00001, 0.01, 0.00001),
     "T": (273.15, 323.15, 0.5),  # 0°C to 50°C
-    # Additional channel conductances — derived from channel registry.
+    # Per-channel conductances — derived from the channel registry.  Includes
+    # the HH-classic core (na, k, nal, kl) since #320.
     **{ch.g_max_field: ch.g_max_range for ch in ADDITIONAL_CHANNELS},
 }
 

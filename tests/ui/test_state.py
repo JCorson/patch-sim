@@ -354,11 +354,11 @@ async def test_load_protocol_preset_unknown_name_is_ignored() -> None:
 
 
 async def test_load_neuron_preset_fast_spiking_interneuron() -> None:
-    """load_neuron_preset exposes IKv31 (and only IKv31) for Fast-Spiking."""
+    """load_neuron_preset exposes the HH-classic core plus IKv31 for Fast-Spiking."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(FAST_SPIKING_INTERNEURON)]
-    assert set(ns.visible_channel_ids) == {"ikv31"}
+    assert set(ns.visible_channel_ids) == {"na", "k", "nal", "kl", "ikv31"}
 
 
 async def test_load_neuron_preset_sets_active_neuron_type() -> None:
@@ -1266,9 +1266,9 @@ async def test_load_neuron_preset_squid_uses_base_protocol_params() -> None:
 async def test_load_neuron_preset_reapplies_protocol_neuron_overrides() -> None:
     """Switching neuron type re-applies PROTOCOL_NEURON_OVERRIDES on top of preset.
 
-    The 'Na+ Channel Activation' preset sets g_K=0.  Loading a new neuron
-    preset would normally restore g_K to its default value, but the override
-    must be re-applied on top so that g_K stays at 0.
+    The 'Na+ Channel Activation' preset sets the K channel's g_max to 0.
+    Loading a new neuron preset would normally restore k_g_max to its default
+    value, but the override must be re-applied on top so that it stays at 0.
     """
     ns = _make_neuron_state()
     ps = _make_protocol_state()
@@ -1281,7 +1281,7 @@ async def test_load_neuron_preset_reapplies_protocol_neuron_overrides() -> None:
         new=_make_get_state_fn({ProtocolState: ps, SimulationState: sim_st}),
     ):
         [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
-    assert ns.g_K == pytest.approx(0.0)
+    assert ns.k_g_max == pytest.approx(0.0)
 
 
 async def test_load_neuron_preset_syncs_figure_clamp_mode() -> None:
@@ -1692,7 +1692,7 @@ async def test_build_neuron_preserves_inap_slow_inactivation_for_stn() -> None:
         [_ async for _ in ns.load_neuron_preset(STN)]
     neuron = ns._build_neuron()
 
-    inap = next((ch for ch in neuron.additional_channels if ch.name == "NaP"), None)
+    inap = next((ch for ch in neuron.channels if ch.name == "NaP"), None)
     assert inap is not None, "STN preset must include INaP channel"
     gate_names = {g.name for g in inap.gating_variables}
     assert "sNaP" in gate_names, (
@@ -1762,7 +1762,7 @@ async def test_build_neuron_preserves_inap_slow_inactivation_for_cp() -> None:
         [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
     neuron = ns._build_neuron()
 
-    inap = next((ch for ch in neuron.additional_channels if ch.name == "NaP"), None)
+    inap = next((ch for ch in neuron.channels if ch.name == "NaP"), None)
     assert inap is not None, "Cortical pyramidal preset must include INaP channel"
     gate_names = {g.name for g in inap.gating_variables}
     assert "sNaP" in gate_names, (
@@ -1787,7 +1787,7 @@ async def test_build_neuron_preserves_nav12_sNa_for_cortical_pyramidal() -> None
         [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
     neuron = ns._build_neuron()
 
-    na = next((ch for ch in neuron.core_channels if ch.name == "Na"), None)
+    na = next((ch for ch in neuron.channels if ch.name == "Na"), None)
     assert na is not None, "Cortical pyramidal preset must include core Na channel"
     gate_names = {g.name for g in na.gating_variables}
     assert "sNa12" in gate_names, (
@@ -1849,7 +1849,7 @@ async def test_build_neuron_preserves_inap_slow_inactivation_for_ca1() -> None:
         [_ async for _ in ns.load_neuron_preset(CA1_PYRAMIDAL)]
     neuron = ns._build_neuron()
 
-    inap = next((ch for ch in neuron.additional_channels if ch.name == "NaP"), None)
+    inap = next((ch for ch in neuron.channels if ch.name == "NaP"), None)
     assert inap is not None, "CA1 pyramidal preset must include INaP channel"
     gate_names = {g.name for g in inap.gating_variables}
     assert "sNaP" in gate_names, (
@@ -1874,7 +1874,7 @@ async def test_build_neuron_preserves_nav12_sNa_for_ca1() -> None:
         [_ async for _ in ns.load_neuron_preset(CA1_PYRAMIDAL)]
     neuron = ns._build_neuron()
 
-    na = next((ch for ch in neuron.core_channels if ch.name == "Na"), None)
+    na = next((ch for ch in neuron.channels if ch.name == "Na"), None)
     assert na is not None, "CA1 pyramidal preset must include core Na channel"
     gate_names = {g.name for g in na.gating_variables}
     assert "sNa12" in gate_names, (
@@ -1936,7 +1936,7 @@ async def test_build_neuron_preserves_inap_slow_inactivation_for_purkinje() -> N
         [_ async for _ in ns.load_neuron_preset(PURKINJE)]
     neuron = ns._build_neuron()
 
-    inap = next((ch for ch in neuron.additional_channels if ch.name == "NaP"), None)
+    inap = next((ch for ch in neuron.channels if ch.name == "NaP"), None)
     assert inap is not None, "Purkinje preset must include INaP channel"
     gate_names = {g.name for g in inap.gating_variables}
     assert "sNaP" in gate_names, (
@@ -1962,7 +1962,7 @@ async def test_build_neuron_preserves_purkinje_sNa_for_purkinje() -> None:
         [_ async for _ in ns.load_neuron_preset(PURKINJE)]
     neuron = ns._build_neuron()
 
-    na = next((ch for ch in neuron.core_channels if ch.name == "Na"), None)
+    na = next((ch for ch in neuron.channels if ch.name == "Na"), None)
     assert na is not None, "Purkinje preset must include core Na channel"
     gate_names = {g.name for g in na.gating_variables}
     assert "sNa" in gate_names, (
@@ -2028,7 +2028,7 @@ async def test_build_neuron_preserves_snc_inap_slow_inactivation_for_dopaminergi
         [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
     neuron = ns._build_neuron()
 
-    inap = next((ch for ch in neuron.additional_channels if ch.name == "NaP_SNc"), None)
+    inap = next((ch for ch in neuron.channels if ch.name == "NaP_SNc"), None)
     assert inap is not None, "Dopaminergic preset must include INaP_SNc channel"
     gate_names = {g.name for g in inap.gating_variables}
     assert "sNaP_snc" in gate_names, (
@@ -2054,7 +2054,7 @@ async def test_build_neuron_preserves_dopaminergic_sNa_da_for_dopaminergic() -> 
         [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
     neuron = ns._build_neuron()
 
-    na = next((ch for ch in neuron.core_channels if ch.name == "Na"), None)
+    na = next((ch for ch in neuron.channels if ch.name == "Na"), None)
     assert na is not None, "Dopaminergic preset must include core Na channel"
     gate_names = {g.name for g in na.gating_variables}
     assert "sNa_da" in gate_names, (
@@ -2070,14 +2070,16 @@ async def test_build_neuron_preserves_dopaminergic_sNa_da_for_dopaminergic() -> 
 # ---------------------------------------------------------------------------
 
 
-def test_preset_channel_ids_squid_is_empty() -> None:
-    """SQUID_GIANT_AXON has no auxiliary channels, so PRESET_CHANNEL_IDS is empty."""
-    assert PRESET_CHANNEL_IDS[SQUID_GIANT_AXON] == frozenset()
+def test_preset_channel_ids_squid_is_hh_quartet() -> None:
+    """SQUID_GIANT_AXON exposes the four HH-classic channels (Na/K/NaL/KL)."""
+    assert PRESET_CHANNEL_IDS[SQUID_GIANT_AXON] == frozenset({"na", "k", "nal", "kl"})
 
 
-def test_preset_channel_ids_fast_spiking_is_only_ikv31() -> None:
-    """FAST_SPIKING_INTERNEURON exposes only the IKv3.1 toggle."""
-    assert PRESET_CHANNEL_IDS[FAST_SPIKING_INTERNEURON] == frozenset({"ikv31"})
+def test_preset_channel_ids_fast_spiking_includes_core_and_ikv31() -> None:
+    """FAST_SPIKING_INTERNEURON exposes the HH quartet plus IKv3.1 since #320."""
+    assert PRESET_CHANNEL_IDS[FAST_SPIKING_INTERNEURON] == frozenset(
+        {"na", "k", "nal", "kl", "ikv31"}
+    )
 
 
 @pytest.mark.parametrize("preset_name", list(NEURON_PRESETS))
@@ -2090,7 +2092,7 @@ def test_preset_channel_ids_matches_factory_output(preset_name: str) -> None:
     factory = NEURON_PRESETS[preset_name]
     expected = frozenset(
         ui_id
-        for ch in factory().additional_channels
+        for ch in factory().channels
         if (ui_id := CHANNEL_NAME_TO_ID.get(ch.name)) is not None
     )
     assert PRESET_CHANNEL_IDS[preset_name] == expected
@@ -2113,7 +2115,7 @@ async def test_build_neuron_propagates_ih_g_max_slider() -> None:
         [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
 
     baseline = NEURON_PRESETS[CORTICAL_PYRAMIDAL]()
-    preset_g_max = {ch.name: ch.g_max for ch in baseline.additional_channels}
+    preset_g_max = {ch.name: ch.g_max for ch in baseline.channels}
     sentinel_g_max = 0.123
     assert preset_g_max["h"] != pytest.approx(sentinel_g_max), (
         "Sentinel must differ from preset value or test is vacuous."
@@ -2122,7 +2124,7 @@ async def test_build_neuron_propagates_ih_g_max_slider() -> None:
     ns.ih_g_max = sentinel_g_max
     neuron = ns._build_neuron()
 
-    by_name = {ch.name: ch for ch in neuron.additional_channels}
+    by_name = {ch.name: ch for ch in neuron.channels}
     assert by_name["h"].g_max == pytest.approx(sentinel_g_max)
     for name, g in preset_g_max.items():
         if name == "h":
@@ -2133,12 +2135,12 @@ async def test_build_neuron_propagates_ih_g_max_slider() -> None:
         )
 
 
-async def test_visible_channel_ids_empty_for_squid() -> None:
-    """SQUID_GIANT_AXON has no auxiliary channels, so visible_channel_ids is empty."""
+async def test_visible_channel_ids_for_squid() -> None:
+    """SQUID_GIANT_AXON exposes the four HH-classic channel sliders since #320."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(SQUID_GIANT_AXON)]
-    assert ns.visible_channel_ids == []
+    assert set(ns.visible_channel_ids) == {"na", "k", "nal", "kl"}
 
 
 @pytest.mark.parametrize("preset_name", list(NEURON_PRESETS))
@@ -2171,8 +2173,8 @@ async def test_g_max_slider_does_not_invalidate_membrane_test_cache() -> None:
     """Moving an auxiliary-channel g_max must not bust the membrane-test fingerprint.
 
     The membrane test depends only on passive parameters
-    (g_NaL, g_KL, C_m, ion concentrations, T) — auxiliary channels are
-    silent in the passive run.  This regression test pins that contract.
+    (nal_g_max, kl_g_max, C_m, ion concentrations, T) — auxiliary channels
+    are silent in the passive run.  This regression test pins that contract.
     """
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):

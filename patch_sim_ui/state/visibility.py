@@ -13,6 +13,12 @@ from patch_sim_ui.channels import (
 from patch_sim_ui.plotting import compute_trace_visibility_map
 from patch_sim_ui.state._common import _PLOTLY_GD_JS
 
+# HH-classic core channels keep their legacy show_sodium_current /
+# show_potassium_current / show_na_leak_current / show_k_leak_current
+# visibility names (hardcoded into the trace-plotting layer); the registry's
+# new na/k/nal/kl entries don't generate redundant show_* fields here.
+_LEGACY_CORE_IDS: frozenset[str] = frozenset({"na", "k", "nal", "kl"})
+
 _VISIBILITY_FIELDS: list[str] = [
     "show_voltage",
     "show_total_current",
@@ -23,10 +29,11 @@ _VISIBILITY_FIELDS: list[str] = [
     "show_potassium_activation",
     "show_sodium_activation",
     "show_sodium_inactivation",
-    # Additional channel visibility fields — one current + one gating per channel.
+    # Auxiliary channel visibility fields — one current + one gating per channel.
     *[
         field
         for ch in ADDITIONAL_CHANNELS
+        if ch.id not in _LEGACY_CORE_IDS
         for field in (ch.current_visibility_field, ch.gating_visibility_field)
     ],
 ]

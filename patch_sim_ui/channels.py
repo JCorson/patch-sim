@@ -82,12 +82,51 @@ class ChannelMeta:
         return f"{self.current_key} gating ({', '.join(self.gating_vars)})"
 
 
-#: Ordered registry of all additional (non-HH-classic) ion channels.
+#: Ordered registry of every ion channel exposed in the UI.
 #:
-#: This is the single source of truth for per-channel metadata.  All
-#: downstream dicts and field lists are derived from this tuple so that
-#: adding a channel requires only one new entry here.
+#: This is the single source of truth for per-channel metadata.  All downstream
+#: dicts and field lists are derived from this tuple so that adding a channel
+#: requires only one new entry here.  Includes the four HH-classic channels
+#: (Na, K, NaL, KL) since #320 — there is no separate "core" registry.
 ADDITIONAL_CHANNELS: tuple[ChannelMeta, ...] = (
+    # HH-classic core channels (per-preset kinetics; the slider only edits g_max).
+    ChannelMeta(
+        id="na",
+        current_key="Na",
+        label="Na (fast Na⁺)",
+        gating_vars=("m", "h"),
+        g_max_range=(0.0, 300.0, 1.0),
+        current_color="#ff7f0e",
+        gating_var_colors={"m": "#ff7f0e", "h": "#2ca02c"},
+    ),
+    ChannelMeta(
+        id="k",
+        current_key="K",
+        label="K (delayed rectifier)",
+        gating_vars=("n",),
+        g_max_range=(0.0, 100.0, 0.5),
+        current_color="#2ca02c",
+        gating_var_colors={"n": "#1f77b4"},
+    ),
+    ChannelMeta(
+        id="nal",
+        current_key="NaL",
+        label="NaL (Na⁺ leak)",
+        gating_vars=(),
+        g_max_range=(0.0, 2.0, 0.01),
+        current_color="#7f7f7f",
+        gating_var_colors={},
+    ),
+    ChannelMeta(
+        id="kl",
+        current_key="KL",
+        label="KL (K⁺ leak)",
+        gating_vars=(),
+        g_max_range=(0.0, 2.0, 0.01),
+        current_color="#bcbd22",
+        gating_var_colors={},
+    ),
+    # Auxiliary channels.
     ChannelMeta(
         id="ih",
         current_key="Ih",
@@ -225,16 +264,25 @@ ADDITIONAL_CHANNELS: tuple[ChannelMeta, ...] = (
     ),
 )
 
-#: Maps additional-channel current keys to their show_* visibility field names.
+# HH-classic core channels keep their legacy show_sodium_current /
+# show_potassium_current / show_na_leak_current / show_k_leak_current
+# visibility names rather than the registry-derived show_na_current /
+# show_k_current / etc. — these maps therefore exclude the core IDs.
+_LEGACY_CORE_IDS: frozenset[str] = frozenset({"na", "k", "nal", "kl"})
+
+#: Maps auxiliary-channel current keys to their show_* visibility field names.
 #: Used by VisibilityState and SimulationState.
 ADDITIONAL_CURRENT_FIELD_MAP: dict[str, str] = {
-    ch.current_key: ch.current_visibility_field for ch in ADDITIONAL_CHANNELS
+    ch.current_key: ch.current_visibility_field
+    for ch in ADDITIONAL_CHANNELS
+    if ch.id not in _LEGACY_CORE_IDS
 }
 
-#: Maps additional-channel gating variable names to their show_* visibility field names.
+#: Maps auxiliary-channel gating variable names to their show_* visibility field names.
 #: Used by VisibilityState and SimulationState.
 ADDITIONAL_GATING_FIELD_MAP: dict[str, str] = {
     gv: ch.gating_visibility_field
     for ch in ADDITIONAL_CHANNELS
+    if ch.id not in _LEGACY_CORE_IDS
     for gv in ch.gating_vars
 }

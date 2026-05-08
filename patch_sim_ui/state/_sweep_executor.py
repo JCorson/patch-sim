@@ -147,7 +147,7 @@ def _compute_simulation(
                 na_channel = next(
                     (
                         ch
-                        for ch in neuron.core_channels
+                        for ch in neuron.channels
                         if isinstance(ch.reversal_spec, patch_sim.channels.NernstSpec)
                         and ch.reversal_spec.species
                         is patch_sim.channels.IonSpecies.SODIUM

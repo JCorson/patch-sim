@@ -95,6 +95,12 @@ def _channel_trace_group(
     )
 
 
+# HH-classic core channels keep their legacy show_sodium_current /
+# show_potassium_current / show_na_leak_current / show_k_leak_current
+# checkboxes (rendered explicitly in the popovers below); only auxiliary
+# channels are derived from the registry here.
+_LEGACY_CORE_IDS: frozenset[str] = frozenset({"na", "k", "nal", "kl"})
+
 # (header, visible_var, current_label, current_var, current_handler,
 #  gating_label, gating_var, gating_handler)
 # Derived from the channel registry in patch_sim_ui.channels.
@@ -112,6 +118,7 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
         getattr(VisibilityState, f"set_{ch.gating_visibility_field}"),
     )
     for ch in ADDITIONAL_CHANNELS
+    if ch.id not in _LEGACY_CORE_IDS
 ]
 
 

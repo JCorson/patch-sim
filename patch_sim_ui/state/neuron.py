@@ -9,23 +9,6 @@ import reflex as rx
 
 import patch_sim
 import patch_sim.channels
-from patch_sim.constants import (
-    DEFAULT_G_CAV13,
-    DEFAULT_G_ICAL,
-    DEFAULT_G_ICAN,
-    DEFAULT_G_ICAT,
-    DEFAULT_G_IH,
-    DEFAULT_G_IKA,
-    DEFAULT_G_IKCA,
-    DEFAULT_G_IKIR,
-    DEFAULT_G_IKV31,
-    DEFAULT_G_IM,
-    DEFAULT_G_KATP,
-    DEFAULT_G_MSKV,
-    DEFAULT_G_NAP,
-    DEFAULT_G_NAR,
-    DEFAULT_G_SK,
-)
 from patch_sim.presets import NEURON_PRESETS
 from patch_sim_ui import presets
 from patch_sim_ui.channels import ADDITIONAL_CHANNELS
@@ -38,16 +21,17 @@ _CHANNEL_FLOAT_FIELDS: list[str] = [ch.g_max_field for ch in ADDITIONAL_CHANNELS
 
 #: The NeuronState fields that determine the passive-only membrane test result.
 #: Only these fields are included in ``neuron_fingerprint`` so that changing
-#: active conductances (g_Na, g_K, v_rest, auxiliary channels) does not
-#: invalidate the membrane test cache.
+#: active conductances (na_g_max, k_g_max, v_rest, auxiliary channels) does
+#: not invalidate the membrane test cache.
 #:
-#: Ca²⁺ concentrations are omitted: no Ca²⁺ channels are present in the
-#: passive neuron (g_Na = g_K = 0), so their reversal potentials carry no
-#: current.  Na⁺ and K⁺ concentrations ARE included because E_NaL and E_KL
-#: are used to compute the effective E_L for the passive RC circuit.
+#: Ca²⁺ concentrations are omitted: no Ca²⁺ channels survive the passive
+#: filter (membrane_test only retains channels with no gating variables), so
+#: their reversal potentials carry no current.  Na⁺ and K⁺ concentrations ARE
+#: included because E_NaL and E_KL are used to compute the effective E_L for
+#: the passive RC circuit.
 _PASSIVE_PARAM_FIELDS: list[str] = [
-    "g_NaL",
-    "g_KL",
+    "nal_g_max",
+    "kl_g_max",
     "C_m",
     "Na_out",
     "Na_in",
@@ -67,7 +51,7 @@ def _make_neuron_float_setter(field_name: str):
     from generators; returning an event from a sync handler has no effect.
 
     The fingerprint-based cache inside ``run_membrane_test`` ensures the
-    simulation only re-runs when passive-relevant parameters (g_NaL, g_KL,
+    simulation only re-runs when passive-relevant parameters (nal_g_max, kl_g_max,
     C_m, ion concentrations, T) actually change.
 
     Args:
@@ -99,29 +83,13 @@ logger = logging.getLogger(__name__)
 
 
 class NeuronState(rx.State):
-    """State for neuron biophysical parameters and auxiliary channel configuration."""
+    """State for neuron biophysical parameters and channel configuration.
 
-    # ------------------------------------------------------------------ #
-    # Additional channels                                                 #
-    # ------------------------------------------------------------------ #
-    # Per-channel g_max sliders.  Visibility (which slider is shown) is
-    # driven by ``visible_channel_ids`` from the active preset; values are
-    # initialised by ``neuron_to_ui_state`` on preset load.
-    ih_g_max: float = DEFAULT_G_IH
-    ika_g_max: float = DEFAULT_G_IKA
-    ikv31_g_max: float = DEFAULT_G_IKV31
-    mskv_g_max: float = DEFAULT_G_MSKV
-    inap_g_max: float = DEFAULT_G_NAP
-    inar_g_max: float = DEFAULT_G_NAR
-    im_g_max: float = DEFAULT_G_IM
-    katp_g_max: float = DEFAULT_G_KATP
-    ikir_g_max: float = DEFAULT_G_IKIR
-    ikca_g_max: float = DEFAULT_G_IKCA
-    ical_g_max: float = DEFAULT_G_ICAL
-    cav13_g_max: float = DEFAULT_G_CAV13
-    icat_g_max: float = DEFAULT_G_ICAT
-    ican_g_max: float = DEFAULT_G_ICAN
-    sk_g_max: float = DEFAULT_G_SK
+    Per-channel ``{id}_g_max`` reactive vars are added dynamically at module
+    load time (one per entry in :data:`ADDITIONAL_CHANNELS`).  See the
+    ``add_var`` loop at the bottom of this module.  Visibility (which slider
+    is shown) is driven by ``visible_channel_ids`` from the active preset.
+    """
 
     # ------------------------------------------------------------------ #
     # Preset label                                                        #
@@ -176,13 +144,15 @@ class NeuronState(rx.State):
 
     @rx.var
     def E_L(self) -> float:
-        """Effective leak reversal in mV (weighted average of E_Na and E_K)."""
+        """Effective leak reversal in mV (g_max-weighted average of E_NaL and E_KL)."""
         e_na = float(patch_sim.nernst_potential(1, self.T, self.Na_out, self.Na_in))
         e_k = float(patch_sim.nernst_potential(1, self.T, self.K_out, self.K_in))
-        g_total = self.g_NaL + self.g_KL
+        g_nal = self.nal_g_max
+        g_kl = self.kl_g_max
+        g_total = g_nal + g_kl
         if g_total <= 0:
             return self.v_rest
-        return (self.g_NaL * e_na + self.g_KL * e_k) / g_total
+        return (g_nal * e_na + g_kl * e_k) / g_total
 
     @rx.var
     def E_Ca(self) -> float:
@@ -199,7 +169,7 @@ class NeuronState(rx.State):
         the cache has been invalidated by the latest state flush.
 
         Only hashes the fields that determine the passive-only membrane
-        test result (g_NaL, g_KL, C_m, ion concentrations, T).  Active
+        test result (nal_g_max, kl_g_max, C_m, ion concentrations, T).  Active
         conductances are excluded because the membrane test blocks them.
 
         Returns:
@@ -319,12 +289,12 @@ class NeuronState(rx.State):
         """Construct a Neuron from current state parameters.
 
         Calls the active preset's factory to obtain a fully-configured
-        baseline (carrying the preset's core/auxiliary channels, calcium
-        dynamics, and area), then overlays the user's scalar slider values
-        via :func:`dataclasses.replace`.  Per-channel ``g_max`` slider values
-        are also overlaid onto the preset's ``additional_channels`` so the
-        user can scale individual auxiliary conductances; channel composition
-        and kinetics remain preset-baked.
+        baseline (carrying the preset's full channel list, calcium dynamics,
+        and area), then overlays the user's scalar slider values via
+        :func:`dataclasses.replace`.  Per-channel ``g_max`` slider values are
+        also overlaid onto the baseline's channels so the user can scale
+        individual conductances; channel composition and kinetics remain
+        preset-baked.
 
         Returns:
             A :class:`patch_sim.Neuron` whose scalar fields and per-channel
@@ -339,11 +309,11 @@ class NeuronState(rx.State):
             dataclasses.replace(ch, g_max=getattr(self, f"{ui_id}_g_max"))
             if (ui_id := presets.CHANNEL_NAME_TO_ID.get(ch.name)) is not None
             else ch
-            for ch in baseline.additional_channels
+            for ch in baseline.channels
         )
         return dataclasses.replace(
             baseline,
-            additional_channels=rebuilt_channels,
+            channels=rebuilt_channels,
             **scalar_overrides,
         )
 
@@ -351,3 +321,13 @@ class NeuronState(rx.State):
 # Register Neuron scalar fields as NeuronState vars
 for _nc_name, _nc_default in presets.NEURON_CONFIG_SCALAR_DEFAULTS.items():
     NeuronState.add_var(_nc_name, float, _nc_default)
+
+# Register one ``{id}_g_max`` reactive var per channel in the registry, seeded
+# from the registry default.  Per-channel sliders bind to these vars; values
+# are reset by ``neuron_to_ui_state`` whenever a preset is loaded.
+for _ch_meta in ADDITIONAL_CHANNELS:
+    NeuronState.add_var(
+        _ch_meta.g_max_field,
+        float,
+        presets._DEFAULT_G_MAX[_ch_meta.id],
+    )
