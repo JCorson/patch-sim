@@ -2138,6 +2138,40 @@ async def test_build_neuron_propagates_ih_g_max_slider() -> None:
         )
 
 
+async def test_visible_channel_ids_empty_for_squid() -> None:
+    """SQUID_GIANT_AXON has no auxiliary channels, so visible_channel_ids is empty."""
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(SQUID_GIANT_AXON)]
+    assert ns.visible_channel_ids == []
+
+
+@pytest.mark.parametrize("preset_name", list(NEURON_PRESETS))
+async def test_visible_channel_ids_matches_active_preset(preset_name: str) -> None:
+    """visible_channel_ids must reflect the loaded preset's auxiliary channels.
+
+    Args:
+        preset_name: Name of the preset to load and verify.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(preset_name)]
+    assert set(ns.visible_channel_ids) == PRESET_CHANNEL_IDS[preset_name]
+
+
+async def test_visible_channel_ids_updates_on_preset_switch() -> None:
+    """Switching presets must update visible_channel_ids reactively."""
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(FAST_SPIKING_INTERNEURON)]
+        first = list(ns.visible_channel_ids)
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
+        second = list(ns.visible_channel_ids)
+    assert set(first) == PRESET_CHANNEL_IDS[FAST_SPIKING_INTERNEURON]
+    assert set(second) == PRESET_CHANNEL_IDS[CORTICAL_PYRAMIDAL]
+    assert first != second
+
+
 async def test_g_max_slider_does_not_invalidate_membrane_test_cache() -> None:
     """Moving an auxiliary-channel g_max must not bust the membrane-test fingerprint.
 

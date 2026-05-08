@@ -166,6 +166,27 @@ class NeuronState(rx.State):
     active_neuron_type: str = "Squid Giant Axon (Classic HH)"
 
     # ------------------------------------------------------------------ #
+    # Visible auxiliary channels                                         #
+    # ------------------------------------------------------------------ #
+    @rx.var
+    def visible_channel_ids(self) -> list[str]:
+        """UI ids of auxiliary channels the active preset includes.
+
+        Iterated in :data:`ADDITIONAL_CHANNELS` order so the rendered row
+        order is deterministic regardless of ``frozenset`` iteration order.
+        Drives both the neuron-panel auxiliary-channel rows and the
+        sweep-manager trace-visibility checkboxes — single source of truth
+        for "this preset uses these channels".
+
+        Returns:
+            Ordered list of channel ids (e.g. ``["ih", "inap", "im", "mskv"]``
+            for Cortical Pyramidal).  Empty for presets with no auxiliary
+            channels (e.g. Squid Giant Axon) or unknown preset names.
+        """
+        ids = presets.PRESET_CHANNEL_IDS.get(self.active_neuron_type, frozenset())
+        return [ch.id for ch in ADDITIONAL_CHANNELS if ch.id in ids]
+
+    # ------------------------------------------------------------------ #
     # Derived reversal potentials                                        #
     # ------------------------------------------------------------------ #
     @rx.var
