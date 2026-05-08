@@ -2099,3 +2099,57 @@ def test_preset_channel_ids_matches_factory_output(preset_name: str) -> None:
         if (ui_id := CHANNEL_NAME_TO_ID.get(ch.name)) is not None
     )
     assert PRESET_CHANNEL_IDS[preset_name] == expected
+
+
+# ---------------------------------------------------------------------------
+# _build_neuron — per-channel g_max slider propagation
+# ---------------------------------------------------------------------------
+
+
+async def test_build_neuron_propagates_ih_g_max_slider() -> None:
+    """Moving the Ih g_max slider on Cortical Pyramidal updates the built channel.
+
+    Verifies the slider is functional under policy A: dataclasses.replace on
+    the preset's IonChannel produces a Neuron whose Ih channel has the
+    user-supplied g_max while every other channel keeps its preset value.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
+
+    baseline = NEURON_PRESETS[CORTICAL_PYRAMIDAL]()
+    preset_g_max = {ch.name: ch.g_max for ch in baseline.additional_channels}
+    sentinel_g_max = 0.123
+    assert preset_g_max["h"] != pytest.approx(sentinel_g_max), (
+        "Sentinel must differ from preset value or test is vacuous."
+    )
+
+    ns.ih_g_max = sentinel_g_max
+    neuron = ns._build_neuron()
+
+    by_name = {ch.name: ch for ch in neuron.additional_channels}
+    assert by_name["h"].g_max == pytest.approx(sentinel_g_max)
+    for name, g in preset_g_max.items():
+        if name == "h":
+            continue
+        assert by_name[name].g_max == pytest.approx(g), (
+            f"Non-Ih channel '{name}' g_max changed unexpectedly: "
+            f"{by_name[name].g_max} vs preset {g}"
+        )
+
+
+async def test_g_max_slider_does_not_invalidate_membrane_test_cache() -> None:
+    """Moving an auxiliary-channel g_max must not bust the membrane-test fingerprint.
+
+    The membrane test depends only on passive parameters
+    (g_NaL, g_KL, C_m, ion concentrations, T) — auxiliary channels are
+    silent in the passive run.  This regression test pins that contract.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
+
+    fingerprint_before = ns._compute_fingerprint()
+    ns.ih_g_max = ns.ih_g_max + 0.5
+    fingerprint_after = ns._compute_fingerprint()
+    assert fingerprint_before == fingerprint_after

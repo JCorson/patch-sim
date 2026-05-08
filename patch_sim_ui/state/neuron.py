@@ -328,21 +328,31 @@ class NeuronState(rx.State):
         Calls the active preset's factory to obtain a fully-configured
         baseline (carrying the preset's core/auxiliary channels, calcium
         dynamics, and area), then overlays the user's scalar slider values
-        via :func:`dataclasses.replace`.  Per the policy A design, channel
-        composition is not user-editable — channels are baked into the
-        preset and reused as-is.
+        via :func:`dataclasses.replace`.  Per-channel ``g_max`` slider values
+        are also overlaid onto the preset's ``additional_channels`` so the
+        user can scale individual auxiliary conductances; channel composition
+        and kinetics remain preset-baked.
 
         Returns:
-            A :class:`patch_sim.Neuron` whose scalar fields reflect the
-            current sliders and whose channel composition matches the
-            active preset.
+            A :class:`patch_sim.Neuron` whose scalar fields and per-channel
+            ``g_max`` reflect the current sliders.
         """
         factory = NEURON_PRESETS.get(self.active_neuron_type)
         baseline = factory() if factory is not None else patch_sim.Neuron()
         scalar_overrides = {
             name: getattr(self, name) for name in presets.NEURON_CONFIG_SCALAR_FIELDS
         }
-        return dataclasses.replace(baseline, **scalar_overrides)
+        rebuilt_channels = tuple(
+            dataclasses.replace(ch, g_max=getattr(self, f"{ui_id}_g_max"))
+            if (ui_id := presets.CHANNEL_NAME_TO_ID.get(ch.name)) is not None
+            else ch
+            for ch in baseline.additional_channels
+        )
+        return dataclasses.replace(
+            baseline,
+            additional_channels=rebuilt_channels,
+            **scalar_overrides,
+        )
 
 
 # Register Neuron scalar fields as NeuronState vars
