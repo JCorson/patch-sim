@@ -13,12 +13,6 @@ from patch_sim.analysis.membrane_test import run_membrane_test
 from patch_sim.channels import (
     make_dopaminergic_k_channel,
     make_dopaminergic_na_channel,
-    make_icat_channel,
-    make_ih_channel,
-    make_ikca_channel,
-    make_inap_channel,
-    make_inar_channel,
-    make_mainen_sejnowski_kv_channel,
     make_nav11_channel,
     make_nav12_channel,
     make_pospischil_k_channel,
@@ -43,7 +37,6 @@ from patch_sim.constants import (
     THALAMIC_RELAY,
     TRN,
 )
-from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import (
     NEURON_PRESET_NAMES,
     NEURON_PRESETS,
@@ -219,30 +212,30 @@ def test_cortical_pyramidal_uses_pospischil_na_factory() -> None:
     make_nav12_channel always includes the sNa12 slow inactivation gate
     (#327 depol-block recovery) — no factory wrapping needed.
     """
-    config = NEURON_PRESETS[CORTICAL_PYRAMIDAL]
-    assert config.na_channel_factory is make_nav12_channel
+    neuron = NEURON_PRESETS[CORTICAL_PYRAMIDAL]()
+    assert neuron.na_channel_factory is make_nav12_channel
 
 
 def test_cortical_pyramidal_uses_mainen_sejnowski_kv_via_channels() -> None:
     """Cortical Pyramidal includes Mainen-Sejnowski Kv via channels list (#311)."""
-    config = NEURON_PRESETS[CORTICAL_PYRAMIDAL]
-    factories = {ch.factory for ch in config.channels}
-    assert make_mainen_sejnowski_kv_channel in factories
+    neuron = NEURON_PRESETS[CORTICAL_PYRAMIDAL]()
+    channel_names = {ch.name for ch in neuron.additional_channels}
+    assert "Kv" in channel_names
     # Pospischil K is no longer the primary K channel — replaced by M-S Kv as
     # the sole delayed rectifier (g_K=0).
-    assert config.g_K == 0.0
+    assert neuron.g_K == 0.0
 
 
 def test_fsi_uses_nav11_factory() -> None:
     """FSI preset wires the Nav1.1-flavoured Na⁺ channel factory (issue #231)."""
-    config = NEURON_PRESETS[FAST_SPIKING_INTERNEURON]
-    assert config.na_channel_factory is make_nav11_channel
+    neuron = NEURON_PRESETS[FAST_SPIKING_INTERNEURON]()
+    assert neuron.na_channel_factory is make_nav11_channel
 
 
 def test_fsi_uses_pospischil_k_factory() -> None:
     """FSI preset wires the Pospischil K⁺ channel factory (issue #231)."""
-    config = NEURON_PRESETS[FAST_SPIKING_INTERNEURON]
-    assert config.k_channel_factory is make_pospischil_k_channel
+    neuron = NEURON_PRESETS[FAST_SPIKING_INTERNEURON]()
+    assert neuron.k_channel_factory is make_pospischil_k_channel
 
 
 def test_ca1_uses_nav12_factory() -> None:
@@ -251,26 +244,26 @@ def test_ca1_uses_nav12_factory() -> None:
     make_nav12_channel always includes the sNa12 slow inactivation gate
     (#328 depol-block recovery) — no factory wrapping needed.
     """
-    config = NEURON_PRESETS[CA1_PYRAMIDAL]
-    assert config.na_channel_factory is make_nav12_channel
+    neuron = NEURON_PRESETS[CA1_PYRAMIDAL]()
+    assert neuron.na_channel_factory is make_nav12_channel
 
 
 def test_ca1_uses_pospischil_k_factory() -> None:
     """CA1 preset wires the Pospischil K⁺ channel factory (issue #231)."""
-    config = NEURON_PRESETS[CA1_PYRAMIDAL]
-    assert config.k_channel_factory is make_pospischil_k_channel
+    neuron = NEURON_PRESETS[CA1_PYRAMIDAL]()
+    assert neuron.k_channel_factory is make_pospischil_k_channel
 
 
 def test_thalamic_relay_uses_mh92_na_factory() -> None:
     """Thalamic Relay preset wires the McCormick-Huguenard Na⁺ factory (issue #241)."""
-    config = NEURON_PRESETS[THALAMIC_RELAY]
-    assert config.na_channel_factory is make_thalamic_relay_na_channel
+    neuron = NEURON_PRESETS[THALAMIC_RELAY]()
+    assert neuron.na_channel_factory is make_thalamic_relay_na_channel
 
 
 def test_thalamic_relay_uses_mh92_k_factory() -> None:
     """Thalamic Relay preset wires the McCormick-Huguenard K⁺ factory (issue #241)."""
-    config = NEURON_PRESETS[THALAMIC_RELAY]
-    assert config.k_channel_factory is make_thalamic_relay_k_channel
+    neuron = NEURON_PRESETS[THALAMIC_RELAY]()
+    assert neuron.k_channel_factory is make_thalamic_relay_k_channel
 
 
 def test_thalamic_relay_t_ref_is_mccormick_huguenard_recording_temp() -> None:
@@ -279,7 +272,7 @@ def test_thalamic_relay_t_ref_is_mccormick_huguenard_recording_temp() -> None:
     Prevents regression to the HH52 default (295.15 K = 22 °C) which applied
     a ~5.2× Q10 overcorrection and distorted Na⁺ inactivation kinetics.
     """
-    assert NEURON_PRESETS[THALAMIC_RELAY].T_ref == pytest.approx(309.15)
+    assert NEURON_PRESETS[THALAMIC_RELAY]().T_ref == pytest.approx(309.15)
 
 
 # ---------------------------------------------------------------------------
@@ -329,7 +322,7 @@ def test_preset_passive_properties_in_physiological_range(
         rin_lo: Lower bound for the input resistance in kΩ·cm².
         rin_hi: Upper bound for the input resistance in kΩ·cm².
     """
-    neuron = make_neuron(NEURON_PRESETS[preset_name])
+    neuron = NEURON_PRESETS[preset_name]()
     props = run_membrane_test(neuron)
     assert props is not None, f"Preset '{preset_name}': run_membrane_test returned None"
     assert tau_lo <= props.time_constant <= tau_hi, (
@@ -358,8 +351,7 @@ def test_trn_preset_vrest_is_physiological() -> None:
     falls to ~0.038 mS/cm², which g_total safely overcomes.  −80 mV is within
     the physiological range reported by Huguenard & Prince (1992) for TRN cells.
     """
-    config = NEURON_PRESETS[TRN]
-    assert config.v_rest == pytest.approx(-80.0)
+    assert NEURON_PRESETS[TRN]().v_rest == pytest.approx(-80.0)
 
 
 def test_trn_icat_ft_inf_at_vrest_enables_burst_firing() -> None:
@@ -377,7 +369,7 @@ def test_trn_icat_ft_inf_at_vrest_enables_burst_firing() -> None:
     """
     channel = make_trn_icat_channel()
     ft_var = next(gv for gv in channel.gating_variables if gv.name == "ft")
-    v_rest = NEURON_PRESETS[TRN].v_rest
+    v_rest = NEURON_PRESETS[TRN]().v_rest
     alpha = ft_var.alpha(v_rest, 0.0)
     beta = ft_var.beta(v_rest, 0.0)
     ft_inf = alpha / (alpha + beta)
@@ -391,8 +383,7 @@ def test_trn_uses_huguenard_na_factory() -> None:
     Na⁺ kinetics (VT = −67 mV, recorded at 36 °C) are used instead of the
     default HH52 squid axon kinetics.
     """
-    config = NEURON_PRESETS[TRN]
-    assert config.na_channel_factory is make_trn_na_channel
+    assert NEURON_PRESETS[TRN]().na_channel_factory is make_trn_na_channel
 
 
 def test_trn_uses_huguenard_k_factory() -> None:
@@ -402,8 +393,7 @@ def test_trn_uses_huguenard_k_factory() -> None:
     K⁺ kinetics (VT = −67 mV, recorded at 36 °C) are used instead of the
     default HH52 squid axon kinetics.
     """
-    config = NEURON_PRESETS[TRN]
-    assert config.k_channel_factory is make_trn_k_channel
+    assert NEURON_PRESETS[TRN]().k_channel_factory is make_trn_k_channel
 
 
 def test_trn_t_ref_is_huguenard_recording_temp() -> None:
@@ -413,8 +403,7 @@ def test_trn_t_ref_is_huguenard_recording_temp() -> None:
     to ~1.12× (36→37 °C), preserving the published Huguenard & Prince kinetics
     and preventing premature Na⁺ inactivation at physiological temperature.
     """
-    config = NEURON_PRESETS[TRN]
-    assert config.T_ref == pytest.approx(309.15)
+    assert NEURON_PRESETS[TRN]().T_ref == pytest.approx(309.15)
 
 
 def test_trn_includes_ikca_channel() -> None:
@@ -432,35 +421,43 @@ def test_trn_includes_ikca_channel() -> None:
     spike, 200–600 Hz) is verified separately in
     ``test_trn_step_release_produces_hp92_rebound_burst``.
     """
-    config = NEURON_PRESETS[TRN]
-    ikca_configs = [c for c in config.channels if c.factory is make_ikca_channel]
-    assert len(ikca_configs) == 1, (
-        f"TRN preset must include exactly one IKCa channel, found {len(ikca_configs)}"
+    neuron = NEURON_PRESETS[TRN]()
+    ikca_channels = [c for c in neuron.additional_channels if c.name == "KCa"]
+    assert len(ikca_channels) == 1, (
+        f"TRN preset must include exactly one IKCa channel, found {len(ikca_channels)}"
     )
-    assert ikca_configs[0].g_max > 0.0, (
-        f"TRN IKCa g_max must be positive, got {ikca_configs[0].g_max}"
+    assert ikca_channels[0].g_max > 0.0, (
+        f"TRN IKCa g_max must be positive, got {ikca_channels[0].g_max}"
     )
 
 
 def test_trn_uses_trn_icat_factory() -> None:
-    """TRN preset must wire :func:`make_trn_icat_channel` (sigmoid tau, issue #295).
+    """TRN preset must wire the sigmoid-tau ICaT variant (issue #295).
 
     The default :func:`make_icat_channel` cosh-shaped tau collapses the LTS
     plateau in 5–10 ms, which is too fast to fit the 5–15 Na⁺ spikes of the
-    HP92 rebound burst.  The TRN factory replaces only the inactivation
-    time constant with a sigmoid shape; ft_inf is bit-identical.
+    HP92 rebound burst.  :func:`make_trn_icat_channel` replaces only the
+    inactivation time constant with a sigmoid shape; ft_inf is bit-identical.
+
+    Distinguishes the two variants behaviorally: at V = −50 mV the TRN
+    sigmoid-tau gives tau_ft ≈ 110 ms versus ≈ 7 ms for the default
+    cosh-shaped tau — a >15× difference.
     """
-    config = NEURON_PRESETS[TRN]
-    icat_configs = [c for c in config.channels if c.factory is make_trn_icat_channel]
-    assert len(icat_configs) == 1, (
-        f"TRN preset must wire exactly one make_trn_icat_channel; "
-        f"found {len(icat_configs)}"
+    neuron = NEURON_PRESETS[TRN]()
+    icat_channels = [c for c in neuron.additional_channels if c.name == "CaT"]
+    assert len(icat_channels) == 1, (
+        f"TRN preset must include exactly one CaT channel; found {len(icat_channels)}"
     )
-    assert icat_configs[0].g_max > 0.0
-    legacy_icat_configs = [c for c in config.channels if c.factory is make_icat_channel]
-    assert len(legacy_icat_configs) == 0, (
-        "TRN preset must not also wire the default make_icat_channel — the "
-        "sigmoid-tau factory is the sole ICaT source for TRN."
+    icat = icat_channels[0]
+    assert icat.g_max > 0.0
+    # Verify sigmoid-tau: at V=-50 mV the TRN factory gives tau_ft >> 50 ms.
+    ft_var = next(gv for gv in icat.gating_variables if gv.name == "ft")
+    v_test = -50.0
+    tau_ft = 1.0 / (ft_var.alpha(v_test, 0.0) + ft_var.beta(v_test, 0.0))
+    assert tau_ft > 50.0, (
+        f"TRN ICaT tau_ft at V=-50 mV should be >50 ms (sigmoid shape), "
+        f"got {tau_ft:.1f} ms — the default cosh-shaped factory may have "
+        "been wired instead of make_trn_icat_channel."
     )
 
 
@@ -476,8 +473,7 @@ def test_purkinje_uses_dschutter_bower_na_factory() -> None:
     used instead of the default HH52 squid axon kinetics, which applied a
     ~5.2× Q10 overcorrection inappropriate for a mammalian Purkinje cell.
     """
-    config = NEURON_PRESETS[PURKINJE]
-    assert config.na_channel_factory is make_purkinje_na_channel
+    assert NEURON_PRESETS[PURKINJE]().na_channel_factory is make_purkinje_na_channel
 
 
 def test_purkinje_uses_dschutter_bower_k_factory() -> None:
@@ -486,8 +482,7 @@ def test_purkinje_uses_dschutter_bower_k_factory() -> None:
     Verifies that Traub-Miles kinetics (VT = −58 mV, recorded at 32 °C) are
     used instead of the default HH52 squid axon kinetics.
     """
-    config = NEURON_PRESETS[PURKINJE]
-    assert config.k_channel_factory is make_purkinje_k_channel
+    assert NEURON_PRESETS[PURKINJE]().k_channel_factory is make_purkinje_k_channel
 
 
 def test_purkinje_t_ref_is_dschutter_bower_recording_temp() -> None:
@@ -497,8 +492,7 @@ def test_purkinje_t_ref_is_dschutter_bower_recording_temp() -> None:
     to ~1.73× (32→37 °C), preserving the published De Schutter & Bower kinetics
     and preventing distorted Na⁺ inactivation at physiological temperature.
     """
-    config = NEURON_PRESETS[PURKINJE]
-    assert config.T_ref == pytest.approx(305.15)
+    assert NEURON_PRESETS[PURKINJE]().T_ref == pytest.approx(305.15)
 
 
 def test_purkinje_has_nap_channel() -> None:
@@ -508,9 +502,8 @@ def test_purkinje_has_nap_channel() -> None:
     pacemaking range and amplifies subthreshold depolarizations.
     Ref: Raman & Bean (1999), J. Neurosci. 19:4663.
     """
-    config = NEURON_PRESETS[PURKINJE]
-    factories = [cc.factory for cc in config.channels]
-    assert make_inap_channel in factories
+    channel_names = [ch.name for ch in NEURON_PRESETS[PURKINJE]().additional_channels]
+    assert "NaP" in channel_names
 
 
 def test_purkinje_has_nar_channel() -> None:
@@ -523,9 +516,8 @@ def test_purkinje_has_nar_channel() -> None:
     intrinsic tonic spiking.
     Ref: Raman & Bean (1997), Neuron 19:881.
     """
-    config = NEURON_PRESETS[PURKINJE]
-    factories = [cc.factory for cc in config.channels]
-    assert make_inar_channel in factories
+    channel_names = [ch.name for ch in NEURON_PRESETS[PURKINJE]().additional_channels]
+    assert "NaR" in channel_names
 
 
 def test_purkinje_nap_conductance_physiological() -> None:
@@ -535,10 +527,11 @@ def test_purkinje_nap_conductance_physiological() -> None:
     effect on resting potential; values above 0.5 produce pathologically large
     persistent inward currents.
     """
-    config = NEURON_PRESETS[PURKINJE]
-    nap_configs = [cc for cc in config.channels if cc.factory is make_inap_channel]
-    assert len(nap_configs) == 1
-    assert 0.01 <= nap_configs[0].g_max <= 0.5
+    nap_channels = [
+        ch for ch in NEURON_PRESETS[PURKINJE]().additional_channels if ch.name == "NaP"
+    ]
+    assert len(nap_channels) == 1
+    assert 0.01 <= nap_channels[0].g_max <= 0.5
 
 
 def test_purkinje_vrest_in_pacemaking_range() -> None:
@@ -549,8 +542,7 @@ def test_purkinje_vrest_in_pacemaking_range() -> None:
     subthreshold window currents.  The lower bound is widened to −65.5 mV to
     accommodate the 0.5 mV equilibrium-finding tolerance.
     """
-    config = NEURON_PRESETS[PURKINJE]
-    assert -65.5 <= config.v_rest <= -55.0
+    assert -65.5 <= NEURON_PRESETS[PURKINJE]().v_rest <= -55.0
 
 
 def test_purkinje_nar_conductance_physiological() -> None:
@@ -560,10 +552,11 @@ def test_purkinje_nar_conductance_physiological() -> None:
     guards against silent regressions to non-physiological values.
     Ref: Raman & Bean (1997), Neuron 19:881.
     """
-    config = NEURON_PRESETS[PURKINJE]
-    nar_configs = [cc for cc in config.channels if cc.factory is make_inar_channel]
-    assert len(nar_configs) == 1
-    assert 0.01 <= nar_configs[0].g_max <= 0.5
+    nar_channels = [
+        ch for ch in NEURON_PRESETS[PURKINJE]().additional_channels if ch.name == "NaR"
+    ]
+    assert len(nar_channels) == 1
+    assert 0.01 <= nar_channels[0].g_max <= 0.5
 
 
 def test_purkinje_has_ih_channel() -> None:
@@ -573,9 +566,8 @@ def test_purkinje_has_ih_channel() -> None:
     enabling spontaneous autonomous pacemaking without external current.
     Ref: Destexhe et al. (1993), J. Neurophysiol. 70:1385.
     """
-    config = NEURON_PRESETS[PURKINJE]
-    factories = [cc.factory for cc in config.channels]
-    assert make_ih_channel in factories
+    channel_names = [ch.name for ch in NEURON_PRESETS[PURKINJE]().additional_channels]
+    assert "h" in channel_names
 
 
 def test_purkinje_ih_conductance_physiological() -> None:
@@ -585,10 +577,11 @@ def test_purkinje_ih_conductance_physiological() -> None:
     to drive recovery from the post-AP AHP; values above 5.0 dominate
     membrane current and produce unrealistically fast pacemaking.
     """
-    config = NEURON_PRESETS[PURKINJE]
-    ih_configs = [cc for cc in config.channels if cc.factory is make_ih_channel]
-    assert len(ih_configs) == 1
-    assert 0.1 <= ih_configs[0].g_max <= 5.0
+    ih_channels = [
+        ch for ch in NEURON_PRESETS[PURKINJE]().additional_channels if ch.name == "h"
+    ]
+    assert len(ih_channels) == 1
+    assert 0.1 <= ih_channels[0].g_max <= 5.0
 
 
 # ---------------------------------------------------------------------------
@@ -603,8 +596,8 @@ def test_dopaminergic_uses_komendantov_na_factory() -> None:
     used instead of the HH52 squid axon kinetics, which applied a ~5.2×
     Q10 overcorrection inappropriate for an SNc dopaminergic neuron.
     """
-    config = NEURON_PRESETS[DOPAMINERGIC]
-    assert config.na_channel_factory is make_dopaminergic_na_channel
+    neuron = NEURON_PRESETS[DOPAMINERGIC]()
+    assert neuron.na_channel_factory is make_dopaminergic_na_channel
 
 
 def test_dopaminergic_uses_komendantov_k_factory() -> None:
@@ -613,8 +606,8 @@ def test_dopaminergic_uses_komendantov_k_factory() -> None:
     Verifies that Komendantov (2004) kinetics (VT=-67 mV, T_ref=308.15 K) are
     used instead of the HH52 squid axon kinetics.
     """
-    config = NEURON_PRESETS[DOPAMINERGIC]
-    assert config.k_channel_factory is make_dopaminergic_k_channel
+    neuron = NEURON_PRESETS[DOPAMINERGIC]()
+    assert neuron.k_channel_factory is make_dopaminergic_k_channel
 
 
 def test_dopaminergic_t_ref_is_komendantov_recording_temp() -> None:
@@ -624,7 +617,7 @@ def test_dopaminergic_t_ref_is_komendantov_recording_temp() -> None:
     a ~5.2× Q10 overcorrection and produced excessively fast Na⁺ gating.
     Komendantov (2004) recorded at 35 °C = 308.15 K.
     """
-    assert NEURON_PRESETS[DOPAMINERGIC].T_ref == pytest.approx(308.15)
+    assert NEURON_PRESETS[DOPAMINERGIC]().T_ref == pytest.approx(308.15)
 
 
 # ---------------------------------------------------------------------------
@@ -655,11 +648,11 @@ def test_presets_have_expected_area_cm2(
     preset_name: str, expected_area: float | None
 ) -> None:
     """Each preset carries the area_cm2 listed in the issue table."""
-    config = NEURON_PRESETS[preset_name]
+    neuron = NEURON_PRESETS[preset_name]()
     if expected_area is None:
-        assert config.area_cm2 is None
+        assert neuron.area_cm2 is None
     else:
-        assert config.area_cm2 == pytest.approx(expected_area)
+        assert neuron.area_cm2 == pytest.approx(expected_area)
 
 
 @pytest.mark.parametrize(
@@ -677,8 +670,7 @@ def test_preset_with_area_yields_finite_absolute_passive_properties(
     test guards against silent regressions where the conversion returns
     None / inf / negative values.
     """
-    config = NEURON_PRESETS[preset_name]
-    neuron = make_neuron(config)
+    neuron = NEURON_PRESETS[preset_name]()
     props = run_membrane_test(neuron)
     assert props is not None
     assert props.input_resistance_mohm is not None

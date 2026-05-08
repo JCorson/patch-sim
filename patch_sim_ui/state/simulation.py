@@ -161,7 +161,7 @@ class SimulationState(rx.State):
         Reflex class-level defaults set ``active_neuron_type`` and the scalar
         neuron fields independently, so the displayed preset can be out of sync
         with the underlying parameters (e.g. ``Q10`` defaults to ``3.0`` from
-        :class:`~patch_sim.NeuronConfig` but the SGA preset requires ``1.0``).
+        :class:`~patch_sim.Neuron` but the SGA preset requires ``1.0``).
         This method bootstraps a consistent state by calling
         :meth:`NeuronState._apply_neuron_preset` and
         :meth:`ProtocolState._apply_protocol_preset` for the configured

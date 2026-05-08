@@ -23,7 +23,6 @@ from patch_sim.constants import (
     TRN,
 )
 from patch_sim.neuron import Neuron
-from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESETS, build_protocol_from_preset
 from patch_sim.protocols import step_current
 
@@ -51,7 +50,7 @@ def test_purkinje_tonic_firing_reports_zero_bursts() -> None:
     as a 2-spike burst — masking the steady-state tonic phenotype this
     test is pinning.
     """
-    neuron = make_neuron(NEURON_PRESETS[PURKINJE])
+    neuron = NEURON_PRESETS[PURKINJE]()
     protocol = step_current(
         duration=600.0,
         current_amplitude=10.0,
@@ -167,7 +166,7 @@ def test_thalamic_relay_step_release_produces_multi_spike_lts_burst() -> None:
     Verifies issue #287: prior to the fix, the TC preset produced only a
     single rebound spike.
     """
-    neuron = make_neuron(NEURON_PRESETS[THALAMIC_RELAY])
+    neuron = NEURON_PRESETS[THALAMIC_RELAY]()
     pre = 50.0
     stim = 300.0
     post = 200.0
@@ -226,7 +225,7 @@ def test_trn_step_release_produces_hp92_rebound_burst() -> None:
     embedded-burst carve-out must successfully isolate the rebound burst
     from the surrounding tonic spikes.
     """
-    neuron = make_neuron(NEURON_PRESETS[TRN])
+    neuron = NEURON_PRESETS[TRN]()
     pre = 200.0
     stim = 500.0
     post = 200.0
@@ -274,7 +273,7 @@ def test_trn_hyperpolarization_steps_protocol_produces_burst_per_sweep() -> None
     :func:`test_trn_step_release_produces_hp92_rebound_burst` does not
     cover.
     """
-    neuron = make_neuron(NEURON_PRESETS[TRN])
+    neuron = NEURON_PRESETS[TRN]()
     protocol = build_protocol_from_preset(HYPERPOLARIZATION_STEPS, neuron_preset=TRN)
     assert protocol.shape[0] == 5, (
         f"Expected 5 sweeps for TRN HYPERPOLARIZATION_STEPS, got {protocol.shape[0]}"
@@ -344,7 +343,7 @@ def test_user_supplied_threshold_changes_grouping() -> None:
     ISIs into "unburst" while a very large one (500 ms) should merge
     everything into a single burst.
     """
-    neuron = make_neuron(NEURON_PRESETS[PURKINJE])
+    neuron = NEURON_PRESETS[PURKINJE]()
     protocol = step_current(
         duration=400.0,
         current_amplitude=10.0,
@@ -383,7 +382,7 @@ def test_stn_conditional_burst_mode_under_hyperpolarising_step_release() -> None
     ``g_CaT`` (5 mS/cm²) drives a high-frequency rebound burst.  Sanity
     check that the secondary firing mode is wired in.
     """
-    neuron = make_neuron(NEURON_PRESETS[STN])
+    neuron = NEURON_PRESETS[STN]()
     pre = 50.0
     stim = 300.0
     post = 100.0

@@ -1143,11 +1143,11 @@ def test_stn_preset_uses_otsuka_factories() -> None:
     from patch_sim.constants import STN
     from patch_sim.presets import NEURON_PRESETS
 
-    config = NEURON_PRESETS[STN]
+    neuron = NEURON_PRESETS[STN]()
     # make_stn_na_channel always includes the sNa slow inactivation gate
     # (#324 depol-block recovery), so no factory wrapping is needed.
-    assert config.na_channel_factory is make_stn_na_channel
-    assert config.k_channel_factory is make_stn_k_channel
+    assert neuron.na_channel_factory is make_stn_na_channel
+    assert neuron.k_channel_factory is make_stn_k_channel
 
 
 # ---------------------------------------------------------------------------

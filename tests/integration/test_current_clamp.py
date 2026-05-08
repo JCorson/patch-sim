@@ -6,7 +6,6 @@ import pytest
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
 from patch_sim.constants import DOPAMINERGIC, PURKINJE, STN, TRN
 from patch_sim.neuron import Neuron
-from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
 
 # Purkinje is a pacemaker with an UNSTABLE zero-current equilibrium at v_rest.
@@ -414,8 +413,7 @@ def test_all_presets_stable_at_rest(preset_name: str) -> None:
     Purkinje is excluded because its v_rest is an unstable zero-current
     equilibrium (pacemaker threshold); see test_purkinje.py for pacemaking tests.
     """
-    config = NEURON_PRESETS[preset_name]
-    neuron = make_neuron(config)
+    neuron = NEURON_PRESETS[preset_name]()
 
     duration = 50  # ms
     num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1

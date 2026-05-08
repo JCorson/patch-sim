@@ -16,10 +16,8 @@ import pytest
 
 from patch_sim.analysis.ap_metrics import analyze_aps_from_result
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
-from patch_sim.constants import SQUID_GIANT_AXON
 from patch_sim.neuron import Neuron
-from patch_sim.neuron_factory import make_neuron
-from patch_sim.presets import NEURON_PRESETS
+from patch_sim.presets import make_squid_giant_axon
 from patch_sim.protocols import step_current
 from tests.integration._ap_shape import assert_ap_shape
 
@@ -38,7 +36,7 @@ _HH52_REFERENCE = "Hodgkin & Huxley 1952"
 @pytest.fixture
 def squid_neuron() -> Neuron:
     """HH52 squid giant axon instance for all tests in this module."""
-    return make_neuron(NEURON_PRESETS[SQUID_GIANT_AXON])
+    return make_squid_giant_axon()
 
 
 @pytest.fixture

@@ -79,12 +79,6 @@ from .constants import (
 from .electrochemistry import goldman_potential, nernst_potential
 from .equilibrium import find_coupled_equilibrium, find_zero_current_voltage
 from .neuron import Neuron
-from .neuron_factory import (
-    CHANNEL_REGISTRY,
-    ChannelConfig,
-    NeuronConfig,
-    make_neuron,
-)
 from .presets import (
     NEURON_PRESET_NAMES,
     NEURON_PRESETS,
@@ -172,10 +166,6 @@ __all__ = [
     "VOLTAGE_PROTOCOLS",
     "CalciumDynamics",
     "Neuron",
-    "CHANNEL_REGISTRY",
-    "ChannelConfig",
-    "NeuronConfig",
-    "make_neuron",
     "NEURON_PRESET_NAMES",
     "NEURON_PRESETS",
     "NEURON_PROTOCOL_ADJUSTMENTS",

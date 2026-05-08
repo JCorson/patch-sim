@@ -19,7 +19,6 @@ from patch_sim.constants import (
     THALAMIC_RELAY,
     TRN,
 )
-from patch_sim.neuron_factory import make_neuron
 from patch_sim.presets import NEURON_PRESETS
 from patch_sim.protocols import step_current
 
@@ -72,7 +71,7 @@ def test_strong_stim_peak_ca_in_band(preset_name: str) -> None:
     lower_um, upper_um = _CA_PEAK_BAND_OVERRIDES.get(
         preset_name, (_CA_PEAK_MIN_UM_DEFAULT, _CA_PEAK_MAX_UM_DEFAULT)
     )
-    neuron = make_neuron(NEURON_PRESETS[preset_name])
+    neuron = NEURON_PRESETS[preset_name]()
     assert neuron.calcium_dynamics is not None, (
         f"Preset '{preset_name}' must have CalciumDynamics"
     )
