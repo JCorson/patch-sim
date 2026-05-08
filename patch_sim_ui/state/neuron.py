@@ -186,6 +186,18 @@ class NeuronState(rx.State):
         ids = presets.PRESET_CHANNEL_IDS.get(self.active_neuron_type, frozenset())
         return [ch.id for ch in ADDITIONAL_CHANNELS if ch.id in ids]
 
+    @rx.var
+    def has_visible_channels(self) -> bool:
+        """True if the active preset exposes any auxiliary channels.
+
+        Used by the neuron panel to hide the "Additional Channels" accordion
+        entirely when the preset has none (e.g. Squid Giant Axon).
+
+        Returns:
+            ``True`` iff :attr:`visible_channel_ids` is non-empty.
+        """
+        return len(self.visible_channel_ids) > 0
+
     # ------------------------------------------------------------------ #
     # Derived reversal potentials                                        #
     # ------------------------------------------------------------------ #
