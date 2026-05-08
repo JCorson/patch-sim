@@ -35,31 +35,6 @@ _NEURON_FLOAT_FIELDS: list[str] = list(presets.NEURON_CONFIG_SCALAR_FIELDS)
 
 _CHANNEL_FLOAT_FIELDS: list[str] = [ch.g_max_field for ch in ADDITIONAL_CHANNELS]
 
-_NON_VISIBILITY_BOOL_FIELDS: list[str] = [
-    ch.enabled_field for ch in ADDITIONAL_CHANNELS
-]
-
-
-def _make_bool_setter(field_name: str, class_name: str = "NeuronState"):
-    """Factory returning a bool event handler for ``field_name``.
-
-    Args:
-        field_name: Name of the state attribute to update.
-        class_name: Owning state class name used in ``__qualname__``.
-
-    Returns:
-        An event handler method that sets the bool field.
-    """
-
-    def setter(self, value: bool) -> None:
-        """Set the field from a checkbox event."""
-        setattr(self, field_name, value)
-
-    setter.__name__ = f"set_{field_name}"
-    setter.__qualname__ = f"{class_name}.set_{field_name}"
-    setter.__doc__ = f"Set {field_name} from a checkbox event."
-    return setter
-
 
 #: The NeuronState fields that determine the passive-only membrane test result.
 #: Only these fields are included in ``neuron_fingerprint`` so that changing
@@ -129,35 +104,23 @@ class NeuronState(rx.State):
     # ------------------------------------------------------------------ #
     # Additional channels                                                 #
     # ------------------------------------------------------------------ #
-    ih_enabled: bool = False
+    # Per-channel g_max sliders.  Visibility (which slider is shown) is
+    # driven by ``visible_channel_ids`` from the active preset; values are
+    # initialised by ``neuron_to_ui_state`` on preset load.
     ih_g_max: float = DEFAULT_G_IH
-    ika_enabled: bool = False
     ika_g_max: float = DEFAULT_G_IKA
-    ikv31_enabled: bool = False
     ikv31_g_max: float = DEFAULT_G_IKV31
-    mskv_enabled: bool = False
     mskv_g_max: float = DEFAULT_G_MSKV
-    inap_enabled: bool = False
     inap_g_max: float = DEFAULT_G_NAP
-    inar_enabled: bool = False
     inar_g_max: float = DEFAULT_G_NAR
-    im_enabled: bool = False
     im_g_max: float = DEFAULT_G_IM
-    katp_enabled: bool = False
     katp_g_max: float = DEFAULT_G_KATP
-    ikir_enabled: bool = False
     ikir_g_max: float = DEFAULT_G_IKIR
-    ikca_enabled: bool = False
     ikca_g_max: float = DEFAULT_G_IKCA
-    ical_enabled: bool = False
     ical_g_max: float = DEFAULT_G_ICAL
-    cav13_enabled: bool = False
     cav13_g_max: float = DEFAULT_G_CAV13
-    icat_enabled: bool = False
     icat_g_max: float = DEFAULT_G_ICAT
-    ican_enabled: bool = False
     ican_g_max: float = DEFAULT_G_ICAN
-    sk_enabled: bool = False
     sk_g_max: float = DEFAULT_G_SK
 
     # ------------------------------------------------------------------ #
@@ -348,9 +311,6 @@ class NeuronState(rx.State):
 
     for _f in _NEURON_FLOAT_FIELDS + _CHANNEL_FLOAT_FIELDS:
         vars()[f"set_{_f}"] = _make_neuron_float_setter(_f)
-
-    for _f in _NON_VISIBILITY_BOOL_FIELDS:
-        vars()[f"set_{_f}"] = _make_bool_setter(_f, "NeuronState")
 
     # ------------------------------------------------------------------ #
     # Simulation helpers                                                 #

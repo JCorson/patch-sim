@@ -354,12 +354,11 @@ async def test_load_protocol_preset_unknown_name_is_ignored() -> None:
 
 
 async def test_load_neuron_preset_fast_spiking_interneuron() -> None:
-    """load_neuron_preset enables IKv31 and leaves IKa disabled for Fast-Spiking."""
+    """load_neuron_preset exposes IKv31 (and only IKv31) for Fast-Spiking."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(FAST_SPIKING_INTERNEURON)]
-    assert ns.ikv31_enabled is True
-    assert ns.ika_enabled is False
+    assert set(ns.visible_channel_ids) == {"ikv31"}
 
 
 async def test_load_neuron_preset_sets_active_neuron_type() -> None:
@@ -370,61 +369,57 @@ async def test_load_neuron_preset_sets_active_neuron_type() -> None:
     assert ns.active_neuron_type == CORTICAL_PYRAMIDAL
 
 
-async def test_load_neuron_preset_resets_previously_enabled_channels() -> None:
-    """Loading a second neuron preset disables channels from the first."""
+async def test_load_neuron_preset_replaces_visible_channels() -> None:
+    """Switching presets replaces visible_channel_ids — no leftovers."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(FAST_SPIKING_INTERNEURON)]
-        assert ns.ikv31_enabled is True
+        assert "ikv31" in ns.visible_channel_ids
         [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
-    assert ns.ikv31_enabled is False
+    assert "ikv31" not in ns.visible_channel_ids
 
 
 async def test_load_neuron_preset_pyramidal_neuron() -> None:
-    """load_neuron_preset enables Ih, INaP, and IM channels for Cortical Pyramidal."""
+    """load_neuron_preset exposes Ih, INaP, and IM among CP's channels."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
-    assert ns.ih_enabled is True
-    assert ns.inap_enabled is True
-    assert ns.im_enabled is True
+    visible = set(ns.visible_channel_ids)
+    assert {"ih", "inap", "im"} <= visible
 
 
 async def test_load_neuron_preset_purkinje_cell() -> None:
-    """load_neuron_preset enables ICaL, ICaT, and IKCa channels for Purkinje Cell."""
+    """load_neuron_preset exposes ICaL, ICaT, and IKCa among Purkinje's channels."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(PURKINJE)]
-    assert ns.ical_enabled is True
-    assert ns.icat_enabled is True
-    assert ns.ikca_enabled is True
+    visible = set(ns.visible_channel_ids)
+    assert {"ical", "icat", "ikca"} <= visible
 
 
 async def test_load_neuron_preset_dopaminergic_neuron() -> None:
-    """load_neuron_preset enables the SNc DA pacemaker channel set.
+    """load_neuron_preset exposes the SNc DA pacemaker channel set.
 
     The Putzier+Drion minimal SNc DA preset uses Cav1.3, SK, INaP and Ih.
     IM and Mainen-Sejnowski Kv are not characteristic of SNc DA neurons and
-    are not enabled by this preset.
+    are not exposed by this preset.
     """
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
-    assert ns.ih_enabled is True
-    assert ns.cav13_enabled is True
-    assert ns.sk_enabled is True
-    assert ns.inap_enabled is True
-    assert ns.im_enabled is False
-    assert ns.mskv_enabled is False
+    visible = set(ns.visible_channel_ids)
+    assert {"ih", "cav13", "sk", "inap"} <= visible
+    assert "im" not in visible
+    assert "mskv" not in visible
 
 
 async def test_load_neuron_preset_thalamic_relay() -> None:
-    """load_neuron_preset enables ICaT and Ih channels for Thalamic Relay."""
+    """load_neuron_preset exposes ICaT and Ih among Thalamic Relay's channels."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(THALAMIC_RELAY)]
-    assert ns.icat_enabled is True
-    assert ns.ih_enabled is True
+    visible = set(ns.visible_channel_ids)
+    assert {"icat", "ih"} <= visible
 
 
 # ---------------------------------------------------------------------------

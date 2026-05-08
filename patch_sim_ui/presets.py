@@ -98,10 +98,12 @@ def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
     Produces a mapping whose keys exactly match ``NeuronState`` field names so
     that it can be unpacked with ``setattr`` in ``load_neuron_preset``.
 
-    All auxiliary channels that are absent from *neuron.additional_channels*
-    are set to disabled with their default maximum conductances, so that
-    loading a preset never leaves channels enabled that were set by a previous
-    preset.
+    For each auxiliary channel, the corresponding ``{id}_g_max`` key is set
+    to the channel's preset-tuned ``g_max`` if present on *neuron*, otherwise
+    the registry default in :data:`_DEFAULT_G_MAX`.  Visibility (which slider
+    appears in the panel) is driven separately by :data:`PRESET_CHANNEL_IDS`,
+    so the default fallback only matters when the user later switches to a
+    preset that does include the channel.
 
     Args:
         neuron: Core neuron instance to convert.
@@ -113,19 +115,17 @@ def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
         name: getattr(neuron, name) for name in NEURON_CONFIG_SCALAR_FIELDS
     }
 
-    # Disable all auxiliary channels with default conductances.
+    # Initialise every auxiliary-channel slider to its registry default.
     for ch_meta in ADDITIONAL_CHANNELS:
-        state[ch_meta.enabled_field] = False
         state[ch_meta.g_max_field] = _DEFAULT_G_MAX[ch_meta.id]
 
-    # Enable channels present on the Neuron instance.  Variant factories
-    # (e.g. make_snc_inap_channel) produce channels with names that are
-    # resolved via CHANNEL_NAME_TO_ID so the lookup collapses variants onto
-    # the same UI toggle automatically.
+    # Override with preset-tuned values for channels present on the Neuron.
+    # Variant factories (e.g. make_snc_inap_channel) produce channels with
+    # names that resolve via CHANNEL_NAME_TO_ID, so the lookup collapses
+    # variants onto the same UI slider automatically.
     for ch in neuron.additional_channels:
         ui_id = CHANNEL_NAME_TO_ID.get(ch.name)
         if ui_id is not None:
-            state[f"{ui_id}_enabled"] = True
             state[f"{ui_id}_g_max"] = ch.g_max
 
     return state

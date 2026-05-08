@@ -37,15 +37,6 @@ class ChannelMeta:
     gating_var_colors: dict[str, str]
 
     @property
-    def enabled_field(self) -> str:
-        """NeuronState attribute name for the enable checkbox.
-
-        Returns:
-            Field name, e.g. ``"ih_enabled"``.
-        """
-        return f"{self.id}_enabled"
-
-    @property
     def g_max_field(self) -> str:
         """NeuronState attribute name for the conductance slider.
 
