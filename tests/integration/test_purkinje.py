@@ -15,9 +15,8 @@ import pytest
 
 from patch_sim.analysis.ap_metrics import analyze_aps_from_result
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
-from patch_sim.constants import PURKINJE
 from patch_sim.neuron import Neuron
-from patch_sim.presets import NEURON_PRESETS
+from patch_sim.presets import make_purkinje
 from patch_sim.protocols import step_current
 from tests.integration._ap_shape import assert_ap_shape
 
@@ -29,7 +28,7 @@ from tests.integration._ap_shape import assert_ap_shape
 @pytest.fixture
 def pk_neuron() -> Neuron:
     """Purkinje neuron instance for all tests in this module."""
-    return NEURON_PRESETS[PURKINJE]()
+    return make_purkinje()
 
 
 def _count_action_potentials(voltage: np.ndarray, threshold: float = 0.0) -> int:
