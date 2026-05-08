@@ -6,10 +6,12 @@ live in the core library and should be imported from ``patch_sim.presets``
 directly.
 """
 
+from collections.abc import Callable
 from dataclasses import Field
 from dataclasses import fields as dc_fields
 from typing import Any
 
+from patch_sim.channels import IonChannel, IonSpecies, NernstSpec
 from patch_sim.constants import (
     ACTION_POTENTIAL,
     DEFAULT_G_CAV13,
@@ -165,10 +167,67 @@ DEFAULT_NEURON_PRESET: str = SQUID_GIANT_AXON
 #: Default protocol preset applied on app startup and reset.
 DEFAULT_PROTOCOL_PRESET: str = ACTION_POTENTIAL
 
+
+def _is_sodium_carrying(channel: IonChannel) -> bool:
+    """Return True if ``channel`` carries Na⁺ ions through a Nernst reversal.
+
+    Used by the Na+ Channel Activation protocol override to decide which
+    sliders to leave alone (Na, NaL, INaP, INaR, INaP_SNc) versus zero
+    (every K-, Ca-, or Goldman-mixed-cation channel).
+
+    Args:
+        channel: An ion channel from a Neuron preset.
+
+    Returns:
+        ``True`` iff ``channel.reversal_spec`` is a ``NernstSpec`` with
+        species ``IonSpecies.SODIUM``.  ``GoldmanSpec`` channels (Ih)
+        return ``False`` even though they pass some Na⁺.
+    """
+    spec = channel.reversal_spec
+    return isinstance(spec, NernstSpec) and spec.species is IonSpecies.SODIUM
+
+
+def _na_channel_activation_override(neuron_preset_name: str) -> dict[str, Any]:
+    """Build the Na+ Channel Activation slider override for ``neuron_preset_name``.
+
+    Walks the active preset's channels and emits ``{"<ui_id>_g_max": 0.0}``
+    for every channel that does NOT carry sodium.  Channels not in
+    :data:`CHANNEL_NAME_TO_ID` (i.e. with no UI slider) are skipped.
+
+    Args:
+        neuron_preset_name: Key into :data:`patch_sim.presets.NEURON_PRESETS`.
+            Unknown names produce an empty dict (no overrides applied).
+
+    Returns:
+        Mapping of NeuronState slider field name to ``0.0``.  Only
+        non-Na-carrying channels are included; Na/NaL/NaP/NaR sliders
+        keep their current values.
+    """
+    factory = NEURON_PRESETS.get(neuron_preset_name)
+    if factory is None:
+        return {}
+    overrides: dict[str, Any] = {}
+    for ch in factory().channels:
+        if _is_sodium_carrying(ch):
+            continue
+        ui_id = CHANNEL_NAME_TO_ID.get(ch.name)
+        if ui_id is not None:
+            overrides[f"{ui_id}_g_max"] = 0.0
+    return overrides
+
+
 # Neuron-parameter overrides applied when a protocol preset is loaded,
-# regardless of which neuron type is active.  Keys must match NeuronState field
-# names exactly.
-PROTOCOL_NEURON_OVERRIDES: dict[str, dict[str, Any]] = {
-    # Disable K⁺ channels so only Na⁺ current is visible.
-    NA_CHANNEL_ACTIVATION: {"k_g_max": 0.0},
+# regardless of which neuron type is active.  Each value is either:
+#   - a static ``dict[str, Any]`` of NeuronState field name → value, or
+#   - a callable ``(neuron_preset_name: str) -> dict[str, Any]`` that
+#     computes the override based on which channels the active preset has.
+# The callable form lets the Na+ Channel Activation override adapt to
+# whichever delayed rectifier each preset uses (HH-style "K", Mainen-Sejnowski
+# "Kv", IKv3.1, etc.) instead of hard-coding a single slider name.
+PROTOCOL_NEURON_OVERRIDES: dict[
+    str, dict[str, Any] | Callable[[str], dict[str, Any]]
+] = {
+    # Zero every non-Na-carrying channel so only the Na⁺ current contributes
+    # to the voltage-clamp trace — the textbook TEA/4-AP/Cd²⁺/Cs⁺ cocktail.
+    NA_CHANNEL_ACTIVATION: _na_channel_activation_override,
 }

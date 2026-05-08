@@ -91,6 +91,14 @@ class NeuronState(rx.State):
     is shown) is driven by ``visible_channel_ids`` from the active preset.
     """
 
+    # Snapshot of slider values overwritten by the active protocol's
+    # ``PROTOCOL_NEURON_OVERRIDES`` entry — populated when an override is
+    # applied, drained when the user switches to a protocol without an
+    # override (or to a different override).  Keeps Na+ Channel Activation
+    # reversible so leaving the protocol restores the user's prior values
+    # rather than leaving every non-Na slider stuck at 0.
+    _protocol_override_snapshot: dict[str, float] = {}
+
     # ------------------------------------------------------------------ #
     # Preset label                                                        #
     # ------------------------------------------------------------------ #
@@ -193,14 +201,66 @@ class NeuronState(rx.State):
         return self._compute_fingerprint()
 
     # ------------------------------------------------------------------ #
+    # Protocol override snapshot/restore                                  #
+    # ------------------------------------------------------------------ #
+    def _restore_protocol_overrides(self) -> None:
+        """Undo the active protocol override by restoring snapshotted values.
+
+        Walks :attr:`_protocol_override_snapshot`, restoring each key whose
+        slider still exists on this state instance.  Clears the snapshot so
+        a subsequent override takes a fresh capture.  Skips keys that no
+        longer correspond to a registered field (e.g. when the user changed
+        neuron preset between snapshot and restore).
+        """
+        for key, value in self._protocol_override_snapshot.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+        self._protocol_override_snapshot = {}
+
+    def _apply_protocol_overrides(self, protocol_name: str | None) -> None:
+        """Apply ``PROTOCOL_NEURON_OVERRIDES`` for ``protocol_name``.
+
+        Always restores any previously-snapshotted values first, so the
+        new override is taken on top of the user's pre-override slider
+        state.  Then snapshots the current values for keys the new override
+        touches, applies the override, and stores the snapshot for the
+        next call.
+
+        When ``protocol_name`` is ``None`` or has no override entry, this
+        method just clears the snapshot (no new override is applied).
+        Static dict overrides and callable overrides are both supported;
+        a callable is invoked with :attr:`active_neuron_type` so it can
+        adapt to whichever channels the active preset has.
+
+        Args:
+            protocol_name: Key into ``presets.PROTOCOL_NEURON_OVERRIDES``,
+                or ``None`` if no protocol is active.
+        """
+        self._restore_protocol_overrides()
+        if protocol_name is None:
+            return
+        overrides = presets.PROTOCOL_NEURON_OVERRIDES.get(protocol_name, {})
+        if callable(overrides):
+            overrides = overrides(self.active_neuron_type)
+        snapshot: dict[str, float] = {}
+        for key, value in overrides.items():
+            if hasattr(self, key):
+                snapshot[key] = float(getattr(self, key))
+                setattr(self, key, value)
+        self._protocol_override_snapshot = snapshot
+
+    # ------------------------------------------------------------------ #
     # Event handlers                                                     #
     # ------------------------------------------------------------------ #
     def _apply_neuron_preset(self, name: str) -> None:
         """Apply neuron preset config to this state instance synchronously.
 
         Sets all conductances, channel enables, and ``active_neuron_type`` for
-        the given preset.  Does not touch any cross-state fields (use
-        :meth:`load_neuron_preset` for the full async handler).
+        the given preset.  Clears any active protocol-override snapshot
+        because the snapshot's keys may reference sliders that don't apply
+        to the new preset.  Does not touch any cross-state fields (use
+        :meth:`load_neuron_preset` for the full async handler that
+        re-applies the active protocol's override on top).
 
         Args:
             name: Key into ``patch_sim_ui.presets.NEURON_UI_PRESETS``.
@@ -208,6 +268,9 @@ class NeuronState(rx.State):
         """
         if name not in presets.NEURON_UI_PRESETS:
             return
+        # Discard any prior protocol-override snapshot — it referenced the
+        # previous preset's sliders and would be misleading after re-seed.
+        self._protocol_override_snapshot = {}
         config = presets.NEURON_UI_PRESETS[name]
         for key, value in config.items():
             setattr(self, key, value)
@@ -247,10 +310,7 @@ class NeuronState(rx.State):
         proto_st = await self.get_state(ProtocolState)
         if proto_st.active_protocol_preset:
             proto_st._apply_protocol_preset(proto_st.active_protocol_preset, name)
-            for key, value in presets.PROTOCOL_NEURON_OVERRIDES.get(
-                proto_st.active_protocol_preset, {}
-            ).items():
-                setattr(self, key, value)
+            self._apply_protocol_overrides(proto_st.active_protocol_preset)
         sim_st = await self.get_state(SimulationState)
         _cleared = not sim_st.stored_traces
         if _cleared:

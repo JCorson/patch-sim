@@ -11,7 +11,7 @@ import patch_sim.clamp_simulations
 from patch_sim.constants import CURRENT_CLAMP
 from patch_sim.presets import NEURON_PROTOCOL_ADJUSTMENTS, PROTOCOL_PRESETS
 from patch_sim.protocols.builders import build_current_protocol, build_voltage_protocol
-from patch_sim_ui import constants, presets
+from patch_sim_ui import constants
 from patch_sim_ui.state._common import _make_float_setter, _set_float
 
 _PROTOCOL_FLOAT_FIELDS: list[str] = [
@@ -223,8 +223,10 @@ class ProtocolState(rx.State):
         logger.info("Loaded protocol preset: %s", name)
         neuron_st = await self.get_state(NeuronState)
         self._apply_protocol_preset(name, neuron_st.active_neuron_type)
-        for key, value in presets.PROTOCOL_NEURON_OVERRIDES.get(name, {}).items():
-            setattr(neuron_st, key, value)
+        # Snapshot prior values & apply override; protocols without an
+        # override (most of them) just clear any prior snapshot — so
+        # leaving Na+ Channel Activation restores the user's slider state.
+        neuron_st._apply_protocol_overrides(name)
         sim_st = await self.get_state(SimulationState)
         sim_st._clear_for_new_protocol()
         sim_st._figure_clamp_mode = self.clamp_mode
