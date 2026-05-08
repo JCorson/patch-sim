@@ -18,7 +18,7 @@ def _additional_channel_row(
 
     Per the design, channel composition is preset-baked: the panel
     only shows rows for channels the active preset includes, so an
-    enable/disable checkbox is unnecessary.  The g_max slider modifies 
+    enable/disable checkbox is unnecessary.  The g_max slider modifies
     the channel's ``g_max`` on the next simulation run.
 
     Args:
