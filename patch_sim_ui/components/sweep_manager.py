@@ -47,7 +47,7 @@ def _section_label(text: str) -> rx.Component:
 
 def _channel_trace_group(
     header: str,
-    enabled_var: rx.Var,
+    visible_var: rx.Var,
     current_label: str,
     current_var: rx.Var,
     current_handler,
@@ -60,11 +60,13 @@ def _channel_trace_group(
     """Render a per-channel group with optional current and required gating checkboxes.
 
     The group is wrapped in ``rx.cond`` and only rendered when the channel is
-    enabled.
+    on the active preset (i.e. visible in the neuron panel).
 
     Args:
         header: Section header text (e.g. ``"Ih (HCN)"``).
-        enabled_var: State var indicating whether the channel is enabled.
+        visible_var: Boolean predicate indicating whether the channel is on
+            the active preset.  Typically
+            ``NeuronState.visible_channel_ids.contains(ch.id)``.
         current_label: Label for the current trace checkbox.
         current_var: State var for current trace visibility.
         current_handler: Event handler for current trace checkbox.
@@ -83,7 +85,7 @@ def _channel_trace_group(
         else []
     )
     return rx.cond(
-        enabled_var,
+        visible_var,
         rx.fragment(
             rx.separator(),
             _section_label(header),
@@ -93,13 +95,15 @@ def _channel_trace_group(
     )
 
 
-# (header, enabled_var, current_label, current_var, current_handler,
+# (header, visible_var, current_label, current_var, current_handler,
 #  gating_label, gating_var, gating_handler)
 # Derived from the channel registry in patch_sim_ui.channels.
+# ``visible_var`` is gated on the same predicate as the neuron panel, so the
+# trace-visibility popover shows the same set of channels as the panel.
 _ADDITIONAL_CHANNEL_TRACE_SPECS = [
     (
         ch.label,
-        getattr(NeuronState, ch.enabled_field),
+        NeuronState.visible_channel_ids.contains(ch.id),
         ch.current_label,
         getattr(VisibilityState, ch.current_visibility_field),
         getattr(VisibilityState, f"set_{ch.current_visibility_field}"),

@@ -83,13 +83,13 @@ _DEFAULT_G_MAX: dict[str, float] = {
 # "SK") have an IonChannel.name equal to the key directly.
 # Variant channels with a divergent name (e.g. SNc INaP -> "NaP_SNc") are
 # mapped explicitly so they collapse onto the canonical UI toggle.
-_CHANNEL_NAME_TO_ID: dict[str, str] = {}
+CHANNEL_NAME_TO_ID: dict[str, str] = {}
 for _ch_meta in ADDITIONAL_CHANNELS:
     if _ch_meta.current_key.startswith("I"):
-        _CHANNEL_NAME_TO_ID[_ch_meta.current_key[1:]] = _ch_meta.id
+        CHANNEL_NAME_TO_ID[_ch_meta.current_key[1:]] = _ch_meta.id
     else:
-        _CHANNEL_NAME_TO_ID[_ch_meta.current_key] = _ch_meta.id
-_CHANNEL_NAME_TO_ID["NaP_SNc"] = "inap"
+        CHANNEL_NAME_TO_ID[_ch_meta.current_key] = _ch_meta.id
+CHANNEL_NAME_TO_ID["NaP_SNc"] = "inap"
 
 
 def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
@@ -98,10 +98,12 @@ def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
     Produces a mapping whose keys exactly match ``NeuronState`` field names so
     that it can be unpacked with ``setattr`` in ``load_neuron_preset``.
 
-    All auxiliary channels that are absent from *neuron.additional_channels*
-    are set to disabled with their default maximum conductances, so that
-    loading a preset never leaves channels enabled that were set by a previous
-    preset.
+    For each auxiliary channel, the corresponding ``{id}_g_max`` key is set
+    to the channel's preset-tuned ``g_max`` if present on *neuron*, otherwise
+    the registry default in :data:`_DEFAULT_G_MAX`.  Visibility (which slider
+    appears in the panel) is driven separately by :data:`PRESET_CHANNEL_IDS`,
+    so the default fallback only matters when the user later switches to a
+    preset that does include the channel.
 
     Args:
         neuron: Core neuron instance to convert.
@@ -113,19 +115,17 @@ def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
         name: getattr(neuron, name) for name in NEURON_CONFIG_SCALAR_FIELDS
     }
 
-    # Disable all auxiliary channels with default conductances.
+    # Initialise every auxiliary-channel slider to its registry default.
     for ch_meta in ADDITIONAL_CHANNELS:
-        state[ch_meta.enabled_field] = False
         state[ch_meta.g_max_field] = _DEFAULT_G_MAX[ch_meta.id]
 
-    # Enable channels present on the Neuron instance.  Variant factories
-    # (e.g. make_snc_inap_channel) produce channels with names that are
-    # resolved via _CHANNEL_NAME_TO_ID so the lookup collapses variants onto
-    # the same UI toggle automatically.
+    # Override with preset-tuned values for channels present on the Neuron.
+    # Variant factories (e.g. make_snc_inap_channel) produce channels with
+    # names that resolve via CHANNEL_NAME_TO_ID, so the lookup collapses
+    # variants onto the same UI slider automatically.
     for ch in neuron.additional_channels:
-        ui_id = _CHANNEL_NAME_TO_ID.get(ch.name)
+        ui_id = CHANNEL_NAME_TO_ID.get(ch.name)
         if ui_id is not None:
-            state[f"{ui_id}_enabled"] = True
             state[f"{ui_id}_g_max"] = ch.g_max
 
     return state
@@ -134,6 +134,20 @@ def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
 # Flat UI-state dicts derived from core Neuron presets.
 NEURON_UI_PRESETS: dict[str, dict[str, Any]] = {
     name: neuron_to_ui_state(factory()) for name, factory in NEURON_PRESETS.items()
+}
+
+#: Maps preset name -> set of UI channel ids the preset's factory produces.
+#: Single source of truth for which auxiliary-channel rows render in the
+#: neuron panel and which trace-visibility checkboxes appear in the sweep
+#: manager.  Computed once at import time.  Unknown preset names default to
+#: an empty frozenset so the UI can render zero rows safely.
+PRESET_CHANNEL_IDS: dict[str, frozenset[str]] = {
+    name: frozenset(
+        ui_id
+        for ch in factory().additional_channels
+        if (ui_id := CHANNEL_NAME_TO_ID.get(ch.name)) is not None
+    )
+    for name, factory in NEURON_PRESETS.items()
 }
 
 #: Default neuron preset applied on app startup and reset.

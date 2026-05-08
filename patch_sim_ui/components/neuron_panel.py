@@ -10,48 +10,38 @@ from patch_sim_ui.state.neuron import NeuronState
 
 def _additional_channel_row(
     label: str,
-    enabled_var: rx.Var,
-    enabled_setter,
     g_var: rx.Var,
     g_setter,
     param_key: str,
 ) -> rx.Component:
-    """Render a checkbox + conditional conductance slider for an additional channel.
+    """Render an auxiliary-channel label + conductance slider row.
+
+    Per the design, channel composition is preset-baked: the panel
+    only shows rows for channels the active preset includes, so an
+    enable/disable checkbox is unnecessary.  The g_max slider modifies
+    the channel's ``g_max`` on the next simulation run.
 
     Args:
-        label: Display name for the channel (e.g. 'Ih (HCN)').
-        enabled_var: Reactive bool var bound to the enable checkbox.
-        enabled_setter: Event handler called when the checkbox changes.
+        label: Display name for the channel (e.g. ``"Ih (HCN)"``).
         g_var: Reactive float var bound to the conductance slider.
         g_setter: Event handler called when the conductance changes.
         param_key: Key into PARAM_RANGES for the conductance slider bounds.
 
     Returns:
-        A vstack containing an enable checkbox and a conditional g_max row.
+        A vstack containing a channel label and its g_max slider.
     """
     min_val, max_val, step = PARAM_RANGES[param_key]
     return rx.vstack(
-        rx.hstack(
-            rx.checkbox(
-                checked=enabled_var,
-                on_change=enabled_setter,
-            ),
-            rx.text(label, size="2"),
-            spacing="2",
-            align="center",
+        rx.text(label, size="2"),
+        _param_row(
+            "g_max (mS/cm²)",
+            g_var,
+            g_setter,
+            min_val,
+            max_val,
+            step,
         ),
-        rx.cond(
-            enabled_var,
-            _param_row(
-                "g_max (mS/cm²)",
-                g_var,
-                g_setter,
-                min_val,
-                max_val,
-                step,
-            ),
-        ),
-        spacing="2",
+        spacing="1",
         width="100%",
     )
 
@@ -171,13 +161,14 @@ def _param_row(
     )
 
 
-# (label, enabled_var, enabled_setter, g_var, g_setter, param_key)
+# (id, label, g_var, g_setter, param_key)
 # Derived from the channel registry in patch_sim_ui.channels.
+# ``id`` is used to gate row visibility on ``NeuronState.visible_channel_ids``
+# so only channels the active preset uses are rendered.
 _ADDITIONAL_CHANNEL_ROW_SPECS = [
     (
+        ch.id,
         ch.label,
-        getattr(NeuronState, ch.enabled_field),
-        getattr(NeuronState, f"set_{ch.enabled_field}"),
         getattr(NeuronState, ch.g_max_field),
         getattr(NeuronState, f"set_{ch.g_max_field}"),
         ch.g_max_field,
@@ -333,28 +324,42 @@ def neuron_panel() -> rx.Component:
             variant="ghost",
             width="100%",
         ),
-        rx.separator(),
-        rx.accordion.root(
-            rx.accordion.item(
-                header=rx.text(
-                    "Additional Channels",
-                    size="2",
-                    weight="bold",
-                    color="var(--gray-12)",
-                ),
-                content=rx.vstack(
-                    *[
-                        _additional_channel_row(*spec)
-                        for spec in _ADDITIONAL_CHANNEL_ROW_SPECS
-                    ],
-                    spacing="2",
+        rx.cond(
+            NeuronState.has_visible_channels,
+            rx.fragment(
+                rx.separator(),
+                rx.accordion.root(
+                    rx.accordion.item(
+                        header=rx.text(
+                            "Additional Channels",
+                            size="2",
+                            weight="bold",
+                            color="var(--gray-12)",
+                        ),
+                        content=rx.vstack(
+                            *[
+                                rx.cond(
+                                    NeuronState.visible_channel_ids.contains(ch_id),
+                                    _additional_channel_row(
+                                        label, g_var, g_setter, param_key
+                                    ),
+                                    rx.fragment(),
+                                )
+                                for ch_id, label, g_var, g_setter, param_key in (
+                                    _ADDITIONAL_CHANNEL_ROW_SPECS
+                                )
+                            ],
+                            spacing="2",
+                            width="100%",
+                        ),
+                        value="additional-channels",
+                    ),
+                    collapsible=True,
+                    variant="ghost",
                     width="100%",
                 ),
-                value="additional-channels",
             ),
-            collapsible=True,
-            variant="ghost",
-            width="100%",
+            rx.fragment(),
         ),
         rx.separator(),
         rx.text("Reversal Potentials", size="2", weight="bold"),

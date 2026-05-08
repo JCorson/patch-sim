@@ -39,10 +39,12 @@ from patch_sim.constants import (
 from patch_sim_ui import constants  # noqa: E402
 from patch_sim_ui.log_handler import UILogRecord  # noqa: E402
 from patch_sim_ui.presets import (  # noqa: E402
+    CHANNEL_NAME_TO_ID,
     DEFAULT_NEURON_PRESET,
     DEFAULT_PROTOCOL_PRESET,
     NEURON_CONFIG_SCALAR_DEFAULTS,
     NEURON_CONFIG_SCALAR_FIELDS,
+    PRESET_CHANNEL_IDS,
     neuron_to_ui_state,
 )
 from patch_sim_ui.state import SimulationState  # noqa: E402
@@ -352,12 +354,11 @@ async def test_load_protocol_preset_unknown_name_is_ignored() -> None:
 
 
 async def test_load_neuron_preset_fast_spiking_interneuron() -> None:
-    """load_neuron_preset enables IKv31 and leaves IKa disabled for Fast-Spiking."""
+    """load_neuron_preset exposes IKv31 (and only IKv31) for Fast-Spiking."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(FAST_SPIKING_INTERNEURON)]
-    assert ns.ikv31_enabled is True
-    assert ns.ika_enabled is False
+    assert set(ns.visible_channel_ids) == {"ikv31"}
 
 
 async def test_load_neuron_preset_sets_active_neuron_type() -> None:
@@ -368,61 +369,57 @@ async def test_load_neuron_preset_sets_active_neuron_type() -> None:
     assert ns.active_neuron_type == CORTICAL_PYRAMIDAL
 
 
-async def test_load_neuron_preset_resets_previously_enabled_channels() -> None:
-    """Loading a second neuron preset disables channels from the first."""
+async def test_load_neuron_preset_replaces_visible_channels() -> None:
+    """Switching presets replaces visible_channel_ids — no leftovers."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(FAST_SPIKING_INTERNEURON)]
-        assert ns.ikv31_enabled is True
+        assert "ikv31" in ns.visible_channel_ids
         [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
-    assert ns.ikv31_enabled is False
+    assert "ikv31" not in ns.visible_channel_ids
 
 
 async def test_load_neuron_preset_pyramidal_neuron() -> None:
-    """load_neuron_preset enables Ih, INaP, and IM channels for Cortical Pyramidal."""
+    """load_neuron_preset exposes Ih, INaP, and IM among CP's channels."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
-    assert ns.ih_enabled is True
-    assert ns.inap_enabled is True
-    assert ns.im_enabled is True
+    visible = set(ns.visible_channel_ids)
+    assert {"ih", "inap", "im"} <= visible
 
 
 async def test_load_neuron_preset_purkinje_cell() -> None:
-    """load_neuron_preset enables ICaL, ICaT, and IKCa channels for Purkinje Cell."""
+    """load_neuron_preset exposes ICaL, ICaT, and IKCa among Purkinje's channels."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(PURKINJE)]
-    assert ns.ical_enabled is True
-    assert ns.icat_enabled is True
-    assert ns.ikca_enabled is True
+    visible = set(ns.visible_channel_ids)
+    assert {"ical", "icat", "ikca"} <= visible
 
 
 async def test_load_neuron_preset_dopaminergic_neuron() -> None:
-    """load_neuron_preset enables the SNc DA pacemaker channel set.
+    """load_neuron_preset exposes the SNc DA pacemaker channel set.
 
     The Putzier+Drion minimal SNc DA preset uses Cav1.3, SK, INaP and Ih.
     IM and Mainen-Sejnowski Kv are not characteristic of SNc DA neurons and
-    are not enabled by this preset.
+    are not exposed by this preset.
     """
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(DOPAMINERGIC)]
-    assert ns.ih_enabled is True
-    assert ns.cav13_enabled is True
-    assert ns.sk_enabled is True
-    assert ns.inap_enabled is True
-    assert ns.im_enabled is False
-    assert ns.mskv_enabled is False
+    visible = set(ns.visible_channel_ids)
+    assert {"ih", "cav13", "sk", "inap"} <= visible
+    assert "im" not in visible
+    assert "mskv" not in visible
 
 
 async def test_load_neuron_preset_thalamic_relay() -> None:
-    """load_neuron_preset enables ICaT and Ih channels for Thalamic Relay."""
+    """load_neuron_preset exposes ICaT and Ih among Thalamic Relay's channels."""
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
         [_ async for _ in ns.load_neuron_preset(THALAMIC_RELAY)]
-    assert ns.icat_enabled is True
-    assert ns.ih_enabled is True
+    visible = set(ns.visible_channel_ids)
+    assert {"icat", "ih"} <= visible
 
 
 # ---------------------------------------------------------------------------
@@ -2066,3 +2063,122 @@ async def test_build_neuron_preserves_dopaminergic_sNa_da_for_dopaminergic() -> 
         f"make_dopaminergic_na_channel is no longer producing the Khaliq "
         f"& Bean 2010 slow-inactivation gate."
     )
+
+
+# ---------------------------------------------------------------------------
+# PRESET_CHANNEL_IDS — preset-scoped UI channel sets
+# ---------------------------------------------------------------------------
+
+
+def test_preset_channel_ids_squid_is_empty() -> None:
+    """SQUID_GIANT_AXON has no auxiliary channels, so PRESET_CHANNEL_IDS is empty."""
+    assert PRESET_CHANNEL_IDS[SQUID_GIANT_AXON] == frozenset()
+
+
+def test_preset_channel_ids_fast_spiking_is_only_ikv31() -> None:
+    """FAST_SPIKING_INTERNEURON exposes only the IKv3.1 toggle."""
+    assert PRESET_CHANNEL_IDS[FAST_SPIKING_INTERNEURON] == frozenset({"ikv31"})
+
+
+@pytest.mark.parametrize("preset_name", list(NEURON_PRESETS))
+def test_preset_channel_ids_matches_factory_output(preset_name: str) -> None:
+    """PRESET_CHANNEL_IDS[name] must equal the UI ids derived from the factory.
+
+    Args:
+        preset_name: Name of the preset to validate.
+    """
+    factory = NEURON_PRESETS[preset_name]
+    expected = frozenset(
+        ui_id
+        for ch in factory().additional_channels
+        if (ui_id := CHANNEL_NAME_TO_ID.get(ch.name)) is not None
+    )
+    assert PRESET_CHANNEL_IDS[preset_name] == expected
+
+
+# ---------------------------------------------------------------------------
+# _build_neuron — per-channel g_max slider propagation
+# ---------------------------------------------------------------------------
+
+
+async def test_build_neuron_propagates_ih_g_max_slider() -> None:
+    """Moving the Ih g_max slider on Cortical Pyramidal updates the built channel.
+
+    Verifies the slider is functional under policy A: dataclasses.replace on
+    the preset's IonChannel produces a Neuron whose Ih channel has the
+    user-supplied g_max while every other channel keeps its preset value.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
+
+    baseline = NEURON_PRESETS[CORTICAL_PYRAMIDAL]()
+    preset_g_max = {ch.name: ch.g_max for ch in baseline.additional_channels}
+    sentinel_g_max = 0.123
+    assert preset_g_max["h"] != pytest.approx(sentinel_g_max), (
+        "Sentinel must differ from preset value or test is vacuous."
+    )
+
+    ns.ih_g_max = sentinel_g_max
+    neuron = ns._build_neuron()
+
+    by_name = {ch.name: ch for ch in neuron.additional_channels}
+    assert by_name["h"].g_max == pytest.approx(sentinel_g_max)
+    for name, g in preset_g_max.items():
+        if name == "h":
+            continue
+        assert by_name[name].g_max == pytest.approx(g), (
+            f"Non-Ih channel '{name}' g_max changed unexpectedly: "
+            f"{by_name[name].g_max} vs preset {g}"
+        )
+
+
+async def test_visible_channel_ids_empty_for_squid() -> None:
+    """SQUID_GIANT_AXON has no auxiliary channels, so visible_channel_ids is empty."""
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(SQUID_GIANT_AXON)]
+    assert ns.visible_channel_ids == []
+
+
+@pytest.mark.parametrize("preset_name", list(NEURON_PRESETS))
+async def test_visible_channel_ids_matches_active_preset(preset_name: str) -> None:
+    """visible_channel_ids must reflect the loaded preset's auxiliary channels.
+
+    Args:
+        preset_name: Name of the preset to load and verify.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(preset_name)]
+    assert set(ns.visible_channel_ids) == PRESET_CHANNEL_IDS[preset_name]
+
+
+async def test_visible_channel_ids_updates_on_preset_switch() -> None:
+    """Switching presets must update visible_channel_ids reactively."""
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(FAST_SPIKING_INTERNEURON)]
+        first = list(ns.visible_channel_ids)
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
+        second = list(ns.visible_channel_ids)
+    assert set(first) == PRESET_CHANNEL_IDS[FAST_SPIKING_INTERNEURON]
+    assert set(second) == PRESET_CHANNEL_IDS[CORTICAL_PYRAMIDAL]
+    assert first != second
+
+
+async def test_g_max_slider_does_not_invalidate_membrane_test_cache() -> None:
+    """Moving an auxiliary-channel g_max must not bust the membrane-test fingerprint.
+
+    The membrane test depends only on passive parameters
+    (g_NaL, g_KL, C_m, ion concentrations, T) — auxiliary channels are
+    silent in the passive run.  This regression test pins that contract.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
+
+    fingerprint_before = ns._compute_fingerprint()
+    ns.ih_g_max = ns.ih_g_max + 0.5
+    fingerprint_after = ns._compute_fingerprint()
+    assert fingerprint_before == fingerprint_after
