@@ -1,5 +1,7 @@
 """Subthalamic nucleus pacemaker preset factory."""
 
+from typing import Any
+
 from patch_sim.calcium import CalciumDynamics
 from patch_sim.channels import (
     make_ical_channel,
@@ -13,7 +15,48 @@ from patch_sim.channels import (
     make_stn_k_channel,
     make_stn_na_channel,
 )
+from patch_sim.constants import (
+    ACTION_POTENTIAL,
+    FI_CURVE,
+    REPETITIVE_FIRING,
+    SUBTHRESHOLD_RESPONSE,
+)
 from patch_sim.neuron import Neuron
+
+PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
+    # Very low threshold (~0.27 µA/cm²); keep subthreshold well below it.
+    SUBTHRESHOLD_RESPONSE: {
+        "min_stimulus": 0.15,
+        "max_stimulus": 0.15,
+    },
+    # 2 µA/cm² at 5 ms evokes a single AP; default 30 ms produces 5.
+    ACTION_POTENTIAL: {
+        "min_stimulus": 2.0,
+        "max_stimulus": 2.0,
+        "stimulus_duration": 5.0,
+    },
+    # Depolarising bias on top of the autonomous tonic train.  At
+    # +2 µA/cm² the cell fires at ~36 Hz (top of the Bevan & Wilson
+    # 1999 5–50 Hz autonomous range); 200 ms is long enough to
+    # comfortably exceed the ≥5 spike requirement of
+    # test_repetitive_firing_preset.
+    REPETITIVE_FIRING: {
+        "min_stimulus": 2.0,
+        "max_stimulus": 2.0,
+        "stimulus_duration": 200.0,
+    },
+    # Very low threshold; fine-grained 0 → 5 µA/cm² range with 0.5 steps
+    # to capture the abrupt onset of firing.
+    FI_CURVE: {
+        "max_stimulus": 5.0,
+        "stimulus_step": 0.5,
+        "stimulus_duration": 200.0,
+    },
+    # Inherits the base HYPERPOLARIZATION_STEPS range (−10 → −2 µA/cm²).
+    # Very high ICaT conductance (g=5.0 mS/cm²) produces a prominent
+    # post-inhibitory rebound burst on step release; Ih (g=1.0 mS/cm²)
+    # adds a depolarising overshoot that can trigger additional spikes.
+}
 
 
 def make_stn() -> Neuron:

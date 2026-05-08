@@ -1,5 +1,7 @@
 """Cerebellar Purkinje cell preset factory."""
 
+from typing import Any
+
 from patch_sim.calcium import CalciumDynamics
 from patch_sim.channels import (
     make_ical_channel,
@@ -11,7 +13,48 @@ from patch_sim.channels import (
     make_purkinje_k_channel,
     make_purkinje_na_channel,
 )
+from patch_sim.constants import (
+    ACTION_POTENTIAL,
+    HYPERPOLARIZATION_STEPS,
+    REPETITIVE_FIRING,
+    SUBTHRESHOLD_RESPONSE,
+)
 from patch_sim.neuron import Neuron
+
+PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
+    # Purkinje is a spontaneous pacemaker (fires without external current).
+    # The Subthreshold Response and Action Potential protocols are kept for
+    # UI display purposes; the cell will fire spontaneously during both.
+    # Subthreshold Response: small positive current to demonstrate INaP
+    # amplification of subthreshold depolarization just below threshold.
+    SUBTHRESHOLD_RESPONSE: {
+        "min_stimulus": 0.1,
+        "max_stimulus": 0.1,
+    },
+    # 5 µA/cm² at 5 ms superimposed on spontaneous pacemaking.
+    ACTION_POTENTIAL: {
+        "min_stimulus": 5.0,
+        "max_stimulus": 5.0,
+        "stimulus_duration": 5.0,
+    },
+    # 10 µA/cm² for 180 ms drives sustained tonic firing with prominent
+    # Ca²⁺ contributions (ICaL/ICaT/IKCa).  This is intrinsic tonic
+    # firing, not the climbing-fibre-driven "complex spike" of in-vivo
+    # Purkinje cells (which is unmodelled here).
+    REPETITIVE_FIRING: {
+        "min_stimulus": 10.0,
+        "max_stimulus": 10.0,
+        "stimulus_duration": 180.0,
+    },
+    # R_in ≈ 22.7 kΩ·cm²; −0.5 µA/cm² hyperpolarizes by ≈ 11 mV (to −76 mV)
+    # and temporarily suppresses pacemaking, revealing Ih-driven sag and
+    # rebound firing on step release.  −1.5 → −0.5 µA/cm² in 0.5 µA steps.
+    HYPERPOLARIZATION_STEPS: {
+        "min_stimulus": -1.5,
+        "max_stimulus": -0.5,
+        "stimulus_step": 0.5,
+    },
+}
 
 
 def make_purkinje() -> Neuron:

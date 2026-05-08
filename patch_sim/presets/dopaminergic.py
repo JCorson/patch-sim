@@ -1,5 +1,7 @@
 """Substantia nigra dopaminergic neuron preset factory."""
 
+from typing import Any
+
 from patch_sim.calcium import CalciumDynamics
 from patch_sim.channels import (
     make_cav13_channel,
@@ -9,7 +11,68 @@ from patch_sim.channels import (
     make_sk_channel,
     make_snc_inap_channel,
 )
+from patch_sim.constants import (
+    ACTION_POTENTIAL,
+    FI_CURVE,
+    HYPERPOLARIZATION_STEPS,
+    REPETITIVE_FIRING,
+    SUBTHRESHOLD_RESPONSE,
+)
 from patch_sim.neuron import Neuron
+
+PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
+    # Subthreshold: Canavier/Komendantov kinetics (VT=-67 mV) lower the
+    # firing threshold to ~0.3 µA/cm² for a 30 ms step; 0.1 µA/cm² is
+    # comfortably sub-threshold and produces a passive depolarisation.
+    SUBTHRESHOLD_RESPONSE: {
+        "min_stimulus": 0.1,
+        "max_stimulus": 0.1,
+    },
+    # 4 µA/cm² at 5 ms evokes a single AP; lower amplitudes are subthreshold
+    # and higher amplitudes (≥12 µA/cm²) fire two APs within 30 ms.
+    ACTION_POTENTIAL: {
+        "min_stimulus": 4.0,
+        "max_stimulus": 4.0,
+        "stimulus_duration": 5.0,
+    },
+    # SNc DA pacemaker: tonic firing throughout, accelerating modestly
+    # with depolarising drive.  The somatic single-compartment model
+    # does not reproduce depolarisation block at any tested amplitude
+    # × duration (empirical sweep in scratch/characterize_da_block.py
+    # — tonic firing up to 15 µA/cm² × 5 s and 2 µA/cm² × 10 s).
+    # Real SNc DA neurons enter block above ~100 pA sustained drive
+    # (Tucker et al. 2012); reproducing this requires dendritic Na
+    # inactivation absent from this representation (#323).
+    # The REPETITIVE_FIRING protocol uses 0.3 µA/cm² × 3000 ms,
+    # producing ≥30 full APs at ~10 Hz over 3 s.  Duration must stay
+    # > 180 ms (the base REPETITIVE_FIRING preset) — see
+    # test_neuron_protocol_adjustments_change_stimulus_duration.
+    REPETITIVE_FIRING: {
+        "min_stimulus": 0.3,
+        "max_stimulus": 0.3,
+        "stimulus_duration": 3000.0,
+    },
+    # Threshold ~1 µA/cm²; 0 → 12 µA/cm² in 1.5 µA steps spans the
+    # subthreshold zone through repetitive firing.  200 ms duration shows
+    # the steady-state F-I relationship.
+    FI_CURVE: {
+        "max_stimulus": 12.0,
+        "stimulus_step": 1.5,
+        "stimulus_duration": 200.0,
+    },
+    # R_in ≈ 3.3 kΩ·cm²; −20 → −5 µA/cm² gives peaks of −106 to −71 mV
+    # with clear Ih-driven sag (25–8 mV).  At step release, Ih (g=2.0 mS/cm²
+    # activated during the step) drives a transient depolarisation above
+    # threshold, producing a rebound spike at the most-negative step.  This is
+    # an Ih-mediated rebound using Canavier/Komendantov Na⁺ kinetics (VT = −67 mV
+    # gives m_inf ≈ 27% at −48 mV, enough for Ih to trigger firing).  The cell
+    # has no ICaT.
+    HYPERPOLARIZATION_STEPS: {
+        "min_stimulus": -20.0,
+        "max_stimulus": -5.0,
+        "stimulus_step": 5.0,
+    },
+}
 
 
 def make_dopaminergic() -> Neuron:

@@ -1,11 +1,50 @@
 """Cortical fast-spiking interneuron preset factory."""
 
+from typing import Any
+
 from patch_sim.channels import (
     make_ikv31_channel,
     make_nav11_channel,
     make_pospischil_k_channel,
 )
+from patch_sim.constants import (
+    ACTION_POTENTIAL,
+    HYPERPOLARIZATION_STEPS,
+    REPETITIVE_FIRING,
+)
 from patch_sim.neuron import Neuron
+
+PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
+    # High total leak (g_NaL+g_KL=1.5 mS/cm²) raises the firing threshold;
+    # 30 µA/cm² is safely suprathreshold with the retuned Pospischil
+    # kinetics (g_Na=80, g_K=30).  3–6 ms all produce exactly 1 AP;
+    # 5 ms sits in the middle of that stable range.  ≥8 ms triggers a
+    # second AP; the previous setting (25 µA/cm² · 5 ms) fails to reach
+    # threshold under the retuned conductances (issue #301).
+    ACTION_POTENTIAL: {
+        "min_stimulus": 30.0,
+        "max_stimulus": 30.0,
+        "stimulus_duration": 5.0,
+    },
+    # 26 µA/cm² is just above the repetitive-firing threshold for the
+    # retuned cell (≈68 spikes over 180 ms).  Lower amplitudes fire only
+    # 1 AP; Pospischil kinetics sustain non-adapting high-frequency firing
+    # without depolarization block.
+    REPETITIVE_FIRING: {
+        "min_stimulus": 26.0,
+        "max_stimulus": 26.0,
+        "stimulus_duration": 180.0,
+    },
+    # Very low R_in (~0.67 kΩ·cm²) requires large currents for noticeable
+    # hyperpolarization.  −20 → −5 µA/cm² gives peaks of −74 to −67 mV.
+    # No post-inhibitory rebound: Pospischil Na⁺/K⁺ kinetics at 34 °C do
+    # not produce the Na⁺ de-inactivation overshoot seen in HH52 kinetics.
+    HYPERPOLARIZATION_STEPS: {
+        "min_stimulus": -20.0,
+        "max_stimulus": -5.0,
+        "stimulus_step": 5.0,
+    },
+}
 
 
 def make_fast_spiking_interneuron() -> Neuron:

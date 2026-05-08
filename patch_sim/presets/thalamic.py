@@ -1,5 +1,7 @@
 """Thalamocortical relay neuron preset factory."""
 
+from typing import Any
+
 from patch_sim.calcium import CalciumDynamics
 from patch_sim.channels import (
     make_ih_channel,
@@ -7,7 +9,59 @@ from patch_sim.channels import (
     make_thalamic_relay_k_channel,
     make_thalamic_relay_na_channel,
 )
+from patch_sim.constants import (
+    ACTION_POTENTIAL,
+    FI_CURVE,
+    REPETITIVE_FIRING,
+    SUBTHRESHOLD_RESPONSE,
+)
 from patch_sim.neuron import Neuron
+
+PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
+    # Burst-mode TC has a very low rheobase (~0.012 µA/cm²) because the
+    # slow-inactivating ICaT (issue #287) and reduced g_K (=10) combine to
+    # amplify any depolarisation through the LTS.  0.01 µA/cm² stays below
+    # threshold while still giving a visible voltage deflection.  The
+    # subthreshold margin is narrow: any stimulus ≥ ~0.05 µA/cm² already
+    # crosses LTS threshold and fires an AP, so a UI user nudging this
+    # value upward will hit threshold within a few clicks.
+    SUBTHRESHOLD_RESPONSE: {
+        "min_stimulus": 0.01,
+        "max_stimulus": 0.01,
+    },
+    # 8 µA/cm² × 0.5 ms evokes a single AP under the retuned (g_Na=45,
+    # g_K=10) preset (#307).  Excitability rose with the lower g_K, so
+    # the previous 20 µA/cm² × 2.5 ms now triggers an LTS-coupled
+    # rebound spike on top of the primary AP.  Shortening the pulse to
+    # 0.5 ms narrows the de-inactivation window for ICaT enough that
+    # only a single AP fires.
+    ACTION_POTENTIAL: {
+        "min_stimulus": 8.0,
+        "max_stimulus": 8.0,
+        "stimulus_duration": 0.5,
+    },
+    # 8 µA/cm² drives sustained tonic firing via T-type Ca²⁺ and Ih
+    # over 200 ms (≥52 spikes).
+    REPETITIVE_FIRING: {
+        "min_stimulus": 8.0,
+        "max_stimulus": 8.0,
+        "stimulus_duration": 200.0,
+    },
+    # Sustained-firing threshold falls in the low-µA/cm² range; 1 µA/cm²
+    # steps over [0, 10] resolve the FI relation cleanly.  Single-spike
+    # rheobase is much lower (~0.02 µA/cm²) — see the SUBTHRESHOLD_RESPONSE
+    # comment — but resolving that floor would need finer steps.
+    FI_CURVE: {
+        "max_stimulus": 10.0,
+        "stimulus_step": 1.0,
+        "stimulus_duration": 100.0,
+    },
+    # Inherits the base HYPERPOLARIZATION_STEPS range (−10 → −2 µA/cm²).
+    # Sustained hyperpolarisation de-inactivates the TC-tuned ICaT
+    # (g=2.5 mS/cm²); on release a textbook post-inhibitory LTS burst
+    # fires (issue #287; McCormick & Huguenard 1992).  Ih (g=1.0 mS/cm²)
+    # also contributes via sag and post-step overshoot.
+}
 
 
 def make_thalamic_relay() -> Neuron:

@@ -1,5 +1,7 @@
 """Thalamic reticular neuron preset factory."""
 
+from typing import Any
+
 from patch_sim.calcium import CalciumDynamics
 from patch_sim.channels import (
     make_ih_channel,
@@ -8,7 +10,63 @@ from patch_sim.channels import (
     make_trn_k_channel,
     make_trn_na_channel,
 )
+from patch_sim.constants import (
+    ACTION_POTENTIAL,
+    FI_CURVE,
+    HYPERPOLARIZATION_STEPS,
+    REPETITIVE_FIRING,
+    SUBTHRESHOLD_RESPONSE,
+)
 from patch_sim.neuron import Neuron
+
+PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
+    # Very low threshold with HP92 kinetics; 0.01 µA/cm² is safely subthreshold.
+    SUBTHRESHOLD_RESPONSE: {
+        "min_stimulus": 0.01,
+        "max_stimulus": 0.01,
+    },
+    # TRN is a tonic pacemaker post-#308 retune (~10 Hz spontaneous from
+    # v_rest = −80 mV with ICaT half-deinactivated), so within the 22 ms
+    # ACTION_POTENTIAL window the cell fires several APs regardless of
+    # injected current — there is no "single-AP" pulse for this preset.
+    # Excluded from ``test_action_potential_preset`` via
+    # ``_QUIESCENT_PRESET_NAMES`` because the strict "exactly 1 AP"
+    # assertion does not apply to a pacemaker.  Stimulus parameters are
+    # kept at the pre-#308 values (5 µA/cm² × 2 ms) so users still see a
+    # stim-evoked perturbation on top of the spontaneous tonic train.
+    ACTION_POTENTIAL: {
+        "min_stimulus": 5.0,
+        "max_stimulus": 5.0,
+        "stimulus_duration": 2.0,
+    },
+    # Depolarizing step for sustained repetitive firing via ICaT;
+    # 3 µA/cm² gives ≥5 spikes over 200 ms with HP92 kinetics.
+    REPETITIVE_FIRING: {
+        "min_stimulus": 3.0,
+        "max_stimulus": 3.0,
+        "stimulus_duration": 200.0,
+    },
+    # Low threshold with HP92 kinetics; 0–5 µA/cm² in 0.5 µA steps.
+    FI_CURVE: {
+        "max_stimulus": 5.0,
+        "stimulus_step": 0.5,
+        "stimulus_duration": 100.0,
+    },
+    # Sweep −5 → −1 µA/cm² (in 1.0 µA steps) for 500 ms with 100 ms pre
+    # and 300 ms post.  At ≤ −2 µA/cm² the cell de-inactivates ICaT and
+    # activates Ih enough to fire the HP92 rebound burst on release;
+    # the −1 µA step is included as a reference subthreshold sweep so
+    # the burst is visible by contrast.  Step duration is 500 ms (vs
+    # the 300 ms default) so Ih has time to fully activate.
+    HYPERPOLARIZATION_STEPS: {
+        "pre_stimulus_duration": 100.0,
+        "stimulus_duration": 500.0,
+        "post_stimulus_duration": 300.0,
+        "min_stimulus": -5.0,
+        "max_stimulus": -1.0,
+        "stimulus_step": 1.0,
+    },
+}
 
 
 def make_trn() -> Neuron:

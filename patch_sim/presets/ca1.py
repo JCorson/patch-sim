@@ -1,5 +1,7 @@
 """CA1 hippocampal pyramidal cell preset factory."""
 
+from typing import Any
+
 from patch_sim.calcium import CalciumDynamics
 from patch_sim.channels import (
     make_ical_channel,
@@ -13,7 +15,58 @@ from patch_sim.channels import (
     make_nav12_channel,
     make_pospischil_k_channel,
 )
+from patch_sim.constants import (
+    ACTION_POTENTIAL,
+    FI_CURVE,
+    HYPERPOLARIZATION_STEPS,
+    REPETITIVE_FIRING,
+    SUBTHRESHOLD_RESPONSE,
+)
 from patch_sim.neuron import Neuron
+
+PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
+    # 1.0 µA/cm² peaks near −50 mV (subthreshold) under the retuned preset
+    # (issue #302); the default 1.5 µA/cm² is now suprathreshold because
+    # INaP lowers rheobase to ~1.1 µA/cm².
+    SUBTHRESHOLD_RESPONSE: {
+        "min_stimulus": 1.0,
+        "max_stimulus": 1.0,
+    },
+    # 2 µA/cm² at 15 ms evokes a single AP with the retuned preset (INaP
+    # lowers rheobase from ~5 to ~1.1 µA/cm² so the previous 6 µA/cm²
+    # stimulus now produces multiple spikes).
+    ACTION_POTENTIAL: {
+        "min_stimulus": 2.0,
+        "max_stimulus": 2.0,
+        "stimulus_duration": 15.0,
+    },
+    # Long moderate-amplitude step reveals progressive SFA driven by IM
+    # accumulation and gradual IKCa activation.  12 µA/cm² × 300 ms
+    # produces ~38 spikes with growing ISIs; peak [Ca²⁺]ᵢ stays well
+    # within the 0.1–5 µM physiological band (issue #302 retune).
+    REPETITIVE_FIRING: {
+        "min_stimulus": 12.0,
+        "max_stimulus": 12.0,
+        "stimulus_duration": 300.0,
+    },
+    # IKa and IM raise the firing threshold above the default HH range.
+    # Positive-only range; longer step to reveal spike-frequency adaptation.
+    FI_CURVE: {
+        "max_stimulus": 30.0,
+        "stimulus_step": 3.0,
+        "stimulus_duration": 150.0,
+    },
+    # High R_in (≈20 kΩ·cm²) with Ih; −3 → −1 µA/cm² gives peaks of
+    # −86 to −71 mV with Ih-driven sag of 2–10 mV.  Pospischil kinetics
+    # with the retuned leak produce larger voltage deflections per µA/cm²
+    # than the previous HH52 configuration; the range is reduced accordingly
+    # to stay in the biologically relevant window.
+    HYPERPOLARIZATION_STEPS: {
+        "min_stimulus": -3.0,
+        "max_stimulus": -1.0,
+        "stimulus_step": 0.5,
+    },
+}
 
 
 def make_ca1_pyramidal() -> Neuron:

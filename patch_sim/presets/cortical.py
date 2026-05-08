@@ -1,5 +1,7 @@
 """Cortical RS pyramidal cell preset factory."""
 
+from typing import Any
+
 from patch_sim.channels import (
     make_ih_channel,
     make_im_channel,
@@ -8,7 +10,64 @@ from patch_sim.channels import (
     make_nav12_channel,
     make_pospischil_k_channel,
 )
+from patch_sim.constants import (
+    ACTION_POTENTIAL,
+    FI_CURVE,
+    HYPERPOLARIZATION_STEPS,
+    REPETITIVE_FIRING,
+    SUBTHRESHOLD_RESPONSE,
+)
 from patch_sim.neuron import Neuron
+
+PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
+    # 0.3 µA/cm² peaks near −65 mV (strongly subthreshold) under the
+    # Pospischil Na + M-S Kv pairing introduced in #311.
+    SUBTHRESHOLD_RESPONSE: {
+        "min_stimulus": 0.3,
+        "max_stimulus": 0.3,
+    },
+    # 2 µA/cm² × 15 ms evokes a single AP under the Pospischil Na +
+    # M-S Kv pairing (g_Na=35, Q10=1).  At 1.0 µA/cm² the new lower
+    # g_Na fails to reach AP threshold within the 15 ms step.
+    ACTION_POTENTIAL: {
+        "min_stimulus": 2.0,
+        "max_stimulus": 2.0,
+        "stimulus_duration": 15.0,
+    },
+    # 800 ms at 5 µA/cm² is long enough for the (now reduced) IM to
+    # accumulate and produce a measurable increase in inter-spike intervals
+    # (spike-frequency adaptation); under g_M=0.075 the effect is modest
+    # (~10–15% ISI growth) but reliably present.
+    REPETITIVE_FIRING: {
+        "min_stimulus": 5.0,
+        "max_stimulus": 5.0,
+        "stimulus_duration": 800.0,
+        "pre_stimulus_duration": 50.0,
+        "post_stimulus_duration": 50.0,
+    },
+    # Threshold is ~3–4 µA/cm²; 0 → 12 in steps of 1.5 (9 sweeps) spans
+    # the subthreshold zone through fast repetitive firing.  300 ms is
+    # long enough for IM-driven adaptation to be visible within each
+    # suprathreshold sweep.
+    FI_CURVE: {
+        "max_stimulus": 12.0,
+        "stimulus_step": 1.5,
+        "stimulus_duration": 300.0,
+    },
+    # High R_in means small currents produce large deflections.  −5 → −1 µA/cm²
+    # gives peaks of −109 to −80 mV with Ih-driven sag of 10–25 mV per step.
+    # At the deepest steps the cell shows a post-hyperpolarization rebound
+    # spike driven by two overlapping mechanisms: HH anode-break excitation
+    # (h fully de-inactivates at −109 mV; n deactivates; m fires on release)
+    # and Ih-driven overshoot (Ih activated during the step continues
+    # conducting after release, transiently depolarising the membrane).  The
+    # cell has no ICaT, so the rebound is not a low-threshold Ca²⁺ burst.
+    HYPERPOLARIZATION_STEPS: {
+        "min_stimulus": -5.0,
+        "max_stimulus": -1.0,
+        "stimulus_step": 1.0,
+    },
+}
 
 
 def make_cortical_pyramidal() -> Neuron:
