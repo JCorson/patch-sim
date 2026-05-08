@@ -83,13 +83,13 @@ _DEFAULT_G_MAX: dict[str, float] = {
 # "SK") have an IonChannel.name equal to the key directly.
 # Variant channels with a divergent name (e.g. SNc INaP -> "NaP_SNc") are
 # mapped explicitly so they collapse onto the canonical UI toggle.
-_CHANNEL_NAME_TO_ID: dict[str, str] = {}
+CHANNEL_NAME_TO_ID: dict[str, str] = {}
 for _ch_meta in ADDITIONAL_CHANNELS:
     if _ch_meta.current_key.startswith("I"):
-        _CHANNEL_NAME_TO_ID[_ch_meta.current_key[1:]] = _ch_meta.id
+        CHANNEL_NAME_TO_ID[_ch_meta.current_key[1:]] = _ch_meta.id
     else:
-        _CHANNEL_NAME_TO_ID[_ch_meta.current_key] = _ch_meta.id
-_CHANNEL_NAME_TO_ID["NaP_SNc"] = "inap"
+        CHANNEL_NAME_TO_ID[_ch_meta.current_key] = _ch_meta.id
+CHANNEL_NAME_TO_ID["NaP_SNc"] = "inap"
 
 
 def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
@@ -120,10 +120,10 @@ def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
 
     # Enable channels present on the Neuron instance.  Variant factories
     # (e.g. make_snc_inap_channel) produce channels with names that are
-    # resolved via _CHANNEL_NAME_TO_ID so the lookup collapses variants onto
+    # resolved via CHANNEL_NAME_TO_ID so the lookup collapses variants onto
     # the same UI toggle automatically.
     for ch in neuron.additional_channels:
-        ui_id = _CHANNEL_NAME_TO_ID.get(ch.name)
+        ui_id = CHANNEL_NAME_TO_ID.get(ch.name)
         if ui_id is not None:
             state[f"{ui_id}_enabled"] = True
             state[f"{ui_id}_g_max"] = ch.g_max
