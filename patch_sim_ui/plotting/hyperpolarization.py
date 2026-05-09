@@ -2,7 +2,7 @@
 
 import plotly.graph_objects as go
 
-from patch_sim_ui.plotting._layout import _ANALYSIS_FIGURE_LAYOUT
+from patch_sim_ui.plotting._layout import ANALYSIS_FIGURE_LAYOUT
 
 
 def build_hyperpolarization_figure(hyp_data: dict) -> go.Figure:
@@ -47,7 +47,7 @@ def build_hyperpolarization_figure(hyp_data: dict) -> go.Figure:
         )
     )
     fig.update_layout(
-        **_ANALYSIS_FIGURE_LAYOUT,
+        **ANALYSIS_FIGURE_LAYOUT,
         xaxis_title="Current (µA/cm²)",
         yaxis=dict(title="Sag amplitude (mV)", color="#16a085"),
         yaxis2=dict(

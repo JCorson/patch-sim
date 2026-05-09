@@ -3,7 +3,7 @@
 import plotly.graph_objects as go
 
 from patch_sim_ui.constants import SWEEP_COLORS
-from patch_sim_ui.plotting._layout import _ANALYSIS_FIGURE_LAYOUT
+from patch_sim_ui.plotting._layout import ANALYSIS_FIGURE_LAYOUT
 
 
 def build_sfa_figure(sfa_data: dict) -> go.Figure:
@@ -79,7 +79,7 @@ def build_sfa_figure(sfa_data: dict) -> go.Figure:
         )
 
     fig.update_layout(
-        **_ANALYSIS_FIGURE_LAYOUT,
+        **ANALYSIS_FIGURE_LAYOUT,
         xaxis_title="Spike Interval #",
         yaxis_title="Inst. Frequency (Hz)",
         showlegend=False,

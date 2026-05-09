@@ -4,7 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 from patch_sim_ui.constants import CC_VOLTAGE_COLOR
-from patch_sim_ui.plotting._layout import _ANALYSIS_FIGURE_LAYOUT
+from patch_sim_ui.plotting._layout import ANALYSIS_FIGURE_LAYOUT
 
 
 def build_phase_plane_figure(phase_plane_data: dict) -> go.Figure:
@@ -56,7 +56,7 @@ def build_phase_plane_figure(phase_plane_data: dict) -> go.Figure:
         )
 
     fig.update_layout(
-        **_ANALYSIS_FIGURE_LAYOUT,
+        **ANALYSIS_FIGURE_LAYOUT,
         hovermode="closest",
         showlegend=False,
         xaxis_title="V (mV)",

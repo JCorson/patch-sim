@@ -2,7 +2,7 @@
 
 import plotly.graph_objects as go
 
-from patch_sim_ui.plotting._layout import _ANALYSIS_FIGURE_LAYOUT
+from patch_sim_ui.plotting._layout import ANALYSIS_FIGURE_LAYOUT
 
 
 def build_tau_v_figure(tau_v_data: dict) -> go.Figure:
@@ -66,7 +66,7 @@ def build_tau_v_figure(tau_v_data: dict) -> go.Figure:
             )
         )
     fig.update_layout(
-        **_ANALYSIS_FIGURE_LAYOUT,
+        **ANALYSIS_FIGURE_LAYOUT,
         xaxis_title="Voltage (mV)",
         yaxis_title="τ (ms)",
         yaxis_type="log",
