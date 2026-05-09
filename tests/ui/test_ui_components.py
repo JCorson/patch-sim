@@ -35,6 +35,76 @@ def test_protocol_panel_renders_without_error():
     protocol_panel()
 
 
+def test_protocol_param_schema_covers_all_protocols():
+    """Schema keys must match every (clamp_mode, protocol_type) pair.
+
+    Every protocol exposed via ``CURRENT_PROTOCOLS`` / ``VOLTAGE_PROTOCOLS``
+    must have a schema entry, and the schema must not contain entries for
+    protocols that are not advertised in the UI dropdown.  This catches the
+    "added a protocol but forgot the schema entry" failure mode.
+    """
+    from patch_sim.constants import (
+        CURRENT_CLAMP,
+        CURRENT_PROTOCOLS,
+        VOLTAGE_CLAMP,
+        VOLTAGE_PROTOCOLS,
+    )
+    from patch_sim_ui.components.protocol_panel import _PROTOCOL_PARAM_SCHEMA
+
+    expected = {(CURRENT_CLAMP, p) for p in CURRENT_PROTOCOLS} | {
+        (VOLTAGE_CLAMP, p) for p in VOLTAGE_PROTOCOLS
+    }
+    assert set(_PROTOCOL_PARAM_SCHEMA.keys()) == expected
+
+
+def test_protocol_param_schema_attrs_resolve_on_state():
+    """Every schema ``attr`` must resolve to a ``ProtocolState`` field + setter.
+
+    The data-driven builder calls ``getattr(ProtocolState, f.attr)`` and
+    ``getattr(ProtocolState, f"set_{f.attr}")`` for each schema entry; this
+    test catches typos or missing handlers at static-data time rather than at
+    render time.
+    """
+    from patch_sim_ui.components.protocol_panel import _PROTOCOL_PARAM_SCHEMA
+    from patch_sim_ui.state.protocol import ProtocolState
+
+    for (clamp_mode, protocol_type), fields in _PROTOCOL_PARAM_SCHEMA.items():
+        for field in fields:
+            assert hasattr(ProtocolState, field.attr), (
+                f"{clamp_mode}/{protocol_type}: ProtocolState has no attribute "
+                f"{field.attr!r}"
+            )
+            assert hasattr(ProtocolState, f"set_{field.attr}"), (
+                f"{clamp_mode}/{protocol_type}: ProtocolState has no setter "
+                f"set_{field.attr!r}"
+            )
+
+
+@pytest.mark.parametrize(
+    "clamp_mode,protocol_type",
+    [
+        ("Current Clamp", "Step"),
+        ("Current Clamp", "Ramp"),
+        ("Current Clamp", "Pulse Train"),
+        ("Current Clamp", "Sinusoidal"),
+        ("Current Clamp", "Chirp"),
+        ("Current Clamp", "Noise"),
+        ("Voltage Clamp", "Step"),
+        ("Voltage Clamp", "Ramp"),
+        ("Voltage Clamp", "Pulse Train"),
+    ],
+)
+def test_build_param_form_renders_for_each_protocol(clamp_mode, protocol_type):
+    """``_build_param_form`` must build without error for every schema entry."""
+    from patch_sim_ui.components.protocol_panel import (
+        _PROTOCOL_PARAM_SCHEMA,
+        _build_param_form,
+    )
+
+    fields = _PROTOCOL_PARAM_SCHEMA[(clamp_mode, protocol_type)]
+    _build_param_form(fields)
+
+
 def test_index_page_renders_without_error():
     """Instantiating the main index page must not raise."""
     from patch_sim_ui.patch_sim_ui import index

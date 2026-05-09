@@ -1,9 +1,16 @@
 """Protocol configuration panel component."""
 
+from dataclasses import dataclass
+
 import reflex as rx
 
 from patch_sim.presets import PROTOCOL_PRESET_NAMES
-from patch_sim_ui.constants import CURRENT_CLAMP, VOLTAGE_CLAMP
+from patch_sim_ui.constants import (
+    CURRENT_CLAMP,
+    CURRENT_PROTOCOLS,
+    VOLTAGE_CLAMP,
+    VOLTAGE_PROTOCOLS,
+)
 from patch_sim_ui.state.protocol import ProtocolState
 
 
@@ -62,212 +69,102 @@ def _duration_fields() -> tuple[rx.Component, rx.Component, rx.Component]:
     )
 
 
-def _cc_step_params() -> rx.Component:
-    """Parameter fields for the current clamp Step protocol."""
-    return rx.vstack(
-        *_duration_fields(),
-        _num_field(
-            "Current min (µA/cm²)",
-            ProtocolState.min_stimulus,
-            ProtocolState.set_min_stimulus,
-        ),
-        _num_field(
-            "Current max (µA/cm²)",
-            ProtocolState.max_stimulus,
-            ProtocolState.set_max_stimulus,
-        ),
-        _num_field(
+@dataclass(frozen=True)
+class ParamField:
+    """Schema entry describing one numeric parameter input.
+
+    Attributes:
+        label: Display label (units inlined, e.g. ``"Current min (µA/cm²)"``).
+        attr: ``ProtocolState`` attribute name; the matching event handler is
+            looked up as ``set_<attr>``.
+        disabled: Optional reactive flag (or static bool) forwarded to the
+            input's ``disabled`` prop.
+    """
+
+    label: str
+    attr: str
+    disabled: rx.Var | bool = False
+
+
+_PROTOCOL_PARAM_SCHEMA: dict[tuple[str, str], tuple[ParamField, ...]] = {
+    (CURRENT_CLAMP, "Step"): (
+        ParamField("Current min (µA/cm²)", "min_stimulus"),
+        ParamField("Current max (µA/cm²)", "max_stimulus"),
+        ParamField(
             "Current step (µA/cm²)",
-            ProtocolState.stimulus_step,
-            ProtocolState.set_stimulus_step,
+            "stimulus_step",
             disabled=ProtocolState.is_step_single_sweep,
         ),
-        spacing="2",
-        width="100%",
-    )
-
-
-def _cc_ramp_params() -> rx.Component:
-    """Parameter fields for the current clamp Ramp protocol."""
-    return rx.vstack(
-        *_duration_fields(),
-        _num_field(
-            "Start current (µA/cm²)",
-            ProtocolState.start_current,
-            ProtocolState.set_start_current,
-        ),
-        _num_field(
-            "End current (µA/cm²)",
-            ProtocolState.end_current,
-            ProtocolState.set_end_current,
-        ),
-        spacing="2",
-        width="100%",
-    )
-
-
-def _cc_pulse_params() -> rx.Component:
-    """Parameter fields for the current clamp Pulse Train protocol."""
-    return rx.vstack(
-        *_duration_fields(),
-        _num_field(
-            "Pulse amplitude (µA/cm²)",
-            ProtocolState.pulse_amplitude,
-            ProtocolState.set_pulse_amplitude,
-        ),
-        _num_field(
-            "Pulse width (ms)", ProtocolState.pulse_width, ProtocolState.set_pulse_width
-        ),
-        _num_field(
-            "Pulse interval (ms)",
-            ProtocolState.pulse_interval,
-            ProtocolState.set_pulse_interval,
-        ),
-        spacing="2",
-        width="100%",
-    )
-
-
-def _cc_sine_params() -> rx.Component:
-    """Parameter fields for the current clamp Sinusoidal protocol."""
-    return rx.vstack(
-        *_duration_fields(),
-        _num_field(
-            "DC offset (µA/cm²)", ProtocolState.dc_offset, ProtocolState.set_dc_offset
-        ),
-        _num_field(
-            "Amplitude (µA/cm²)", ProtocolState.amplitude, ProtocolState.set_amplitude
-        ),
-        _num_field(
-            "Frequency (Hz)", ProtocolState.frequency, ProtocolState.set_frequency
-        ),
-        spacing="2",
-        width="100%",
-    )
-
-
-def _cc_chirp_params() -> rx.Component:
-    """Parameter fields for the current clamp Chirp protocol."""
-    return rx.vstack(
-        *_duration_fields(),
-        _num_field(
-            "DC offset (µA/cm²)", ProtocolState.dc_offset, ProtocolState.set_dc_offset
-        ),
-        _num_field(
-            "Amplitude (µA/cm²)", ProtocolState.amplitude, ProtocolState.set_amplitude
-        ),
-        _num_field(
-            "Start freq (Hz)",
-            ProtocolState.start_frequency,
-            ProtocolState.set_start_frequency,
-        ),
-        _num_field(
-            "End freq (Hz)",
-            ProtocolState.end_frequency,
-            ProtocolState.set_end_frequency,
-        ),
-        spacing="2",
-        width="100%",
-    )
-
-
-def _cc_noise_params() -> rx.Component:
-    """Parameter fields for the current clamp Noise protocol."""
-    return rx.vstack(
-        *_duration_fields(),
-        _num_field(
-            "Mean current (µA/cm²)",
-            ProtocolState.mean_current,
-            ProtocolState.set_mean_current,
-        ),
-        _num_field(
-            "Std current (µA/cm²)",
-            ProtocolState.std_current,
-            ProtocolState.set_std_current,
-        ),
-        spacing="2",
-        width="100%",
-    )
-
-
-def _vc_step_params() -> rx.Component:
-    """Parameter fields for the voltage clamp Step protocol."""
-    return rx.vstack(
-        *_duration_fields(),
-        _num_field(
-            "Voltage min (mV)",
-            ProtocolState.min_stimulus,
-            ProtocolState.set_min_stimulus,
-        ),
-        _num_field(
-            "Voltage max (mV)",
-            ProtocolState.max_stimulus,
-            ProtocolState.set_max_stimulus,
-        ),
-        _num_field(
+    ),
+    (CURRENT_CLAMP, "Ramp"): (
+        ParamField("Start current (µA/cm²)", "start_current"),
+        ParamField("End current (µA/cm²)", "end_current"),
+    ),
+    (CURRENT_CLAMP, "Pulse Train"): (
+        ParamField("Pulse amplitude (µA/cm²)", "pulse_amplitude"),
+        ParamField("Pulse width (ms)", "pulse_width"),
+        ParamField("Pulse interval (ms)", "pulse_interval"),
+    ),
+    (CURRENT_CLAMP, "Sinusoidal"): (
+        ParamField("DC offset (µA/cm²)", "dc_offset"),
+        ParamField("Amplitude (µA/cm²)", "amplitude"),
+        ParamField("Frequency (Hz)", "frequency"),
+    ),
+    (CURRENT_CLAMP, "Chirp"): (
+        ParamField("DC offset (µA/cm²)", "dc_offset"),
+        ParamField("Amplitude (µA/cm²)", "amplitude"),
+        ParamField("Start freq (Hz)", "start_frequency"),
+        ParamField("End freq (Hz)", "end_frequency"),
+    ),
+    (CURRENT_CLAMP, "Noise"): (
+        ParamField("Mean current (µA/cm²)", "mean_current"),
+        ParamField("Std current (µA/cm²)", "std_current"),
+    ),
+    (VOLTAGE_CLAMP, "Step"): (
+        ParamField("Voltage min (mV)", "min_stimulus"),
+        ParamField("Voltage max (mV)", "max_stimulus"),
+        ParamField(
             "Voltage step (mV)",
-            ProtocolState.stimulus_step,
-            ProtocolState.set_stimulus_step,
+            "stimulus_step",
             disabled=ProtocolState.is_step_single_sweep,
         ),
-        _num_field(
-            "Holding voltage (mV)",
-            ProtocolState.holding_voltage,
-            ProtocolState.set_holding_voltage,
-        ),
-        spacing="2",
-        width="100%",
-    )
+        ParamField("Holding voltage (mV)", "holding_voltage"),
+    ),
+    (VOLTAGE_CLAMP, "Ramp"): (
+        ParamField("Start voltage (mV)", "vc_start_voltage"),
+        ParamField("End voltage (mV)", "vc_end_voltage"),
+        ParamField("Holding voltage (mV)", "holding_voltage"),
+    ),
+    (VOLTAGE_CLAMP, "Pulse Train"): (
+        ParamField("Pulse amplitude (mV)", "vc_pulse_amplitude"),
+        ParamField("Pulse width (ms)", "vc_pulse_width"),
+        ParamField("Pulse interval (ms)", "vc_pulse_interval"),
+        ParamField("Holding voltage (mV)", "holding_voltage"),
+    ),
+}
 
 
-def _vc_ramp_params() -> rx.Component:
-    """Parameter fields for the voltage clamp Ramp protocol."""
+def _build_param_form(fields: tuple[ParamField, ...]) -> rx.Component:
+    """Render the shared duration fields followed by ``fields``.
+
+    Args:
+        fields: Schema entries describing the protocol-specific numeric inputs.
+
+    Returns:
+        Stacked component containing duration inputs and one ``_num_field``
+        per schema entry.
+    """
     return rx.vstack(
         *_duration_fields(),
-        _num_field(
-            "Start voltage (mV)",
-            ProtocolState.vc_start_voltage,
-            ProtocolState.set_vc_start_voltage,
-        ),
-        _num_field(
-            "End voltage (mV)",
-            ProtocolState.vc_end_voltage,
-            ProtocolState.set_vc_end_voltage,
-        ),
-        _num_field(
-            "Holding voltage (mV)",
-            ProtocolState.holding_voltage,
-            ProtocolState.set_holding_voltage,
-        ),
-        spacing="2",
-        width="100%",
-    )
-
-
-def _vc_pulse_params() -> rx.Component:
-    """Parameter fields for the voltage clamp Pulse Train protocol."""
-    return rx.vstack(
-        *_duration_fields(),
-        _num_field(
-            "Pulse amplitude (mV)",
-            ProtocolState.vc_pulse_amplitude,
-            ProtocolState.set_vc_pulse_amplitude,
-        ),
-        _num_field(
-            "Pulse width (ms)",
-            ProtocolState.vc_pulse_width,
-            ProtocolState.set_vc_pulse_width,
-        ),
-        _num_field(
-            "Pulse interval (ms)",
-            ProtocolState.vc_pulse_interval,
-            ProtocolState.set_vc_pulse_interval,
-        ),
-        _num_field(
-            "Holding voltage (mV)",
-            ProtocolState.holding_voltage,
-            ProtocolState.set_holding_voltage,
-        ),
+        *[
+            _num_field(
+                f.label,
+                getattr(ProtocolState, f.attr),
+                getattr(ProtocolState, f"set_{f.attr}"),
+                disabled=f.disabled,
+            )
+            for f in fields
+        ],
         spacing="2",
         width="100%",
     )
@@ -277,12 +174,10 @@ def _current_protocol_params() -> rx.Component:
     """Dynamic parameter form for the selected current clamp protocol."""
     return rx.match(
         ProtocolState.protocol_type,
-        ("Step", _cc_step_params()),
-        ("Ramp", _cc_ramp_params()),
-        ("Pulse Train", _cc_pulse_params()),
-        ("Sinusoidal", _cc_sine_params()),
-        ("Chirp", _cc_chirp_params()),
-        ("Noise", _cc_noise_params()),
+        *[
+            (proto, _build_param_form(_PROTOCOL_PARAM_SCHEMA[(CURRENT_CLAMP, proto)]))
+            for proto in CURRENT_PROTOCOLS
+        ],
         rx.fragment(),
     )
 
@@ -291,9 +186,10 @@ def _voltage_protocol_params() -> rx.Component:
     """Dynamic parameter form for the selected voltage clamp protocol."""
     return rx.match(
         ProtocolState.protocol_type,
-        ("Step", _vc_step_params()),
-        ("Ramp", _vc_ramp_params()),
-        ("Pulse Train", _vc_pulse_params()),
+        *[
+            (proto, _build_param_form(_PROTOCOL_PARAM_SCHEMA[(VOLTAGE_CLAMP, proto)]))
+            for proto in VOLTAGE_PROTOCOLS
+        ],
         rx.fragment(),
     )
 
