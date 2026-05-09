@@ -7,15 +7,11 @@ from patch_sim.constants import (  # noqa: F401
     VOLTAGE_CLAMP,
     VOLTAGE_PROTOCOLS,
 )
-from patch_sim_ui.channels import ADDITIONAL_CHANNELS
+from patch_sim_ui.channels import CHANNELS
 
 # Slider ranges for neuron parameters
 PARAM_RANGES: dict[str, tuple[float, float, float]] = {
     # name: (min, max, step)
-    "g_Na": (0.0, 300.0, 1.0),
-    "g_K": (0.0, 100.0, 0.5),
-    "g_NaL": (0.0, 2.0, 0.01),
-    "g_KL": (0.0, 2.0, 0.01),
     "C_m": (0.1, 5.0, 0.1),
     "v_rest": (-90.0, -40.0, 1.0),
     "Na_out": (1.0, 500.0, 1.0),
@@ -25,8 +21,8 @@ PARAM_RANGES: dict[str, tuple[float, float, float]] = {
     "Ca_out": (0.1, 20.0, 0.1),
     "Ca_in": (0.00001, 0.01, 0.00001),
     "T": (273.15, 323.15, 0.5),  # 0°C to 50°C
-    # Additional channel conductances — derived from channel registry.
-    **{ch.g_max_field: ch.g_max_range for ch in ADDITIONAL_CHANNELS},
+    # Per-channel conductances — derived from the channel registry.
+    **{ch.g_max_field: ch.g_max_range for ch in CHANNELS},
 }
 
 # Fixed colour for the Current Clamp voltage trace.  Matches the blue used for
@@ -39,32 +35,23 @@ CC_VOLTAGE_COLOR: str = "#1f77b4"
 # meaningful channel and gating-variable traces.
 STIMULUS_COLOR: str | None = "#888888"
 
-# Fixed colours per ion current channel (used in Voltage Clamp overlay plot).
-# Additional channel colours are derived from the channel registry.
+# Per-channel trace colours (used in the Voltage Clamp overlay plot).
+# Keys are simulation column names (``"INa"``, ``"IK"``, ``"Ih"``, …) so a
+# Sweep's ``channel_currents`` dict can be looked up directly.  The
+# ``"total_current"`` key keys the summed-current trace.
 CHANNEL_COLORS: dict[str, str] = {
-    # Classic HH channels
     "total_current": "#1f77b4",  # blue
-    "sodium_current": "#ff7f0e",  # orange
-    "potassium_current": "#2ca02c",  # green
-    "na_leak_current": "#7f7f7f",  # grey
-    "k_leak_current": "#bcbd22",  # olive
-    # Additional channels
-    **{ch.current_key: ch.current_color for ch in ADDITIONAL_CHANNELS},
+    **{ch.column_name: ch.current_color for ch in CHANNELS},
 }
 
-# Gating variable name → unique colour (each variable gets its own distinct colour).
-# Additional channel gating variable colours are derived from the channel registry.
+# Gating variable name → unique colour (each variable gets its own distinct
+# colour).  HH-classic gates (n / m / h) are listed explicitly; every other
+# gate's colour comes from the channel registry.
 GATING_VAR_COLORS: dict[str, str] = {
-    # Classic HH gating variables
     "n": "#1f77b4",  # blue
     "m": "#ff7f0e",  # orange
     "h": "#2ca02c",  # green
-    # Additional channel gating variables
-    **{
-        gv: color
-        for ch in ADDITIONAL_CHANNELS
-        for gv, color in ch.gating_var_colors.items()
-    },
+    **{gv: color for ch in CHANNELS for gv, color in ch.gating_var_colors.items()},
 }
 
 # Distinct-hue palette for oscilloscope-style stored traces.  The rgba opacity

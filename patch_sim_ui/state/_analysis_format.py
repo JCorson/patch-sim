@@ -171,7 +171,7 @@ def _compute_multi_sweep_ca_transient_data(
     pooled: list[tuple[int, patch_sim.CalciumTransient]] = []
     baselines: list[float] = []
     for sweep_idx, sweep in enumerate(sweeps):
-        ca_trace = sweep.additional_gating.get("ca_i")
+        ca_trace = sweep.channel_gating.get("ca_i")
         if not ca_trace:
             continue
         time_arr = np.array(sweep.time)

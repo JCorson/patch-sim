@@ -47,7 +47,7 @@ def test_gv_curve_integration_hh_neuron(hh_model):
 
     na_channel = next(
         ch
-        for ch in hh_model.core_channels
+        for ch in hh_model.channels
         if isinstance(ch.reversal_spec, patch_sim.channels.NernstSpec)
         and ch.reversal_spec.species is patch_sim.channels.IonSpecies.SODIUM
     )

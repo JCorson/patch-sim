@@ -1,6 +1,6 @@
 """Cell-agnostic auxiliary ion channel factories.
 
-These channels can be added to any neuron model via ``additional_channels``.
+These channels can be added to any neuron model's ``channels`` tuple.
 They are cell-type-agnostic (not tuned for a specific neuron type).
 """
 

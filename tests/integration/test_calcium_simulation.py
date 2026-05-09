@@ -6,6 +6,8 @@ calcium dynamics behave correctly during full HH simulations.
 Unit tests for CalciumDynamics in isolation live in tests/unit/test_calcium.py.
 """
 
+import dataclasses
+
 import numpy as np
 
 from patch_sim.calcium import CalciumDynamics
@@ -17,8 +19,16 @@ from patch_sim.channels import (
 )
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from patch_sim.neuron import Neuron
+from patch_sim.presets import make_squid_giant_axon
 from patch_sim.protocols import step_current, step_voltage
 from patch_sim.rates import VoltageOnlyFn
+
+
+def _hh_with(*extras: IonChannel, **overrides: object) -> Neuron:
+    """Build an HH52 squid neuron with the given extra channels appended."""
+    base = make_squid_giant_axon()
+    return dataclasses.replace(base, channels=base.channels + extras, **overrides)
+
 
 # ---------------------------------------------------------------------------
 # Minimal calcium channel shared across tests.
@@ -79,7 +89,7 @@ def test_voltage_clamp_no_ca_column_by_default(hh_model: Neuron) -> None:
 def test_current_clamp_ca_stays_at_rest_no_calcium_channels() -> None:
     """ca_i stays at ca_rest throughout when no channel carries calcium."""
     cd = CalciumDynamics()
-    neuron = Neuron(calcium_dynamics=cd)
+    neuron = dataclasses.replace(make_squid_giant_axon(), calcium_dynamics=cd)
     protocol = step_current(
         duration=5.0,
         current_amplitude=10.0,
@@ -95,7 +105,7 @@ def test_current_clamp_ca_stays_at_rest_no_calcium_channels() -> None:
 def test_voltage_clamp_ca_stays_at_rest_no_calcium_channels() -> None:
     """ca_i stays at ca_rest throughout when no channel carries calcium."""
     cd = CalciumDynamics()
-    neuron = Neuron(calcium_dynamics=cd)
+    neuron = dataclasses.replace(make_squid_giant_axon(), calcium_dynamics=cd)
     protocol = step_voltage(
         duration=5.0,
         voltage_amplitude=0.0,
@@ -117,10 +127,7 @@ def test_voltage_clamp_ca_stays_at_rest_no_calcium_channels() -> None:
 def test_current_clamp_ca_varies_with_calcium_channel() -> None:
     """ca_i column is present and changes from ca_rest when a Ca2+ channel exists."""
     cd = CalciumDynamics(alpha_ca=1e-3, tau_ca=500.0, ca_rest=1e-4)
-    neuron = Neuron(
-        calcium_dynamics=cd,
-        additional_channels=(_MOCK_CALCIUM_CHANNEL,),
-    )
+    neuron = _hh_with(_MOCK_CALCIUM_CHANNEL, calcium_dynamics=cd)
     protocol = step_current(
         duration=20.0,
         current_amplitude=0.0,
@@ -137,10 +144,7 @@ def test_current_clamp_ca_varies_with_calcium_channel() -> None:
 def test_voltage_clamp_ca_varies_with_calcium_channel() -> None:
     """ca_i column is present and changes from ca_rest in voltage clamp."""
     cd = CalciumDynamics(alpha_ca=1e-3, tau_ca=500.0, ca_rest=1e-4)
-    neuron = Neuron(
-        calcium_dynamics=cd,
-        additional_channels=(_MOCK_CALCIUM_CHANNEL,),
-    )
+    neuron = _hh_with(_MOCK_CALCIUM_CHANNEL, calcium_dynamics=cd)
     protocol = step_voltage(
         duration=20.0,
         voltage_amplitude=0.0,
@@ -162,10 +166,7 @@ def test_voltage_clamp_ca_varies_with_calcium_channel() -> None:
 def test_ca_i_stays_non_negative_current_clamp() -> None:
     """ca_i is never negative throughout a current-clamp simulation."""
     cd = CalciumDynamics(alpha_ca=1.0, tau_ca=1.0, ca_rest=0.0)
-    neuron = Neuron(
-        calcium_dynamics=cd,
-        additional_channels=(_MOCK_CALCIUM_CHANNEL,),
-    )
+    neuron = _hh_with(_MOCK_CALCIUM_CHANNEL, calcium_dynamics=cd)
     protocol = step_current(
         duration=5.0,
         current_amplitude=0.0,
@@ -179,10 +180,7 @@ def test_ca_i_stays_non_negative_current_clamp() -> None:
 def test_ca_i_stays_non_negative_voltage_clamp() -> None:
     """ca_i is never negative throughout a voltage-clamp simulation."""
     cd = CalciumDynamics(alpha_ca=1.0, tau_ca=1.0, ca_rest=0.0)
-    neuron = Neuron(
-        calcium_dynamics=cd,
-        additional_channels=(_MOCK_CALCIUM_CHANNEL,),
-    )
+    neuron = _hh_with(_MOCK_CALCIUM_CHANNEL, calcium_dynamics=cd)
     protocol = step_voltage(
         duration=5.0,
         voltage_amplitude=0.0,

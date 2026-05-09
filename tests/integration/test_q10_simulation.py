@@ -12,6 +12,8 @@ deliberately uses the same T (and hence the same reversal potentials) while
 varying Q10 to isolate the kinetic effect.
 """
 
+import dataclasses
+
 import numpy as np
 import pytest
 
@@ -21,7 +23,14 @@ from patch_sim.clamp_simulations import (
     simulate_voltage_clamp,
 )
 from patch_sim.neuron import Neuron
+from patch_sim.presets import make_squid_giant_axon
 from patch_sim.protocols import step_current, step_voltage
+
+
+def _hh(**overrides: object) -> Neuron:
+    """HH52 squid neuron with the given field overrides applied."""
+    return dataclasses.replace(make_squid_giant_axon(), **overrides)
+
 
 # Protocol must be generated at the simulation sampling frequency so that each
 # array element maps to exactly one simulation time step (dt = 1/SIM_SAMPLING_FREQ ms).
@@ -67,8 +76,8 @@ def test_q10_scaling_speeds_up_m_gate() -> None:
         sampling_frequency=_SF,
     )
 
-    cold = Neuron(T=_T_REF, T_ref=_T_REF, Q10=3.0)
-    hot = Neuron(T=_T_HOT, T_ref=_T_REF, Q10=3.0)
+    cold = _hh(T=_T_REF, T_ref=_T_REF, Q10=3.0)
+    hot = _hh(T=_T_HOT, T_ref=_T_REF, Q10=3.0)
 
     cold_result = simulate_voltage_clamp(cold, voltage_protocol=v_protocol)
     hot_result = simulate_voltage_clamp(hot, voltage_protocol=v_protocol)
@@ -100,8 +109,8 @@ def test_q10_scaling_preserves_steady_state_gating() -> None:
         sampling_frequency=_SF,
     )
 
-    cold = Neuron(T=_T_REF, T_ref=_T_REF, Q10=3.0)
-    hot = Neuron(T=_T_PHYS, T_ref=_T_REF, Q10=3.0)
+    cold = _hh(T=_T_REF, T_ref=_T_REF, Q10=3.0)
+    hot = _hh(T=_T_PHYS, T_ref=_T_REF, Q10=3.0)
 
     cold_result = simulate_voltage_clamp(cold, voltage_protocol=v_protocol)
     hot_result = simulate_voltage_clamp(hot, voltage_protocol=v_protocol)
@@ -128,8 +137,8 @@ def test_q10_of_one_produces_no_temperature_effect() -> None:
         sampling_frequency=_SF,
     )
 
-    at_ref = Neuron(T=_T_REF, T_ref=_T_REF, Q10=1.0)
-    at_phys = Neuron(T=_T_PHYS, T_ref=_T_REF, Q10=1.0)
+    at_ref = _hh(T=_T_REF, T_ref=_T_REF, Q10=1.0)
+    at_phys = _hh(T=_T_PHYS, T_ref=_T_REF, Q10=1.0)
 
     result_ref = simulate_voltage_clamp(at_ref, voltage_protocol=v_protocol)
     result_phys = simulate_voltage_clamp(at_phys, voltage_protocol=v_protocol)
@@ -155,8 +164,8 @@ def test_q10_current_clamp_earlier_ap_onset() -> None:
     # Slow: T_ref == T → phi = 1.0 (no scaling).
     # Fast: T_ref = T - 10 → phi = Q10^1 = 3.0 (3× faster kinetics).
     # K_out=7.8 mM matches HH52 squid seawater; DEFAULT_K_OUT is 4.0 mM (mammalian).
-    slow = Neuron(T=_T_REF, T_ref=_T_REF, Q10=3.0, K_out=7.8)
-    fast = Neuron(T=_T_REF, T_ref=_T_REF - 10.0, Q10=3.0, K_out=7.8)
+    slow = _hh(T=_T_REF, T_ref=_T_REF, Q10=3.0)
+    fast = _hh(T=_T_REF, T_ref=_T_REF - 10.0, Q10=3.0)
 
     # Near-threshold current so the subthreshold buildup is long enough for the
     # kinetic difference to shift AP onset by at least a few samples.

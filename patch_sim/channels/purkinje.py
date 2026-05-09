@@ -209,11 +209,11 @@ def make_purkinje_na_channel(g_max: float) -> IonChannel:
     activation threshold of mammalian cerebellar Purkinje neurons recorded
     by De Schutter & Bower (1994) at 32 °C.
 
-    Intended as the ``na_channel_factory`` of the Purkinje preset.  Compared
-    with the default HH52 Na⁺ channel (fitted to squid axon at 22 °C), the
-    Traub-Miles form with VT = −58 mV places the α_m singularity (and
-    approximate activation inflection) near −45 mV and prevents the ~5.2×
-    Q10 overcorrection that caused premature Na⁺ inactivation.
+    Used as the Purkinje preset's Na⁺ channel.  Compared with the default
+    HH52 Na⁺ channel (fitted to squid axon at 22 °C), the Traub-Miles form
+    with VT = −58 mV places the α_m singularity (and approximate activation
+    inflection) near −45 mV and prevents the ~5.2× Q10 overcorrection that
+    caused premature Na⁺ inactivation.
 
     The channel exposes three gates: activation ``m`` (power 3), fast
     inactivation ``h`` (power 1), and slow voltage-dependent inactivation
@@ -268,7 +268,7 @@ def make_purkinje_k_channel(g_max: float) -> IonChannel:
     activation threshold of mammalian cerebellar Purkinje neurons recorded
     by De Schutter & Bower (1994) at 32 °C.
 
-    Intended as the ``k_channel_factory`` of the Purkinje preset.
+    Used as the Purkinje preset's K⁺ channel.
 
     Reference: De Schutter & Bower (1994), J. Neurophysiol. 71:375.
     Kinetics recorded at 32 °C — use T_ref = 305.15 K with this factory.

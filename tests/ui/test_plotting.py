@@ -121,14 +121,14 @@ def test_from_result_classic_columns_are_populated() -> None:
     stim = _make_stimulus()
     s = Sweep.from_result(df, stim, "A", "#fff", "Current Clamp")
     assert len(s.voltage) == _N
-    assert len(s.sodium_current) == _N
-    assert len(s.potassium_current) == _N
-    assert len(s.na_leak_current) == _N
-    assert len(s.k_leak_current) == _N
+    assert len(s.channel_currents["INa"]) == _N
+    assert len(s.channel_currents["IK"]) == _N
+    assert len(s.channel_currents["INaL"]) == _N
+    assert len(s.channel_currents["IKL"]) == _N
     assert len(s.total_current) == _N
-    assert len(s.potassium_activation) == _N
-    assert len(s.sodium_activation) == _N
-    assert len(s.sodium_inactivation) == _N
+    assert len(s.channel_gating["n"]) == _N
+    assert len(s.channel_gating["m"]) == _N
+    assert len(s.channel_gating["h"]) == _N
 
 
 def test_from_result_time_field_stored() -> None:
@@ -147,41 +147,45 @@ def test_from_result_stimulus_stored() -> None:
     assert s.stimulus == pytest.approx(stim.tolist())
 
 
-def test_from_result_no_extra_columns_gives_empty_dicts() -> None:
-    """With only classic columns both additional dicts are empty."""
+def test_from_result_no_extra_columns_gives_only_core_currents_and_hh_gates() -> None:
+    """Classify classic columns into channel_currents and channel_gating.
+
+    With only classic columns ``channel_currents`` holds the four HH-classic
+    core entries and ``channel_gating`` holds n/m/h.
+    """
     s = Sweep.from_result(_make_result(), _make_stimulus(), "", "", "Current Clamp")
-    assert s.additional_currents == {}
-    assert s.additional_gating == {}
+    assert set(s.channel_currents.keys()) == {"INa", "IK", "INaL", "IKL"}
+    assert set(s.channel_gating.keys()) == {"n", "m", "h"}
 
 
-def test_from_result_i_prefix_goes_to_additional_currents() -> None:
-    """Extra columns starting with I are placed in additional_currents."""
+def test_from_result_i_prefix_goes_to_channel_currents() -> None:
+    """Extra columns starting with I are placed in channel_currents."""
     extra = {"Ih": list(np.ones(_N) * 0.5)}
     s = Sweep.from_result(
         _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
     )
-    assert "Ih" in s.additional_currents
-    assert s.additional_currents["Ih"] == pytest.approx([0.5] * _N)
+    assert "Ih" in s.channel_currents
+    assert s.channel_currents["Ih"] == pytest.approx([0.5] * _N)
 
 
 def test_from_result_i_prefix_key_is_column_name() -> None:
-    """The column name is used as-is as the key in additional_currents."""
+    """The column name is used as-is as the key in channel_currents."""
     extra = {"IKa": list(np.zeros(_N))}
     s = Sweep.from_result(
         _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
     )
-    assert list(s.additional_currents.keys()) == ["IKa"]
+    assert "IKa" in s.channel_currents
 
 
-def test_from_result_non_current_extra_goes_to_additional_gating() -> None:
-    """Extra columns not starting with I are placed in additional_gating."""
+def test_from_result_non_current_extra_goes_to_channel_gating() -> None:
+    """Extra columns not starting with I are placed in channel_gating."""
     extra = {"r": list(np.full(_N, 0.4))}
     s = Sweep.from_result(
         _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
     )
-    assert "r" in s.additional_gating
-    assert "r" not in s.additional_currents
-    assert s.additional_gating["r"] == pytest.approx([0.4] * _N)
+    assert "r" in s.channel_gating
+    assert "r" not in s.channel_currents
+    assert s.channel_gating["r"] == pytest.approx([0.4] * _N)
 
 
 def test_from_result_multiple_extra_columns_classified() -> None:
@@ -194,8 +198,9 @@ def test_from_result_multiple_extra_columns_classified() -> None:
     s = Sweep.from_result(
         _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
     )
-    assert set(s.additional_currents.keys()) == {"IKa"}
-    assert set(s.additional_gating.keys()) == {"a", "b"}
+    assert "IKa" in s.channel_currents
+    # n, m, h come from the base classic result; a, b are the new extras.
+    assert {"a", "b"}.issubset(s.channel_gating.keys())
 
 
 def test_from_result_missing_classic_field_returns_empty_list() -> None:
@@ -236,22 +241,14 @@ def test_from_result_label_and_color_stored() -> None:
 
 
 def _all_flags_true() -> TraceVisibility:
-    """Return a TraceVisibility with all classic flags set to True.
+    """Return a TraceVisibility with every flag set to True.
 
     Returns:
-        A TraceVisibility instance with every flag enabled.
+        A TraceVisibility instance with every flag enabled.  Per-channel
+        and per-gate dict fields are left as empty defaults, which
+        ``build_figure`` interprets as "show all".
     """
-    return TraceVisibility(
-        voltage=True,
-        total_current=True,
-        sodium_current=True,
-        potassium_current=True,
-        na_leak_current=True,
-        k_leak_current=True,
-        potassium_activation=True,
-        sodium_activation=True,
-        sodium_inactivation=True,
-    )
+    return TraceVisibility(voltage=True, total_current=True)
 
 
 def test_build_figure_returns_go_figure() -> None:
@@ -284,6 +281,56 @@ def test_build_figure_vc_has_three_subplots() -> None:
 def test_build_figure_empty_sweeps_no_error() -> None:
     """build_figure with no sweeps returns a valid empty figure."""
     fig = build_figure([], visibility=_all_flags_true(), clamp_mode="Current Clamp")
+    assert isinstance(fig, go.Figure)
+
+
+def test_build_figure_vc_skips_classic_columns_absent_from_simulation() -> None:
+    """build_figure must not crash when a preset omits IK / INaL / IKL columns.
+
+    Cortical Pyramidal and STN drop the HH-style core ``"K"`` channel since
+    #320, so their voltage-clamp results have no ``IK`` / ``IKL`` / ``INaL``
+    columns and no ``n`` gate.  The ``Sweep.from_result`` classifier then
+    leaves the corresponding classic attributes (``potassium_current``,
+    ``k_leak_current``, ``na_leak_current``, ``potassium_activation``) as
+    empty lists.  Default ``TraceVisibility`` has all five flags set to True;
+    before this regression fix, the multi-sweep hover-table path called
+    ``np.array([[], []], dtype=float)[:, indices]`` and raised
+    ``IndexError: index 0 is out of bounds for axis 1 with size 0``.
+
+    Regression for the runtime crash hit by the Na+ Channel Activation
+    protocol on Cortical Pyramidal in voltage-clamp mode (which produces
+    multiple sweeps, exercising the ``is_multi_sweep`` hover-table path).
+    """
+    n = _N
+    t = np.linspace(0.0, 50.0, n)
+    # Build a result that mirrors what Cortical Pyramidal produces in VC:
+    # INa is present, IK/INaL/IKL/n are not.
+    fields = [
+        ("time", np.float64),
+        ("voltage", np.float64),
+        ("Itotal", np.float64),
+        ("INa", np.float64),
+        ("m", np.float64),
+        ("h", np.float64),
+    ]
+    result = np.empty(n, dtype=np.dtype(fields))
+    result["time"] = t
+    result["voltage"] = np.full(n, -65.0)
+    result["Itotal"] = np.zeros(n)
+    result["INa"] = np.zeros(n)
+    result["m"] = np.full(n, 0.05)
+    result["h"] = np.full(n, 0.6)
+    # Two sweeps so build_figure takes the is_multi_sweep hover-table path.
+    sweep1 = Sweep.from_result(
+        result, _make_stimulus(n), "s1", "#888888", "Voltage Clamp"
+    )
+    sweep2 = Sweep.from_result(
+        result, _make_stimulus(n), "s2", "#999999", "Voltage Clamp"
+    )
+
+    fig = build_figure(
+        [sweep1, sweep2], visibility=_all_flags_true(), clamp_mode="Voltage Clamp"
+    )
     assert isinstance(fig, go.Figure)
 
 
@@ -492,11 +539,7 @@ def test_build_figure_gating_traces_hidden_when_flags_off() -> None:
     """All gating traces are present but hidden when their flags are False."""
     # Use an empty label so trace names are plain "n", "m", "h".
     sweep = _make_sweep(label="", mode="Current Clamp")
-    vis = TraceVisibility(
-        potassium_activation=False,
-        sodium_activation=False,
-        sodium_inactivation=False,
-    )
+    vis = TraceVisibility(channel_gating={"n": False, "m": False, "h": False})
     fig = build_figure([sweep], visibility=vis, clamp_mode="Current Clamp")
     gating_traces = [t for t in fig.data if t.name in ("n", "m", "h")]
     assert len(gating_traces) == 3
@@ -598,11 +641,7 @@ def test_build_hover_tables_stim_html_contains_time_data() -> None:
 def test_build_hover_tables_all_flags_off_gating_returns_empty_strings() -> None:
     """When all gating visibility flags are False, gating HTML entries are empty."""
     sweeps = [_make_sweep(label="A"), _make_sweep(label="B")]
-    vis = TraceVisibility(
-        potassium_activation=False,
-        sodium_activation=False,
-        sodium_inactivation=False,
-    )
+    vis = TraceVisibility(channel_gating={"n": False, "m": False, "h": False})
     args = {**_default_hover_args(sweeps), "visibility": vis}
     _, gating, _ = _build_hover_tables(**args)
     assert all(html == "" for html in gating)
@@ -615,10 +654,7 @@ def test_build_hover_tables_vc_all_current_flags_off_resp_returns_empty_strings(
     sweeps = [_make_sweep(label="A"), _make_sweep(label="B")]
     vis = TraceVisibility(
         total_current=False,
-        sodium_current=False,
-        potassium_current=False,
-        na_leak_current=False,
-        k_leak_current=False,
+        channel_currents={"INa": False, "IK": False, "INaL": False, "IKL": False},
     )
     args = {**_default_hover_args(sweeps, is_vc=True), "visibility": vis}
     resp, _, _ = _build_hover_tables(**args)
@@ -639,73 +675,94 @@ def test_build_hover_tables_stride_2_length() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_compute_trace_visibility_map_cc_single_sweep_classic_fields() -> None:
-    """CC single sweep maps classic show_* fields to the correct indices."""
+def test_compute_trace_visibility_map_cc_single_sweep_gating_fields() -> None:
+    """CC single sweep maps the registry's per-channel show_*_gating fields."""
+    from patch_sim_ui.channels import GATING_FIELD_MAP
+
     sweep = _make_sweep(mode="Current Clamp")
-    result = compute_trace_visibility_map([sweep], "Current Clamp")
-    # trace order: voltage(0), n(1), m(2), h(3), stimulus(4, not mapped)
+    result = compute_trace_visibility_map(
+        [sweep],
+        "Current Clamp",
+        additional_gating_field_map=GATING_FIELD_MAP,
+    )
+    # trace order: voltage(0), n(1), m(2), h(3), stimulus(4, not mapped).
+    # n routes to show_k_gating; m and h route to show_na_gating.
     assert result["show_voltage"] == [0]
-    assert result["show_potassium_activation"] == [1]
-    assert result["show_sodium_activation"] == [2]
-    assert result["show_sodium_inactivation"] == [3]
-    assert "show_na_leak_current" not in result
-    assert "show_k_leak_current" not in result
+    assert result["show_k_gating"] == [1]
+    assert result["show_na_gating"] == [2, 3]
+    assert "show_nal_current" not in result
+    assert "show_kl_current" not in result
 
 
 def test_compute_trace_visibility_map_vc_single_sweep_classic_fields() -> None:
-    """VC single sweep maps classic show_* fields to the correct indices."""
+    """VC single sweep maps the registry-derived show_* fields to indices."""
+    from patch_sim_ui.channels import CURRENT_FIELD_MAP, GATING_FIELD_MAP
+
     sweep = _make_sweep(mode="Voltage Clamp")
-    result = compute_trace_visibility_map([sweep], "Voltage Clamp")
-    # trace order: total(0), Na(1), K(2), NaL(3), KL(4), n(5), m(6), h(7), stim(8)
+    result = compute_trace_visibility_map(
+        [sweep],
+        "Voltage Clamp",
+        additional_current_field_map=CURRENT_FIELD_MAP,
+        additional_gating_field_map=GATING_FIELD_MAP,
+    )
+    # trace order: total(0), INa(1), IK(2), INaL(3), IKL(4), n(5), m(6), h(7), stim(8)
     assert result["show_total_current"] == [0]
-    assert result["show_sodium_current"] == [1]
-    assert result["show_potassium_current"] == [2]
-    assert result["show_na_leak_current"] == [3]
-    assert result["show_k_leak_current"] == [4]
-    assert result["show_potassium_activation"] == [5]
-    assert result["show_sodium_activation"] == [6]
-    assert result["show_sodium_inactivation"] == [7]
+    assert result["show_na_current"] == [1]
+    assert result["show_k_current"] == [2]
+    assert result["show_nal_current"] == [3]
+    assert result["show_kl_current"] == [4]
+    assert result["show_k_gating"] == [5]
+    assert result["show_na_gating"] == [6, 7]
     assert "show_voltage" not in result
 
 
 def test_compute_trace_visibility_map_cc_multi_sweep_accumulates_indices() -> None:
     """Multi-sweep CC maps each field to one index per sweep."""
+    from patch_sim_ui.channels import GATING_FIELD_MAP
+
     sweeps = [_make_sweep(mode="Current Clamp"), _make_sweep(mode="Current Clamp")]
-    result = compute_trace_visibility_map(sweeps, "Current Clamp")
+    result = compute_trace_visibility_map(
+        sweeps, "Current Clamp", additional_gating_field_map=GATING_FIELD_MAP
+    )
     # Sweep 0: voltage(0), n(1), m(2), h(3), stim(4)
     # Sweep 1: voltage(5), n(6), m(7), h(8), stim(9)
     assert result["show_voltage"] == [0, 5]
-    assert result["show_potassium_activation"] == [1, 6]
-    assert result["show_sodium_activation"] == [2, 7]
-    assert result["show_sodium_inactivation"] == [3, 8]
+    assert result["show_k_gating"] == [1, 6]
+    assert result["show_na_gating"] == [2, 3, 7, 8]
 
 
 def test_compute_trace_visibility_map_cc_additional_gating_mapped() -> None:
-    """CC sweep with additional gating maps the field to the correct index."""
+    """CC sweep with auxiliary gating maps the field to the correct index."""
     extra = {"r": [0.0] * _N}
     sweep = _make_sweep(mode="Current Clamp", extra_cols=extra)
-    gating_map = {"r": "show_ih_gating"}
+    gating_map = {"r": "show_ih_gating", "n": "show_k_gating", "h": "show_na_gating"}
     result = compute_trace_visibility_map(
         [sweep], "Current Clamp", additional_gating_field_map=gating_map
     )
-    # voltage(0), n(1), m(2), h(3), r(4), stim(5)
+    # voltage(0), n(1), m(2 — unmapped, _skip), h(3), r(4), stim(5)
     assert result["show_ih_gating"] == [4]
-    assert result["show_sodium_inactivation"] == [3]
+    assert result["show_na_gating"] == [3]
+    assert result["show_k_gating"] == [1]
 
 
 def test_compute_trace_visibility_map_vc_additional_current_mapped() -> None:
-    """VC sweep with additional current maps the field to the correct index."""
+    """VC sweep with auxiliary current maps the field to the correct index."""
+    from patch_sim_ui.channels import GATING_FIELD_MAP
+
     extra = {"IFoo": [0.0] * _N}
     sweep = _make_sweep(mode="Voltage Clamp", extra_cols=extra)
     curr_map = {"IFoo": "show_foo_current"}
     result = compute_trace_visibility_map(
-        [sweep], "Voltage Clamp", additional_current_field_map=curr_map
+        [sweep],
+        "Voltage Clamp",
+        additional_current_field_map=curr_map,
+        additional_gating_field_map=GATING_FIELD_MAP,
     )
-    # total(0), Na(1), K(2), NaL(3), KL(4), IFoo(5), n(6), m(7), h(8), stim(9)
+    # total(0), Na(1, _skip), K(_skip 2), NaL(_skip 3), KL(_skip 4), IFoo(5),
+    # n(6 → show_k_gating), m(7 → show_na_gating), h(8 → show_na_gating).
     assert result["show_foo_current"] == [5]
-    assert result["show_potassium_activation"] == [6]
-    assert result["show_sodium_activation"] == [7]
-    assert result["show_sodium_inactivation"] == [8]
+    assert result["show_k_gating"] == [6]
+    assert result["show_na_gating"] == [7, 8]
 
 
 def test_compute_trace_visibility_map_multi_gating_keys_same_field() -> None:
@@ -716,19 +773,23 @@ def test_compute_trace_visibility_map_multi_gating_keys_same_field() -> None:
     result = compute_trace_visibility_map(
         [sweep], "Current Clamp", additional_gating_field_map=gating_map
     )
-    # voltage(0), n(1), m(2), h(3), a(4), b(5), stim(6)
+    # voltage(0), n(_skip 1), m(_skip 2), h(_skip 3), a(4), b(5), stim(_skip 6)
     assert result["show_ika_gating"] == [4, 5]
 
 
 def test_compute_trace_visibility_map_unknown_additional_key_advances_counter() -> None:
     """Additional keys absent from the field map still advance the index counter."""
+    from patch_sim_ui.channels import GATING_FIELD_MAP
+
     extra = {"IUnknown": [0.0] * _N}
     sweep = _make_sweep(mode="Voltage Clamp", extra_cols=extra)
-    result = compute_trace_visibility_map([sweep], "Voltage Clamp")
-    # IUnknown (additional_current) advances the counter; classic gating at 6, 7, 8
-    assert result["show_potassium_activation"] == [6]
-    assert result["show_sodium_activation"] == [7]
-    assert result["show_sodium_inactivation"] == [8]
+    result = compute_trace_visibility_map(
+        [sweep], "Voltage Clamp", additional_gating_field_map=GATING_FIELD_MAP
+    )
+    # total(_skip 0), Na(_skip 1), K(_skip 2), NaL(_skip 3), KL(_skip 4),
+    # IUnknown(_skip 5), n(6 → show_k_gating), m(7 → show_na_gating), h(8).
+    assert result["show_k_gating"] == [6]
+    assert result["show_na_gating"] == [7, 8]
 
 
 # ---------------------------------------------------------------------------

@@ -92,7 +92,6 @@ from .snc import (
     make_snc_inap_channel,
 )
 from .stn import (
-    make_stn_k_channel,
     make_stn_na_channel,
 )
 from .thalamic import (
@@ -211,7 +210,6 @@ __all__ = [
     "purkinje_beta_m",
     "purkinje_beta_n",
     # stn
-    "make_stn_k_channel",
     "make_stn_na_channel",
     # snc
     "DOPAMINERGIC_VT",

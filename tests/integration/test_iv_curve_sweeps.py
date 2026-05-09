@@ -5,13 +5,25 @@ Verifies that running each voltage step as an independent simulation
 and that each sweep has the expected single-step protocol shape.
 """
 
+import dataclasses
+
 import numpy as np
 import pytest
 
 import patch_sim
 import patch_sim.channels
 import patch_sim.clamp_simulations
+from patch_sim.channels import IonChannel
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
+from patch_sim.neuron import Neuron
+from patch_sim.presets import make_squid_giant_axon
+
+
+def _hh_with(*extras: IonChannel, **overrides: object) -> Neuron:
+    """HH52 squid neuron with the given extra channels appended."""
+    base = make_squid_giant_axon()
+    return dataclasses.replace(base, channels=base.channels + extras, **overrides)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -83,7 +95,7 @@ def _make_iv_sweeps(
     Returns:
         List of (protocol_array, result_array) tuples, one per voltage.
     """
-    neuron = patch_sim.Neuron()
+    neuron = make_squid_giant_axon()
     sweep_duration = pre_pulse_duration + step_duration + post_pulse_duration
     n_steps = round((voltage_max - voltage_min) / voltage_step) + 1
     voltages = np.linspace(voltage_min, voltage_max, n_steps)
@@ -185,7 +197,7 @@ def test_iv_curve_protocol_peak_voltage_matches_step_voltage() -> None:
 
 def test_batch_matches_sequential() -> None:
     """simulate_batch results are identical to sequential simulate_voltage_clamp."""
-    neuron = patch_sim.Neuron()
+    neuron = make_squid_giant_axon()
     _voltages, protocols = _make_iv_protocols(
         voltage_min=-60.0,
         voltage_max=0.0,
@@ -203,7 +215,7 @@ def test_batch_matches_sequential() -> None:
 
 def test_batch_single_sweep() -> None:
     """A single-protocol batch yields exactly one correct DataFrame."""
-    neuron = patch_sim.Neuron()
+    neuron = make_squid_giant_axon()
     _voltages, protocols = _make_iv_protocols(
         voltage_min=0.0,
         voltage_max=0.0,
@@ -220,14 +232,14 @@ def test_batch_single_sweep() -> None:
 
 def test_batch_empty_protocols() -> None:
     """An empty protocol list yields no results."""
-    neuron = patch_sim.Neuron()
+    neuron = make_squid_giant_axon()
     results = list(patch_sim.simulate_batch(neuron, [], max_workers=2))
     assert results == []
 
 
 def test_batch_preserves_order() -> None:
     """Results come back in voltage order (same order as input protocols)."""
-    neuron = patch_sim.Neuron()
+    neuron = make_squid_giant_axon()
     voltages, protocols = _make_iv_protocols(
         voltage_min=-80.0,
         voltage_max=40.0,
@@ -255,10 +267,7 @@ def test_batch_with_calcium_channels() -> None:
     """
     ical = patch_sim.channels.make_ical_channel()
     cd = patch_sim.CalciumDynamics()
-    neuron = patch_sim.Neuron(
-        additional_channels=(ical,),
-        calcium_dynamics=cd,
-    )
+    neuron = _hh_with(ical, calcium_dynamics=cd)
     voltages = [-40.0, 0.0, 40.0]
     protocols = [
         patch_sim.step_voltage(
@@ -289,7 +298,7 @@ def test_batch_with_calcium_channels() -> None:
 
 def test_batch_with_current_clamp() -> None:
     """simulate_batch with simulate_fn=simulate_current_clamp works correctly."""
-    neuron = patch_sim.Neuron()
+    neuron = make_squid_giant_axon()
     num_steps = int(_FS * 0.05)  # 50 ms
     stimulus = np.zeros(num_steps)
     stimulus[int(_FS * 0.01) : int(_FS * 0.04)] = 10.0

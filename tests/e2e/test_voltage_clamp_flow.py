@@ -3,7 +3,12 @@
 Exercises: VC preset loading → simulate → IV/GV analysis population.
 """
 
-from patch_sim.constants import IV_CURVE, NA_CHANNEL_ACTIVATION, SQUID_GIANT_AXON
+from patch_sim.constants import (
+    CORTICAL_PYRAMIDAL,
+    IV_CURVE,
+    NA_CHANNEL_ACTIVATION,
+    SQUID_GIANT_AXON,
+)
 from tests.e2e.conftest import StateTree, run_flow
 
 
@@ -57,6 +62,29 @@ async def test_na_channel_activation_preset_produces_multi_sweep(
     result = await run_flow(
         state_tree,
         neuron_preset=SQUID_GIANT_AXON,
+        protocol_preset=NA_CHANNEL_ACTIVATION,
+    )
+
+    assert len(result.sweeps) > 1
+
+
+async def test_na_channel_activation_on_cortical_pyramidal(
+    state_tree: StateTree,
+) -> None:
+    """Na+ Channel Activation on Cortical Pyramidal runs end-to-end without crashing.
+
+    Cortical Pyramidal omits the HH-style core ``"K"`` channel since #320,
+    so its VC simulation has no ``IK`` / ``IKL`` / ``INaL`` columns and no
+    ``n`` gate.  The combination of (a) a multi-sweep protocol, (b) default
+    visibility flags that try to render those columns, and (c) the
+    ``is_multi_sweep`` hover-table path previously raised
+    ``IndexError: index 0 is out of bounds for axis 1 with size 0`` from
+    ``_build_hover_tables`` and a similar error from the gating-carrier
+    fallback.  This exercises the whole pipeline to pin the regression.
+    """
+    result = await run_flow(
+        state_tree,
+        neuron_preset=CORTICAL_PYRAMIDAL,
         protocol_preset=NA_CHANNEL_ACTIVATION,
     )
 

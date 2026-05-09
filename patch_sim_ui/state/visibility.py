@@ -6,9 +6,9 @@ import logging
 import reflex as rx
 
 from patch_sim_ui.channels import (
-    ADDITIONAL_CHANNELS,
-    ADDITIONAL_CURRENT_FIELD_MAP,
-    ADDITIONAL_GATING_FIELD_MAP,
+    CHANNELS,
+    CURRENT_FIELD_MAP,
+    GATING_FIELD_MAP,
 )
 from patch_sim_ui.plotting import compute_trace_visibility_map
 from patch_sim_ui.state._common import _PLOTLY_GD_JS
@@ -16,19 +16,10 @@ from patch_sim_ui.state._common import _PLOTLY_GD_JS
 _VISIBILITY_FIELDS: list[str] = [
     "show_voltage",
     "show_total_current",
-    "show_sodium_current",
-    "show_potassium_current",
-    "show_na_leak_current",
-    "show_k_leak_current",
-    "show_potassium_activation",
-    "show_sodium_activation",
-    "show_sodium_inactivation",
-    # Additional channel visibility fields — one current + one gating per channel.
-    *[
-        field
-        for ch in ADDITIONAL_CHANNELS
-        for field in (ch.current_visibility_field, ch.gating_visibility_field)
-    ],
+    # Per-channel current toggles, derived uniformly from the registry.
+    *[ch.current_visibility_field for ch in CHANNELS],
+    # Per-channel joint gating toggles for every channel that has gates.
+    *[ch.gating_visibility_field for ch in CHANNELS if ch.gating_vars],
 ]
 
 logger = logging.getLogger(__name__)
@@ -59,8 +50,8 @@ def _make_visibility_setter_async(field_name: str):
         trace_map = compute_trace_visibility_map(
             current_sweeps=sim_st._current_sweeps,
             clamp_mode=sim_st._figure_clamp_mode,
-            additional_current_field_map=ADDITIONAL_CURRENT_FIELD_MAP,
-            additional_gating_field_map=ADDITIONAL_GATING_FIELD_MAP,
+            additional_current_field_map=CURRENT_FIELD_MAP,
+            additional_gating_field_map=GATING_FIELD_MAP,
             stored_traces=sim_st.stored_traces,
         )
         indices = trace_map.get(field_name, [])
@@ -87,13 +78,12 @@ class VisibilityState(rx.State):
     # ------------------------------------------------------------------ #
     show_voltage: bool = True
     show_total_current: bool = True
-    show_sodium_current: bool = True
-    show_potassium_current: bool = True
-    show_na_leak_current: bool = False
-    show_k_leak_current: bool = False
-    show_potassium_activation: bool = True
-    show_sodium_activation: bool = True
-    show_sodium_inactivation: bool = True
+    show_na_current: bool = True
+    show_k_current: bool = True
+    show_nal_current: bool = False
+    show_kl_current: bool = False
+    show_na_gating: bool = True
+    show_k_gating: bool = True
     show_ih_current: bool = True
     show_ih_gating: bool = True
     show_ika_current: bool = True

@@ -12,6 +12,8 @@ from patch_sim.channels import (
     make_ikca_channel,
     make_im_channel,
     make_inap_channel,
+    make_k_leak_channel,
+    make_na_leak_channel,
     make_nav12_channel,
     make_pospischil_k_channel,
 )
@@ -149,15 +151,13 @@ def make_ca1_pyramidal() -> Neuron:
         and tuned CalciumDynamics.
     """
     return Neuron(
-        g_Na=60.0,
-        g_K=3.0,
-        g_NaL=0.020854,
-        g_KL=0.029146,
         Q10=1.0,
         T_ref=307.15,
-        na_channel_factory=make_nav12_channel,
-        k_channel_factory=make_pospischil_k_channel,
-        additional_channels=(
+        channels=(
+            make_nav12_channel(g_max=60.0),
+            make_pospischil_k_channel(g_max=3.0),
+            make_na_leak_channel(g_max=0.020854),
+            make_k_leak_channel(g_max=0.029146),
             make_ika_channel(g_max=0.5),
             make_im_channel(g_max=0.75),
             make_ih_channel(g_max=0.05),

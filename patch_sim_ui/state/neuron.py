@@ -9,45 +9,29 @@ import reflex as rx
 
 import patch_sim
 import patch_sim.channels
-from patch_sim.constants import (
-    DEFAULT_G_CAV13,
-    DEFAULT_G_ICAL,
-    DEFAULT_G_ICAN,
-    DEFAULT_G_ICAT,
-    DEFAULT_G_IH,
-    DEFAULT_G_IKA,
-    DEFAULT_G_IKCA,
-    DEFAULT_G_IKIR,
-    DEFAULT_G_IKV31,
-    DEFAULT_G_IM,
-    DEFAULT_G_KATP,
-    DEFAULT_G_MSKV,
-    DEFAULT_G_NAP,
-    DEFAULT_G_NAR,
-    DEFAULT_G_SK,
-)
 from patch_sim.presets import NEURON_PRESETS
 from patch_sim_ui import presets
-from patch_sim_ui.channels import ADDITIONAL_CHANNELS
+from patch_sim_ui.channels import CHANNELS
 from patch_sim_ui.state._common import _set_float
 
 _NEURON_FLOAT_FIELDS: list[str] = list(presets.NEURON_CONFIG_SCALAR_FIELDS)
 
-_CHANNEL_FLOAT_FIELDS: list[str] = [ch.g_max_field for ch in ADDITIONAL_CHANNELS]
+_CHANNEL_FLOAT_FIELDS: list[str] = [ch.g_max_field for ch in CHANNELS]
 
 
 #: The NeuronState fields that determine the passive-only membrane test result.
 #: Only these fields are included in ``neuron_fingerprint`` so that changing
-#: active conductances (g_Na, g_K, v_rest, auxiliary channels) does not
-#: invalidate the membrane test cache.
+#: active conductances (na_g_max, k_g_max, v_rest, auxiliary channels) does
+#: not invalidate the membrane test cache.
 #:
-#: Ca²⁺ concentrations are omitted: no Ca²⁺ channels are present in the
-#: passive neuron (g_Na = g_K = 0), so their reversal potentials carry no
-#: current.  Na⁺ and K⁺ concentrations ARE included because E_NaL and E_KL
-#: are used to compute the effective E_L for the passive RC circuit.
+#: Ca²⁺ concentrations are omitted: no Ca²⁺ channels survive the passive
+#: filter (membrane_test only retains channels with no gating variables), so
+#: their reversal potentials carry no current.  Na⁺ and K⁺ concentrations ARE
+#: included because E_NaL and E_KL are used to compute the effective E_L for
+#: the passive RC circuit.
 _PASSIVE_PARAM_FIELDS: list[str] = [
-    "g_NaL",
-    "g_KL",
+    "nal_g_max",
+    "kl_g_max",
     "C_m",
     "Na_out",
     "Na_in",
@@ -67,7 +51,7 @@ def _make_neuron_float_setter(field_name: str):
     from generators; returning an event from a sync handler has no effect.
 
     The fingerprint-based cache inside ``run_membrane_test`` ensures the
-    simulation only re-runs when passive-relevant parameters (g_NaL, g_KL,
+    simulation only re-runs when passive-relevant parameters (nal_g_max, kl_g_max,
     C_m, ion concentrations, T) actually change.
 
     Args:
@@ -99,29 +83,21 @@ logger = logging.getLogger(__name__)
 
 
 class NeuronState(rx.State):
-    """State for neuron biophysical parameters and auxiliary channel configuration."""
+    """State for neuron biophysical parameters and channel configuration.
 
-    # ------------------------------------------------------------------ #
-    # Additional channels                                                 #
-    # ------------------------------------------------------------------ #
-    # Per-channel g_max sliders.  Visibility (which slider is shown) is
-    # driven by ``visible_channel_ids`` from the active preset; values are
-    # initialised by ``neuron_to_ui_state`` on preset load.
-    ih_g_max: float = DEFAULT_G_IH
-    ika_g_max: float = DEFAULT_G_IKA
-    ikv31_g_max: float = DEFAULT_G_IKV31
-    mskv_g_max: float = DEFAULT_G_MSKV
-    inap_g_max: float = DEFAULT_G_NAP
-    inar_g_max: float = DEFAULT_G_NAR
-    im_g_max: float = DEFAULT_G_IM
-    katp_g_max: float = DEFAULT_G_KATP
-    ikir_g_max: float = DEFAULT_G_IKIR
-    ikca_g_max: float = DEFAULT_G_IKCA
-    ical_g_max: float = DEFAULT_G_ICAL
-    cav13_g_max: float = DEFAULT_G_CAV13
-    icat_g_max: float = DEFAULT_G_ICAT
-    ican_g_max: float = DEFAULT_G_ICAN
-    sk_g_max: float = DEFAULT_G_SK
+    Per-channel ``{id}_g_max`` reactive vars are added dynamically at module
+    load time (one per entry in :data:`CHANNELS`).  See the
+    ``add_var`` loop at the bottom of this module.  Visibility (which slider
+    is shown) is driven by ``visible_channel_ids`` from the active preset.
+    """
+
+    # Snapshot of slider values overwritten by the active protocol's
+    # ``PROTOCOL_NEURON_OVERRIDES`` entry — populated when an override is
+    # applied, drained when the user switches to a protocol without an
+    # override (or to a different override).  Keeps Na+ Channel Activation
+    # reversible so leaving the protocol restores the user's prior values
+    # rather than leaving every non-Na slider stuck at 0.
+    _protocol_override_snapshot: dict[str, float] = {}
 
     # ------------------------------------------------------------------ #
     # Preset label                                                        #
@@ -135,7 +111,7 @@ class NeuronState(rx.State):
     def visible_channel_ids(self) -> list[str]:
         """UI ids of auxiliary channels the active preset includes.
 
-        Iterated in :data:`ADDITIONAL_CHANNELS` order so the rendered row
+        Iterated in :data:`CHANNELS` order so the rendered row
         order is deterministic regardless of ``frozenset`` iteration order.
         Drives both the neuron-panel auxiliary-channel rows and the
         sweep-manager trace-visibility checkboxes — single source of truth
@@ -147,7 +123,7 @@ class NeuronState(rx.State):
             channels (e.g. Squid Giant Axon) or unknown preset names.
         """
         ids = presets.PRESET_CHANNEL_IDS.get(self.active_neuron_type, frozenset())
-        return [ch.id for ch in ADDITIONAL_CHANNELS if ch.id in ids]
+        return [ch.id for ch in CHANNELS if ch.id in ids]
 
     @rx.var
     def has_visible_channels(self) -> bool:
@@ -176,13 +152,15 @@ class NeuronState(rx.State):
 
     @rx.var
     def E_L(self) -> float:
-        """Effective leak reversal in mV (weighted average of E_Na and E_K)."""
+        """Effective leak reversal in mV (g_max-weighted average of E_NaL and E_KL)."""
         e_na = float(patch_sim.nernst_potential(1, self.T, self.Na_out, self.Na_in))
         e_k = float(patch_sim.nernst_potential(1, self.T, self.K_out, self.K_in))
-        g_total = self.g_NaL + self.g_KL
+        g_nal = self.nal_g_max
+        g_kl = self.kl_g_max
+        g_total = g_nal + g_kl
         if g_total <= 0:
             return self.v_rest
-        return (self.g_NaL * e_na + self.g_KL * e_k) / g_total
+        return (g_nal * e_na + g_kl * e_k) / g_total
 
     @rx.var
     def E_Ca(self) -> float:
@@ -199,7 +177,7 @@ class NeuronState(rx.State):
         the cache has been invalidated by the latest state flush.
 
         Only hashes the fields that determine the passive-only membrane
-        test result (g_NaL, g_KL, C_m, ion concentrations, T).  Active
+        test result (nal_g_max, kl_g_max, C_m, ion concentrations, T).  Active
         conductances are excluded because the membrane test blocks them.
 
         Returns:
@@ -223,14 +201,66 @@ class NeuronState(rx.State):
         return self._compute_fingerprint()
 
     # ------------------------------------------------------------------ #
+    # Protocol override snapshot/restore                                  #
+    # ------------------------------------------------------------------ #
+    def _restore_protocol_overrides(self) -> None:
+        """Undo the active protocol override by restoring snapshotted values.
+
+        Walks :attr:`_protocol_override_snapshot`, restoring each key whose
+        slider still exists on this state instance.  Clears the snapshot so
+        a subsequent override takes a fresh capture.  Skips keys that no
+        longer correspond to a registered field (e.g. when the user changed
+        neuron preset between snapshot and restore).
+        """
+        for key, value in self._protocol_override_snapshot.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+        self._protocol_override_snapshot = {}
+
+    def _apply_protocol_overrides(self, protocol_name: str | None) -> None:
+        """Apply ``PROTOCOL_NEURON_OVERRIDES`` for ``protocol_name``.
+
+        Always restores any previously-snapshotted values first, so the
+        new override is taken on top of the user's pre-override slider
+        state.  Then snapshots the current values for keys the new override
+        touches, applies the override, and stores the snapshot for the
+        next call.
+
+        When ``protocol_name`` is ``None`` or has no override entry, this
+        method just clears the snapshot (no new override is applied).
+        Static dict overrides and callable overrides are both supported;
+        a callable is invoked with :attr:`active_neuron_type` so it can
+        adapt to whichever channels the active preset has.
+
+        Args:
+            protocol_name: Key into ``presets.PROTOCOL_NEURON_OVERRIDES``,
+                or ``None`` if no protocol is active.
+        """
+        self._restore_protocol_overrides()
+        if protocol_name is None:
+            return
+        overrides = presets.PROTOCOL_NEURON_OVERRIDES.get(protocol_name, {})
+        if callable(overrides):
+            overrides = overrides(self.active_neuron_type)
+        snapshot: dict[str, float] = {}
+        for key, value in overrides.items():
+            if hasattr(self, key):
+                snapshot[key] = float(getattr(self, key))
+                setattr(self, key, value)
+        self._protocol_override_snapshot = snapshot
+
+    # ------------------------------------------------------------------ #
     # Event handlers                                                     #
     # ------------------------------------------------------------------ #
     def _apply_neuron_preset(self, name: str) -> None:
         """Apply neuron preset config to this state instance synchronously.
 
         Sets all conductances, channel enables, and ``active_neuron_type`` for
-        the given preset.  Does not touch any cross-state fields (use
-        :meth:`load_neuron_preset` for the full async handler).
+        the given preset.  Clears any active protocol-override snapshot
+        because the snapshot's keys may reference sliders that don't apply
+        to the new preset.  Does not touch any cross-state fields (use
+        :meth:`load_neuron_preset` for the full async handler that
+        re-applies the active protocol's override on top).
 
         Args:
             name: Key into ``patch_sim_ui.presets.NEURON_UI_PRESETS``.
@@ -238,6 +268,9 @@ class NeuronState(rx.State):
         """
         if name not in presets.NEURON_UI_PRESETS:
             return
+        # Discard any prior protocol-override snapshot — it referenced the
+        # previous preset's sliders and would be misleading after re-seed.
+        self._protocol_override_snapshot = {}
         config = presets.NEURON_UI_PRESETS[name]
         for key, value in config.items():
             setattr(self, key, value)
@@ -277,10 +310,7 @@ class NeuronState(rx.State):
         proto_st = await self.get_state(ProtocolState)
         if proto_st.active_protocol_preset:
             proto_st._apply_protocol_preset(proto_st.active_protocol_preset, name)
-            for key, value in presets.PROTOCOL_NEURON_OVERRIDES.get(
-                proto_st.active_protocol_preset, {}
-            ).items():
-                setattr(self, key, value)
+            self._apply_protocol_overrides(proto_st.active_protocol_preset)
         sim_st = await self.get_state(SimulationState)
         _cleared = not sim_st.stored_traces
         if _cleared:
@@ -319,12 +349,12 @@ class NeuronState(rx.State):
         """Construct a Neuron from current state parameters.
 
         Calls the active preset's factory to obtain a fully-configured
-        baseline (carrying the preset's core/auxiliary channels, calcium
-        dynamics, and area), then overlays the user's scalar slider values
-        via :func:`dataclasses.replace`.  Per-channel ``g_max`` slider values
-        are also overlaid onto the preset's ``additional_channels`` so the
-        user can scale individual auxiliary conductances; channel composition
-        and kinetics remain preset-baked.
+        baseline (carrying the preset's full channel list, calcium dynamics,
+        and area), then overlays the user's scalar slider values via
+        :func:`dataclasses.replace`.  Per-channel ``g_max`` slider values are
+        also overlaid onto the baseline's channels so the user can scale
+        individual conductances; channel composition and kinetics remain
+        preset-baked.
 
         Returns:
             A :class:`patch_sim.Neuron` whose scalar fields and per-channel
@@ -339,11 +369,11 @@ class NeuronState(rx.State):
             dataclasses.replace(ch, g_max=getattr(self, f"{ui_id}_g_max"))
             if (ui_id := presets.CHANNEL_NAME_TO_ID.get(ch.name)) is not None
             else ch
-            for ch in baseline.additional_channels
+            for ch in baseline.channels
         )
         return dataclasses.replace(
             baseline,
-            additional_channels=rebuilt_channels,
+            channels=rebuilt_channels,
             **scalar_overrides,
         )
 
@@ -351,3 +381,13 @@ class NeuronState(rx.State):
 # Register Neuron scalar fields as NeuronState vars
 for _nc_name, _nc_default in presets.NEURON_CONFIG_SCALAR_DEFAULTS.items():
     NeuronState.add_var(_nc_name, float, _nc_default)
+
+# Register one ``{id}_g_max`` reactive var per channel in the registry, seeded
+# from the registry default.  Per-channel sliders bind to these vars; values
+# are reset by ``neuron_to_ui_state`` whenever a preset is loaded.
+for _ch_meta in CHANNELS:
+    NeuronState.add_var(
+        _ch_meta.g_max_field,
+        float,
+        presets.DEFAULT_G_MAX[_ch_meta.id],
+    )

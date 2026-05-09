@@ -343,8 +343,9 @@ def make_pospischil_k_channel(g_max: float) -> IonChannel:
     activation gate *n* (power 4).  The reversal potential is computed
     dynamically via the Nernst equation for K⁺.
 
-    Intended for use as the ``k_channel_factory`` of the Cortical Pyramidal
-    preset to match the Pospischil RS neuron model.
+    Used by the FSI and CA1 Pyramidal presets to match the Pospischil RS
+    neuron model.  (Cortical Pyramidal switched to Mainen-Sejnowski Kv as
+    its sole delayed rectifier in #311.)
 
     Args:
         g_max: Maximum conductance in mS/cm².

@@ -2,6 +2,12 @@
 
 from typing import Any
 
+from patch_sim.channels import (
+    make_k_channel,
+    make_k_leak_channel,
+    make_na_channel,
+    make_na_leak_channel,
+)
 from patch_sim.constants import ACTION_POTENTIAL
 from patch_sim.neuron import Neuron
 
@@ -58,4 +64,10 @@ def make_squid_giant_axon() -> Neuron:
     return Neuron(
         K_out=7.8,
         Q10=1.0,
+        channels=(
+            make_na_channel(g_max=120.0),
+            make_k_channel(g_max=36.0),
+            make_na_leak_channel(g_max=0.054),
+            make_k_leak_channel(g_max=0.246),
+        ),
     )

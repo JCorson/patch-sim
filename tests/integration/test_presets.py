@@ -24,6 +24,7 @@ from patch_sim.channels import (
     make_trn_k_channel,
     make_trn_na_channel,
 )
+from patch_sim.channels.base import IonChannel
 from patch_sim.constants import (
     ACTION_POTENTIAL,
     CA1_PYRAMIDAL,
@@ -37,6 +38,7 @@ from patch_sim.constants import (
     THALAMIC_RELAY,
     TRN,
 )
+from patch_sim.neuron import Neuron
 from patch_sim.presets import (
     NEURON_PRESET_NAMES,
     NEURON_PRESETS,
@@ -47,6 +49,40 @@ from patch_sim.presets import (
 )
 
 SAMPLING_FREQUENCY = 10_000.0  # Hz — fast enough for correct shapes
+
+
+def _kinetics_match(actual: IonChannel, factory) -> None:
+    """Assert that ``actual``'s gate kinetics match a channel built by ``factory``.
+
+    Compares gate names (set-equal) and each gate's alpha/beta function output
+    at four representative voltages.  Used as a structural replacement for
+    factory-identity assertions after issue #320.
+    """
+    reference = factory(g_max=1.0)
+    actual_gates = {gv.name: gv for gv in actual.gating_variables}
+    expected_gates = {gv.name: gv for gv in reference.gating_variables}
+    assert actual_gates.keys() == expected_gates.keys(), (
+        f"gate names differ: actual={set(actual_gates)} expected={set(expected_gates)}"
+    )
+    for V in (-65.0, -30.0, 0.0, 30.0):
+        for name, gv_a in actual_gates.items():
+            gv_e = expected_gates[name]
+            assert gv_a.alpha(V, 0.0) == pytest.approx(gv_e.alpha(V, 0.0)), (
+                f"gate {name!r} alpha differs at V={V}"
+            )
+            assert gv_a.beta(V, 0.0) == pytest.approx(gv_e.beta(V, 0.0)), (
+                f"gate {name!r} beta differs at V={V}"
+            )
+
+
+def _channel_by_name(neuron: Neuron, name: str) -> IonChannel:
+    """Return the unique channel with ``name`` on ``neuron``.
+
+    Raises:
+        KeyError: If no channel with that name is present.
+    """
+    by_name = {ch.name: ch for ch in neuron.channels}
+    return by_name[name]
 
 
 # ---------------------------------------------------------------------------
@@ -213,29 +249,29 @@ def test_cortical_pyramidal_uses_pospischil_na_factory() -> None:
     (#327 depol-block recovery) — no factory wrapping needed.
     """
     neuron = NEURON_PRESETS[CORTICAL_PYRAMIDAL]()
-    assert neuron.na_channel_factory is make_nav12_channel
+    _kinetics_match(_channel_by_name(neuron, "Na"), make_nav12_channel)
 
 
 def test_cortical_pyramidal_uses_mainen_sejnowski_kv_via_channels() -> None:
     """Cortical Pyramidal includes Mainen-Sejnowski Kv via channels list (#311)."""
     neuron = NEURON_PRESETS[CORTICAL_PYRAMIDAL]()
-    channel_names = {ch.name for ch in neuron.additional_channels}
+    channel_names = {ch.name for ch in neuron.channels}
     assert "Kv" in channel_names
-    # Pospischil K is no longer the primary K channel — replaced by M-S Kv as
-    # the sole delayed rectifier (g_K=0).
-    assert neuron.g_K == 0.0
+    # M-S Kv is the sole delayed rectifier — the HH-style core "K" channel
+    # is omitted from the channels list entirely (issue #311 / #320).
+    assert "K" not in channel_names
 
 
 def test_fsi_uses_nav11_factory() -> None:
     """FSI preset wires the Nav1.1-flavoured Na⁺ channel factory (issue #231)."""
     neuron = NEURON_PRESETS[FAST_SPIKING_INTERNEURON]()
-    assert neuron.na_channel_factory is make_nav11_channel
+    _kinetics_match(_channel_by_name(neuron, "Na"), make_nav11_channel)
 
 
 def test_fsi_uses_pospischil_k_factory() -> None:
     """FSI preset wires the Pospischil K⁺ channel factory (issue #231)."""
     neuron = NEURON_PRESETS[FAST_SPIKING_INTERNEURON]()
-    assert neuron.k_channel_factory is make_pospischil_k_channel
+    _kinetics_match(_channel_by_name(neuron, "K"), make_pospischil_k_channel)
 
 
 def test_ca1_uses_nav12_factory() -> None:
@@ -245,25 +281,25 @@ def test_ca1_uses_nav12_factory() -> None:
     (#328 depol-block recovery) — no factory wrapping needed.
     """
     neuron = NEURON_PRESETS[CA1_PYRAMIDAL]()
-    assert neuron.na_channel_factory is make_nav12_channel
+    _kinetics_match(_channel_by_name(neuron, "Na"), make_nav12_channel)
 
 
 def test_ca1_uses_pospischil_k_factory() -> None:
     """CA1 preset wires the Pospischil K⁺ channel factory (issue #231)."""
     neuron = NEURON_PRESETS[CA1_PYRAMIDAL]()
-    assert neuron.k_channel_factory is make_pospischil_k_channel
+    _kinetics_match(_channel_by_name(neuron, "K"), make_pospischil_k_channel)
 
 
 def test_thalamic_relay_uses_mh92_na_factory() -> None:
     """Thalamic Relay preset wires the McCormick-Huguenard Na⁺ factory (issue #241)."""
     neuron = NEURON_PRESETS[THALAMIC_RELAY]()
-    assert neuron.na_channel_factory is make_thalamic_relay_na_channel
+    _kinetics_match(_channel_by_name(neuron, "Na"), make_thalamic_relay_na_channel)
 
 
 def test_thalamic_relay_uses_mh92_k_factory() -> None:
     """Thalamic Relay preset wires the McCormick-Huguenard K⁺ factory (issue #241)."""
     neuron = NEURON_PRESETS[THALAMIC_RELAY]()
-    assert neuron.k_channel_factory is make_thalamic_relay_k_channel
+    _kinetics_match(_channel_by_name(neuron, "K"), make_thalamic_relay_k_channel)
 
 
 def test_thalamic_relay_t_ref_is_mccormick_huguenard_recording_temp() -> None:
@@ -383,7 +419,7 @@ def test_trn_uses_huguenard_na_factory() -> None:
     Na⁺ kinetics (VT = −67 mV, recorded at 36 °C) are used instead of the
     default HH52 squid axon kinetics.
     """
-    assert NEURON_PRESETS[TRN]().na_channel_factory is make_trn_na_channel
+    _kinetics_match(_channel_by_name(NEURON_PRESETS[TRN](), "Na"), make_trn_na_channel)
 
 
 def test_trn_uses_huguenard_k_factory() -> None:
@@ -393,7 +429,7 @@ def test_trn_uses_huguenard_k_factory() -> None:
     K⁺ kinetics (VT = −67 mV, recorded at 36 °C) are used instead of the
     default HH52 squid axon kinetics.
     """
-    assert NEURON_PRESETS[TRN]().k_channel_factory is make_trn_k_channel
+    _kinetics_match(_channel_by_name(NEURON_PRESETS[TRN](), "K"), make_trn_k_channel)
 
 
 def test_trn_t_ref_is_huguenard_recording_temp() -> None:
@@ -422,7 +458,7 @@ def test_trn_includes_ikca_channel() -> None:
     ``test_trn_step_release_produces_hp92_rebound_burst``.
     """
     neuron = NEURON_PRESETS[TRN]()
-    ikca_channels = [c for c in neuron.additional_channels if c.name == "KCa"]
+    ikca_channels = [c for c in neuron.channels if c.name == "KCa"]
     assert len(ikca_channels) == 1, (
         f"TRN preset must include exactly one IKCa channel, found {len(ikca_channels)}"
     )
@@ -444,7 +480,7 @@ def test_trn_uses_trn_icat_factory() -> None:
     cosh-shaped tau — a >15× difference.
     """
     neuron = NEURON_PRESETS[TRN]()
-    icat_channels = [c for c in neuron.additional_channels if c.name == "CaT"]
+    icat_channels = [c for c in neuron.channels if c.name == "CaT"]
     assert len(icat_channels) == 1, (
         f"TRN preset must include exactly one CaT channel; found {len(icat_channels)}"
     )
@@ -473,7 +509,9 @@ def test_purkinje_uses_dschutter_bower_na_factory() -> None:
     used instead of the default HH52 squid axon kinetics, which applied a
     ~5.2× Q10 overcorrection inappropriate for a mammalian Purkinje cell.
     """
-    assert NEURON_PRESETS[PURKINJE]().na_channel_factory is make_purkinje_na_channel
+    _kinetics_match(
+        _channel_by_name(NEURON_PRESETS[PURKINJE](), "Na"), make_purkinje_na_channel
+    )
 
 
 def test_purkinje_uses_dschutter_bower_k_factory() -> None:
@@ -482,7 +520,9 @@ def test_purkinje_uses_dschutter_bower_k_factory() -> None:
     Verifies that Traub-Miles kinetics (VT = −58 mV, recorded at 32 °C) are
     used instead of the default HH52 squid axon kinetics.
     """
-    assert NEURON_PRESETS[PURKINJE]().k_channel_factory is make_purkinje_k_channel
+    _kinetics_match(
+        _channel_by_name(NEURON_PRESETS[PURKINJE](), "K"), make_purkinje_k_channel
+    )
 
 
 def test_purkinje_t_ref_is_dschutter_bower_recording_temp() -> None:
@@ -502,7 +542,7 @@ def test_purkinje_has_nap_channel() -> None:
     pacemaking range and amplifies subthreshold depolarizations.
     Ref: Raman & Bean (1999), J. Neurosci. 19:4663.
     """
-    channel_names = [ch.name for ch in NEURON_PRESETS[PURKINJE]().additional_channels]
+    channel_names = [ch.name for ch in NEURON_PRESETS[PURKINJE]().channels]
     assert "NaP" in channel_names
 
 
@@ -516,7 +556,7 @@ def test_purkinje_has_nar_channel() -> None:
     intrinsic tonic spiking.
     Ref: Raman & Bean (1997), Neuron 19:881.
     """
-    channel_names = [ch.name for ch in NEURON_PRESETS[PURKINJE]().additional_channels]
+    channel_names = [ch.name for ch in NEURON_PRESETS[PURKINJE]().channels]
     assert "NaR" in channel_names
 
 
@@ -528,7 +568,7 @@ def test_purkinje_nap_conductance_physiological() -> None:
     persistent inward currents.
     """
     nap_channels = [
-        ch for ch in NEURON_PRESETS[PURKINJE]().additional_channels if ch.name == "NaP"
+        ch for ch in NEURON_PRESETS[PURKINJE]().channels if ch.name == "NaP"
     ]
     assert len(nap_channels) == 1
     assert 0.01 <= nap_channels[0].g_max <= 0.5
@@ -553,7 +593,7 @@ def test_purkinje_nar_conductance_physiological() -> None:
     Ref: Raman & Bean (1997), Neuron 19:881.
     """
     nar_channels = [
-        ch for ch in NEURON_PRESETS[PURKINJE]().additional_channels if ch.name == "NaR"
+        ch for ch in NEURON_PRESETS[PURKINJE]().channels if ch.name == "NaR"
     ]
     assert len(nar_channels) == 1
     assert 0.01 <= nar_channels[0].g_max <= 0.5
@@ -566,7 +606,7 @@ def test_purkinje_has_ih_channel() -> None:
     enabling spontaneous autonomous pacemaking without external current.
     Ref: Destexhe et al. (1993), J. Neurophysiol. 70:1385.
     """
-    channel_names = [ch.name for ch in NEURON_PRESETS[PURKINJE]().additional_channels]
+    channel_names = [ch.name for ch in NEURON_PRESETS[PURKINJE]().channels]
     assert "h" in channel_names
 
 
@@ -577,9 +617,7 @@ def test_purkinje_ih_conductance_physiological() -> None:
     to drive recovery from the post-AP AHP; values above 5.0 dominate
     membrane current and produce unrealistically fast pacemaking.
     """
-    ih_channels = [
-        ch for ch in NEURON_PRESETS[PURKINJE]().additional_channels if ch.name == "h"
-    ]
+    ih_channels = [ch for ch in NEURON_PRESETS[PURKINJE]().channels if ch.name == "h"]
     assert len(ih_channels) == 1
     assert 0.1 <= ih_channels[0].g_max <= 5.0
 
@@ -597,7 +635,7 @@ def test_dopaminergic_uses_komendantov_na_factory() -> None:
     Q10 overcorrection inappropriate for an SNc dopaminergic neuron.
     """
     neuron = NEURON_PRESETS[DOPAMINERGIC]()
-    assert neuron.na_channel_factory is make_dopaminergic_na_channel
+    _kinetics_match(_channel_by_name(neuron, "Na"), make_dopaminergic_na_channel)
 
 
 def test_dopaminergic_uses_komendantov_k_factory() -> None:
@@ -607,7 +645,7 @@ def test_dopaminergic_uses_komendantov_k_factory() -> None:
     used instead of the HH52 squid axon kinetics.
     """
     neuron = NEURON_PRESETS[DOPAMINERGIC]()
-    assert neuron.k_channel_factory is make_dopaminergic_k_channel
+    _kinetics_match(_channel_by_name(neuron, "K"), make_dopaminergic_k_channel)
 
 
 def test_dopaminergic_t_ref_is_komendantov_recording_temp() -> None:

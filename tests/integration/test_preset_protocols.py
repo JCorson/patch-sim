@@ -61,8 +61,11 @@ _QUIESCENT_PRESET_NAMES = [
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-_CURRENT_CLAMP_REQUIRED = {"time", "voltage", "INa", "IK", "INaL", "IKL", "Itotal"}
-_VOLTAGE_CLAMP_REQUIRED = {"time", "voltage", "Itotal", "INa", "IK", "INaL", "IKL"}
+# Every preset has a fast Na current and the integrator always emits Itotal.
+# Other ion-channel columns (IK, IKL, INaL, etc.) vary by preset — for example
+# Cortical Pyramidal and STN omit the HH-style core K channel since #320.
+_CURRENT_CLAMP_REQUIRED = {"time", "voltage", "INa", "Itotal"}
+_VOLTAGE_CLAMP_REQUIRED = {"time", "voltage", "Itotal", "INa"}
 
 
 def _count_action_potentials(voltage: np.ndarray, threshold: float = 0.0) -> int:
@@ -341,9 +344,12 @@ def test_iv_curve_preset(preset_name: str) -> None:
         assert np.isfinite(result["INa"]).all(), (
             f"{preset_name} sweep {i}: INa contains non-finite values"
         )
-        assert np.isfinite(result["IK"]).all(), (
-            f"{preset_name} sweep {i}: IK contains non-finite values"
-        )
+        # Some presets (e.g. Cortical Pyramidal, STN) omit the HH-style core K
+        # channel since #320 — only assert finiteness when the column exists.
+        if "IK" in (result.dtype.names or ()):
+            assert np.isfinite(result["IK"]).all(), (
+                f"{preset_name} sweep {i}: IK contains non-finite values"
+            )
 
 
 # ---------------------------------------------------------------------------

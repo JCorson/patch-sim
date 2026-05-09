@@ -11,8 +11,8 @@ from patch_sim.channels import (
     make_ikca_channel,
     make_ikv31_channel,
     make_inap_channel,
+    make_k_leak_channel,
     make_katp_channel,
-    make_stn_k_channel,
     make_stn_na_channel,
 )
 from patch_sim.constants import (
@@ -74,17 +74,17 @@ def make_stn() -> Neuron:
         during the AHP and drives slow depolarisation back to threshold,
         sustaining regular autonomous firing.  v_rest=−60 mV is the simulation
         starting point; this cell has no stable zero-current resting potential.
-        g_NaL=0 / g_KL=0.04 mS/cm²: a balanced Na+K leak that pins I_total=0
-        at v_rest prevents pacemaking; the pure-K⁺ leak lets the oscillator
-        operate freely.
+        Only a pure-K⁺ leak (g_KL=0.04 mS/cm²) is wired in; the Na-leak channel
+        is omitted entirely so that I_total at rest is not pinned to zero,
+        which lets the pacemaking oscillator operate freely.
 
     IKv3.1 delayed rectifier:
         IKv3.1 (Erisir 1999, V½ = −12.4 mV, n², τ_floor=0.2 ms) is the sole
         delayed rectifier.  Wigmore & Lacey (2000) directly characterised the
         dominant somatic K current in rat STN as Kv3.1-like (V½ near −13 mV,
         threshold ≈ −38 mV) and concluded it enables high-frequency spike
-        trains.  The Otsuka K factory is retained for structural symmetry but
-        set to g_K=0.
+        trains.  The HH-style core ``"K"`` channel is omitted from the
+        preset's ``channels`` tuple entirely (#320).
 
     Burst mode (conditional):
         Prominent ICaT (g=5.0 mS/cm²) supports post-inhibitory rebound bursts
@@ -139,18 +139,16 @@ def make_stn() -> Neuron:
         IKCa/INaP/Ih/K_ATP auxiliary channels, and tuned CalciumDynamics.
     """
     return Neuron(
-        g_Na=14.0,
-        g_K=0.0,
         v_rest=-60.0,
         Na_out=145.0,
         K_out=5.0,
-        g_NaL=0.0,
-        g_KL=0.04,
         Q10=1.0,
         T_ref=308.15,
-        na_channel_factory=make_stn_na_channel,
-        k_channel_factory=make_stn_k_channel,
-        additional_channels=(
+        channels=(
+            make_stn_na_channel(g_max=14.0),
+            # K-leak only — no Na-leak, no HH-style core K (Kv3.1 is the
+            # delayed rectifier).  See preset docstring for rationale.
+            make_k_leak_channel(g_max=0.04),
             make_icat_channel(g_max=5.0),
             make_ical_channel(g_max=0.5),
             make_ika_channel(g_max=3.0),

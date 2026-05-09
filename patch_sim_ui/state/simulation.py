@@ -28,8 +28,8 @@ from patch_sim.constants import CURRENT_CLAMP
 from patch_sim_ui import constants, presets
 from patch_sim_ui.api import traces
 from patch_sim_ui.channels import (
-    ADDITIONAL_CURRENT_FIELD_MAP,
-    ADDITIONAL_GATING_FIELD_MAP,
+    CURRENT_FIELD_MAP,
+    GATING_FIELD_MAP,
 )
 from patch_sim_ui.plotting import (
     TraceVisibility,
@@ -280,8 +280,8 @@ class SimulationState(rx.State):
         trace_map = compute_trace_visibility_map(
             current_sweeps=self._current_sweeps,
             clamp_mode=self._figure_clamp_mode,
-            additional_current_field_map=ADDITIONAL_CURRENT_FIELD_MAP,
-            additional_gating_field_map=ADDITIONAL_GATING_FIELD_MAP,
+            additional_current_field_map=CURRENT_FIELD_MAP,
+            additional_gating_field_map=GATING_FIELD_MAP,
             stored_traces=self.stored_traces,
         )
         hidden: list[int] = []
@@ -335,8 +335,8 @@ class SimulationState(rx.State):
         trace_map = compute_trace_visibility_map(
             current_sweeps=self._current_sweeps,
             clamp_mode=self._figure_clamp_mode,
-            additional_current_field_map=ADDITIONAL_CURRENT_FIELD_MAP,
-            additional_gating_field_map=ADDITIONAL_GATING_FIELD_MAP,
+            additional_current_field_map=CURRENT_FIELD_MAP,
+            additional_gating_field_map=GATING_FIELD_MAP,
             stored_traces=self.stored_traces,
         )
         hidden: list[int] = []

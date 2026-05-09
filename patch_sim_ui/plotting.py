@@ -10,6 +10,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from patch_sim_ui.channels import CHANNELS
 from patch_sim_ui.constants import (
     CC_VOLTAGE_COLOR,
     CHANNEL_COLORS,
@@ -21,6 +22,11 @@ from patch_sim_ui.constants import (
     VOLTAGE_CLAMP,
 )
 from patch_sim_ui.sweep import Sweep
+
+# Pre-built ``column_name → "I_<current_key>"`` lookup so traces and hover
+# tables get their display labels from the registry rather than hand-rolled
+# string surgery.  Falls back to ``f"I_{column_name}"`` for unknown keys.
+_CURRENT_LABELS: dict[str, str] = {ch.column_name: ch.current_label for ch in CHANNELS}
 
 # Maximum number of hover carrier points; keeps tooltip HTML build time short.
 _MAX_HOVER_POINTS = 2000
@@ -57,38 +63,26 @@ _ANALYSIS_FIGURE_LAYOUT: dict = {
 class TraceVisibility:
     """Visibility flags for every plotted trace.
 
-    All classic flags default to ``True`` so callers only need to supply
-    the flags they want to override.  Additional-channel dicts are empty
-    by default, which ``build_figure`` and ``_build_hover_tables`` treat as
-    "show all".
+    All bool flags default to ``True`` so callers only need to supply the
+    flags they want to override.  Channel-current and channel-gating dicts
+    are empty by default, which ``build_figure`` and
+    ``_build_hover_tables`` treat as "show all".
 
     Attributes:
         voltage: Show the membrane voltage trace (Current Clamp).
         total_current: Show the summed ion current trace (Voltage Clamp).
-        sodium_current: Show I_Na.
-        potassium_current: Show I_K.
-        na_leak_current: Show I_NaL (Na⁺ leak).
-        k_leak_current: Show I_KL (K⁺ leak).
-        potassium_activation: Show gating variable n.
-        sodium_activation: Show gating variable m.
-        sodium_inactivation: Show gating variable h.
-        additional_currents: Visibility flags for extra channel currents,
-            keyed by channel name.
-        additional_gating: Visibility flags for extra gating variables,
-            keyed by variable name.
+        channel_currents: Visibility flags for per-channel currents, keyed
+            by simulation column name (``"INa"``, ``"IK"``, ``"INaL"``,
+            ``"IKL"``, ``"Ih"``, ``"IKv31"``, …).
+        channel_gating: Visibility flags for per-channel gating variables,
+            keyed by gate name (``"n"``, ``"m"``, ``"h"``, ``"sNa12"``,
+            ``"r"``, ``"a"``, …).
     """
 
     voltage: bool = True
     total_current: bool = True
-    sodium_current: bool = True
-    potassium_current: bool = True
-    na_leak_current: bool = True
-    k_leak_current: bool = True
-    potassium_activation: bool = True
-    sodium_activation: bool = True
-    sodium_inactivation: bool = True
-    additional_currents: dict[str, bool] = field(default_factory=dict)
-    additional_gating: dict[str, bool] = field(default_factory=dict)
+    channel_currents: dict[str, bool] = field(default_factory=dict)
+    channel_gating: dict[str, bool] = field(default_factory=dict)
 
 
 def _build_hover_tables(
@@ -144,7 +138,6 @@ def _build_hover_tables(
 
     def _build_rows_html(
         cols: list[tuple[str, str, str]],
-        additional_attr: str,
         fmt_spec: str,
     ) -> list[str]:
         """Build per-time-point HTML for one subplot given column specs.
@@ -157,12 +150,12 @@ def _build_hover_tables(
         ``n_pts``, ``n_sweeps``, ``labels``, and ``_fmt_table``.
 
         Args:
-            cols: Column spec triples ``(header_label, source, data_key)``.
-                ``source`` is either ``"classic"`` (attribute on ``Sweep``) or
-                ``"additional"`` (looked up via ``additional_attr``).
-            additional_attr: Name of the ``Sweep`` dict attribute used for
-                ``"additional"`` columns (e.g. ``"additional_currents"`` or
-                ``"additional_gating"``).
+            cols: Column spec triples ``(header_label, attr, key)``.
+                ``attr`` is either a ``Sweep`` scalar attribute (``"voltage"``,
+                ``"total_current"``) or the name of a ``Sweep`` dict attribute
+                (``"channel_currents"``, ``"channel_gating"``).  When ``attr``
+                names a dict, ``key`` is the lookup key; plain attributes use
+                an empty ``key``.
             fmt_spec: Python format spec for numeric values (e.g. ``".2f"``).
 
         Returns:
@@ -176,14 +169,14 @@ def _build_hover_tables(
         # Downsampling via fancy indexing is done once per column rather than
         # per time-point, eliminating getattr/dict.get from the inner loop.
         col_arrays: list[np.ndarray] = []
-        for _, src, key in cols:
-            if src == "classic":
-                raw = np.array([getattr(s, key) for s in current_sweeps], dtype=float)
-            else:
+        for _, attr, key in cols:
+            if key:
                 raw = np.array(
-                    [getattr(s, additional_attr).get(key, []) for s in current_sweeps],
+                    [getattr(s, attr).get(key, []) for s in current_sweeps],
                     dtype=float,
                 )
+            else:
+                raw = np.array([getattr(s, attr) for s in current_sweeps], dtype=float)
             col_arrays.append(raw[:, indices])  # (n_sweeps, n_hover_pts)
         # Stack and transpose to (n_hover_pts, n_sweeps, n_cols) for time-first
         # iteration — each slice data_t[t] is (n_sweeps, n_cols).
@@ -203,40 +196,33 @@ def _build_hover_tables(
         return _fmt_table(header, row_groups)
 
     # --- Response subplot (row 1) ---
-    # Col spec: (header_label, source, data_key)
+    # Col spec: (header_label, attr, key).  Per-channel currents live in the
+    # ``channel_currents`` dict on ``Sweep`` keyed by simulation column name;
+    # a key absent from the dict (e.g. ``"IK"`` on Cortical Pyramidal which
+    # omits the ``"K"`` channel since #320) is silently skipped here.
     if is_vc:
         resp_cols: list[tuple[str, str, str]] = []
-        if visibility.total_current:
-            resp_cols.append(("I_total", "classic", "total_current"))
-        if visibility.sodium_current:
-            resp_cols.append(("I_Na", "classic", "sodium_current"))
-        if visibility.potassium_current:
-            resp_cols.append(("I_K", "classic", "potassium_current"))
-        if visibility.na_leak_current:
-            resp_cols.append(("I_NaL", "classic", "na_leak_current"))
-        if visibility.k_leak_current:
-            resp_cols.append(("I_KL", "classic", "k_leak_current"))
+        first = current_sweeps[0]
+        if visibility.total_current and first.total_current:
+            resp_cols.append(("I_total", "total_current", ""))
         for ch_name in add_current_keys:
-            if visibility.additional_currents.get(ch_name, True):
-                resp_cols.append((f"I_{ch_name}", "additional", ch_name))
+            if visibility.channel_currents.get(ch_name, True):
+                label = _CURRENT_LABELS.get(ch_name, f"I_{ch_name}")
+                resp_cols.append((label, "channel_currents", ch_name))
     else:
-        resp_cols = [("V (mV)", "classic", "voltage")]
+        resp_cols = [("V (mV)", "voltage", "")]
 
-    resp_html = _build_rows_html(resp_cols, "additional_currents", ".2f")
+    resp_html = _build_rows_html(resp_cols, ".2f")
 
     # --- Gating subplot (row 2) ---
+    # Per-channel gates live in ``channel_gating`` keyed by gate name.
+    # Gates absent from the active preset are simply not in the dict.
     gating_cols: list[tuple[str, str, str]] = []
-    if visibility.potassium_activation:
-        gating_cols.append(("n", "classic", "potassium_activation"))
-    if visibility.sodium_activation:
-        gating_cols.append(("m", "classic", "sodium_activation"))
-    if visibility.sodium_inactivation:
-        gating_cols.append(("h", "classic", "sodium_inactivation"))
     for gv_name in add_gating_keys:
-        if visibility.additional_gating.get(gv_name, True):
-            gating_cols.append((gv_name, "additional", gv_name))
+        if visibility.channel_gating.get(gv_name, True):
+            gating_cols.append((gv_name, "channel_gating", gv_name))
 
-    gating_html = _build_rows_html(gating_cols, "additional_gating", ".3f")
+    gating_html = _build_rows_html(gating_cols, ".3f")
 
     # --- Stimulus subplot (row 3) ---
     stim_col_label = "Cmd (mV)" if is_vc else "Stim"
@@ -272,14 +258,16 @@ def compute_trace_visibility_map(
     Args:
         current_sweeps: Latest simulation result sweeps.
         clamp_mode: Active UI clamp mode (CURRENT_CLAMP or VOLTAGE_CLAMP).
-        additional_current_field_map: Optional mapping from additional-current
-            sweep keys (e.g. ``"Ih"``) to ``show_*`` field names
-            (e.g. ``"show_ih_current"``).  Keys absent from the map advance
-            the index counter but are not recorded.
-        additional_gating_field_map: Optional mapping from additional-gating
-            sweep keys (e.g. ``"r"``) to ``show_*`` field names
-            (e.g. ``"show_ih_gating"``).  Keys absent from the map advance
-            the index counter but are not recorded.
+        additional_current_field_map: Optional mapping from per-channel
+            current keys (e.g. ``"INa"``, ``"Ih"``) to ``show_*`` field names
+            (e.g. ``"show_na_current"``, ``"show_ih_current"``).  Keys
+            absent from the map advance the index counter but are not
+            recorded.
+        additional_gating_field_map: Optional mapping from gating-variable
+            names (e.g. ``"n"``, ``"r"``, ``"sNa12"``) to ``show_*`` field
+            names (e.g. ``"show_k_gating"``, ``"show_ih_gating"``).  Keys
+            absent from the map advance the index counter but are not
+            recorded.
         stored_traces: Oscilloscope-style stored reference traces.  Always
             visible; their indices are not recorded in the result map.
 
@@ -309,24 +297,20 @@ def compute_trace_visibility_map(
         if sweep.clamp_mode == CURRENT_CLAMP:
             _map("show_voltage")
         else:
-            # Voltage Clamp: matches _add_vc_currents insertion order.
+            # Voltage Clamp: matches _add_vc_currents insertion order — the
+            # total current followed by every channel in ``channel_currents``.
             _map("show_total_current")
-            _map("show_sodium_current")
-            _map("show_potassium_current")
-            _map("show_na_leak_current")
-            _map("show_k_leak_current")
-            for ch_name in sweep.additional_currents:
+            for ch_name in sweep.channel_currents:
                 field = add_curr.get(ch_name)
                 if field:
                     _map(field)
                 else:
                     _skip()
 
-        # Gating row is always present in both modes.
-        _map("show_potassium_activation")
-        _map("show_sodium_activation")
-        _map("show_sodium_inactivation")
-        for gv_name in sweep.additional_gating:
+        # Gating row is always present in both modes.  Every gate that the
+        # active preset's channels produce maps to its joint per-channel
+        # ``show_<id>_gating`` toggle via ``GATING_FIELD_MAP``.
+        for gv_name in sweep.channel_gating:
             field = add_gating.get(gv_name)
             if field:
                 _map(field)
@@ -394,14 +378,14 @@ def build_figure(
     Returns:
         A Plotly Figure with response, gating, and stimulus subplots.
     """
-    # Collect additional keys present in current sweeps.
+    # Collect per-channel keys present in current sweeps.
     add_gating_keys: list[str] = []
     add_current_keys: list[str] = []
     for sweep in current_sweeps:
-        for key in sweep.additional_gating:
+        for key in sweep.channel_gating:
             if key not in add_gating_keys:
                 add_gating_keys.append(key)
-        for key in sweep.additional_currents:
+        for key in sweep.channel_currents:
             if key not in add_current_keys:
                 add_current_keys.append(key)
 
@@ -502,8 +486,9 @@ def build_figure(
     ) -> None:
         """Add Voltage Clamp current traces for one sweep to the figure.
 
-        Iterates over the four classic current channels and any additional
-        channels, calling ``_scatter`` for each.
+        Plots the summed total current followed by every per-channel
+        current present on the sweep, in the order they appear in
+        ``sweep.channel_currents``.
 
         Args:
             sweep: The sweep whose current data to plot.
@@ -517,39 +502,32 @@ def build_figure(
             sweep_index: Index of the sweep this trace belongs to.  ``-1``
                 marks non-sweep traces (saved, stored, carrier).
         """
-        classic_defs: list[tuple[str, str, int | None]] = [
-            ("total_current", "I_total", _TOTAL_CURRENT_LINE_WIDTH),
-            ("sodium_current", "I_Na", None),
-            ("potassium_current", "I_K", None),
-            ("na_leak_current", "I_NaL", None),
-            ("k_leak_current", "I_KL", None),
-        ]
-        for attr, label, width in classic_defs:
-            vis = getattr(visibility, attr) if visibility is not None else True
-            _scatter(
-                sweep.time,
-                getattr(sweep, attr),
-                f"{pfx}{label}",
-                1,
-                CHANNEL_COLORS.get(attr),
-                visible=vis,
-                width=width,
-                dash=dash,
-                hoverinfo=hoverinfo,
-                showlegend=showlegend,
-                legend_ref=legend_ref,
-                sweep_index=sweep_index,
-            )
-        for ch_name, vals in sweep.additional_currents.items():
+        total_vis = visibility.total_current if visibility is not None else True
+        _scatter(
+            sweep.time,
+            sweep.total_current,
+            f"{pfx}I_total",
+            1,
+            CHANNEL_COLORS.get("total_current"),
+            visible=total_vis,
+            width=_TOTAL_CURRENT_LINE_WIDTH,
+            dash=dash,
+            hoverinfo=hoverinfo,
+            showlegend=showlegend,
+            legend_ref=legend_ref,
+            sweep_index=sweep_index,
+        )
+        for ch_name, vals in sweep.channel_currents.items():
             vis = (
-                visibility.additional_currents.get(ch_name, True)
+                visibility.channel_currents.get(ch_name, True)
                 if visibility is not None
                 else True
             )
+            label = _CURRENT_LABELS.get(ch_name, f"I_{ch_name}")
             _scatter(
                 sweep.time,
                 vals,
-                f"{pfx}I_{ch_name}",
+                f"{pfx}{label}",
                 1,
                 CHANNEL_COLORS.get(ch_name),
                 visible=vis,
@@ -604,28 +582,12 @@ def build_figure(
             )
 
         # Gating row is always present; traces are always added with their
-        # visibility flags so the layout never changes on toggle.
-        # All gating traces use bare variable names regardless of sweep so that
-        # the legend always shows "n", "m", "h" — never a stimulus prefix.
-        for gv_attr, gv_label in [
-            ("potassium_activation", "n"),
-            ("sodium_activation", "m"),
-            ("sodium_inactivation", "h"),
-        ]:
-            _scatter(
-                t,
-                getattr(sweep, gv_attr),
-                gv_label,
-                gating_row,
-                GATING_VAR_COLORS.get(gv_label),
-                visible=getattr(visibility, gv_attr),
-                hoverinfo=hi,
-                showlegend=sl,
-                legend_ref="legend2",
-                sweep_index=sweep_idx,
-            )
-        for gv_name, gv_vals in sweep.additional_gating.items():
-            vis = visibility.additional_gating.get(gv_name, True)
+        # visibility flags so the layout never changes on toggle.  All
+        # gating traces use bare variable names regardless of sweep so the
+        # legend always shows "n", "m", "h", "sNa12", … — never a stimulus
+        # prefix.
+        for gv_name, gv_vals in sweep.channel_gating.items():
+            vis = visibility.channel_gating.get(gv_name, True)
             _scatter(
                 t,
                 gv_vals,
@@ -705,11 +667,19 @@ def build_figure(
         )
 
         # Carrier y values mirror the first sweep so autorange is unaffected.
+        # Pick the first non-empty gating attribute so presets that omit the
+        # ``n`` gate (e.g. Cortical Pyramidal, STN since #320) still produce
+        # a valid carrier; fall back to zeros if no gating column exists.
         if is_vc:
             carrier_y1 = np.asarray(first.total_current)[indices]
         else:
             carrier_y1 = np.asarray(first.voltage)[indices]
-        carrier_y_gating = np.asarray(first.potassium_activation)[indices]
+        for _gating_data in first.channel_gating.values():
+            if _gating_data:
+                carrier_y_gating = np.asarray(_gating_data)[indices]
+                break
+        else:
+            carrier_y_gating = np.zeros_like(carrier_x)
         carrier_y_stim = np.asarray(first.stimulus)[indices]
 
         transparent = dict(color="rgba(0,0,0,0)")

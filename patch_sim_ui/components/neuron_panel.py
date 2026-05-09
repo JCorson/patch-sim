@@ -3,18 +3,18 @@
 import reflex as rx
 
 from patch_sim.presets import NEURON_PRESET_NAMES
-from patch_sim_ui.channels import ADDITIONAL_CHANNELS
+from patch_sim_ui.channels import CHANNELS
 from patch_sim_ui.constants import PARAM_RANGES
 from patch_sim_ui.state.neuron import NeuronState
 
 
-def _additional_channel_row(
+def _channel_row(
     label: str,
     g_var: rx.Var,
     g_setter,
     param_key: str,
 ) -> rx.Component:
-    """Render an auxiliary-channel label + conductance slider row.
+    """Render a channel label + conductance slider row.
 
     Per the design, channel composition is preset-baked: the panel
     only shows rows for channels the active preset includes, so an
@@ -173,7 +173,7 @@ _ADDITIONAL_CHANNEL_ROW_SPECS = [
         getattr(NeuronState, f"set_{ch.g_max_field}"),
         ch.g_max_field,
     )
-    for ch in ADDITIONAL_CHANNELS
+    for ch in CHANNELS
 ]
 
 
@@ -188,49 +188,6 @@ def neuron_panel() -> rx.Component:
             on_change=NeuronState.load_neuron_preset,
             width="100%",
             size="2",
-        ),
-        rx.separator(),
-        rx.accordion.root(
-            rx.accordion.item(
-                header=rx.text(
-                    "Conductances (mS/cm²)",
-                    size="2",
-                    weight="bold",
-                    color="var(--gray-12)",
-                ),
-                content=rx.vstack(
-                    _param_row(
-                        "g_Na",
-                        NeuronState.g_Na,
-                        NeuronState.set_g_Na,
-                        *PARAM_RANGES["g_Na"],
-                    ),
-                    _param_row(
-                        "g_K",
-                        NeuronState.g_K,
-                        NeuronState.set_g_K,
-                        *PARAM_RANGES["g_K"],
-                    ),
-                    _param_row(
-                        "g_NaL",
-                        NeuronState.g_NaL,
-                        NeuronState.set_g_NaL,
-                        *PARAM_RANGES["g_NaL"],
-                    ),
-                    _param_row(
-                        "g_KL",
-                        NeuronState.g_KL,
-                        NeuronState.set_g_KL,
-                        *PARAM_RANGES["g_KL"],
-                    ),
-                    spacing="1",
-                    width="100%",
-                ),
-                value="conductances",
-            ),
-            collapsible=True,
-            variant="ghost",
-            width="100%",
         ),
         rx.separator(),
         rx.accordion.root(
@@ -331,7 +288,7 @@ def neuron_panel() -> rx.Component:
                 rx.accordion.root(
                     rx.accordion.item(
                         header=rx.text(
-                            "Additional Channels",
+                            "Channels",
                             size="2",
                             weight="bold",
                             color="var(--gray-12)",
@@ -340,9 +297,7 @@ def neuron_panel() -> rx.Component:
                             *[
                                 rx.cond(
                                     NeuronState.visible_channel_ids.contains(ch_id),
-                                    _additional_channel_row(
-                                        label, g_var, g_setter, param_key
-                                    ),
+                                    _channel_row(label, g_var, g_setter, param_key),
                                     rx.fragment(),
                                 )
                                 for ch_id, label, g_var, g_setter, param_key in (

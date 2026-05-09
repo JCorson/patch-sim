@@ -1,12 +1,14 @@
 """Tests for the current clamp simulation."""
 
+import dataclasses
+
 import numpy as np
 import pytest
 
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
 from patch_sim.constants import DOPAMINERGIC, PURKINJE, STN, TRN
-from patch_sim.neuron import Neuron
-from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS
+from patch_sim.neuron import Neuron  # noqa: F401  (used in type hints below)
+from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS, make_squid_giant_axon
 
 # Purkinje is a pacemaker with an UNSTABLE zero-current equilibrium at v_rest.
 # Starting from v_rest = −65 mV it drifts below threshold — the stability
@@ -78,7 +80,7 @@ def test_simulate_current_clamp_returns_structured_array(hh_model):
 def test_simulation_dynamics():
     """Test that the simulation shows expected dynamics."""
     # K_out=7.8 mM matches HH52 squid seawater; DEFAULT_K_OUT is 4.0 mM (mammalian).
-    custom_model = Neuron(K_out=7.8)
+    custom_model = make_squid_giant_axon()
 
     # Create current array for a 50ms simulation
     duration = 50  # ms
@@ -144,7 +146,7 @@ def test_simulate_current_clamp_with_non_zero_currents(current_amplitude: float)
     duration = 10  # ms
 
     # K_out=7.8 mM matches HH52 squid seawater; DEFAULT_K_OUT is 4.0 mM (mammalian).
-    custom_model = Neuron(K_out=7.8)
+    custom_model = make_squid_giant_axon()
     num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
 
     # Create constant current array for the given amplitude
@@ -201,7 +203,7 @@ def test_physiological_limits_and_action_potentials():
     # Bare Neuron() uses default HH52 squid giant axon kinetics.  Q10=1.0
     # disables temperature scaling so the kinetics match their original
     # parameterisation — this test exercises the HH52 model as published.
-    custom_model = Neuron(Q10=1.0)
+    custom_model = dataclasses.replace(make_squid_giant_axon(), Q10=1.0)
     num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
 
     ap_counts = []
@@ -250,7 +252,7 @@ def test_simulate_current_clamp_with_different_currents():
     dt = 1000.0 / SIM_SAMPLING_FREQ  # ms per step
 
     # Create a custom model for testing
-    custom_model = Neuron()
+    custom_model = make_squid_giant_axon()
 
     # Calculate the number of time steps
     num_time_steps = int(duration / dt) + 1
@@ -296,7 +298,7 @@ def test_simulate_current_clamp_with_different_currents():
 def test_simulation_time_from_current_waveform():
     """Test that simulation time is derived from the current waveform length."""
     dt = 1000.0 / SIM_SAMPLING_FREQ  # ms per step
-    custom_model = Neuron()
+    custom_model = make_squid_giant_axon()
 
     # Create a current waveform of specific length
     duration = 75.0  # ms

@@ -11,11 +11,11 @@ The standard technique blocks voltage-gated channels (TTX for Na⁺, TEA for K�
 so the recorded response reflects only the passive RC membrane rather than
 being contaminated by slow gating relaxations.
 
-This module simulates the same procedure: active conductances are zeroed
-(g_Na = g_K = 0, no auxiliary channels) and the resting potential is set to
-the leak equilibrium (E_L), so the step response is a clean single exponential.
-The resulting R_in, τ_m, and C_m match the set membrane parameters rather than
-the apparent (gating-contaminated) values from the full model.
+This module simulates the same procedure: only ungated (passive) channels are
+retained on a copy of the neuron, and the resting potential is set to the leak
+equilibrium (E_L) so the step response is a clean single exponential. The
+resulting R_in, τ_m, and C_m match the set membrane parameters rather than the
+apparent (gating-contaminated) values from the full model.
 
 Constants:
     MEMBRANE_TEST_CURRENT: Fixed step amplitude in µA/cm² (hyperpolarising).
@@ -33,7 +33,6 @@ from patch_sim.analysis.passive_properties import (
     analyze_passive_properties,
 )
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
-from patch_sim.electrochemistry import nernst_potential
 from patch_sim.neuron import Neuron
 from patch_sim.protocols.current import step_current
 
@@ -57,15 +56,17 @@ MEMBRANE_TEST_POST_MS: float = 10.0
 def run_membrane_test(neuron: Neuron) -> PassiveProperties | None:
     """Run a dedicated membrane test on the given neuron and extract passive properties.
 
-    Constructs a passive-only copy of the neuron (g_Na = g_K = 0, no auxiliary
-    channels, v_rest = E_L) to simulate the equivalent of pharmacological channel
-    block (TTX + TEA).  This ensures the step response is a clean single
-    exponential driven by the passive RC circuit, giving an accurate R_in, τ_m,
-    and C_m rather than values contaminated by K⁺ channel deactivation sag.
+    Constructs a passive-only copy of the neuron — only ungated channels are
+    retained, and ``v_rest`` is set to the leak equilibrium (E_L) — to simulate
+    the equivalent of pharmacological channel block (TTX + TEA).  This ensures
+    the step response is a clean single exponential driven by the passive RC
+    circuit, giving an accurate R_in, τ_m, and C_m rather than values
+    contaminated by K⁺ channel deactivation sag.
 
-    The passive copy preserves g_NaL, g_KL, C_m, ion concentrations, and
-    temperature from the original neuron so that R_in = 1/(g_NaL+g_KL) and
-    C_m match the configured membrane parameters exactly.
+    Passive channels are identified by ``ch.gating_variables == ()``; their
+    ``g_max`` (along with the neuron's ``C_m``, ion concentrations, and
+    temperature) is preserved so R_in = 1 / Σ g_max and C_m match the
+    configured membrane parameters.
 
     When ``neuron.area_cm2`` is set, the returned :class:`PassiveProperties`
     carries absolute MΩ / pF counterparts alongside the per-area density
@@ -73,50 +74,33 @@ def run_membrane_test(neuron: Neuron) -> PassiveProperties | None:
 
     Args:
         neuron: A fully configured :class:`~patch_sim.neuron.Neuron` instance.
-            Its g_NaL, g_KL, C_m, ion concentrations, and temperature are used;
-            active conductances (g_Na, g_K, auxiliary channels) are blocked.
-            ``neuron.area_cm2``, if set, is forwarded to
-            :func:`analyze_passive_properties` to populate absolute units.
+            Only its ungated channels survive the passive copy; gated channels
+            (Na, K, auxiliary) are blocked.  ``neuron.area_cm2``, if set, is
+            forwarded to :func:`analyze_passive_properties` to populate
+            absolute units.
 
     Returns:
         A :class:`~patch_sim.analysis.passive_properties.PassiveProperties`
         instance when extraction succeeds, or ``None`` when the analysis cannot
         converge (should not occur for a pure RC circuit).
     """
-    # Compute the effective leak equilibrium potential from the mixed Na+K leak.
-    # This is the weighted average of E_Na and E_K, which gives the zero-current
-    # voltage of the passive Na+K leak circuit: g_NaL*(V-E_Na) + g_KL*(V-E_K) = 0.
-    e_na = float(
-        nernst_potential(
-            z=1,
-            T=neuron.T,
-            ion_concentration_out=neuron.Na_out,
-            ion_concentration_in=neuron.Na_in,
+    # Effective leak equilibrium: weighted average of each passive channel's
+    # reversal potential.  This is the zero-current voltage of the passive
+    # circuit: Σ g_max_i * (V - E_i) = 0  →  V = Σ g_max_i * E_i / Σ g_max_i.
+    passive_channels = tuple(ch for ch in neuron.channels if not ch.gating_variables)
+    g_total = sum(ch.g_max for ch in passive_channels)
+    if g_total > 0:
+        e_l = (
+            sum(ch.g_max * ch.reversal_potential(neuron) for ch in passive_channels)
+            / g_total
         )
-    )
-    e_k = float(
-        nernst_potential(
-            z=1,
-            T=neuron.T,
-            ion_concentration_out=neuron.K_out,
-            ion_concentration_in=neuron.K_in,
-        )
-    )
-    g_total = neuron.g_NaL + neuron.g_KL
-    e_l = (
-        (neuron.g_NaL * e_na + neuron.g_KL * e_k) / g_total
-        if g_total > 0
-        else neuron.v_rest
-    )
+    else:
+        e_l = neuron.v_rest
 
-    # Passive-only neuron: g_Na = g_K = 0, no auxiliary channels.
-    # Equivalent to pharmacological channel block in a real experiment.
-    # channels=() guarantees a pure RC circuit regardless of which auxiliary
-    # channels the original neuron had.  g_NaL and g_KL are preserved so the
-    # passive RC response is driven by the mixed leak conductance.
-    passive_neuron = dataclasses.replace(
-        neuron, g_Na=0.0, g_K=0.0, v_rest=e_l, additional_channels=()
-    )
+    # Passive-only neuron: only ungated channels survive.  Equivalent to
+    # pharmacological channel block in a real experiment — guarantees a pure RC
+    # circuit regardless of which gated channels the original neuron carried.
+    passive_neuron = dataclasses.replace(neuron, channels=passive_channels, v_rest=e_l)
 
     total_ms = MEMBRANE_TEST_PRE_MS + MEMBRANE_TEST_STEP_MS + MEMBRANE_TEST_POST_MS
     stimulus = step_current(

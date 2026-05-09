@@ -1,10 +1,10 @@
-"""Additional ion channel registry for the patch_sim UI.
+"""Ion channel registry for the patch_sim UI.
 
-Each :class:`ChannelMeta` entry in :data:`ADDITIONAL_CHANNELS` is the single
-source of truth for one auxiliary channel — its label, field names, gating
-variables, slider range, and display colours.  All other modules derive their
-per-channel lists and dicts from this registry rather than maintaining
-parallel enumerations.
+Each :class:`ChannelMeta` entry in :data:`CHANNELS` is the single source of
+truth for one channel — its label, field names, gating variables, slider
+range, and display colours.  All other modules derive their per-channel
+lists and dicts from this registry rather than maintaining parallel
+enumerations.
 
 Adding a new channel requires only a single new :class:`ChannelMeta` entry
 here; all downstream lists and dicts are recomputed automatically.
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 @dataclass
 class ChannelMeta:
-    """Metadata for a single additional ion channel.
+    """Metadata for a single ion channel.
 
     Attributes:
         id: Lowercase identifier used as a field prefix, e.g. ``"ih"``.
@@ -73,21 +73,89 @@ class ChannelMeta:
         return f"I_{self.current_key}"
 
     @property
+    def column_name(self) -> str:
+        """Simulation result column name for this channel's current.
+
+        Mirrors :attr:`patch_sim.channels.IonChannel.current_name` — the
+        ``f"I{IonChannel.name}"`` convention used throughout the simulator.
+        Aux registry entries already encode the leading ``I`` (e.g.
+        ``current_key="Ih"`` for ``IonChannel.name="h"``); HH-classic core
+        entries store the bare channel name (e.g. ``current_key="Na"``) and
+        get the ``I`` prefix added here.
+
+        Returns:
+            Simulation column name, e.g. ``"INa"`` or ``"Ih"``.
+        """
+        if self.current_key.startswith("I") and self.current_key != "I":
+            return self.current_key
+        return f"I{self.current_key}"
+
+    @property
     def gating_label(self) -> str:
         """Visibility checkbox label for the gating variable trace(s).
 
+        Uses ``current_key`` (the bare channel identifier) rather than
+        enumerating each gate name, because some channels have
+        variant-specific extra gates (e.g. Na has the slow-inactivation
+        gate ``sNa12`` only when the active preset uses Pospischil Nav1.2)
+        — listing every possible gate here would mislead users about
+        which gates the active preset actually exposes.
+
         Returns:
-            Label string, e.g. ``"Ih gating (r)"``.
+            Label string, e.g. ``"Ih gating"`` or ``"Na gating"``.
         """
-        return f"{self.current_key} gating ({', '.join(self.gating_vars)})"
+        return f"{self.current_key} gating"
 
 
-#: Ordered registry of all additional (non-HH-classic) ion channels.
+#: Ordered registry of every ion channel exposed in the UI.
 #:
-#: This is the single source of truth for per-channel metadata.  All
-#: downstream dicts and field lists are derived from this tuple so that
-#: adding a channel requires only one new entry here.
-ADDITIONAL_CHANNELS: tuple[ChannelMeta, ...] = (
+#: Single source of truth for per-channel metadata; downstream dicts and
+#: field lists are derived from this tuple so that adding a channel
+#: requires only one new entry here.
+CHANNELS: tuple[ChannelMeta, ...] = (
+    # HH-classic core channels (per-preset kinetics; the slider only edits g_max).
+    ChannelMeta(
+        id="na",
+        current_key="Na",
+        label="Na (fast Na⁺)",
+        # ``m`` and ``h`` are the HH52 fast gates; ``sNa``/``sNa11``/
+        # ``sNa12``/``sNa_da`` are slow-inactivation gates added by the STN /
+        # Purkinje, Pospischil Nav1.1, Pospischil Nav1.2, and Dopaminergic
+        # variant factories respectively.  Only the gates produced by the
+        # active preset's Na factory appear in the simulation columns.
+        gating_vars=("m", "h", "sNa", "sNa11", "sNa12", "sNa_da"),
+        g_max_range=(0.0, 300.0, 1.0),
+        current_color="#ff7f0e",
+        gating_var_colors={"m": "#ff7f0e", "h": "#2ca02c"},
+    ),
+    ChannelMeta(
+        id="k",
+        current_key="K",
+        label="K (delayed rectifier)",
+        gating_vars=("n",),
+        g_max_range=(0.0, 100.0, 0.5),
+        current_color="#2ca02c",
+        gating_var_colors={"n": "#1f77b4"},
+    ),
+    ChannelMeta(
+        id="nal",
+        current_key="NaL",
+        label="NaL (Na⁺ leak)",
+        gating_vars=(),
+        g_max_range=(0.0, 2.0, 0.01),
+        current_color="#7f7f7f",
+        gating_var_colors={},
+    ),
+    ChannelMeta(
+        id="kl",
+        current_key="KL",
+        label="KL (K⁺ leak)",
+        gating_vars=(),
+        g_max_range=(0.0, 2.0, 0.01),
+        current_color="#bcbd22",
+        gating_var_colors={},
+    ),
+    # Auxiliary channels.
     ChannelMeta(
         id="ih",
         current_key="Ih",
@@ -128,7 +196,10 @@ ADDITIONAL_CHANNELS: tuple[ChannelMeta, ...] = (
         id="inap",
         current_key="INaP",
         label="INaP (Persistent Na\u207a)",
-        gating_vars=("p",),
+        # ``p``/``sNaP`` come from ``make_inap_channel``; ``pSNc``/``sNaP_snc``
+        # come from ``make_snc_inap_channel`` (the SNc variant maps onto the
+        # same UI id via CHANNEL_NAME_TO_ID["NaP_SNc"] = "inap").
+        gating_vars=("p", "sNaP", "pSNc", "sNaP_snc"),
         g_max_range=(0.0, 5.0, 0.01),
         current_color="#e377c2",
         gating_var_colors={"p": "#7f7f7f"},
@@ -225,16 +296,17 @@ ADDITIONAL_CHANNELS: tuple[ChannelMeta, ...] = (
     ),
 )
 
-#: Maps additional-channel current keys to their show_* visibility field names.
-#: Used by VisibilityState and SimulationState.
-ADDITIONAL_CURRENT_FIELD_MAP: dict[str, str] = {
-    ch.current_key: ch.current_visibility_field for ch in ADDITIONAL_CHANNELS
+#: Maps simulation result column names (e.g. ``"INa"``, ``"Ih"``) to their
+#: ``show_*_current`` visibility field names.  Used by VisibilityState and
+#: SimulationState to translate per-channel current keys into the
+#: corresponding bool flag.
+CURRENT_FIELD_MAP: dict[str, str] = {
+    ch.column_name: ch.current_visibility_field for ch in CHANNELS
 }
 
-#: Maps additional-channel gating variable names to their show_* visibility field names.
-#: Used by VisibilityState and SimulationState.
-ADDITIONAL_GATING_FIELD_MAP: dict[str, str] = {
-    gv: ch.gating_visibility_field
-    for ch in ADDITIONAL_CHANNELS
-    for gv in ch.gating_vars
+#: Maps gating variable names to their ``show_*_gating`` visibility field
+#: names.  Every channel with non-empty ``gating_vars`` contributes — each
+#: per-channel toggle hides every gate of that channel uniformly.
+GATING_FIELD_MAP: dict[str, str] = {
+    gv: ch.gating_visibility_field for ch in CHANNELS for gv in ch.gating_vars
 }

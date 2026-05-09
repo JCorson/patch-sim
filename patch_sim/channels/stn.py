@@ -17,7 +17,6 @@ from .base import GatingVariable, IonChannel, IonSpecies, NernstSpec
 
 __all__ = [
     "make_stn_na_channel",
-    "make_stn_k_channel",
 ]
 
 
@@ -145,50 +144,6 @@ _stn_alpha_sNa, _stn_beta_sNa = boltzmann_cosh_rates(
 )
 
 
-def _stn_alpha_n_impl(V: float, ca_i: float) -> float:
-    """Forward rate for STN K⁺ DR activation gate n (Otsuka et al. 2004).
-
-    Derived from:
-      n_inf(V) = 1/(1 + exp(−(V + 41)/14))
-      τ_n(V)   = 0.25 + 10.75/(exp(−(V + 51)/12) + exp((V + 51)/15))
-
-    Args:
-        V: Membrane voltage in mV.
-        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
-
-    Returns:
-        Forward rate in 1/ms.
-    """
-    n_inf = 1.0 / (1.0 + safe_exp(-(V + 41.0) / 14.0))
-    tau_n = 0.25 + 10.75 / (safe_exp(-(V + 51.0) / 12.0) + safe_exp((V + 51.0) / 15.0))
-    return n_inf / tau_n
-
-
-_stn_alpha_n = VoltageOnlyFn(_stn_alpha_n_impl)
-
-
-def _stn_beta_n_impl(V: float, ca_i: float) -> float:
-    """Backward rate for STN K⁺ DR activation gate n (Otsuka et al. 2004).
-
-    Derived from:
-      n_inf(V) = 1/(1 + exp(−(V + 41)/14))
-      τ_n(V)   = 0.25 + 10.75/(exp(−(V + 51)/12) + exp((V + 51)/15))
-
-    Args:
-        V: Membrane voltage in mV.
-        ca_i: Intracellular Ca²⁺ concentration in mM (accepted but ignored).
-
-    Returns:
-        Backward rate in 1/ms.
-    """
-    n_inf = 1.0 / (1.0 + safe_exp(-(V + 41.0) / 14.0))
-    tau_n = 0.25 + 10.75 / (safe_exp(-(V + 51.0) / 12.0) + safe_exp((V + 51.0) / 15.0))
-    return (1.0 - n_inf) / tau_n
-
-
-_stn_beta_n = VoltageOnlyFn(_stn_beta_n_impl)
-
-
 def make_stn_na_channel(g_max: float) -> IonChannel:
     """Create the STN high-threshold sodium channel (Otsuka et al. 2004).
 
@@ -235,34 +190,4 @@ def make_stn_na_channel(g_max: float) -> IonChannel:
         g_max=g_max,
         gating_variables=(m_var, h_var, s_var),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
-    )
-
-
-def make_stn_k_channel(g_max: float) -> IonChannel:
-    """Create the STN fast delayed-rectifier potassium channel (Otsuka et al. 2004).
-
-    Uses fast DR kinetics specific to subthalamic nucleus neurons.  The
-    activation half-point is −41 mV (vs −55 mV in HH52) with a slope of
-    14 mV, and the voltage-dependent time constant peaks at ~5.6 ms near
-    −51 mV and decays at more depolarised or hyperpolarised potentials.
-
-    Uses a single activation gate ``"n"`` with power 4, matching the simulation
-    result field used throughout the simulator.
-
-    Reference: Otsuka et al. (2004), J. Neurophysiol. 92, 255–264, Table 1.
-
-    Args:
-        g_max: Maximum conductance in mS/cm².
-
-    Returns:
-        An :class:`~patch_sim.channels.IonChannel` representing the STN K⁺ DR
-        channel.
-    """
-    return IonChannel(
-        name="K",
-        g_max=g_max,
-        gating_variables=(
-            GatingVariable(name="n", power=4, alpha=_stn_alpha_n, beta=_stn_beta_n),
-        ),
-        reversal_spec=NernstSpec(IonSpecies.POTASSIUM),
     )

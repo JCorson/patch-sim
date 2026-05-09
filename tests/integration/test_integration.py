@@ -9,6 +9,7 @@ import numpy as np
 
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
 from patch_sim.neuron import Neuron
+from patch_sim.presets import make_squid_giant_axon
 from patch_sim.protocols import (
     chirp_current,
     noise_current,
@@ -171,9 +172,15 @@ def test_noise_current_to_simulation() -> None:
     )
 
     # Use separate model instances so tests are not order-dependent
-    result_a = simulate_current_clamp(Neuron(), current_external=protocol_a)
-    result_b = simulate_current_clamp(Neuron(), current_external=protocol_b)
-    result_c = simulate_current_clamp(Neuron(), current_external=protocol_c)
+    result_a = simulate_current_clamp(
+        make_squid_giant_axon(), current_external=protocol_a
+    )
+    result_b = simulate_current_clamp(
+        make_squid_giant_axon(), current_external=protocol_b
+    )
+    result_c = simulate_current_clamp(
+        make_squid_giant_axon(), current_external=protocol_c
+    )
 
     _assert_current_clamp_result(result_a)
 

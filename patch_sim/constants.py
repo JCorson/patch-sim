@@ -1,23 +1,10 @@
 """Default neuron parameter values and domain constants for the Hodgkin-Huxley model."""
 
-# Default neuron parameters (Hodgkin-Huxley squid giant axon values)
+# Default neuron parameters.
 #
 # DEFAULT_K_OUT = 4.0 mM is the physiological mammalian ACSF value
 # (E_K ≈ −95 mV at 37 °C).  All mammalian presets rely on this default.
 # SQUID_GIANT_AXON overrides it to 7.8 mM (HH52 seawater, E_K ≈ −77 mV).
-#
-# The passive leak is split into Na⁺ and K⁺ background conductances:
-#   DEFAULT_G_NAL = 0.054 mS/cm²  (Na⁺ leak, NALCN-type)
-#   DEFAULT_G_KL  = 0.246 mS/cm²  (K⁺ leak, TREK/TRAAK-type)
-# These values are chosen so that g_NaL + g_KL = 0.3 mS/cm² (preserving τ_m)
-# and I_NaL + I_KL at V = −65 mV equals the old chloride-leak current
-# (g_L_old × (−65 − E_L_old)), ensuring v_rest remains at −65 mV.
-# Mammalian presets each override g_NaL and g_KL explicitly and are retuned
-# for their own K_out=4.0 value.
-DEFAULT_G_NA: float = 120.0
-DEFAULT_G_K: float = 36.0
-DEFAULT_G_NAL: float = 0.054
-DEFAULT_G_KL: float = 0.246
 DEFAULT_C_M: float = 1.0
 DEFAULT_V_REST: float = -65.0
 DEFAULT_NA_OUT: float = 97.4
@@ -76,24 +63,6 @@ VOLTAGE_PROTOCOLS: list[str] = [
     "Ramp",
     "Pulse Train",
 ]
-
-DEFAULT_NEURON_PARAMS: dict[str, float] = {
-    "g_Na": DEFAULT_G_NA,
-    "g_K": DEFAULT_G_K,
-    "g_NaL": DEFAULT_G_NAL,
-    "g_KL": DEFAULT_G_KL,
-    "C_m": DEFAULT_C_M,
-    "v_rest": DEFAULT_V_REST,
-    "Na_out": DEFAULT_NA_OUT,
-    "Na_in": DEFAULT_NA_IN,
-    "K_out": DEFAULT_K_OUT,
-    "K_in": DEFAULT_K_IN,
-    "Ca_out": DEFAULT_CA_OUT,
-    "Ca_in": DEFAULT_CA_IN,
-    "T": DEFAULT_T,
-    "Q10": DEFAULT_Q10,
-    "T_ref": DEFAULT_T_REF,
-}
 
 # Neuron preset names
 SQUID_GIANT_AXON: str = "Squid Giant Axon (Classic HH)"

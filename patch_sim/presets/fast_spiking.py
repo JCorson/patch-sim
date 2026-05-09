@@ -4,6 +4,8 @@ from typing import Any
 
 from patch_sim.channels import (
     make_ikv31_channel,
+    make_k_leak_channel,
+    make_na_leak_channel,
     make_nav11_channel,
     make_pospischil_k_channel,
 )
@@ -104,13 +106,13 @@ def make_fast_spiking_interneuron() -> Neuron:
         inactivation, IKv3.1 auxiliary channel, and a high-leak membrane.
     """
     return Neuron(
-        g_Na=88.0,
-        g_K=30.0,
-        g_NaL=0.3115,
-        g_KL=1.1885,
         T_ref=307.15,
-        na_channel_factory=make_nav11_channel,
-        k_channel_factory=make_pospischil_k_channel,
-        additional_channels=(make_ikv31_channel(g_max=20.0),),
+        channels=(
+            make_nav11_channel(g_max=88.0),
+            make_pospischil_k_channel(g_max=30.0),
+            make_na_leak_channel(g_max=0.3115),
+            make_k_leak_channel(g_max=1.1885),
+            make_ikv31_channel(g_max=20.0),
+        ),
         area_cm2=3e-6,
     )

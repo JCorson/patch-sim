@@ -8,6 +8,8 @@ from patch_sim.channels import (
     make_dopaminergic_k_channel,
     make_dopaminergic_na_channel,
     make_ih_channel,
+    make_k_leak_channel,
+    make_na_leak_channel,
     make_sk_channel,
     make_snc_inap_channel,
 )
@@ -144,15 +146,13 @@ def make_dopaminergic() -> Neuron:
     """
     return Neuron(
         v_rest=-55.0,
-        g_Na=10.0,
-        g_K=0.5,
-        g_NaL=0.012,
-        g_KL=0.028,
         Q10=1.0,
         T_ref=308.15,
-        na_channel_factory=make_dopaminergic_na_channel,
-        k_channel_factory=make_dopaminergic_k_channel,
-        additional_channels=(
+        channels=(
+            make_dopaminergic_na_channel(g_max=10.0),
+            make_dopaminergic_k_channel(g_max=0.5),
+            make_na_leak_channel(g_max=0.012),
+            make_k_leak_channel(g_max=0.028),
             make_cav13_channel(g_max=0.04),
             make_sk_channel(g_max=1.75),
             make_snc_inap_channel(g_max=0.012),

@@ -6,9 +6,10 @@ from patch_sim.channels import (
     make_ih_channel,
     make_im_channel,
     make_inap_channel,
+    make_k_leak_channel,
     make_mainen_sejnowski_kv_channel,
+    make_na_leak_channel,
     make_nav12_channel,
-    make_pospischil_k_channel,
 )
 from patch_sim.constants import (
     ACTION_POTENTIAL,
@@ -82,8 +83,9 @@ def make_cortical_pyramidal() -> Neuron:
         Pospischil et al. (2008) Traub-Miles Na⁺ kinetics (VT = −56.2 mV,
         via ``make_nav12_channel``) provide the fast spike upstroke.
         Mainen & Sejnowski (1996) Kv kinetics (``make_mainen_sejnowski_kv_channel``)
-        serve as the sole active delayed rectifier; the Pospischil K factory is
-        present but set to g_K=0.  The M-S Kv is essentially closed at rest
+        serve as the sole delayed rectifier; the HH-style core ``"K"`` channel
+        is omitted from the preset's ``channels`` tuple entirely (#311 / #320).
+        The M-S Kv is essentially closed at rest
         (n_inf 50 % point near +4 mV) and deactivates on a τ ~1–2 ms scale —
         this slow-K balance is what broadens the AP into the 1.0–2.5 ms
         McCormick et al. (1985) half-width band.  A fast K (Pospischil n⁴)
@@ -147,17 +149,16 @@ def make_cortical_pyramidal() -> Neuron:
         Ih/INaP/IM/M-S Kv auxiliary channels, and a high-resistance leak.
     """
     return Neuron(
-        g_Na=70.0,
-        g_K=0.0,
         v_rest=-70.0,
         K_out=3.32,
-        g_NaL=0.000391,
-        g_KL=0.049609,
         Q10=1.0,
         T_ref=307.15,
-        na_channel_factory=make_nav12_channel,
-        k_channel_factory=make_pospischil_k_channel,
-        additional_channels=(
+        channels=(
+            make_nav12_channel(g_max=70.0),
+            # No HH-style core K — Mainen-Sejnowski Kv is the sole delayed
+            # rectifier (added below).  See preset docstring.
+            make_na_leak_channel(g_max=0.000391),
+            make_k_leak_channel(g_max=0.049609),
             make_ih_channel(g_max=0.3),
             make_inap_channel(g_max=0.1),
             make_im_channel(g_max=0.075),
