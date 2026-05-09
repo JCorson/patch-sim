@@ -1,5 +1,7 @@
 """Tests for the current clamp simulation."""
 
+import dataclasses
+
 import numpy as np
 import pytest
 
@@ -201,8 +203,6 @@ def test_physiological_limits_and_action_potentials():
     # Bare Neuron() uses default HH52 squid giant axon kinetics.  Q10=1.0
     # disables temperature scaling so the kinetics match their original
     # parameterisation — this test exercises the HH52 model as published.
-    import dataclasses
-
     custom_model = dataclasses.replace(make_squid_giant_axon(), Q10=1.0)
     num_steps = int(duration / (1000.0 / SIM_SAMPLING_FREQ)) + 1
 
