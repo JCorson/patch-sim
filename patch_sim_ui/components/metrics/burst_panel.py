@@ -5,12 +5,13 @@ import reflex as rx
 from patch_sim_ui.components.metrics._row import RowColumn, metrics_row
 from patch_sim_ui.state.analysis import AnalysisState
 
-# The Sweep cell uses a regular space (rather than ``""``) for the empty
-# branch to keep row baseline aligned across the table grid when this cell
-# would otherwise be empty.
+# The Sweep cell uses a non-breaking space (U+00A0) for the empty branch
+# to keep row baseline aligned across the table grid when this cell would
+# otherwise be empty — a regular space collapses under default HTML
+# white-space rules.
 _BURST_COLUMNS: tuple[RowColumn, ...] = (
     RowColumn("index", kind="int_1based"),
-    RowColumn("sweep_index", kind="gated_int", empty_text=" "),
+    RowColumn("sweep_index", kind="gated_int", empty_text=" "),
     RowColumn("start_time"),
     RowColumn("end_time"),
     RowColumn("duration"),
