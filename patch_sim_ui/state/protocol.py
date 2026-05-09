@@ -43,6 +43,10 @@ _PROTOCOL_FLOAT_FIELDS: list[str] = [
 
 logger = logging.getLogger(__name__)
 
+# Sweep mode toggle values shown in the protocol panel.
+SWEEP_MODE_SINGLE = "Single Sweep"
+SWEEP_MODE_MULTI = "Multi-Sweep"
+
 
 class ProtocolState(rx.State):
     """State for experiment mode, protocol parameters, and protocol loading."""
@@ -64,6 +68,13 @@ class ProtocolState(rx.State):
     min_stimulus: float = 10.0
     max_stimulus: float = 10.0
     stimulus_step: float = 0.0
+
+    # Backend-only memo of the user's last multi-sweep range/step so toggling
+    # Single → Multi → Single → Multi preserves their values rather than
+    # resetting to a hardcoded default.  Stored as a delta so restoring
+    # always yields max > min regardless of any min edit while in single mode.
+    _last_multi_range_delta: float = 20.0
+    _last_multi_step: float = 2.0
 
     # Current clamp protocol params
     start_current: float = 0.0
@@ -307,6 +318,46 @@ class ProtocolState(rx.State):
             self.stimulus_step = 1.0
             return
         self.stimulus_step = parsed
+
+    def set_single_stimulus(self, value: "str | float") -> None:
+        """Set both min_stimulus and max_stimulus to value for single-sweep mode.
+
+        Used by the single-sweep input field (rendered when Step is in single
+        mode).  Mirrors the parsed value into both range bounds so the
+        existing protocol builders see ``min == max`` and emit one sweep.
+
+        Args:
+            value: Raw input value from the UI field.
+        """
+        self._set_float("min_stimulus", value)
+        self.max_stimulus = self.min_stimulus
+
+    def set_step_sweep_mode(self, mode: str) -> None:
+        """Switch the Step protocol between single-sweep and multi-sweep modes.
+
+        Switching to single sweep snapshots the current ``(max - min)`` range
+        and ``stimulus_step`` into backend-only memo fields, then collapses
+        ``max_stimulus`` onto ``min_stimulus`` and zeroes ``stimulus_step``.
+        Switching to multi sweep restores the memoised range and step.  The
+        memo only updates on a real Multi → Single transition, so toggling
+        Single → Multi → Single does not clobber the user's range.
+
+        Args:
+            mode: ``SWEEP_MODE_SINGLE`` or ``SWEEP_MODE_MULTI``.
+        """
+        if mode == SWEEP_MODE_SINGLE:
+            delta = self.max_stimulus - self.min_stimulus
+            if delta > 0:
+                self._last_multi_range_delta = delta
+            if self.stimulus_step > 0:
+                self._last_multi_step = self.stimulus_step
+            self.max_stimulus = self.min_stimulus
+            self.stimulus_step = 0.0
+        elif mode == SWEEP_MODE_MULTI:
+            self.max_stimulus = self.min_stimulus + self._last_multi_range_delta
+            self.stimulus_step = self._last_multi_step
+        else:
+            logger.debug("set_step_sweep_mode: unknown mode %r ignored", mode)
 
     # ------------------------------------------------------------------ #
     # Protocol building                                                  #

@@ -11,7 +11,11 @@ from patch_sim_ui.constants import (
     VOLTAGE_CLAMP,
     VOLTAGE_PROTOCOLS,
 )
-from patch_sim_ui.state.protocol import ProtocolState
+from patch_sim_ui.state.protocol import (
+    SWEEP_MODE_MULTI,
+    SWEEP_MODE_SINGLE,
+    ProtocolState,
+)
 
 
 def _num_field(
@@ -76,30 +80,24 @@ class ParamField:
     Attributes:
         label: Display label (units inlined, e.g. ``"Current min (µA/cm²)"``).
         attr: ``ProtocolState`` attribute name; the matching event handler is
-            looked up as ``set_<attr>``.
+            looked up as ``set_<attr>`` unless ``setter_attr`` overrides it.
         disabled: Optional reactive flag (or static bool) forwarded to the
             input's ``disabled`` prop.
+        setter_attr: Optional explicit setter name on ``ProtocolState``.  When
+            ``None`` (default) the setter is derived as ``set_<attr>``.
     """
 
     label: str
     attr: str
     disabled: rx.Var | bool = False
+    setter_attr: str | None = None
 
 
-# `disabled` values below capture the reactive `rx.Var` (e.g.
-# `ProtocolState.is_step_single_sweep`) at module-import time, NOT its
-# current bool value.  Use a `Var`/`@rx.var` reference here, not a Python
-# expression — Reflex needs the reactive handle to re-render when the
-# underlying state changes.
 _PROTOCOL_PARAM_SCHEMA: dict[tuple[str, str], tuple[ParamField, ...]] = {
     (CURRENT_CLAMP, "Step"): (
         ParamField("Current min (µA/cm²)", "min_stimulus"),
         ParamField("Current max (µA/cm²)", "max_stimulus"),
-        ParamField(
-            "Current step (µA/cm²)",
-            "stimulus_step",
-            disabled=ProtocolState.is_step_single_sweep,
-        ),
+        ParamField("Current step (µA/cm²)", "stimulus_step"),
     ),
     (CURRENT_CLAMP, "Ramp"): (
         ParamField("Start current (µA/cm²)", "start_current"),
@@ -128,11 +126,7 @@ _PROTOCOL_PARAM_SCHEMA: dict[tuple[str, str], tuple[ParamField, ...]] = {
     (VOLTAGE_CLAMP, "Step"): (
         ParamField("Voltage min (mV)", "min_stimulus"),
         ParamField("Voltage max (mV)", "max_stimulus"),
-        ParamField(
-            "Voltage step (mV)",
-            "stimulus_step",
-            disabled=ProtocolState.is_step_single_sweep,
-        ),
+        ParamField("Voltage step (mV)", "stimulus_step"),
         ParamField("Holding voltage (mV)", "holding_voltage"),
     ),
     (VOLTAGE_CLAMP, "Ramp"): (
@@ -148,6 +142,32 @@ _PROTOCOL_PARAM_SCHEMA: dict[tuple[str, str], tuple[ParamField, ...]] = {
     ),
 }
 
+# Single-sweep amplitude fields for the Step protocol.  In single-sweep mode
+# the user edits one combined value and ``set_single_stimulus`` mirrors it
+# into both ``min_stimulus`` and ``max_stimulus`` so the existing builders
+# emit one sweep.  Voltage clamp keeps its holding-voltage row alongside.
+_STEP_SINGLE_FIELDS: dict[str, tuple[ParamField, ...]] = {
+    CURRENT_CLAMP: (
+        ParamField(
+            "Current (µA/cm²)", "min_stimulus", setter_attr="set_single_stimulus"
+        ),
+    ),
+    VOLTAGE_CLAMP: (
+        ParamField("Voltage (mV)", "min_stimulus", setter_attr="set_single_stimulus"),
+        ParamField("Holding voltage (mV)", "holding_voltage"),
+    ),
+}
+
+
+def _render_field(f: ParamField) -> rx.Component:
+    """Render a single ParamField as a numeric input row."""
+    return _num_field(
+        f.label,
+        getattr(ProtocolState, f.attr),
+        getattr(ProtocolState, f.setter_attr or f"set_{f.attr}"),
+        disabled=f.disabled,
+    )
+
 
 def _build_param_form(fields: tuple[ParamField, ...]) -> rx.Component:
     """Render the shared duration fields followed by ``fields``.
@@ -161,15 +181,61 @@ def _build_param_form(fields: tuple[ParamField, ...]) -> rx.Component:
     """
     return rx.vstack(
         *_duration_fields(),
-        *[
-            _num_field(
-                f.label,
-                getattr(ProtocolState, f.attr),
-                getattr(ProtocolState, f"set_{f.attr}"),
-                disabled=f.disabled,
-            )
-            for f in fields
-        ],
+        *[_render_field(f) for f in fields],
+        spacing="2",
+        width="100%",
+    )
+
+
+def _sweep_mode_toggle() -> rx.Component:
+    """Single-sweep / multi-sweep radio toggle for the Step protocol."""
+    return rx.hstack(
+        rx.text("Sweep mode", size="2", color="gray", width="160px"),
+        rx.radio_group(
+            [SWEEP_MODE_SINGLE, SWEEP_MODE_MULTI],
+            value=rx.cond(
+                ProtocolState.is_step_single_sweep,
+                SWEEP_MODE_SINGLE,
+                SWEEP_MODE_MULTI,
+            ),
+            on_change=ProtocolState.set_step_sweep_mode,
+            direction="row",
+        ),
+        width="100%",
+        spacing="2",
+        align="center",
+    )
+
+
+def _step_form(clamp_mode: str) -> rx.Component:
+    """Step protocol form with sweep-mode toggle and mode-swapped fields.
+
+    In single-sweep mode the form shows one combined amplitude field; in
+    multi-sweep mode it shows the standard min/max/step trio (and, for
+    voltage clamp, the holding-voltage row).  The toggle drives the swap
+    via ``ProtocolState.is_step_single_sweep``.
+
+    Args:
+        clamp_mode: ``CURRENT_CLAMP`` or ``VOLTAGE_CLAMP``.
+    """
+    multi_fields = _PROTOCOL_PARAM_SCHEMA[(clamp_mode, "Step")]
+    single_fields = _STEP_SINGLE_FIELDS[clamp_mode]
+    return rx.vstack(
+        *_duration_fields(),
+        _sweep_mode_toggle(),
+        rx.cond(
+            ProtocolState.is_step_single_sweep,
+            rx.vstack(
+                *[_render_field(f) for f in single_fields],
+                spacing="2",
+                width="100%",
+            ),
+            rx.vstack(
+                *[_render_field(f) for f in multi_fields],
+                spacing="2",
+                width="100%",
+            ),
+        ),
         spacing="2",
         width="100%",
     )
@@ -179,9 +245,11 @@ def _current_protocol_params() -> rx.Component:
     """Dynamic parameter form for the selected current clamp protocol."""
     return rx.match(
         ProtocolState.protocol_type,
+        ("Step", _step_form(CURRENT_CLAMP)),
         *[
             (proto, _build_param_form(_PROTOCOL_PARAM_SCHEMA[(CURRENT_CLAMP, proto)]))
             for proto in CURRENT_PROTOCOLS
+            if proto != "Step"
         ],
         rx.fragment(),
     )
@@ -191,9 +259,11 @@ def _voltage_protocol_params() -> rx.Component:
     """Dynamic parameter form for the selected voltage clamp protocol."""
     return rx.match(
         ProtocolState.protocol_type,
+        ("Step", _step_form(VOLTAGE_CLAMP)),
         *[
             (proto, _build_param_form(_PROTOCOL_PARAM_SCHEMA[(VOLTAGE_CLAMP, proto)]))
             for proto in VOLTAGE_PROTOCOLS
+            if proto != "Step"
         ],
         rx.fragment(),
     )

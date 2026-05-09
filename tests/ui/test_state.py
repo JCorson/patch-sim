@@ -896,6 +896,104 @@ def test_set_stimulus_step_zero_accepted_when_single_sweep() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Sweep mode toggle — set_step_sweep_mode / set_single_stimulus
+# ---------------------------------------------------------------------------
+
+
+def test_set_single_stimulus_mirrors_to_both_fields() -> None:
+    """set_single_stimulus updates both min_stimulus and max_stimulus."""
+    from patch_sim_ui.state.protocol import SWEEP_MODE_SINGLE  # noqa: F401
+
+    ps = _make_protocol_state()
+    ps.min_stimulus = 5.0
+    ps.max_stimulus = 5.0
+    ps.set_single_stimulus(12.5)
+    assert ps.min_stimulus == 12.5
+    assert ps.max_stimulus == 12.5
+
+
+def test_set_step_sweep_mode_to_single_collapses_max_to_min() -> None:
+    """Switching to single sweep collapses max onto min and zeroes step."""
+    from patch_sim_ui.state.protocol import SWEEP_MODE_SINGLE
+
+    ps = _make_protocol_state()
+    ps.min_stimulus = 5.0
+    ps.max_stimulus = 15.0
+    ps.stimulus_step = 2.5
+    ps.set_step_sweep_mode(SWEEP_MODE_SINGLE)
+    assert ps.max_stimulus == 5.0
+    assert ps.stimulus_step == 0.0
+    assert ps.is_step_single_sweep is True
+
+
+def test_set_step_sweep_mode_to_single_memoises_range_and_step() -> None:
+    """Multi → Single transition saves (max - min) and step into backend memo."""
+    from patch_sim_ui.state.protocol import SWEEP_MODE_SINGLE
+
+    ps = _make_protocol_state()
+    ps.min_stimulus = 5.0
+    ps.max_stimulus = 15.0
+    ps.stimulus_step = 2.5
+    ps.set_step_sweep_mode(SWEEP_MODE_SINGLE)
+    assert ps._last_multi_range_delta == 10.0
+    assert ps._last_multi_step == 2.5
+
+
+def test_set_step_sweep_mode_to_multi_restores_remembered_range() -> None:
+    """Single → Multi restores the delta/step memoised on the previous toggle."""
+    from patch_sim_ui.state.protocol import SWEEP_MODE_MULTI, SWEEP_MODE_SINGLE
+
+    ps = _make_protocol_state()
+    ps.min_stimulus = 5.0
+    ps.max_stimulus = 15.0
+    ps.stimulus_step = 2.5
+    ps.set_step_sweep_mode(SWEEP_MODE_SINGLE)
+    ps.set_step_sweep_mode(SWEEP_MODE_MULTI)
+    assert ps.min_stimulus == 5.0
+    assert ps.max_stimulus == 15.0
+    assert ps.stimulus_step == 2.5
+
+
+def test_set_step_sweep_mode_to_multi_uses_defaults_on_first_toggle() -> None:
+    """Toggling fresh single → multi uses the initialised memo defaults."""
+    from patch_sim_ui.state.protocol import SWEEP_MODE_MULTI
+
+    ps = _make_protocol_state()
+    # Initial state: min == max == 10, step == 0 (single sweep).
+    ps.set_step_sweep_mode(SWEEP_MODE_MULTI)
+    assert ps.min_stimulus == 10.0
+    assert ps.max_stimulus == 10.0 + ps._last_multi_range_delta
+    assert ps.stimulus_step == ps._last_multi_step
+
+
+def test_set_step_sweep_mode_to_single_when_already_single_preserves_memo() -> None:
+    """A redundant Single → Single toggle must not clobber the memoised range."""
+    from patch_sim_ui.state.protocol import SWEEP_MODE_SINGLE
+
+    ps = _make_protocol_state()
+    ps.min_stimulus = 10.0
+    ps.max_stimulus = 10.0
+    ps.stimulus_step = 0.0
+    prior_delta = ps._last_multi_range_delta
+    prior_step = ps._last_multi_step
+    ps.set_step_sweep_mode(SWEEP_MODE_SINGLE)
+    assert ps._last_multi_range_delta == prior_delta
+    assert ps._last_multi_step == prior_step
+
+
+def test_set_step_sweep_mode_unknown_value_is_ignored() -> None:
+    """Unknown mode strings leave state untouched."""
+    ps = _make_protocol_state()
+    ps.min_stimulus = 5.0
+    ps.max_stimulus = 15.0
+    ps.stimulus_step = 2.5
+    ps.set_step_sweep_mode("bogus")
+    assert ps.min_stimulus == 5.0
+    assert ps.max_stimulus == 15.0
+    assert ps.stimulus_step == 2.5
+
+
+# ---------------------------------------------------------------------------
 # continuous_active computed var
 # ---------------------------------------------------------------------------
 
