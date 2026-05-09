@@ -56,7 +56,7 @@ def test_analysis_sidebar_renders_with_burst_data():
     per-burst table into the new Bursts sub-tab; this smoke test ensures
     the surrounding tab structure still builds.
     """
-    from patch_sim_ui.components.metrics_panel import analysis_sidebar
+    from patch_sim_ui.components.metrics import analysis_sidebar
 
     analysis_sidebar()
 
@@ -193,6 +193,6 @@ def test_tau_v_plot_helper_renders_without_error():
     ``AnalysisState.has_tau_v_data`` so that it only appears once a τ-V
     analysis has been computed; this smoke-tests its construction.
     """
-    from patch_sim_ui.components.metrics_panel import _tau_v_plot
+    from patch_sim_ui.components.metrics import _tau_v_plot
 
     _tau_v_plot()

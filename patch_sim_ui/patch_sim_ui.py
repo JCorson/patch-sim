@@ -4,7 +4,7 @@ import reflex as rx
 
 from patch_sim_ui.api.traces import starlette_app as _traces_app
 from patch_sim_ui.components.log_panel import log_panel
-from patch_sim_ui.components.metrics_panel import analysis_sidebar
+from patch_sim_ui.components.metrics import analysis_sidebar
 from patch_sim_ui.components.neuron_panel import neuron_panel
 from patch_sim_ui.components.protocol_panel import protocol_panel
 from patch_sim_ui.components.sweep_manager import sweep_manager
