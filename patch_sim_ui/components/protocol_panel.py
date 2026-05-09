@@ -86,6 +86,11 @@ class ParamField:
     disabled: rx.Var | bool = False
 
 
+# `disabled` values below capture the reactive `rx.Var` (e.g.
+# `ProtocolState.is_step_single_sweep`) at module-import time, NOT its
+# current bool value.  Use a `Var`/`@rx.var` reference here, not a Python
+# expression — Reflex needs the reactive handle to re-render when the
+# underlying state changes.
 _PROTOCOL_PARAM_SCHEMA: dict[tuple[str, str], tuple[ParamField, ...]] = {
     (CURRENT_CLAMP, "Step"): (
         ParamField("Current min (µA/cm²)", "min_stimulus"),

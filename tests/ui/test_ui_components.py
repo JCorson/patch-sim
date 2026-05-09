@@ -80,20 +80,19 @@ def test_protocol_param_schema_attrs_resolve_on_state():
             )
 
 
-@pytest.mark.parametrize(
-    "clamp_mode,protocol_type",
-    [
-        ("Current Clamp", "Step"),
-        ("Current Clamp", "Ramp"),
-        ("Current Clamp", "Pulse Train"),
-        ("Current Clamp", "Sinusoidal"),
-        ("Current Clamp", "Chirp"),
-        ("Current Clamp", "Noise"),
-        ("Voltage Clamp", "Step"),
-        ("Voltage Clamp", "Ramp"),
-        ("Voltage Clamp", "Pulse Train"),
-    ],
-)
+def _protocol_schema_keys():
+    """Return all (clamp_mode, protocol_type) keys from the schema.
+
+    Used to parametrize the per-entry render test so the schema is the
+    single source of truth — adding a new protocol entry automatically
+    extends the test matrix.
+    """
+    from patch_sim_ui.components.protocol_panel import _PROTOCOL_PARAM_SCHEMA
+
+    return list(_PROTOCOL_PARAM_SCHEMA.keys())
+
+
+@pytest.mark.parametrize("clamp_mode,protocol_type", _protocol_schema_keys())
 def test_build_param_form_renders_for_each_protocol(clamp_mode, protocol_type):
     """``_build_param_form`` must build without error for every schema entry."""
     from patch_sim_ui.components.protocol_panel import (
