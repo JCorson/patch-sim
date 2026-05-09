@@ -57,34 +57,6 @@ NEURON_CONFIG_SCALAR_DEFAULTS: dict[str, float] = {
     if isinstance(f.default, float)
 }
 
-# Default conductances for each channel slider, keyed by channel UI id.
-# Defaults for the HH-classic core (na, k, nal, kl) come from the Squid Giant
-# Axon preset; auxiliary channels use the per-channel defaults from the core
-# library's ``DEFAULT_G_*`` constants.
-DEFAULT_G_MAX: dict[str, float] = {
-    # HH-classic core channels — defaults match the Squid Giant Axon preset.
-    "na": 120.0,
-    "k": 36.0,
-    "nal": 0.054,
-    "kl": 0.246,
-    # Auxiliary channels.
-    "ih": DEFAULT_G_IH,
-    "ika": DEFAULT_G_IKA,
-    "ikv31": DEFAULT_G_IKV31,
-    "mskv": DEFAULT_G_MSKV,
-    "inap": DEFAULT_G_NAP,
-    "inar": DEFAULT_G_NAR,
-    "im": DEFAULT_G_IM,
-    "katp": DEFAULT_G_KATP,
-    "ikir": DEFAULT_G_IKIR,
-    "ikca": DEFAULT_G_IKCA,
-    "ical": DEFAULT_G_ICAL,
-    "cav13": DEFAULT_G_CAV13,
-    "icat": DEFAULT_G_ICAT,
-    "ican": DEFAULT_G_ICAN,
-    "sk": DEFAULT_G_SK,
-}
-
 # Map from IonChannel.name to ChannelMeta.id for every channel in the registry.
 #
 # Channels whose current_key starts with "I" (the convention for *current*
@@ -101,6 +73,36 @@ for _ch_meta in CHANNELS:
     else:
         CHANNEL_NAME_TO_ID[_ch_meta.current_key] = _ch_meta.id
 CHANNEL_NAME_TO_ID["NaP_SNc"] = "inap"
+
+#: Default conductance for each channel's UI slider, keyed by channel UI id.
+#:
+#: HH-classic core defaults are pulled from the canonical Squid Giant Axon
+#: ``Neuron`` object; auxiliary channel defaults come from the core library's
+#: per-channel ``DEFAULT_G_*`` constants (their authoritative home).  Used
+#: both to seed ``NeuronState`` g_max vars at module load and to initialise
+#: every slider in :func:`neuron_to_ui_state` before per-preset overrides
+#: are applied.
+_SQUID_G_MAX: dict[str, float] = {
+    CHANNEL_NAME_TO_ID[ch.name]: ch.g_max
+    for ch in NEURON_PRESETS[SQUID_GIANT_AXON]().channels
+}
+DEFAULT_G_MAX: dict[str, float] = _SQUID_G_MAX | {
+    "ih": DEFAULT_G_IH,
+    "ika": DEFAULT_G_IKA,
+    "ikv31": DEFAULT_G_IKV31,
+    "mskv": DEFAULT_G_MSKV,
+    "inap": DEFAULT_G_NAP,
+    "inar": DEFAULT_G_NAR,
+    "im": DEFAULT_G_IM,
+    "katp": DEFAULT_G_KATP,
+    "ikir": DEFAULT_G_IKIR,
+    "ikca": DEFAULT_G_IKCA,
+    "ical": DEFAULT_G_ICAL,
+    "cav13": DEFAULT_G_CAV13,
+    "icat": DEFAULT_G_ICAT,
+    "ican": DEFAULT_G_ICAN,
+    "sk": DEFAULT_G_SK,
+}
 
 
 def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
