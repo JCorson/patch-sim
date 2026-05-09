@@ -1,4 +1,4 @@
-"""Unit tests for patch_sim_ui/plotting.py.
+"""Unit tests for the patch_sim_ui.plotting package.
 
 Covers Sweep.from_result, build_figure, and _build_hover_tables.
 All three are pure functions with no Reflex dependency.
@@ -13,13 +13,13 @@ import pytest
 
 from patch_sim_ui.constants import CC_VOLTAGE_COLOR, STIMULUS_COLOR
 from patch_sim_ui.plotting import (
-    Sweep,
     TraceVisibility,
-    _build_hover_tables,
     build_figure,
     build_tau_v_figure,
     compute_trace_visibility_map,
 )
+from patch_sim_ui.plotting.traces import _build_hover_tables
+from patch_sim_ui.sweep import Sweep
 
 # ---------------------------------------------------------------------------
 # Helpers
