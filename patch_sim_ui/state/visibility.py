@@ -6,9 +6,9 @@ import logging
 import reflex as rx
 
 from patch_sim_ui.channels import (
-    ADDITIONAL_CHANNELS,
-    ADDITIONAL_CURRENT_FIELD_MAP,
-    ADDITIONAL_GATING_FIELD_MAP,
+    CHANNELS,
+    CURRENT_FIELD_MAP,
+    GATING_FIELD_MAP,
     HH_CLASSIC_CHANNEL_IDS,
 )
 from patch_sim_ui.plotting import compute_trace_visibility_map
@@ -18,7 +18,7 @@ _VISIBILITY_FIELDS: list[str] = [
     "show_voltage",
     "show_total_current",
     # Per-channel current toggles, derived uniformly from the registry.
-    *[ch.current_visibility_field for ch in ADDITIONAL_CHANNELS],
+    *[ch.current_visibility_field for ch in CHANNELS],
     # HH-classic core channels expose their gating via per-gate toggles
     # (n / m / h) rather than the registry's joint show_<id>_gating field.
     "show_potassium_activation",
@@ -27,7 +27,7 @@ _VISIBILITY_FIELDS: list[str] = [
     # Auxiliary-channel joint gating toggles.
     *[
         ch.gating_visibility_field
-        for ch in ADDITIONAL_CHANNELS
+        for ch in CHANNELS
         if ch.id not in HH_CLASSIC_CHANNEL_IDS
     ],
 ]
@@ -60,8 +60,8 @@ def _make_visibility_setter_async(field_name: str):
         trace_map = compute_trace_visibility_map(
             current_sweeps=sim_st._current_sweeps,
             clamp_mode=sim_st._figure_clamp_mode,
-            additional_current_field_map=ADDITIONAL_CURRENT_FIELD_MAP,
-            additional_gating_field_map=ADDITIONAL_GATING_FIELD_MAP,
+            additional_current_field_map=CURRENT_FIELD_MAP,
+            additional_gating_field_map=GATING_FIELD_MAP,
             stored_traces=sim_st.stored_traces,
         )
         indices = trace_map.get(field_name, [])

@@ -1,10 +1,10 @@
-"""Additional ion channel registry for the patch_sim UI.
+"""Ion channel registry for the patch_sim UI.
 
-Each :class:`ChannelMeta` entry in :data:`ADDITIONAL_CHANNELS` is the single
-source of truth for one auxiliary channel — its label, field names, gating
-variables, slider range, and display colours.  All other modules derive their
-per-channel lists and dicts from this registry rather than maintaining
-parallel enumerations.
+Each :class:`ChannelMeta` entry in :data:`CHANNELS` is the single source of
+truth for one channel — its label, field names, gating variables, slider
+range, and display colours.  All other modules derive their per-channel
+lists and dicts from this registry rather than maintaining parallel
+enumerations.
 
 Adding a new channel requires only a single new :class:`ChannelMeta` entry
 here; all downstream lists and dicts are recomputed automatically.
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 @dataclass
 class ChannelMeta:
-    """Metadata for a single additional ion channel.
+    """Metadata for a single ion channel.
 
     Attributes:
         id: Lowercase identifier used as a field prefix, e.g. ``"ih"``.
@@ -102,11 +102,10 @@ class ChannelMeta:
 
 #: Ordered registry of every ion channel exposed in the UI.
 #:
-#: This is the single source of truth for per-channel metadata.  All downstream
-#: dicts and field lists are derived from this tuple so that adding a channel
-#: requires only one new entry here.  Includes the four HH-classic channels
-#: (Na, K, NaL, KL) since #320 — there is no separate "core" registry.
-ADDITIONAL_CHANNELS: tuple[ChannelMeta, ...] = (
+#: Single source of truth for per-channel metadata; downstream dicts and
+#: field lists are derived from this tuple so that adding a channel
+#: requires only one new entry here.
+CHANNELS: tuple[ChannelMeta, ...] = (
     # HH-classic core channels (per-preset kinetics; the slider only edits g_max).
     ChannelMeta(
         id="na",
@@ -295,16 +294,16 @@ HH_CLASSIC_CHANNEL_IDS: frozenset[str] = frozenset({"na", "k", "nal", "kl"})
 #: ``show_*_current`` visibility field names.  Used by VisibilityState and
 #: SimulationState to translate per-channel current keys into the
 #: corresponding bool flag.
-ADDITIONAL_CURRENT_FIELD_MAP: dict[str, str] = {
-    ch.column_name: ch.current_visibility_field for ch in ADDITIONAL_CHANNELS
+CURRENT_FIELD_MAP: dict[str, str] = {
+    ch.column_name: ch.current_visibility_field for ch in CHANNELS
 }
 
 #: Maps gating variable names to their ``show_*_gating`` visibility field
 #: names.  HH-classic core channels are excluded — their gates ``n``, ``m``,
 #: ``h`` are wired to the per-gate fields above.
-ADDITIONAL_GATING_FIELD_MAP: dict[str, str] = {
+GATING_FIELD_MAP: dict[str, str] = {
     gv: ch.gating_visibility_field
-    for ch in ADDITIONAL_CHANNELS
+    for ch in CHANNELS
     if ch.id not in HH_CLASSIC_CHANNEL_IDS
     for gv in ch.gating_vars
 }

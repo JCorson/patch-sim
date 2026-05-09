@@ -11,12 +11,12 @@ import patch_sim
 import patch_sim.channels
 from patch_sim.presets import NEURON_PRESETS
 from patch_sim_ui import presets
-from patch_sim_ui.channels import ADDITIONAL_CHANNELS
+from patch_sim_ui.channels import CHANNELS
 from patch_sim_ui.state._common import _set_float
 
 _NEURON_FLOAT_FIELDS: list[str] = list(presets.NEURON_CONFIG_SCALAR_FIELDS)
 
-_CHANNEL_FLOAT_FIELDS: list[str] = [ch.g_max_field for ch in ADDITIONAL_CHANNELS]
+_CHANNEL_FLOAT_FIELDS: list[str] = [ch.g_max_field for ch in CHANNELS]
 
 
 #: The NeuronState fields that determine the passive-only membrane test result.
@@ -86,7 +86,7 @@ class NeuronState(rx.State):
     """State for neuron biophysical parameters and channel configuration.
 
     Per-channel ``{id}_g_max`` reactive vars are added dynamically at module
-    load time (one per entry in :data:`ADDITIONAL_CHANNELS`).  See the
+    load time (one per entry in :data:`CHANNELS`).  See the
     ``add_var`` loop at the bottom of this module.  Visibility (which slider
     is shown) is driven by ``visible_channel_ids`` from the active preset.
     """
@@ -111,7 +111,7 @@ class NeuronState(rx.State):
     def visible_channel_ids(self) -> list[str]:
         """UI ids of auxiliary channels the active preset includes.
 
-        Iterated in :data:`ADDITIONAL_CHANNELS` order so the rendered row
+        Iterated in :data:`CHANNELS` order so the rendered row
         order is deterministic regardless of ``frozenset`` iteration order.
         Drives both the neuron-panel auxiliary-channel rows and the
         sweep-manager trace-visibility checkboxes — single source of truth
@@ -123,7 +123,7 @@ class NeuronState(rx.State):
             channels (e.g. Squid Giant Axon) or unknown preset names.
         """
         ids = presets.PRESET_CHANNEL_IDS.get(self.active_neuron_type, frozenset())
-        return [ch.id for ch in ADDITIONAL_CHANNELS if ch.id in ids]
+        return [ch.id for ch in CHANNELS if ch.id in ids]
 
     @rx.var
     def has_visible_channels(self) -> bool:
@@ -385,7 +385,7 @@ for _nc_name, _nc_default in presets.NEURON_CONFIG_SCALAR_DEFAULTS.items():
 # Register one ``{id}_g_max`` reactive var per channel in the registry, seeded
 # from the registry default.  Per-channel sliders bind to these vars; values
 # are reset by ``neuron_to_ui_state`` whenever a preset is loaded.
-for _ch_meta in ADDITIONAL_CHANNELS:
+for _ch_meta in CHANNELS:
     NeuronState.add_var(
         _ch_meta.g_max_field,
         float,

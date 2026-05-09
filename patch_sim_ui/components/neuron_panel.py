@@ -3,7 +3,7 @@
 import reflex as rx
 
 from patch_sim.presets import NEURON_PRESET_NAMES
-from patch_sim_ui.channels import ADDITIONAL_CHANNELS
+from patch_sim_ui.channels import CHANNELS
 from patch_sim_ui.constants import PARAM_RANGES
 from patch_sim_ui.state.neuron import NeuronState
 
@@ -173,7 +173,7 @@ _ADDITIONAL_CHANNEL_ROW_SPECS = [
         getattr(NeuronState, f"set_{ch.g_max_field}"),
         ch.g_max_field,
     )
-    for ch in ADDITIONAL_CHANNELS
+    for ch in CHANNELS
 ]
 
 

@@ -111,13 +111,13 @@ def test_cc_additional_channels_section_gating_only():
     For every additional channel the current label (e.g. ``"I_Ih"``) must not
     appear in the rendered group while the gating label must remain visible.
     """
-    from patch_sim_ui.channels import ADDITIONAL_CHANNELS, HH_CLASSIC_CHANNEL_IDS
+    from patch_sim_ui.channels import CHANNELS, HH_CLASSIC_CHANNEL_IDS
     from patch_sim_ui.components.sweep_manager import (
         _ADDITIONAL_CHANNEL_TRACE_SPECS,
         _channel_trace_group,
     )
 
-    aux = [ch for ch in ADDITIONAL_CHANNELS if ch.id not in HH_CLASSIC_CHANNEL_IDS]
+    aux = [ch for ch in CHANNELS if ch.id not in HH_CLASSIC_CHANNEL_IDS]
     for i, ch in enumerate(aux):
         spec = _ADDITIONAL_CHANNEL_TRACE_SPECS[i]
         comp = _channel_trace_group(*spec, include_current=False)
@@ -135,13 +135,13 @@ def test_vc_additional_channels_section_includes_current():
     For every additional channel both the current label (e.g. ``"I_Ih"``) and
     the gating label must appear in the rendered group.
     """
-    from patch_sim_ui.channels import ADDITIONAL_CHANNELS, HH_CLASSIC_CHANNEL_IDS
+    from patch_sim_ui.channels import CHANNELS, HH_CLASSIC_CHANNEL_IDS
     from patch_sim_ui.components.sweep_manager import (
         _ADDITIONAL_CHANNEL_TRACE_SPECS,
         _channel_trace_group,
     )
 
-    aux = [ch for ch in ADDITIONAL_CHANNELS if ch.id not in HH_CLASSIC_CHANNEL_IDS]
+    aux = [ch for ch in CHANNELS if ch.id not in HH_CLASSIC_CHANNEL_IDS]
     for i, ch in enumerate(aux):
         spec = _ADDITIONAL_CHANNEL_TRACE_SPECS[i]
         comp = _channel_trace_group(*spec, include_current=True)

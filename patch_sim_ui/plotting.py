@@ -10,7 +10,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from patch_sim_ui.channels import ADDITIONAL_CHANNELS
+from patch_sim_ui.channels import CHANNELS
 from patch_sim_ui.constants import (
     CC_VOLTAGE_COLOR,
     CHANNEL_COLORS,
@@ -26,9 +26,7 @@ from patch_sim_ui.sweep import Sweep
 # Pre-built ``column_name → "I_<current_key>"`` lookup so traces and hover
 # tables get their display labels from the registry rather than hand-rolled
 # string surgery.  Falls back to ``f"I_{column_name}"`` for unknown keys.
-_CURRENT_LABELS: dict[str, str] = {
-    ch.column_name: ch.current_label for ch in ADDITIONAL_CHANNELS
-}
+_CURRENT_LABELS: dict[str, str] = {ch.column_name: ch.current_label for ch in CHANNELS}
 
 # Maximum number of hover carrier points; keeps tooltip HTML build time short.
 _MAX_HOVER_POINTS = 2000

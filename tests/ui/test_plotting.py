@@ -702,13 +702,13 @@ def test_compute_trace_visibility_map_cc_single_sweep_classic_fields() -> None:
 
 def test_compute_trace_visibility_map_vc_single_sweep_classic_fields() -> None:
     """VC single sweep maps the registry-derived show_* fields to indices."""
-    from patch_sim_ui.channels import ADDITIONAL_CURRENT_FIELD_MAP
+    from patch_sim_ui.channels import CURRENT_FIELD_MAP
 
     sweep = _make_sweep(mode="Voltage Clamp")
     result = compute_trace_visibility_map(
         [sweep],
         "Voltage Clamp",
-        additional_current_field_map=ADDITIONAL_CURRENT_FIELD_MAP,
+        additional_current_field_map=CURRENT_FIELD_MAP,
     )
     # trace order: total(0), INa(1), IK(2), INaL(3), IKL(4), n(5), m(6), h(7), stim(8)
     assert result["show_total_current"] == [0]

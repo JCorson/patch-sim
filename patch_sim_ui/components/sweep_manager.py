@@ -2,7 +2,7 @@
 
 import reflex as rx
 
-from patch_sim_ui.channels import ADDITIONAL_CHANNELS, HH_CLASSIC_CHANNEL_IDS
+from patch_sim_ui.channels import CHANNELS, HH_CLASSIC_CHANNEL_IDS
 from patch_sim_ui.constants import CURRENT_CLAMP
 from patch_sim_ui.state import SimulationState
 from patch_sim_ui.state.log import LogState
@@ -105,7 +105,7 @@ _CORE_CURRENT_TRACE_SPECS = [
         getattr(VisibilityState, ch.current_visibility_field),
         getattr(VisibilityState, f"set_{ch.current_visibility_field}"),
     )
-    for ch in ADDITIONAL_CHANNELS
+    for ch in CHANNELS
     if ch.id in HH_CLASSIC_CHANNEL_IDS
 ]
 
@@ -124,7 +124,7 @@ _ADDITIONAL_CHANNEL_TRACE_SPECS = [
         getattr(VisibilityState, ch.gating_visibility_field),
         getattr(VisibilityState, f"set_{ch.gating_visibility_field}"),
     )
-    for ch in ADDITIONAL_CHANNELS
+    for ch in CHANNELS
     if ch.id not in HH_CLASSIC_CHANNEL_IDS
 ]
 

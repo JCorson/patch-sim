@@ -34,7 +34,7 @@ from patch_sim.constants import (
 )
 from patch_sim.neuron import Neuron
 from patch_sim.presets import NEURON_PRESETS
-from patch_sim_ui.channels import ADDITIONAL_CHANNELS
+from patch_sim_ui.channels import CHANNELS
 
 # Enumerate Neuron scalar fields once; derived constants reuse this tuple.
 # Neuron does not use ``from __future__ import annotations``, so f.type is
@@ -95,7 +95,7 @@ DEFAULT_G_MAX: dict[str, float] = {
 # directly.  Variant channels with a divergent name (e.g. SNc INaP -> "NaP_SNc")
 # are mapped explicitly so they collapse onto the canonical UI toggle.
 CHANNEL_NAME_TO_ID: dict[str, str] = {}
-for _ch_meta in ADDITIONAL_CHANNELS:
+for _ch_meta in CHANNELS:
     if _ch_meta.current_key.startswith("I") and _ch_meta.current_key != "I":
         CHANNEL_NAME_TO_ID[_ch_meta.current_key[1:]] = _ch_meta.id
     else:
@@ -127,7 +127,7 @@ def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
     }
 
     # Initialise every channel slider to its registry default.
-    for ch_meta in ADDITIONAL_CHANNELS:
+    for ch_meta in CHANNELS:
         state[ch_meta.g_max_field] = DEFAULT_G_MAX[ch_meta.id]
 
     # Override with preset-tuned values for channels present on the Neuron.
