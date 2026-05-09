@@ -118,7 +118,11 @@ class ProtocolState(rx.State):
         """True when the Step protocol is configured as a single sweep.
 
         A single sweep is produced whenever min_stimulus == max_stimulus,
-        regardless of the stimulus_step value.
+        regardless of the stimulus_step value.  This var also drives the
+        Sweep mode radio in the protocol panel, so editing min/max directly
+        until they coincide is treated as an implicit switch to single
+        sweep — the radio reflects the new state, but the multi-sweep memo
+        in ``set_step_sweep_mode`` is only updated on an explicit toggle.
 
         Returns:
             True if min_stimulus equals max_stimulus, False otherwise.
