@@ -9,7 +9,6 @@ from patch_sim_ui.channels import (
     CHANNELS,
     CURRENT_FIELD_MAP,
     GATING_FIELD_MAP,
-    HH_CLASSIC_CHANNEL_IDS,
 )
 from patch_sim_ui.plotting import compute_trace_visibility_map
 from patch_sim_ui.state._common import _PLOTLY_GD_JS
@@ -19,17 +18,8 @@ _VISIBILITY_FIELDS: list[str] = [
     "show_total_current",
     # Per-channel current toggles, derived uniformly from the registry.
     *[ch.current_visibility_field for ch in CHANNELS],
-    # HH-classic core channels expose their gating via per-gate toggles
-    # (n / m / h) rather than the registry's joint show_<id>_gating field.
-    "show_potassium_activation",
-    "show_sodium_activation",
-    "show_sodium_inactivation",
-    # Auxiliary-channel joint gating toggles.
-    *[
-        ch.gating_visibility_field
-        for ch in CHANNELS
-        if ch.id not in HH_CLASSIC_CHANNEL_IDS
-    ],
+    # Per-channel joint gating toggles for every channel that has gates.
+    *[ch.gating_visibility_field for ch in CHANNELS if ch.gating_vars],
 ]
 
 logger = logging.getLogger(__name__)
@@ -92,9 +82,8 @@ class VisibilityState(rx.State):
     show_k_current: bool = True
     show_nal_current: bool = False
     show_kl_current: bool = False
-    show_potassium_activation: bool = True
-    show_sodium_activation: bool = True
-    show_sodium_inactivation: bool = True
+    show_na_gating: bool = True
+    show_k_gating: bool = True
     show_ih_current: bool = True
     show_ih_gating: bool = True
     show_ika_current: bool = True

@@ -61,20 +61,28 @@ def test_analysis_sidebar_renders_with_burst_data():
     analysis_sidebar()
 
 
+def _spec_for_id(ui_id: str):
+    """Return the ``_PER_CHANNEL_TRACE_SPECS`` entry for ``ui_id``."""
+    from patch_sim_ui.channels import CHANNELS
+    from patch_sim_ui.components.sweep_manager import _PER_CHANNEL_TRACE_SPECS
+
+    idx = next(i for i, ch in enumerate(CHANNELS) if ch.id == ui_id)
+    return _PER_CHANNEL_TRACE_SPECS[idx]
+
+
 def test_channel_trace_group_excludes_current_when_flag_false():
     """_channel_trace_group with include_current=False must omit the current label.
 
     The current checkbox label (e.g. ``"I_Ih"``) must not appear in the rendered
     component while the gating label must still be present.
     """
-    from patch_sim_ui.components.sweep_manager import (
-        _ADDITIONAL_CHANNEL_TRACE_SPECS,
-        _channel_trace_group,
-    )
+    from patch_sim_ui.components.sweep_manager import _channel_trace_group
 
-    spec = _ADDITIONAL_CHANNEL_TRACE_SPECS[0]
-    current_label, gating_label = spec[2], spec[5]
-    comp = _channel_trace_group(*spec, include_current=False)
+    *positional, has_gating = _spec_for_id("ih")
+    current_label, gating_label = positional[2], positional[5]
+    comp = _channel_trace_group(
+        *positional, include_current=False, include_gating=has_gating
+    )
     assert not _label_present(comp, current_label), (
         f"Current label {current_label!r} must not appear when include_current=False"
     )
@@ -89,14 +97,11 @@ def test_channel_trace_group_includes_current_by_default():
     Both the current label (e.g. ``"I_Ih"``) and the gating label must appear
     in the rendered component.
     """
-    from patch_sim_ui.components.sweep_manager import (
-        _ADDITIONAL_CHANNEL_TRACE_SPECS,
-        _channel_trace_group,
-    )
+    from patch_sim_ui.components.sweep_manager import _channel_trace_group
 
-    spec = _ADDITIONAL_CHANNEL_TRACE_SPECS[0]
-    current_label, gating_label = spec[2], spec[5]
-    comp = _channel_trace_group(*spec)
+    *positional, has_gating = _spec_for_id("ih")
+    current_label, gating_label = positional[2], positional[5]
+    comp = _channel_trace_group(*positional, include_gating=has_gating)
     assert _label_present(comp, current_label), (
         f"Current label {current_label!r} must appear by default"
     )
@@ -105,52 +110,66 @@ def test_channel_trace_group_includes_current_by_default():
     )
 
 
-def test_cc_additional_channels_section_gating_only():
-    """_additional_channels_section(include_current=False) must hide all current labels.
+def test_channel_trace_group_skips_gating_when_no_gates():
+    """Leaks (NaL, KL) have no gates — the gating checkbox must not appear."""
+    from patch_sim_ui.components.sweep_manager import _channel_trace_group
 
-    For every additional channel the current label (e.g. ``"I_Ih"``) must not
-    appear in the rendered group while the gating label must remain visible.
+    *positional, has_gating = _spec_for_id("nal")
+    assert has_gating is False
+    current_label, gating_label = positional[2], positional[5]
+    comp = _channel_trace_group(*positional, include_gating=has_gating)
+    assert _label_present(comp, current_label), (
+        f"Current label {current_label!r} must appear for a current-only group"
+    )
+    assert not _label_present(comp, gating_label), (
+        f"Gating label {gating_label!r} must not appear for a leak channel"
+    )
+
+
+def test_cc_per_channel_section_gating_only():
+    """In CC mode each channel sub-group hides current and (if applicable) shows gating.
+
+    For every channel the current label must be absent.  Channels with
+    gating variables must show their gating label; leak channels must not.
     """
-    from patch_sim_ui.channels import CHANNELS, HH_CLASSIC_CHANNEL_IDS
+    from patch_sim_ui.channels import CHANNELS
     from patch_sim_ui.components.sweep_manager import (
-        _ADDITIONAL_CHANNEL_TRACE_SPECS,
+        _PER_CHANNEL_TRACE_SPECS,
         _channel_trace_group,
     )
 
-    aux = [ch for ch in CHANNELS if ch.id not in HH_CLASSIC_CHANNEL_IDS]
-    for i, ch in enumerate(aux):
-        spec = _ADDITIONAL_CHANNEL_TRACE_SPECS[i]
-        comp = _channel_trace_group(*spec, include_current=False)
+    for ch, (*positional, has_gating) in zip(CHANNELS, _PER_CHANNEL_TRACE_SPECS):
+        comp = _channel_trace_group(
+            *positional, include_current=False, include_gating=has_gating
+        )
         assert not _label_present(comp, ch.current_label), (
             f"Channel {ch.label!r}: {ch.current_label!r} must be absent in CC mode"
         )
-        assert _label_present(comp, ch.gating_label), (
-            f"Channel {ch.label!r}: {ch.gating_label!r} must be present in CC mode"
-        )
+        if has_gating:
+            assert _label_present(comp, ch.gating_label), (
+                f"Channel {ch.label!r}: {ch.gating_label!r} must be present in CC mode"
+            )
 
 
-def test_vc_additional_channels_section_includes_current():
-    """_additional_channels_section() (VC default) must show both labels.
-
-    For every additional channel both the current label (e.g. ``"I_Ih"``) and
-    the gating label must appear in the rendered group.
-    """
-    from patch_sim_ui.channels import CHANNELS, HH_CLASSIC_CHANNEL_IDS
+def test_vc_per_channel_section_includes_current():
+    """In VC mode each channel sub-group shows current; gating only when present."""
+    from patch_sim_ui.channels import CHANNELS
     from patch_sim_ui.components.sweep_manager import (
-        _ADDITIONAL_CHANNEL_TRACE_SPECS,
+        _PER_CHANNEL_TRACE_SPECS,
         _channel_trace_group,
     )
 
-    aux = [ch for ch in CHANNELS if ch.id not in HH_CLASSIC_CHANNEL_IDS]
-    for i, ch in enumerate(aux):
-        spec = _ADDITIONAL_CHANNEL_TRACE_SPECS[i]
-        comp = _channel_trace_group(*spec, include_current=True)
+    for ch, (*positional, has_gating) in zip(CHANNELS, _PER_CHANNEL_TRACE_SPECS):
+        comp = _channel_trace_group(
+            *positional, include_current=True, include_gating=has_gating
+        )
         assert _label_present(comp, ch.current_label), (
             f"Channel {ch.label!r}: {ch.current_label!r} must be present in VC mode"
         )
-        assert _label_present(comp, ch.gating_label), (
-            f"Channel {ch.label!r}: {ch.gating_label!r} must be present in VC mode"
-        )
+        if has_gating:
+            assert _label_present(comp, ch.gating_label), (
+                f"Channel {ch.label!r}: {ch.gating_label!r} must be present in VC mode"
+            )
 
 
 def test_log_panel_renders_without_error():

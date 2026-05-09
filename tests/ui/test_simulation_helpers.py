@@ -153,9 +153,6 @@ def _make_cc_sweep(
         voltage=voltage.tolist(),
         dvdt=dvdt.tolist(),
         total_current=[0.0] * n_points,
-        potassium_activation=[0.0] * n_points,
-        sodium_activation=[0.0] * n_points,
-        sodium_inactivation=[0.0] * n_points,
         stimulus=[0.0] * n_points,
         clamp_mode=CURRENT_CLAMP,
     )
@@ -184,9 +181,6 @@ def _make_vc_sweep(label: str = "0 mV") -> Sweep:
         voltage=[0.0] * n,
         dvdt=[],
         total_current=total.tolist(),
-        potassium_activation=[0.0] * n,
-        sodium_activation=[0.0] * n,
-        sodium_inactivation=[0.0] * n,
         stimulus=[0.0] * n,
         clamp_mode=VOLTAGE_CLAMP,
     )

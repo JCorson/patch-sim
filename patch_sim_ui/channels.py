@@ -94,10 +94,17 @@ class ChannelMeta:
     def gating_label(self) -> str:
         """Visibility checkbox label for the gating variable trace(s).
 
+        Uses ``current_key`` (the bare channel identifier) rather than
+        enumerating each gate name, because some channels have
+        variant-specific extra gates (e.g. Na has the slow-inactivation
+        gate ``sNa12`` only when the active preset uses Pospischil Nav1.2)
+        — listing every possible gate here would mislead users about
+        which gates the active preset actually exposes.
+
         Returns:
-            Label string, e.g. ``"Ih gating (r)"``.
+            Label string, e.g. ``"Ih gating"`` or ``"Na gating"``.
         """
-        return f"{self.current_key} gating ({', '.join(self.gating_vars)})"
+        return f"{self.current_key} gating"
 
 
 #: Ordered registry of every ion channel exposed in the UI.
@@ -111,7 +118,12 @@ CHANNELS: tuple[ChannelMeta, ...] = (
         id="na",
         current_key="Na",
         label="Na (fast Na⁺)",
-        gating_vars=("m", "h"),
+        # ``m`` and ``h`` are the HH52 fast gates; ``sNa``/``sNa11``/
+        # ``sNa12``/``sNa_da`` are slow-inactivation gates added by the STN /
+        # Purkinje, Pospischil Nav1.1, Pospischil Nav1.2, and Dopaminergic
+        # variant factories respectively.  Only the gates produced by the
+        # active preset's Na factory appear in the simulation columns.
+        gating_vars=("m", "h", "sNa", "sNa11", "sNa12", "sNa_da"),
         g_max_range=(0.0, 300.0, 1.0),
         current_color="#ff7f0e",
         gating_var_colors={"m": "#ff7f0e", "h": "#2ca02c"},
@@ -184,7 +196,10 @@ CHANNELS: tuple[ChannelMeta, ...] = (
         id="inap",
         current_key="INaP",
         label="INaP (Persistent Na\u207a)",
-        gating_vars=("p",),
+        # ``p``/``sNaP`` come from ``make_inap_channel``; ``pSNc``/``sNaP_snc``
+        # come from ``make_snc_inap_channel`` (the SNc variant maps onto the
+        # same UI id via CHANNEL_NAME_TO_ID["NaP_SNc"] = "inap").
+        gating_vars=("p", "sNaP", "pSNc", "sNaP_snc"),
         g_max_range=(0.0, 5.0, 0.01),
         current_color="#e377c2",
         gating_var_colors={"p": "#7f7f7f"},
@@ -281,15 +296,6 @@ CHANNELS: tuple[ChannelMeta, ...] = (
     ),
 )
 
-#: Channel ids whose gating variables are exposed via the per-gate visibility
-#: fields (``show_potassium_activation`` for ``n``, ``show_sodium_activation``
-#: for ``m``, ``show_sodium_inactivation`` for ``h``) rather than the joint
-#: ``show_<id>_gating`` field used for every other channel.  ``nal`` and
-#: ``kl`` are leak channels with no gating variables, included for completeness
-#: so callers can use a single set when they want to skip the four HH-classic
-#: core channels.
-HH_CLASSIC_CHANNEL_IDS: frozenset[str] = frozenset({"na", "k", "nal", "kl"})
-
 #: Maps simulation result column names (e.g. ``"INa"``, ``"Ih"``) to their
 #: ``show_*_current`` visibility field names.  Used by VisibilityState and
 #: SimulationState to translate per-channel current keys into the
@@ -299,11 +305,8 @@ CURRENT_FIELD_MAP: dict[str, str] = {
 }
 
 #: Maps gating variable names to their ``show_*_gating`` visibility field
-#: names.  HH-classic core channels are excluded — their gates ``n``, ``m``,
-#: ``h`` are wired to the per-gate fields above.
+#: names.  Every channel with non-empty ``gating_vars`` contributes — each
+#: per-channel toggle hides every gate of that channel uniformly.
 GATING_FIELD_MAP: dict[str, str] = {
-    gv: ch.gating_visibility_field
-    for ch in CHANNELS
-    if ch.id not in HH_CLASSIC_CHANNEL_IDS
-    for gv in ch.gating_vars
+    gv: ch.gating_visibility_field for ch in CHANNELS for gv in ch.gating_vars
 }

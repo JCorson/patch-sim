@@ -2,7 +2,7 @@
 
 import reflex as rx
 
-from patch_sim_ui.channels import CHANNELS, HH_CLASSIC_CHANNEL_IDS
+from patch_sim_ui.channels import CHANNELS
 from patch_sim_ui.constants import CURRENT_CLAMP
 from patch_sim_ui.state import SimulationState
 from patch_sim_ui.state.log import LogState
@@ -56,8 +56,9 @@ def _channel_trace_group(
     gating_handler,
     *,
     include_current: bool = True,
+    include_gating: bool = True,
 ) -> rx.Component:
-    """Render a per-channel group with optional current and required gating checkboxes.
+    """Render a per-channel group with optional current and gating checkboxes.
 
     The group is wrapped in ``rx.cond`` and only rendered when the channel is
     on the active preset (i.e. visible in the neuron panel).
@@ -71,104 +72,118 @@ def _channel_trace_group(
         current_var: State var for current trace visibility.
         current_handler: Event handler for current trace checkbox.
         gating_label: Label for the gating trace checkbox.
-        gating_var: State var for gating trace visibility.
-        gating_handler: Event handler for gating trace checkbox.
+        gating_var: State var for gating trace visibility (ignored when
+            ``include_gating`` is False).
+        gating_handler: Event handler for gating trace checkbox (ignored
+            when ``include_gating`` is False).
         include_current: When False, omit the current checkbox. Use False for
             current clamp mode where additional channel currents are not plotted.
+        include_gating: When False, omit the gating checkbox.  Use False for
+            channels with no gating variables (NaL, KL).
 
     Returns:
         A fragment containing the conditional channel group.
     """
-    current_row = (
-        [_trace_checkbox(current_label, current_var, current_handler)]
-        if include_current
-        else []
-    )
+    rows: list[rx.Component] = []
+    if include_current:
+        rows.append(_trace_checkbox(current_label, current_var, current_handler))
+    if include_gating:
+        rows.append(_trace_checkbox(gating_label, gating_var, gating_handler))
     return rx.cond(
         visible_var,
         rx.fragment(
             rx.separator(),
             _section_label(header),
-            *current_row,
-            _trace_checkbox(gating_label, gating_var, gating_handler),
+            *rows,
         ),
     )
 
 
-# HH-classic core channel current trace specs — rendered as flat checkboxes
-# in the voltage-clamp popover's "Currents" section.  Their gating is shown
-# separately as per-gate toggles (n / m / h) elsewhere.
-_CORE_CURRENT_TRACE_SPECS = [
-    (
-        ch.current_label,
-        NeuronState.visible_channel_ids.contains(ch.id),
-        getattr(VisibilityState, ch.current_visibility_field),
-        getattr(VisibilityState, f"set_{ch.current_visibility_field}"),
-    )
-    for ch in CHANNELS
-    if ch.id in HH_CLASSIC_CHANNEL_IDS
-]
+def _spec_for_channel(ch):
+    """Build a per-channel trace spec tuple.
 
-# Per-channel auxiliary trace specs (current + joint gating checkbox) —
-# rendered as per-channel sub-groups in both popovers.  Excludes HH-classic
-# core channels whose currents go in the flat "Currents" section above and
-# whose gating uses the per-gate toggles.
-_ADDITIONAL_CHANNEL_TRACE_SPECS = [
-    (
+    For channels with no gating variables (NaL, KL) the gating var/handler
+    slots are filled with the current's var/handler as harmless
+    placeholders — they're never read because the spec's trailing
+    ``has_gating`` flag drives ``include_gating=False`` in the renderer.
+
+    Args:
+        ch: A :class:`ChannelMeta` from the registry.
+
+    Returns:
+        A 9-tuple ``(header, visible, current_label, current_var,
+        current_handler, gating_label, gating_var, gating_handler,
+        has_gating)``.
+    """
+    has_gating = bool(ch.gating_vars)
+    current_var = getattr(VisibilityState, ch.current_visibility_field)
+    current_handler = getattr(VisibilityState, f"set_{ch.current_visibility_field}")
+    if has_gating:
+        gating_var = getattr(VisibilityState, ch.gating_visibility_field)
+        gating_handler = getattr(VisibilityState, f"set_{ch.gating_visibility_field}")
+    else:
+        gating_var = current_var
+        gating_handler = current_handler
+    return (
         ch.label,
         NeuronState.visible_channel_ids.contains(ch.id),
         ch.current_label,
-        getattr(VisibilityState, ch.current_visibility_field),
-        getattr(VisibilityState, f"set_{ch.current_visibility_field}"),
+        current_var,
+        current_handler,
         ch.gating_label,
-        getattr(VisibilityState, ch.gating_visibility_field),
-        getattr(VisibilityState, f"set_{ch.gating_visibility_field}"),
-    )
-    for ch in CHANNELS
-    if ch.id not in HH_CLASSIC_CHANNEL_IDS
-]
-
-
-def _core_current_section() -> rx.Component:
-    """Render the flat HH-classic core current checkboxes.
-
-    Each checkbox is wrapped in ``rx.cond`` so it only appears when the
-    active preset includes that channel (matching the per-aux-channel
-    sub-groups).
-
-    Returns:
-        A fragment containing the four core current checkboxes.
-    """
-    return rx.fragment(
-        *[
-            rx.cond(
-                visible_var,
-                _trace_checkbox(label, current_var, current_handler),
-            )
-            for label, visible_var, current_var, current_handler in (
-                _CORE_CURRENT_TRACE_SPECS
-            )
-        ]
+        gating_var,
+        gating_handler,
+        has_gating,
     )
 
 
-def _additional_channels_section(*, include_current: bool = True) -> rx.Component:
-    """Render conditional trace groups for all additional channels.
+# Per-channel trace specs.  One spec per registry entry; the popover renders
+# every channel as its own sub-group containing a current and (optionally) a
+# joint gating checkbox.  ``has_gating`` (final tuple element) is decided
+# per-channel based on whether the channel has any gating variables — NaL and
+# KL are leaks with no gates and therefore render as current-only groups.
+_PER_CHANNEL_TRACE_SPECS = [_spec_for_channel(ch) for ch in CHANNELS]
 
-    Each group is only shown when the corresponding channel is enabled.
+
+def _per_channel_section(*, include_current: bool = True) -> rx.Component:
+    """Render conditional trace groups for every channel in the registry.
+
+    Each group is only shown when the corresponding channel is on the
+    active preset.
 
     Args:
-        include_current: When False, omit the current checkbox from each group.
-            Pass False for current clamp mode where additional channel currents
-            are not plotted.
+        include_current: When False, omit the current checkbox from each
+            group.  Pass False for current clamp mode where channel
+            currents are not plotted.
 
     Returns:
-        A fragment containing all additional channel trace groups.
+        A fragment containing all per-channel trace groups.
     """
     return rx.fragment(
         *[
-            _channel_trace_group(*spec, include_current=include_current)
-            for spec in _ADDITIONAL_CHANNEL_TRACE_SPECS
+            _channel_trace_group(
+                header,
+                visible,
+                current_label,
+                current_var,
+                current_handler,
+                gating_label,
+                gating_var,
+                gating_handler,
+                include_current=include_current,
+                include_gating=has_gating,
+            )
+            for (
+                header,
+                visible,
+                current_label,
+                current_var,
+                current_handler,
+                gating_label,
+                gating_var,
+                gating_handler,
+                has_gating,
+            ) in _PER_CHANNEL_TRACE_SPECS
         ]
     )
 
@@ -176,8 +191,9 @@ def _additional_channels_section(*, include_current: bool = True) -> rx.Componen
 def _cc_popover_content() -> rx.Component:
     """Popover content for current clamp trace visibility.
 
-    Organises checkboxes into Response, Gating Variables, and Additional
-    Channels sections.
+    Organises checkboxes into a Response section followed by a per-channel
+    sub-group for each channel on the active preset that has gating
+    variables to toggle.
 
     Returns:
         A scrollable vstack of labelled checkbox groups.
@@ -189,24 +205,7 @@ def _cc_popover_content() -> rx.Component:
             VisibilityState.show_voltage,
             VisibilityState.set_show_voltage,
         ),
-        rx.separator(),
-        _section_label("Gating Variables"),
-        _trace_checkbox(
-            "K activation (n)",
-            VisibilityState.show_potassium_activation,
-            VisibilityState.set_show_potassium_activation,
-        ),
-        _trace_checkbox(
-            "Na activation (m)",
-            VisibilityState.show_sodium_activation,
-            VisibilityState.set_show_sodium_activation,
-        ),
-        _trace_checkbox(
-            "Na inactivation (h)",
-            VisibilityState.show_sodium_inactivation,
-            VisibilityState.set_show_sodium_inactivation,
-        ),
-        _additional_channels_section(include_current=False),
+        _per_channel_section(include_current=False),
         spacing="1",
         padding="2",
         max_height="60vh",
@@ -217,8 +216,8 @@ def _cc_popover_content() -> rx.Component:
 def _vc_popover_content() -> rx.Component:
     """Popover content for voltage clamp trace visibility.
 
-    Organises checkboxes into Currents, Gating Variables, and Additional
-    Channels sections.
+    Organises checkboxes into a Currents section (Total current followed
+    by a per-channel sub-group for each channel on the active preset).
 
     Returns:
         A scrollable vstack of labelled checkbox groups.
@@ -230,25 +229,7 @@ def _vc_popover_content() -> rx.Component:
             VisibilityState.show_total_current,
             VisibilityState.set_show_total_current,
         ),
-        _core_current_section(),
-        rx.separator(),
-        _section_label("Gating Variables"),
-        _trace_checkbox(
-            "K activation (n)",
-            VisibilityState.show_potassium_activation,
-            VisibilityState.set_show_potassium_activation,
-        ),
-        _trace_checkbox(
-            "Na activation (m)",
-            VisibilityState.show_sodium_activation,
-            VisibilityState.set_show_sodium_activation,
-        ),
-        _trace_checkbox(
-            "Na inactivation (h)",
-            VisibilityState.show_sodium_inactivation,
-            VisibilityState.set_show_sodium_inactivation,
-        ),
-        _additional_channels_section(),
+        _per_channel_section(),
         spacing="1",
         padding="2",
         max_height="60vh",

@@ -5,18 +5,10 @@ from pydantic import BaseModel
 
 from patch_sim.analysis.derivatives import compute_dvdt
 
-# Non-per-channel columns that are not stored in ``channel_currents``: time,
-# voltage, the summed total current, and the HH-classic per-gate variables.
-_RESERVED_COLUMNS = frozenset(
-    {
-        "time",
-        "voltage",
-        "Itotal",
-        "n",
-        "m",
-        "h",
-    }
-)
+# Top-level columns that are not stored in either per-channel dict: time,
+# voltage, and the summed total current.  Every other column is sorted into
+# ``channel_currents`` (currents) or ``channel_gating`` (gating variables).
+_RESERVED_COLUMNS = frozenset({"time", "voltage", "Itotal"})
 
 
 class Sweep(BaseModel):
@@ -29,16 +21,14 @@ class Sweep(BaseModel):
         voltage: Membrane voltage in mV.
         dvdt: Time derivative of membrane voltage in mV/ms.
         total_current: Sum of ion currents in µA/cm².
-        potassium_activation: Gating variable n (dimensionless, 0–1).
-        sodium_activation: Gating variable m (dimensionless, 0–1).
-        sodium_inactivation: Gating variable h (dimensionless, 0–1).
         stimulus: Stimulus waveform (current µA/cm² or voltage command mV).
         clamp_mode: CURRENT_CLAMP or VOLTAGE_CLAMP.
         channel_currents: Per-channel currents keyed by simulation column
             name (``"INa"``, ``"IK"``, ``"INaL"``, ``"IKL"``, ``"Ih"``,
             ``"IKv31"``, …).  Channels absent from a preset are omitted.
-        additional_gating: Auxiliary-channel gating variable traces keyed by
-            variable name (e.g. ``"r"``, ``"a"``).
+        channel_gating: Per-channel gating variable traces keyed by variable
+            name (``"n"``, ``"m"``, ``"h"``, ``"sNa12"``, ``"r"``, ``"a"``,
+            …).  Gates absent from a preset are omitted.
     """
 
     label: str
@@ -47,13 +37,10 @@ class Sweep(BaseModel):
     voltage: list[float]
     dvdt: list[float]
     total_current: list[float]
-    potassium_activation: list[float]
-    sodium_activation: list[float]
-    sodium_inactivation: list[float]
     stimulus: list[float]
     clamp_mode: str
     channel_currents: dict[str, list[float]] = {}
-    additional_gating: dict[str, list[float]] = {}
+    channel_gating: dict[str, list[float]] = {}
 
     @classmethod
     def from_result(
@@ -68,7 +55,7 @@ class Sweep(BaseModel):
 
         Per-channel current columns (anything starting with ``"I"`` other
         than ``"Itotal"``) become entries in ``channel_currents``; remaining
-        non-reserved columns become ``additional_gating``.
+        non-reserved columns become ``channel_gating``.
 
         Args:
             result: Simulation result structured array with a ``"time"`` field.
@@ -87,14 +74,14 @@ class Sweep(BaseModel):
             return result[name].tolist() if name in columns else []
 
         channel_currents: dict[str, list[float]] = {}
-        additional_gating: dict[str, list[float]] = {}
+        channel_gating: dict[str, list[float]] = {}
         for col in columns:
             if col in _RESERVED_COLUMNS:
                 continue
             if col.startswith("I"):
                 channel_currents[col] = result[col].tolist()
             else:
-                additional_gating[col] = result[col].tolist()
+                channel_gating[col] = result[col].tolist()
 
         time_arr = result["time"]
         if "voltage" in columns:
@@ -111,9 +98,6 @@ class Sweep(BaseModel):
             voltage=_col("voltage"),
             dvdt=dvdt_arr.tolist(),
             total_current=_col("Itotal"),
-            potassium_activation=_col("n"),
-            sodium_activation=_col("m"),
-            sodium_inactivation=_col("h"),
             channel_currents=channel_currents,
-            additional_gating=additional_gating,
+            channel_gating=channel_gating,
         )
