@@ -65,6 +65,13 @@ class ProtocolState(rx.State):
     max_stimulus: float = 10.0
     stimulus_step: float = 0.0
 
+    # Backend-only memo of the user's last multi-sweep range/step so toggling
+    # Single → Multi → Single → Multi preserves their values rather than
+    # resetting to a hardcoded default.  Stored as a delta so restoring
+    # always yields max > min regardless of any min edit while in single mode.
+    _last_multi_range_delta: float = 20.0
+    _last_multi_step: float = 2.0
+
     # Current clamp protocol params
     start_current: float = 0.0
     end_current: float = 15.0
@@ -107,7 +114,12 @@ class ProtocolState(rx.State):
         """True when the Step protocol is configured as a single sweep.
 
         A single sweep is produced whenever min_stimulus == max_stimulus,
-        regardless of the stimulus_step value.
+        regardless of the stimulus_step value.  This var also drives the
+        Multi-sweep toggle in the protocol panel, so editing min/max
+        directly until they coincide is treated as an implicit switch to
+        single sweep — the toggle reflects the new state, but the
+        multi-sweep memo in ``set_step_multi_sweep`` is only updated on
+        an explicit toggle.
 
         Returns:
             True if min_stimulus equals max_stimulus, False otherwise.
@@ -307,6 +319,44 @@ class ProtocolState(rx.State):
             self.stimulus_step = 1.0
             return
         self.stimulus_step = parsed
+
+    def set_single_stimulus(self, value: "str | float") -> None:
+        """Set both min_stimulus and max_stimulus to value for single-sweep mode.
+
+        Used by the single-sweep input field (rendered when Step is in single
+        mode).  Mirrors the parsed value into both range bounds so the
+        existing protocol builders see ``min == max`` and emit one sweep.
+
+        Args:
+            value: Raw input value from the UI field.
+        """
+        self._set_float("min_stimulus", value)
+        self.max_stimulus = self.min_stimulus
+
+    def set_step_multi_sweep(self, value: bool) -> None:
+        """Toggle the Step protocol between single-sweep and multi-sweep modes.
+
+        Turning the toggle off (multi → single) snapshots the current
+        ``(max - min)`` range and ``stimulus_step`` into backend-only memo
+        fields, then collapses ``max_stimulus`` onto ``min_stimulus`` and
+        zeroes ``stimulus_step``.  Turning it on (single → multi) restores
+        the memoised range and step.  The memo only updates on the off
+        transition, so a redundant off→off does not clobber it.
+
+        Args:
+            value: True to enable multi-sweep, False for single sweep.
+        """
+        if value:
+            self.max_stimulus = self.min_stimulus + self._last_multi_range_delta
+            self.stimulus_step = self._last_multi_step
+        else:
+            delta = self.max_stimulus - self.min_stimulus
+            if delta > 0:
+                self._last_multi_range_delta = delta
+            if self.stimulus_step > 0:
+                self._last_multi_step = self.stimulus_step
+            self.max_stimulus = self.min_stimulus
+            self.stimulus_step = 0.0
 
     # ------------------------------------------------------------------ #
     # Protocol building                                                  #

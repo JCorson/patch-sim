@@ -896,6 +896,90 @@ def test_set_stimulus_step_zero_accepted_when_single_sweep() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Sweep mode toggle — set_step_multi_sweep / set_single_stimulus
+# ---------------------------------------------------------------------------
+
+
+def test_set_single_stimulus_mirrors_to_both_fields() -> None:
+    """set_single_stimulus updates both min_stimulus and max_stimulus."""
+    ps = _make_protocol_state()
+    ps.min_stimulus = 5.0
+    ps.max_stimulus = 5.0
+    ps.set_single_stimulus(12.5)
+    assert ps.min_stimulus == 12.5
+    assert ps.max_stimulus == 12.5
+
+
+def test_set_single_stimulus_invalid_input_keeps_bounds_synced() -> None:
+    """Invalid input is rejected; min and max remain equal (no desync)."""
+    ps = _make_protocol_state()
+    ps.min_stimulus = 7.0
+    ps.max_stimulus = 7.0
+    ps.set_single_stimulus("not a number")
+    assert ps.min_stimulus == 7.0
+    assert ps.max_stimulus == 7.0
+
+
+def test_set_step_multi_sweep_off_collapses_max_to_min() -> None:
+    """Toggling multi-sweep off collapses max onto min and zeroes step."""
+    ps = _make_protocol_state()
+    ps.min_stimulus = 5.0
+    ps.max_stimulus = 15.0
+    ps.stimulus_step = 2.5
+    ps.set_step_multi_sweep(False)
+    assert ps.max_stimulus == 5.0
+    assert ps.stimulus_step == 0.0
+    assert ps.is_step_single_sweep is True
+
+
+def test_set_step_multi_sweep_off_memoises_range_and_step() -> None:
+    """Multi → Single transition saves (max - min) and step into backend memo."""
+    ps = _make_protocol_state()
+    ps.min_stimulus = 5.0
+    ps.max_stimulus = 15.0
+    ps.stimulus_step = 2.5
+    ps.set_step_multi_sweep(False)
+    assert ps._last_multi_range_delta == 10.0
+    assert ps._last_multi_step == 2.5
+
+
+def test_set_step_multi_sweep_on_restores_remembered_range() -> None:
+    """Single → Multi restores the delta/step memoised on the previous toggle."""
+    ps = _make_protocol_state()
+    ps.min_stimulus = 5.0
+    ps.max_stimulus = 15.0
+    ps.stimulus_step = 2.5
+    ps.set_step_multi_sweep(False)
+    ps.set_step_multi_sweep(True)
+    assert ps.min_stimulus == 5.0
+    assert ps.max_stimulus == 15.0
+    assert ps.stimulus_step == 2.5
+
+
+def test_set_step_multi_sweep_on_uses_defaults_on_first_toggle() -> None:
+    """Toggling fresh single → multi uses the initialised memo defaults."""
+    ps = _make_protocol_state()
+    # Initial state: min == max == 10, step == 0 (single sweep).
+    ps.set_step_multi_sweep(True)
+    assert ps.min_stimulus == 10.0
+    assert ps.max_stimulus == 10.0 + ps._last_multi_range_delta
+    assert ps.stimulus_step == ps._last_multi_step
+
+
+def test_set_step_multi_sweep_off_when_already_single_preserves_memo() -> None:
+    """A redundant off → off toggle must not clobber the memoised range."""
+    ps = _make_protocol_state()
+    ps.min_stimulus = 10.0
+    ps.max_stimulus = 10.0
+    ps.stimulus_step = 0.0
+    prior_delta = ps._last_multi_range_delta
+    prior_step = ps._last_multi_step
+    ps.set_step_multi_sweep(False)
+    assert ps._last_multi_range_delta == prior_delta
+    assert ps._last_multi_step == prior_step
+
+
+# ---------------------------------------------------------------------------
 # continuous_active computed var
 # ---------------------------------------------------------------------------
 
