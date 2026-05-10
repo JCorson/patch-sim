@@ -11,11 +11,7 @@ from patch_sim_ui.constants import (
     VOLTAGE_CLAMP,
     VOLTAGE_PROTOCOLS,
 )
-from patch_sim_ui.state.protocol import (
-    SWEEP_MODE_MULTI,
-    SWEEP_MODE_SINGLE,
-    ProtocolState,
-)
+from patch_sim_ui.state.protocol import ProtocolState
 
 
 def _num_field(
@@ -188,18 +184,17 @@ def _build_param_form(fields: tuple[ParamField, ...]) -> rx.Component:
 
 
 def _sweep_mode_toggle() -> rx.Component:
-    """Single-sweep / multi-sweep radio toggle for the Step protocol."""
+    """Multi-sweep toggle switch for the Step protocol.
+
+    Off means single sweep (one combined amplitude field); on means
+    multi-sweep (min/max/step trio).  Driven by ``is_step_single_sweep``
+    so external edits that drive ``min == max`` flip the switch off too.
+    """
     return rx.hstack(
-        rx.text("Sweep mode", size="2", color="gray", width="160px"),
-        rx.radio_group(
-            [SWEEP_MODE_SINGLE, SWEEP_MODE_MULTI],
-            value=rx.cond(
-                ProtocolState.is_step_single_sweep,
-                SWEEP_MODE_SINGLE,
-                SWEEP_MODE_MULTI,
-            ),
-            on_change=ProtocolState.set_step_sweep_mode,
-            direction="row",
+        rx.text("Multi-sweep", size="2", color="gray", width="160px"),
+        rx.switch(
+            checked=~ProtocolState.is_step_single_sweep,
+            on_change=ProtocolState.set_step_multi_sweep,
         ),
         width="100%",
         spacing="2",
