@@ -2407,9 +2407,9 @@ async def test_visible_channel_ids_updates_on_preset_switch() -> None:
 async def test_g_max_slider_does_not_invalidate_membrane_test_cache() -> None:
     """Moving an auxiliary-channel g_max must not bust the membrane-test fingerprint.
 
-    The membrane test depends only on passive parameters
-    (nal_g_max, kl_g_max, C_m, ion concentrations, T) — auxiliary channels
-    are silent in the passive run.  This regression test pins that contract.
+    The membrane test depends only on passive parameters (ungated-channel
+    g_max, C_m, ion concentrations, T) — gated auxiliary channels are silent
+    in the passive run.  This regression test pins that contract.
     """
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
@@ -2419,3 +2419,60 @@ async def test_g_max_slider_does_not_invalidate_membrane_test_cache() -> None:
     ns.ih_g_max = ns.ih_g_max + 0.5
     fingerprint_after = ns._compute_fingerprint()
     assert fingerprint_before == fingerprint_after
+
+
+@pytest.mark.parametrize("slider", ["nal_g_max", "kl_g_max"])
+async def test_passive_channel_slider_invalidates_membrane_test_cache(
+    slider: str,
+) -> None:
+    """Moving an ungated-channel g_max slider must bust the fingerprint.
+
+    Args:
+        slider: Name of the ungated-channel g_max slider to perturb.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(SQUID_GIANT_AXON)]
+
+    fingerprint_before = ns._compute_fingerprint()
+    setattr(ns, slider, getattr(ns, slider) + 0.01)
+    fingerprint_after = ns._compute_fingerprint()
+    assert fingerprint_before != fingerprint_after
+
+
+@pytest.mark.parametrize("field", ["C_m", "Na_out", "T"])
+async def test_passive_scalar_field_invalidates_membrane_test_cache(
+    field: str,
+) -> None:
+    """Changing a passive scalar field must bust the fingerprint.
+
+    Args:
+        field: Name of the NeuronState scalar attribute to perturb.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(SQUID_GIANT_AXON)]
+
+    fingerprint_before = ns._compute_fingerprint()
+    setattr(ns, field, getattr(ns, field) + 0.01)
+    fingerprint_after = ns._compute_fingerprint()
+    assert fingerprint_before != fingerprint_after
+
+
+async def test_fingerprint_changes_when_preset_switch_changes_passive_channels() -> (
+    None
+):
+    """Switching between presets with different passive g_max must change the fingerprint.
+
+    Pins that the channel walk is actually wired through the active
+    baseline — a silent no-op would leave the fingerprint dependent only
+    on scalar fields, and the Squid → Cortical Pyramidal switch (which
+    changes nal_g_max and kl_g_max defaults) would not produce a new digest.
+    """
+    ns = _make_neuron_state()
+    with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
+        [_ async for _ in ns.load_neuron_preset(SQUID_GIANT_AXON)]
+        squid_fingerprint = ns._compute_fingerprint()
+        [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
+        cortical_fingerprint = ns._compute_fingerprint()
+    assert squid_fingerprint != cortical_fingerprint
