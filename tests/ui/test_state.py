@@ -2440,7 +2440,7 @@ async def test_passive_channel_slider_invalidates_membrane_test_cache(
     assert fingerprint_before != fingerprint_after
 
 
-@pytest.mark.parametrize("field", ["C_m", "Na_out", "T"])
+@pytest.mark.parametrize("field", ["C_m", "Na_out", "Na_in", "K_out", "K_in", "T"])
 async def test_passive_scalar_field_invalidates_membrane_test_cache(
     field: str,
 ) -> None:
@@ -2457,6 +2457,20 @@ async def test_passive_scalar_field_invalidates_membrane_test_cache(
     setattr(ns, field, getattr(ns, field) + 0.01)
     fingerprint_after = ns._compute_fingerprint()
     assert fingerprint_before != fingerprint_after
+
+
+async def test_fingerprint_falls_back_safely_for_unknown_preset() -> None:
+    """An unknown active_neuron_type must not raise and must yield a valid digest.
+
+    Mirrors ``_build_neuron``'s ``factory is None`` fallback so the membrane
+    test still computes (against an empty channel list) rather than crashing
+    the UI when the active preset name is stale.
+    """
+    ns = _make_neuron_state()
+    ns.active_neuron_type = "not-a-real-preset"
+    fingerprint = ns._compute_fingerprint()
+    assert isinstance(fingerprint, str)
+    assert len(fingerprint) == 64
 
 
 async def test_fingerprint_changes_when_preset_switch_changes_passive_channels() -> (

@@ -29,7 +29,9 @@ _CHANNEL_FLOAT_FIELDS: list[str] = [ch.g_max_field for ch in CHANNELS]
 #: Ca²⁺ concentrations are omitted: no Ca²⁺ channels survive the passive
 #: filter, so their reversal potentials carry no current.  Na⁺ and K⁺
 #: concentrations ARE included because E_NaL and E_KL are used to compute
-#: the effective E_L for the passive RC circuit.
+#: the effective E_L for the passive RC circuit.  Q10 / T_ref are omitted
+#: because they only scale gating kinetics and ungated channels have no
+#: gates to scale.
 _PASSIVE_SCALAR_FIELDS: tuple[str, ...] = (
     "C_m",
     "Na_out",
@@ -175,20 +177,31 @@ class NeuronState(rx.State):
         and may return a stale digest if called from a background task before
         the cache has been invalidated by the latest state flush.
 
-        Hashes :data:`_PASSIVE_SCALAR_FIELDS` plus the slider ``g_max`` of every
-        ungated channel on the active baseline.  The channel walk mirrors
+        Hashes :data:`_PASSIVE_SCALAR_FIELDS`, the baseline's ``area_cm2``,
+        and the slider ``g_max`` of every ungated channel on the active
+        baseline.  A channel is only picked up if it is registered in
+        :data:`patch_sim_ui.channels.CHANNELS` (so it has a UI slider) — the
+        baseline-wired-only case has no slider to move and cannot change
+        between calls.  The channel walk mirrors
         :func:`patch_sim.analysis.membrane_test.run_membrane_test`'s
-        ``not ch.gating_variables`` filter, so any ungated channel whose slider
-        the user can move will invalidate the cache when changed.  Active
-        (gated) conductances and ``v_rest`` are excluded because the membrane
-        test blocks them or replaces them with the derived E_L.
+        ``not ch.gating_variables`` filter.  Active (gated) conductances are
+        excluded because the membrane test blocks them.  ``v_rest`` is also
+        excluded because the membrane test overrides it with the
+        leak-conductance-weighted E_L; the only case where ``v_rest`` would
+        change the output is the pathological one where every ungated
+        channel's ``g_max`` is zero, and the leak-channel sliders already
+        invalidate the digest before that boundary is crossed.
 
         Returns:
             A hex digest string that changes only when passive parameters change.
         """
         parts = [f"{name}={getattr(self, name)!r}" for name in _PASSIVE_SCALAR_FIELDS]
         factory = NEURON_PRESETS.get(self.active_neuron_type)
-        baseline_channels = factory().channels if factory is not None else ()
+        baseline = factory() if factory is not None else None
+        parts.append(
+            f"area_cm2={(baseline.area_cm2 if baseline is not None else None)!r}"
+        )
+        baseline_channels = baseline.channels if baseline is not None else ()
         for ch in baseline_channels:
             if ch.gating_variables:
                 continue
