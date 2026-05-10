@@ -2462,7 +2462,7 @@ async def test_passive_scalar_field_invalidates_membrane_test_cache(
 async def test_fingerprint_changes_when_preset_switch_changes_passive_channels() -> (
     None
 ):
-    """Switching between presets with different passive g_max must change the fingerprint.
+    """Switching to a preset with different passive g_max must change the fingerprint.
 
     Pins that the channel walk is actually wired through the active
     baseline — a silent no-op would leave the fingerprint dependent only
