@@ -241,6 +241,35 @@ def test_vc_per_channel_section_includes_current():
             )
 
 
+def test_per_channel_trace_specs_gate_on_visible_channel_ids():
+    """Every channel's trace-visibility spec gates on visible_channel_ids.
+
+    Regression for #355: the voltage-clamp popover previously hardcoded
+    checkboxes for I_K / I_NaL / I_KL so they kept rendering on presets
+    that omit those channels (Cortical Pyramidal, STN). The fix unified
+    every channel into the registry-driven ``_PER_CHANNEL_TRACE_SPECS``
+    loop, gating each group on ``NeuronState.visible_channel_ids``.
+    This test pins that contract by inspecting each spec's
+    ``visible_var`` so a future refactor cannot reintroduce an
+    always-true predicate (e.g. ``rx.Var.create(True)``) for any
+    channel.
+    """
+    from patch_sim_ui.channels import CHANNELS
+    from patch_sim_ui.components.sweep_manager import _PER_CHANNEL_TRACE_SPECS
+
+    for ch, spec in zip(CHANNELS, _PER_CHANNEL_TRACE_SPECS):
+        visible_var = spec[1]
+        js_expr = getattr(visible_var, "_js_expr", "")
+        assert "visible_channel_ids" in js_expr, (
+            f"Channel {ch.id!r}: visible_var must reference "
+            f"NeuronState.visible_channel_ids; got {js_expr!r}"
+        )
+        assert f'includes("{ch.id}")' in js_expr, (
+            f"Channel {ch.id!r}: visible_var must gate on "
+            f'visible_channel_ids.contains("{ch.id}"); got {js_expr!r}'
+        )
+
+
 def test_log_panel_renders_without_error():
     """Instantiating log_panel must not raise a TypeError."""
     from patch_sim_ui.components.log_panel import log_panel
