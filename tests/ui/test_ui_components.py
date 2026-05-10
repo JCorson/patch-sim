@@ -241,6 +241,43 @@ def test_vc_per_channel_section_includes_current():
             )
 
 
+def test_per_channel_trace_specs_gate_on_visible_channel_ids():
+    """Every registry channel's spec gates on visible_channel_ids.
+
+    Regression for #355: the voltage-clamp popover previously hardcoded
+    checkboxes for I_K / I_NaL / I_KL so they kept rendering on presets
+    that omit those channels (Cortical Pyramidal, STN). The fix unified
+    every channel into the registry-driven ``_PER_CHANNEL_TRACE_SPECS``
+    loop, gating each group on ``NeuronState.visible_channel_ids``.
+    This test pins that contract for every entry currently in the spec
+    list, so a future refactor that adds a registry-driven entry
+    without registry-driven gating (e.g. by reintroducing an
+    always-true ``rx.Var.create(True)`` predicate) fails loudly here.
+    Note that this test does not catch a regression of the original
+    bug shape — hardcoded inline checkboxes outside the registry loop;
+    that path is covered by the renderer tests above which iterate
+    only registry-derived specs.
+    """
+    from patch_sim_ui.channels import CHANNELS
+    from patch_sim_ui.components.sweep_manager import _PER_CHANNEL_TRACE_SPECS
+
+    assert len(_PER_CHANNEL_TRACE_SPECS) == len(CHANNELS), (
+        "_PER_CHANNEL_TRACE_SPECS must have one entry per registry channel; "
+        f"got {len(_PER_CHANNEL_TRACE_SPECS)} specs vs {len(CHANNELS)} channels"
+    )
+
+    for ch, (_, visible_var, *_rest) in zip(CHANNELS, _PER_CHANNEL_TRACE_SPECS):
+        js_expr = getattr(visible_var, "_js_expr", "")
+        assert "visible_channel_ids" in js_expr, (
+            f"Channel {ch.id!r}: visible_var must reference "
+            f"NeuronState.visible_channel_ids; got {js_expr!r}"
+        )
+        assert f'includes("{ch.id}")' in js_expr, (
+            f"Channel {ch.id!r}: visible_var must gate on "
+            f'visible_channel_ids.contains("{ch.id}"); got {js_expr!r}'
+        )
+
+
 def test_log_panel_renders_without_error():
     """Instantiating log_panel must not raise a TypeError."""
     from patch_sim_ui.components.log_panel import log_panel
