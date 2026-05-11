@@ -42,10 +42,26 @@ def _impedance_summary() -> rx.Component:
 def _impedance_plot() -> rx.Component:
     """Render the embedded impedance-profile plot (|Z| and phase vs frequency).
 
+    Includes a sub-window caption when ``analyze_impedance`` recovered the
+    profile from a spike-free segment rather than the full chirp window.
+
     Returns:
-        A flex container holding the impedance Plotly figure.
+        A flex container holding the optional caption and the impedance Plotly
+        figure.
     """
     return rx.flex(
+        rx.cond(
+            AnalysisState.impedance_caption != "",
+            rx.text(
+                AnalysisState.impedance_caption,
+                size="1",
+                color="gray",
+                text_align="center",
+                padding_x="3",
+                padding_top="2",
+            ),
+            rx.fragment(),
+        ),
         rx.plotly(
             data=AnalysisState.impedance_figure,
             width="100%",
@@ -62,7 +78,8 @@ def impedance_tab() -> rx.Component:
     """Render the impedance-analysis tab for the chirp current-clamp pane.
 
     Shows the resonance summary and the |Z| / phase plot when impedance data
-    is available, and a placeholder otherwise.
+    is available, the specific unavailability reason when the analysis bailed
+    out, and a generic placeholder otherwise.
 
     Returns:
         The impedance-analysis content as a scrollable flex column.
@@ -79,16 +96,32 @@ def impedance_tab() -> rx.Component:
             height="100%",
             width="100%",
         ),
-        rx.flex(
-            rx.text(
-                "Run a Frequency Response (chirp) current clamp simulation to "
-                "see the impedance profile.  The chirp must keep the cell "
-                "subthreshold — reduce the amplitude if the response spikes.",
-                size="1",
-                color="gray",
-                text_align="center",
+        rx.cond(
+            AnalysisState.impedance_unavailable_reason != "",
+            rx.flex(
+                rx.text(
+                    "Impedance not computed: "
+                    + AnalysisState.impedance_unavailable_reason,
+                    size="1",
+                    color="gray",
+                    text_align="center",
+                ),
+                padding="4",
+                justify="center",
             ),
-            padding="4",
-            justify="center",
+            rx.flex(
+                rx.text(
+                    "Run a Frequency Response (chirp) current clamp simulation "
+                    "to see the impedance profile.  The chirp must keep the "
+                    "cell subthreshold — reduce the amplitude and, for cells "
+                    "that fire spontaneously, apply a hyperpolarizing DC "
+                    "offset (holding current).",
+                    size="1",
+                    color="gray",
+                    text_align="center",
+                ),
+                padding="4",
+                justify="center",
+            ),
         ),
     )

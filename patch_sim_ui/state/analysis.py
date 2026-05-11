@@ -221,8 +221,13 @@ class AnalysisState(rx.State):
 
     @rx.var
     def has_impedance_data(self) -> bool:
-        """Return True when chirp impedance-profile results are available."""
-        return len(self.impedance_data) > 0
+        """Return True when a renderable chirp impedance-profile is available.
+
+        A dict carrying only an ``unavailable_reason`` (the analysis bailed out)
+        is intentionally treated as *no* impedance data so the panel falls
+        through to the reason-aware placeholder.
+        """
+        return "frequencies" in self.impedance_data
 
     @rx.var
     def impedance_figure(self) -> go.Figure:
@@ -230,6 +235,25 @@ class AnalysisState(rx.State):
 
         Returns an empty figure when no impedance data is available.
         """
-        if not self.impedance_data:
+        if "frequencies" not in self.impedance_data:
             return go.Figure()
         return build_impedance_figure(self.impedance_data)
+
+    @rx.var
+    def impedance_unavailable_reason(self) -> str:
+        """Return the reason the chirp impedance analysis didn't run, or ``""``.
+
+        Set by :func:`patch_sim_ui.state._analysis_format._compute_impedance_data`
+        when :func:`patch_sim.analyze_impedance` returns ``None``; the impedance
+        panel renders this in place of the generic placeholder.
+        """
+        return self.impedance_data.get("unavailable_reason", "")
+
+    @rx.var
+    def impedance_caption(self) -> str:
+        """Return the sub-window caption for the impedance plot, or ``""``.
+
+        Populated when ``analyze_impedance`` recovered the profile from a
+        spike-free sub-window rather than the full chirp window.
+        """
+        return self.impedance_data.get("caption", "")

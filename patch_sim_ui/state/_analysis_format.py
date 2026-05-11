@@ -492,10 +492,14 @@ def _compute_impedance_data(
         area_cm2: Membrane surface area in cm², or ``None`` when undeclared.
 
     Returns:
-        A dict with keys ``frequencies``, ``magnitude``, ``phase`` (lists),
-        ``resonance_frequency``, ``quality_factor``, ``peak_impedance``
-        (pre-formatted strings), and ``units``.  Returns an empty dict when the
-        impedance analysis is not applicable (see :func:`patch_sim.analyze_impedance`).
+        On success, a dict with keys ``frequencies``, ``magnitude``, ``phase``
+        (lists), ``resonance_frequency``, ``quality_factor``, ``peak_impedance``
+        (pre-formatted strings), and ``units`` — plus a ``caption`` string when
+        the profile was recovered from a spike-free sub-window rather than the
+        full chirp window.  On failure, a dict with a single
+        ``unavailable_reason`` key carrying a human-readable sentence.  Returns
+        an empty dict only when the sweep itself is too short to attempt
+        analysis.
     """
     time_arr = np.asarray(sweep.time, dtype=float)
     if len(time_arr) < 2:
@@ -519,7 +523,22 @@ def _compute_impedance_data(
         area_cm2=area_cm2,
     )
     if profile is None:
-        return {}
+        # impedance_unavailable_reason covers the cheap pre-FFT failures; if it
+        # is silent, the FFT itself rejected the band (no stimulus power, too
+        # few in-band bins after trimming) — fall back to a generic message.
+        reason = (
+            patch_sim.impedance_unavailable_reason(
+                time_arr,
+                voltage_arr,
+                current_arr,
+                stim_start_ms,
+                stim_end_ms,
+                start_frequency,
+                end_frequency,
+            )
+            or "the chirp produced too little usable signal in the swept band."
+        )
+        return {"unavailable_reason": reason}
     if profile.magnitude_mohm is not None:
         magnitude = profile.magnitude_mohm
         peak = profile.peak_impedance_mohm
@@ -528,7 +547,7 @@ def _compute_impedance_data(
         magnitude = profile.magnitude
         peak = profile.peak_impedance
         units = "kΩ·cm²"
-    return {
+    result: dict[str, Any] = {
         "frequencies": profile.frequencies,
         "magnitude": magnitude,
         "phase": profile.phase,
@@ -537,6 +556,13 @@ def _compute_impedance_data(
         "peak_impedance": _fmt_optional(peak, ".3g"),
         "units": units,
     }
+    if profile.analyzed_window_ms is not None and profile.frequencies:
+        result["caption"] = (
+            f"Computed from a {profile.analyzed_window_ms:.0f} ms spike-free "
+            f"segment of the chirp ({profile.frequencies[0]:.1f}–"
+            f"{profile.frequencies[-1]:.1f} Hz)."
+        )
+    return result
 
 
 def _compute_cc_multi_sweep_analysis(
