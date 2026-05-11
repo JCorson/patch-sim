@@ -474,6 +474,7 @@ class SimulationState(rx.State):
         analysis_st.sfa_data = result.sfa_data
         analysis_st.hyperpolarization_data = result.hyperpolarization_data
         analysis_st.phase_plane_data = result.phase_plane_data
+        analysis_st.impedance_data = result.impedance_data
 
     # ------------------------------------------------------------------ #
     # Continuous simulation mode                                        #
@@ -699,6 +700,8 @@ class SimulationState(rx.State):
             stimulus_step = proto_st.stimulus_step
             pre_stimulus_duration = proto_st.pre_stimulus_duration
             stimulus_duration = proto_st.stimulus_duration
+            start_frequency = proto_st.start_frequency
+            end_frequency = proto_st.end_frequency
 
         logger.info("Simulation started: mode=%s, protocol=%s", mode, ptype)
 
@@ -719,6 +722,9 @@ class SimulationState(rx.State):
                 stimulus_step,
                 pre_stimulus_duration,
                 stimulus_duration,
+                ptype,
+                start_frequency,
+                end_frequency,
             )
         except ValueError as exc:
             logger.exception("Simulation error: %s", exc)

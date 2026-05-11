@@ -12,6 +12,7 @@ from patch_sim.constants import (
     CORTICAL_PYRAMIDAL,
     DOPAMINERGIC,
     FAST_SPIKING_INTERNEURON,
+    FREQUENCY_RESPONSE,
     PURKINJE,
     REPETITIVE_FIRING,
     SQUID_GIANT_AXON,
@@ -109,6 +110,45 @@ async def test_repetitive_firing_populates_phase_plane(state_tree: StateTree) ->
     )
 
     assert state_tree.analysis.phase_plane_data != {}
+
+
+async def test_frequency_response_preset_populates_impedance(
+    state_tree: StateTree,
+) -> None:
+    """The Frequency Response (chirp) preset populates impedance_data after a run."""
+    await run_flow(
+        state_tree,
+        neuron_preset=SQUID_GIANT_AXON,
+        protocol_preset=FREQUENCY_RESPONSE,
+    )
+
+    impedance = state_tree.analysis.impedance_data
+    assert impedance != {}
+    expected_keys = {
+        "frequencies",
+        "magnitude",
+        "phase",
+        "resonance_frequency",
+        "quality_factor",
+        "peak_impedance",
+        "units",
+    }
+    assert expected_keys.issubset(impedance.keys())
+    assert len(impedance["frequencies"]) == len(impedance["magnitude"])
+    assert len(impedance["frequencies"]) > 0
+
+
+async def test_action_potential_preset_leaves_impedance_empty(
+    state_tree: StateTree,
+) -> None:
+    """A non-chirp protocol does not populate impedance_data."""
+    await run_flow(
+        state_tree,
+        neuron_preset=SQUID_GIANT_AXON,
+        protocol_preset=ACTION_POTENTIAL,
+    )
+
+    assert state_tree.analysis.impedance_data == {}
 
 
 async def test_apply_simulation_clears_previous_analysis(

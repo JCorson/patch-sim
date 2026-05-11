@@ -1,8 +1,8 @@
 """Right-hand analysis sidebar — split into per-analysis panels.
 
-A collapsible panel that automatically shows the relevant analysis view
-based on the active clamp mode: AP metrics for current clamp, I-V curve
-for voltage clamp.
+A collapsible panel that automatically shows the relevant analysis view:
+the impedance profile for a chirp current-clamp protocol, AP metrics for any
+other current-clamp protocol, and the I-V curve in voltage clamp mode.
 
 The shell pieces (header, passive-membrane row, expand/collapse strips,
 ``analysis_sidebar`` entry point) live in this ``__init__.py``; the
@@ -12,6 +12,7 @@ per-analysis content lives in sibling modules:
 - :mod:`patch_sim_ui.components.metrics.burst_panel` — burst summary/table
 - :mod:`patch_sim_ui.components.metrics.calcium_panel` — calcium summary/table
 - :mod:`patch_sim_ui.components.metrics.fi_gv_panel` — F-I, g-V, τ-V, I-V tab
+- :mod:`patch_sim_ui.components.metrics.impedance_panel` — chirp impedance profile
 - :mod:`patch_sim_ui.components.metrics.sfa_hyperpol_panel` — SFA/sag plots
 - :mod:`patch_sim_ui.components.metrics._row` — shared dict-to-row helper
 
@@ -29,6 +30,7 @@ from patch_sim_ui.components.metrics.fi_gv_panel import (
     _iv_curve_tab,
     _tau_v_plot,
 )
+from patch_sim_ui.components.metrics.impedance_panel import impedance_tab
 from patch_sim_ui.state import SimulationState
 from patch_sim_ui.state.analysis import AnalysisState
 from patch_sim_ui.state.protocol import ProtocolState
@@ -111,9 +113,9 @@ def _membrane_test_section() -> rx.Component:
 def _expanded_panel() -> rx.Component:
     """Render the full expanded analysis sidebar.
 
-    The analysis view shown depends on the active clamp mode: AP metrics
-    are shown in current clamp mode, and the I-V curve is shown in voltage
-    clamp mode.
+    The analysis view shown depends on the active clamp mode and protocol:
+    the impedance profile for a chirp current-clamp protocol, AP metrics for
+    any other current-clamp protocol, and the I-V curve in voltage clamp mode.
 
     Returns:
         A fixed-width flex column with a header and the mode-appropriate
@@ -124,7 +126,12 @@ def _expanded_panel() -> rx.Component:
             rx.icon("chart-line", size=14),
             rx.cond(
                 ProtocolState.clamp_mode == CURRENT_CLAMP,
-                rx.text("AP Analysis", size="4", weight="bold"),
+                rx.cond(
+                    # "Chirp" is the protocol-type name from CURRENT_PROTOCOLS.
+                    ProtocolState.protocol_type == "Chirp",
+                    rx.text("Impedance Analysis", size="4", weight="bold"),
+                    rx.text("AP Analysis", size="4", weight="bold"),
+                ),
                 rx.text("I-V Analysis", size="4", weight="bold"),
             ),
             rx.spacer(),
@@ -145,7 +152,12 @@ def _expanded_panel() -> rx.Component:
         rx.box(
             rx.cond(
                 ProtocolState.clamp_mode == CURRENT_CLAMP,
-                _ap_metrics_tab(),
+                rx.cond(
+                    # "Chirp" is the protocol-type name from CURRENT_PROTOCOLS.
+                    ProtocolState.protocol_type == "Chirp",
+                    impedance_tab(),
+                    _ap_metrics_tab(),
+                ),
                 _iv_curve_tab(),
             ),
             display="flex",

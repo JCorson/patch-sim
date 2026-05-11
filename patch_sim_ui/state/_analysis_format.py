@@ -464,6 +464,69 @@ def _build_phase_plane_data(sweeps: "list[Sweep]") -> dict[str, Any]:
     return {"sweeps": eligible} if eligible else {}
 
 
+def _compute_impedance_data(
+    sweep: "Sweep",
+    start_frequency: float,
+    end_frequency: float,
+    area_cm2: "float | None",
+) -> dict[str, Any]:
+    """Serialise a chirp current-clamp sweep into impedance data for AnalysisState.
+
+    Computes the FFT-based membrane impedance over the chirp's swept band via
+    :func:`patch_sim.analyze_impedance`.  The whole recording is treated as the
+    chirp window (the Frequency Response preset has no pre/post-stimulus
+    padding).  Absolute MΩ values are used when the neuron declares a surface
+    area, otherwise the per-area kΩ·cm² spectrum is reported.
+
+    Args:
+        sweep: The single current-clamp sweep produced by a chirp protocol;
+            its ``stimulus`` field holds the injected current (µA/cm²).
+        start_frequency: Chirp sweep start frequency in Hz.
+        end_frequency: Chirp sweep end frequency in Hz.
+        area_cm2: Membrane surface area in cm², or ``None`` when undeclared.
+
+    Returns:
+        A dict with keys ``frequencies``, ``magnitude``, ``phase`` (lists),
+        ``resonance_frequency``, ``quality_factor``, ``peak_impedance``
+        (pre-formatted strings), and ``units``.  Returns an empty dict when the
+        impedance analysis is not applicable (see :func:`patch_sim.analyze_impedance`).
+    """
+    time_arr = np.asarray(sweep.time, dtype=float)
+    if len(time_arr) < 2:
+        return {}
+    voltage_arr = np.asarray(sweep.voltage, dtype=float)
+    current_arr = np.asarray(sweep.stimulus, dtype=float)
+    profile = patch_sim.analyze_impedance(
+        time_arr,
+        voltage_arr,
+        current_arr,
+        float(time_arr[0]),
+        float(time_arr[-1]),
+        start_frequency,
+        end_frequency,
+        area_cm2=area_cm2,
+    )
+    if profile is None:
+        return {}
+    if profile.magnitude_mohm is not None:
+        magnitude = profile.magnitude_mohm
+        peak = profile.peak_impedance_mohm
+        units = "MΩ"
+    else:
+        magnitude = profile.magnitude
+        peak = profile.peak_impedance
+        units = "kΩ·cm²"
+    return {
+        "frequencies": profile.frequencies,
+        "magnitude": magnitude,
+        "phase": profile.phase,
+        "resonance_frequency": _fmt_optional(profile.resonance_frequency, ".2f"),
+        "quality_factor": _fmt_optional(profile.quality_factor, ".2f"),
+        "peak_impedance": _fmt_optional(peak, ".3g"),
+        "units": units,
+    }
+
+
 def _compute_cc_multi_sweep_analysis(
     sweeps: "list[Sweep]",
     min_stimulus: float,

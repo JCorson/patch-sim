@@ -9,6 +9,7 @@ from patch_sim_ui.plotting import (
     build_fi_figure,
     build_gv_figure,
     build_hyperpolarization_figure,
+    build_impedance_figure,
     build_iv_figure,
     build_phase_plane_figure,
     build_sfa_figure,
@@ -17,7 +18,7 @@ from patch_sim_ui.plotting import (
 
 
 class AnalysisState(rx.State):
-    """State for AP, F-I, I-V, g-V, SFA, and phase-plane analysis results."""
+    """State for AP, F-I, I-V, g-V, SFA, phase-plane, and impedance results."""
 
     ap_metrics: list[dict[str, Any]] = []  # Per-spike metrics (serialized)
     ap_summary: dict[str, Any] = {}  # Aggregate summary statistics
@@ -37,6 +38,7 @@ class AnalysisState(rx.State):
     sfa_data: dict[str, Any] = {}  # Serialized SFAAnalysisResult for the UI
     hyperpolarization_data: dict[str, Any] = {}  # Serialized sag/rebound analysis
     phase_plane_data: dict[str, Any] = {}  # Serialized V vs dV/dt sweep data
+    impedance_data: dict[str, Any] = {}  # Serialized chirp impedance profile
 
     # Membrane test results — persisted across protocol/simulation changes.
     # Only invalidated when neuron parameters change (neuron_fingerprint mismatch).
@@ -69,6 +71,7 @@ class AnalysisState(rx.State):
         self.sfa_data = {}
         self.hyperpolarization_data = {}
         self.phase_plane_data = {}
+        self.impedance_data = {}
 
     @rx.var
     def has_membrane_test(self) -> bool:
@@ -215,3 +218,18 @@ class AnalysisState(rx.State):
         if not self.phase_plane_data:
             return go.Figure()
         return build_phase_plane_figure(self.phase_plane_data)
+
+    @rx.var
+    def has_impedance_data(self) -> bool:
+        """Return True when chirp impedance-profile results are available."""
+        return len(self.impedance_data) > 0
+
+    @rx.var
+    def impedance_figure(self) -> go.Figure:
+        """Return a Plotly impedance-profile figure (|Z| and phase vs frequency).
+
+        Returns an empty figure when no impedance data is available.
+        """
+        if not self.impedance_data:
+            return go.Figure()
+        return build_impedance_figure(self.impedance_data)

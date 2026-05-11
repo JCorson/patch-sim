@@ -217,6 +217,9 @@ async def run_flow(
         stimulus_step=tree.protocol.stimulus_step,
         pre_stimulus_duration=tree.protocol.pre_stimulus_duration,
         stimulus_duration=tree.protocol.stimulus_duration,
+        protocol_type=tree.protocol.protocol_type,
+        start_frequency=tree.protocol.start_frequency,
+        end_frequency=tree.protocol.end_frequency,
     )
     tree.sim._do_apply_simulation(result, tree.analysis)
     return result
@@ -249,6 +252,9 @@ def simulate_and_apply(tree: StateTree) -> _SimResult:
         stimulus_step=tree.protocol.stimulus_step,
         pre_stimulus_duration=tree.protocol.pre_stimulus_duration,
         stimulus_duration=tree.protocol.stimulus_duration,
+        protocol_type=tree.protocol.protocol_type,
+        start_frequency=tree.protocol.start_frequency,
+        end_frequency=tree.protocol.end_frequency,
     )
     tree.sim._do_apply_simulation(result, tree.analysis)
     return result

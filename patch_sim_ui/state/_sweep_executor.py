@@ -25,6 +25,7 @@ from patch_sim_ui.state._analysis_format import (
     _compute_ca_transient_data,
     _compute_cc_multi_sweep_analysis,
     _compute_gv_data,
+    _compute_impedance_data,
     _compute_iv_data,
     _compute_multi_sweep_burst_data,
     _compute_multi_sweep_ca_transient_data,
@@ -62,6 +63,7 @@ class _SimResult:
     sfa_data: dict[str, Any] = dataclasses.field(default_factory=dict)
     hyperpolarization_data: dict[str, Any] = dataclasses.field(default_factory=dict)
     phase_plane_data: dict[str, Any] = dataclasses.field(default_factory=dict)
+    impedance_data: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 
 def _compute_simulation(
@@ -75,6 +77,9 @@ def _compute_simulation(
     stimulus_step: float,
     pre_stimulus_duration: float,
     stimulus_duration: float,
+    protocol_type: str = "",
+    start_frequency: float = 0.0,
+    end_frequency: float = 0.0,
 ) -> _SimResult:
     """Run the simulation synchronously and compute all analysis.
 
@@ -95,6 +100,12 @@ def _compute_simulation(
         stimulus_step: Stimulus step size for analysis range.
         pre_stimulus_duration: Pre-stimulus duration (ms) for analysis windows.
         stimulus_duration: Stimulus duration (ms) for analysis windows.
+        protocol_type: Protocol-type name (e.g. ``"Step"``, ``"Chirp"``).  Used
+            to decide which protocol-specific analyses to run.
+        start_frequency: Chirp sweep start frequency (Hz); only used when
+            ``protocol_type == "Chirp"``.
+        end_frequency: Chirp sweep end frequency (Hz); only used when
+            ``protocol_type == "Chirp"``.
 
     Returns:
         A :class:`_SimResult` containing sweeps, figure token, and all
@@ -239,6 +250,14 @@ def _compute_simulation(
         burst_metrics, burst_summary = _compute_burst_data(
             ap_result, np.asarray(result["time"])
         )
+        # "Chirp" is the protocol-type name from constants.CURRENT_PROTOCOLS.
+        impedance_data = (
+            _compute_impedance_data(
+                sweep, start_frequency, end_frequency, neuron.area_cm2
+            )
+            if protocol_type == "Chirp"
+            else {}
+        )
         return _SimResult(
             sweeps=[sweep],
             sim_token=sim_token,
@@ -273,6 +292,7 @@ def _compute_simulation(
                 else {}
             ),
             phase_plane_data=_build_phase_plane_data([sweep]),
+            impedance_data=impedance_data,
         )
 
     # Single VC sweep — IV/GV require multi-sweep, but calcium transients can
