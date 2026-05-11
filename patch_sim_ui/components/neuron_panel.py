@@ -137,7 +137,7 @@ def _param_row(
             rx.input(
                 value=var,
                 on_change=handler,
-                width="90px",
+                width="64px",
                 size="1",
                 type="number",
                 min=str(min_val),
@@ -198,7 +198,7 @@ def neuron_panel() -> rx.Component:
                 ),
                 content=rx.vstack(
                     _param_row(
-                        "Membrane capacitance (µF/cm²)",
+                        "Capacitance (µF/cm²)",
                         NeuronState.C_m,
                         NeuronState.set_C_m,
                         *PARAM_RANGES["C_m"],
