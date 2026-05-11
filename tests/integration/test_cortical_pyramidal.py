@@ -339,6 +339,48 @@ def test_cp_ap_ahp_depth_in_rs_range(cp_ap_shape_result) -> None:
     )
 
 
+def test_cp_single_ap_repolarizes_cleanly(cp_neuron: Neuron) -> None:
+    """A single evoked AP repolarizes within 5 ms; no post-spike plateau.
+
+    Drives a single AP with the UI ACTION_POTENTIAL protocol (2 µA/cm² ×
+    15 ms) and asserts that within 5 ms after the peak the voltage has
+    dropped below −52 mV.  Regular-spiking neocortical pyramidal APs are
+    ~1–2 ms half-width followed by a fast AHP to roughly −55 to −70 mV
+    within a few ms (McCormick et al. 1985, J. Neurophysiol. 54:782;
+    Connors & Gutnick 1990, Trends Neurosci. 13:99; Bean 2007, Nat. Rev.
+    Neurosci. 8:451, Fig. 2 — cortical pyramidal single APs return below
+    threshold within ~2–4 ms).  −52 mV is a conservative bound just below
+    the −50 mV resting/threshold band so a single weakly-driven AP with a
+    shallow fAHP still clears it; a long plateau hanging at ~−30 mV after
+    the spike would mean a window current is dominating repolarization — a
+    pathology the mean half-width and AHP-depth metrics do not catch
+    (half-width is measured at the spike midpoint, which the trace can
+    cross cleanly even when V parks at −30 mV afterward; cf. SNc DA,
+    PR #318).
+    """
+    pre_ms, stim_ms, post_ms = 10.0, 15.0, 60.0
+    total_samples = _ms_to_samples(pre_ms + stim_ms + post_ms) + 1
+    current = np.zeros(total_samples)
+    pre_n = _ms_to_samples(pre_ms)
+    stim_n = _ms_to_samples(stim_ms)
+    current[pre_n : pre_n + stim_n] = 2.0
+    result = simulate_current_clamp(cp_neuron, current_external=current)
+    t = np.asarray(result["time"])
+    v = np.asarray(result["voltage"])
+
+    peak_idx = int(np.argmax(v))
+    peak_t = float(t[peak_idx])
+    after_mask = (t > peak_t) & (t <= peak_t + 5.0)
+    v_after = v[after_mask]
+    assert v_after.size > 0, "post-peak window is empty"
+    min_v = float(np.min(v_after))
+    assert min_v < -52.0, (
+        f"AP plateau detected: V never falls below −52 mV in 5 ms after the "
+        f"peak (min V = {min_v:.2f} mV at peak={peak_t:.2f} ms).  "
+        f"Reference: {_RS_REFERENCE}; Bean 2007."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Slow Na inactivation engagement and depol-block recovery — issue #327.
 # ---------------------------------------------------------------------------
