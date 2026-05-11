@@ -92,13 +92,12 @@ def _ion_row(
     )
 
 
-def _reversal_str(label: str, value: rx.Var, unit: str = "mV") -> rx.Component:
+def _reversal_str(label: str, value: rx.Var) -> rx.Component:
     """Render a read-only reversal potential display row.
 
     Args:
-        label: Ion species label (e.g. ``"Na⁺ reversal"``).
+        label: Ion species label (e.g. ``"Na⁺"``).
         value: Reactive float var holding the computed reversal potential.
-        unit: Unit string appended after the value (default ``"mV"``).
 
     Returns:
         An hstack showing the label, formatted value, and unit.
@@ -106,7 +105,7 @@ def _reversal_str(label: str, value: rx.Var, unit: str = "mV") -> rx.Component:
     return rx.hstack(
         rx.text(label, size="2", color="gray"),
         rx.text(f"{value:.2f}", size="2"),
-        rx.text(f" {unit}", size="1", color="gray"),
+        rx.text(" mV", size="1", color="gray"),
         width="100%",
     )
 
@@ -319,10 +318,10 @@ def neuron_panel() -> rx.Component:
         rx.separator(),
         rx.text("Reversal Potentials", size="2", weight="bold"),
         rx.grid(
-            _reversal_str("Na⁺ reversal", NeuronState.E_Na),
-            _reversal_str("K⁺ reversal", NeuronState.E_K),
-            _reversal_str("Leak reversal", NeuronState.E_L),
-            _reversal_str("Ca²⁺ reversal", NeuronState.E_Ca),
+            _reversal_str("Na⁺", NeuronState.E_Na),
+            _reversal_str("K⁺", NeuronState.E_K),
+            _reversal_str("Leak", NeuronState.E_L),
+            _reversal_str("Ca²⁺", NeuronState.E_Ca),
             spacing="1",
             width="100%",
             columns="2",
