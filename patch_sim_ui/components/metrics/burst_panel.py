@@ -46,7 +46,7 @@ def _burst_summary() -> rx.Component:
     it was chosen are surfaced so the user can interpret the result.
 
     Returns:
-        A compact grid of labelled metric values.
+        A compact grid of labeled metric values.
     """
     s = AnalysisState.burst_summary
     return rx.box(
@@ -121,7 +121,7 @@ def _ap_bursts_tab() -> rx.Component:
     Returns:
         The per-burst table wrapped in a flex column, or a placeholder when
         no bursts were detected (and no spike-train was long enough to run
-        the burst analyser).
+        the burst analyzer).
     """
     return rx.cond(
         AnalysisState.has_burst_summary,

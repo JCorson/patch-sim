@@ -79,7 +79,7 @@ CHANNEL_NAME_TO_ID["NaP_SNc"] = "inap"
 #: HH-classic core defaults are pulled from the canonical Squid Giant Axon
 #: ``Neuron`` object; auxiliary channel defaults come from the core library's
 #: per-channel ``DEFAULT_G_*`` constants (their authoritative home).  Used
-#: both to seed ``NeuronState`` g_max vars at module load and to initialise
+#: both to seed ``NeuronState`` g_max vars at module load and to initialize
 #: every slider in :func:`neuron_to_ui_state` before per-preset overrides
 #: are applied.
 _SQUID_G_MAX: dict[str, float] = {
@@ -128,7 +128,7 @@ def neuron_to_ui_state(neuron: Neuron) -> dict[str, Any]:
         name: getattr(neuron, name) for name in NEURON_CONFIG_SCALAR_FIELDS
     }
 
-    # Initialise every channel slider to its registry default.
+    # Initialize every channel slider to its registry default.
     for ch_meta in CHANNELS:
         state[ch_meta.g_max_field] = DEFAULT_G_MAX[ch_meta.id]
 

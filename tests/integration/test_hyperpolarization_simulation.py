@@ -3,7 +3,7 @@
 Runs the preset hyperpolarization protocol (with per-neuron adjustments) through
 the full simulation pipeline and verifies:
   - Structural plausibility for every preset (no NaN, in-range voltages).
-  - Ih-driven sag (steady-state depolarisation above the peak) for neurons
+  - Ih-driven sag (steady-state depolarization above the peak) for neurons
     known to express HCN channels.
   - Post-step rebound spikes for every model that produces them, covering all
     three biophysical mechanisms present in this simulator:
@@ -171,7 +171,7 @@ def test_sag_in_cortical_pyramidal(
 ) -> None:
     """Cortical pyramidal shows clear Ih-driven voltage sag during hyperpolarization.
 
-    Ih is a depolarising inward current activated by hyperpolarisation.  During
+    Ih is a depolarizing inward current activated by hyperpolarization.  During
     a sustained negative step, Ih activates and drives the membrane back toward
     rest — the characteristic sag.  The most negative step should show ≥5 mV
     of sag in this model (Ih conductance is significant in the CP preset).
@@ -255,7 +255,7 @@ def test_squid_giant_axon_minimal_sag(
     """Classic HH squid axon has no Ih channel and shows minimal voltage sag.
 
     The HH52 model contains only Na⁺ and K⁺ conductance-based channels plus a
-    passive leak.  Any apparent sag during hyperpolarisation comes from K channel
+    passive leak.  Any apparent sag during hyperpolarization comes from K channel
     deactivation (reduction in outward current), which is a small effect.  The
     sag amplitude should be well below the 1 mV threshold used for Ih-expressing
     neurons across the full current range of the preset.
@@ -281,7 +281,7 @@ def test_rebound_burst_in_thalamic_relay(
 ) -> None:
     """Thalamic relay neuron fires a rebound burst after hyperpolarization release.
 
-    Sustained hyperpolarisation de-inactivates T-type Ca²⁺ channels (ICaT).
+    Sustained hyperpolarization de-inactivates T-type Ca²⁺ channels (ICaT).
     When the step ends, the return to resting potential activates ICaT and drives
     a burst of action potentials — the post-inhibitory rebound.  At the most
     negative current step (−10 µA/cm² base preset), ≥1 rebound spike is expected
@@ -331,7 +331,7 @@ def test_anode_break_in_squid_giant_axon(
     """Squid giant axon fires a post-hyperpolarization spike via HH anode-break.
 
     The plain HH52 model contains only Na⁺, K⁺, and leak conductances — no
-    T-type Ca²⁺ or Ih channels.  Nevertheless, deep hyperpolarisation (~−98 mV)
+    T-type Ca²⁺ or Ih channels.  Nevertheless, deep hyperpolarization (~−98 mV)
     fully de-inactivates the Na⁺ h-gate (h_inf ≈ 0.996, τ_h ≈ 2.5 ms) and
     deactivates the K⁺ n-gate (n_inf ≈ 0.002) within the 300 ms step.  When the
     step ends, the m-gate activates rapidly as the membrane recovers while h is
@@ -360,7 +360,7 @@ def test_rebound_in_cortical_pyramidal(
     (−5 µA/cm²), fully de-inactivating h and deactivating n, which sets up
     HH anode-break excitation on release.  Simultaneously, Ih (activated during
     the step) continues to conduct after step offset, providing an inward
-    depolarising current that accelerates return to threshold.  The cell has no
+    depolarizing current that accelerates return to threshold.  The cell has no
     ICaT, so the rebound is driven entirely by these Na⁺ and Ih mechanisms.
 
     Args:
@@ -403,9 +403,9 @@ def test_rebound_in_dopaminergic(
     """Dopaminergic neuron fires a rebound spike driven by Ih.
 
     The dopaminergic preset has a high HCN conductance (g_Ih = 2.0 mS/cm²) but
-    no ICaT.  Even at shallow hyperpolarisation depths (−69 to −62 mV), Ih
+    no ICaT.  Even at shallow hyperpolarization depths (−69 to −62 mV), Ih
     activates substantially during the 300 ms step.  On release, this inward
-    current continues to depolarise the membrane above its resting state, and in
+    current continues to depolarize the membrane above its resting state, and in
     a cell with low firing threshold (pacemaker) the transient overshoot is
     sufficient to trigger a spike.  Rebound appears for steps of −15 µA/cm² and
     above.

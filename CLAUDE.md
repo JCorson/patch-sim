@@ -26,9 +26,13 @@ Only fall back to Grep/Glob when the LSP cannot answer the question (e.g. search
 
 Patch clamp experiment simulator with a core library (`patch_sim/`) and a Reflex web UI (`patch_sim_ui/`). The core library models ion channels, gating variables, voltage/current clamp protocols, and the HH differential equations. The UI provides interactive controls and live trace plots.
 
+## Spelling
+
+Use **US English** in all code, comments, docstrings, and documentation. LLM-assisted writing on neuroscience topics tends to drift toward British forms (depolarise, hyperpolarise, behaviour, modelling, centre, fibre, colour, analyse, initialise, etc.) because of the training-corpus mix. Always emit the US form: `depolarize`, `hyperpolarize`, `behavior`, `modeling`, `center`, `fiber`, `color`, `analyze`, `initialize`, etc.
+
 ## Biological accuracy
 
-**Prioritise biological accuracy** when designing or modifying neuron presets. If a preset produces behaviour that doesn't match known physiology (wrong resting potential, wrong firing pattern, missing channels), fix the underlying biology rather than working around it. When a full biological fix is out of scope (e.g. a channel type not yet implemented), document the known limitation explicitly in the preset comment and in an issue — do not silently accept a biologically wrong default.
+**Prioritize biological accuracy** when designing or modifying neuron presets. If a preset produces behavior that doesn't match known physiology (wrong resting potential, wrong firing pattern, missing channels), fix the underlying biology rather than working around it. When a full biological fix is out of scope (e.g. a channel type not yet implemented), document the known limitation explicitly in the preset comment and in an issue — do not silently accept a biologically wrong default.
 
 ## Architecture
 

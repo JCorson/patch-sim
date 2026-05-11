@@ -13,7 +13,7 @@ def build_sfa_figure(sfa_data: dict) -> go.Figure:
     instantaneous firing frequency (Hz) vs. spike interval index (1-indexed).
     Single-sweep runs display one green curve with an adaptation index
     annotation.  Multi-sweep runs overlay one curve per sweep using distinct
-    colours from :data:`~patch_sim_ui.constants.SWEEP_COLORS`, with the
+    colors from :data:`~patch_sim_ui.constants.SWEEP_COLORS`, with the
     adaptation index appended to each legend entry.
 
     Args:

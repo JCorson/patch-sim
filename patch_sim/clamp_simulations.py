@@ -93,7 +93,7 @@ def _initialize_gating_variables(
 ) -> dict[str, float]:
     """Compute steady-state gating variables at a given initial voltage.
 
-    Initialises every gating variable (core Na/K/leak and additional channels)
+    Initializes every gating variable (core Na/K/leak and additional channels)
     to its infinite-time steady-state value at *initial_voltage*.
 
     Args:
@@ -491,7 +491,7 @@ def _simulate_voltage_clamp_core(
     # Record initial state. Callers must pass a gating_state whose keys exactly
     # match the neuron's gating variables; any mismatch (e.g. stale keys from a
     # neuron switch mid-iteration) is a programming error. Fail loudly rather
-    # than leaving index 0 uninitialised or silently dropping values.
+    # than leaving index 0 uninitialized or silently dropping values.
     if set(gating_state.keys()) != set(gating_arrs.keys()):
         raise ValueError(
             "gating_state keys do not match the neuron's gating variables: "
@@ -800,7 +800,7 @@ def simulate_voltage_clamp_from_state(
 
     Identical to :func:`simulate_voltage_clamp` except the initial gating
     variables and Ca²⁺ concentration are provided by the caller rather than
-    initialised to steady-state at the first protocol voltage.  This is used
+    initialized to steady-state at the first protocol voltage.  This is used
     by continuous simulation mode to carry neuron state across loop iterations.
 
     Args:
@@ -847,7 +847,7 @@ def simulate_current_clamp_from_state(
 
     Identical to :func:`simulate_current_clamp` except the initial membrane
     voltage, gating variables, and Ca²⁺ concentration are provided by the
-    caller rather than initialised from ``neuron.v_rest``.  This is used by
+    caller rather than initialized from ``neuron.v_rest``.  This is used by
     continuous simulation mode to carry neuron state across loop iterations.
 
     Args:

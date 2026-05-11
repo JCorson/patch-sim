@@ -35,7 +35,7 @@ PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
         "max_stimulus": 2.0,
         "stimulus_duration": 5.0,
     },
-    # Depolarising bias on top of the autonomous tonic train.  At
+    # Depolarizing bias on top of the autonomous tonic train.  At
     # +2 µA/cm² the cell fires at ~36 Hz (top of the Bevan & Wilson
     # 1999 5–50 Hz autonomous range); 200 ms is long enough to
     # comfortably exceed the ≥5 spike requirement of
@@ -55,7 +55,7 @@ PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
     # Inherits the base HYPERPOLARIZATION_STEPS range (−10 → −2 µA/cm²).
     # Very high ICaT conductance (g=5.0 mS/cm²) produces a prominent
     # post-inhibitory rebound burst on step release; Ih (g=1.0 mS/cm²)
-    # adds a depolarising overshoot that can trigger additional spikes.
+    # adds a depolarizing overshoot that can trigger additional spikes.
 }
 
 
@@ -70,8 +70,8 @@ def make_stn() -> Neuron:
 
     Pacemaking mechanism:
         INaP (g=0.05 mS/cm²) provides a persistent Na⁺ window current that
-        destabilises any rest near −60 mV.  Ih (g=1.0 mS/cm²) activates
-        during the AHP and drives slow depolarisation back to threshold,
+        destabilizes any rest near −60 mV.  Ih (g=1.0 mS/cm²) activates
+        during the AHP and drives slow depolarization back to threshold,
         sustaining regular autonomous firing.  v_rest=−60 mV is the simulation
         starting point; this cell has no stable zero-current resting potential.
         Only a pure-K⁺ leak (g_KL=0.04 mS/cm²) is wired in; the Na-leak channel
@@ -88,21 +88,21 @@ def make_stn() -> Neuron:
 
     Burst mode (conditional):
         Prominent ICaT (g=5.0 mS/cm²) supports post-inhibitory rebound bursts
-        when sufficient prior hyperpolarisation de-inactivates the ft gate.
+        when sufficient prior hyperpolarization de-inactivates the ft gate.
         On release, ICaT and Ih together drive a high-frequency burst before
-        IKCa repolarises the cell back to tonic mode.  Burst mode can also be
+        IKCa repolarizes the cell back to tonic mode.  Burst mode can also be
         triggered by NMDA-receptor activation (Beurrier et al. 1999); NMDA is
-        not modelled here, so burst mode is only reachable via a
-        hyperpolarising-step-and-release protocol.
+        not modeled here, so burst mode is only reachable via a
+        hyperpolarizing-step-and-release protocol.
 
-    Depolarisation-block recovery:
-        Three complementary mechanisms cooperate to repolarise the cell after
+    Depolarization-block recovery:
+        Three complementary mechanisms cooperate to repolarize the cell after
         sustained suprathreshold drive:
 
         1. INaP slow inactivation (sNaP, via ``make_inap_channel``) — removes
            >70 % of the persistent Na⁺ window current at the plateau.
         2. Fast-Na slow inactivation (sNa, via ``make_stn_na_channel``) —
-           closes the residual fast-Na h-tail at the depolarised plateau
+           closes the residual fast-Na h-tail at the depolarized plateau
            (Otsuka 2004 h_inf ≈ 1 % at −15 mV; Do & Bean 2003 established
            slow Na inactivation in STN directly).
         3. K_ATP (Stanford & Lacey 1996; Bevan & Wilson 1999; Hahn &

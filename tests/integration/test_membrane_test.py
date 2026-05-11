@@ -95,7 +95,7 @@ def test_membrane_test_protocol_constants() -> None:
     The step must be long enough (> 2 ms) for the exponential fit to converge,
     and all durations must be strictly positive.
     """
-    assert MEMBRANE_TEST_CURRENT < 0, "Step must be hyperpolarising (< 0)"
+    assert MEMBRANE_TEST_CURRENT < 0, "Step must be hyperpolarizing (< 0)"
     assert MEMBRANE_TEST_PRE_MS > 0, "Pre-stimulus duration must be positive"
     assert MEMBRANE_TEST_STEP_MS > 2.0, "Step must be > 2 ms for reliable fitting"
     assert MEMBRANE_TEST_POST_MS > 0, "Post-stimulus duration must be positive"

@@ -1,11 +1,11 @@
-"""Behavioural tests for the SNc Dopaminergic neuron preset.
+"""Behavioral tests for the SNc Dopaminergic neuron preset.
 
 Pins the SNc DA pacemaker phenotype: autonomous firing within the published
 in-vitro range (Grace & Bunney 1984; Liss & Roeper 2008) sustained by the
 Cav1.3 + INaP_SNc subthreshold ramp and SK-shaped AHP (Putzier 2009 + Drion
 2011 reconciliation), broad APs, and tonic firing across the UI F-I sweep.
 
-The somatic single-compartment model does not reproduce depolarisation block:
+The somatic single-compartment model does not reproduce depolarization block:
 at every amplitude tested up to 15 µA/cm² and every duration up to 10 s the
 cell fires tonically with rolling-mean V below −70 mV.  Real SNc DA neurons
 enter sustained block above ~100 pA (Tucker et al. 2012); reproducing that
@@ -34,7 +34,7 @@ from tests.integration._ap_shape import assert_ap_shape
 # 5 s zero-current trace gives ~10 spikes at the preset's pacing rate, enough
 # for stable AP-shape statistics.
 _DA_SPONT_DURATION_MS = 5000.0
-# Modest depolarising step verifying sustained driven firing within the
+# Modest depolarizing step verifying sustained driven firing within the
 # pre-block range; the new tuning supports steady firing up to ~4 µA/cm².
 _DA_STEP_DURATION_MS = 2000.0
 _DA_STEP_CURRENT = 1.0
@@ -93,14 +93,14 @@ def test_da_spontaneous_pacemaking(da_neuron: Neuron) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Modest depolarisation sustains firing.
+# Modest depolarization sustains firing.
 # ---------------------------------------------------------------------------
 
 
 def test_da_modest_step_sustains_firing(da_neuron: Neuron) -> None:
     """A 1 µA/cm² step keeps the cell firing without entering block.
 
-    Real SNc DA neurons enter depolarisation block above ~100 pA injected
+    Real SNc DA neurons enter depolarization block above ~100 pA injected
     current at long sustained drive (Tucker et al. 2012); for a 50 pF cell
     that is roughly 2 µA/cm².  A 1 µA/cm² step sits well inside the
     regular-firing range; 2 s of 1 µA/cm² should produce sustained firing
@@ -126,7 +126,7 @@ def test_da_modest_step_sustains_firing(da_neuron: Neuron) -> None:
 # The somatic single-compartment model fires tonically across the entire
 # sweep: empirical sweep (scratch/characterize_da_block.py) shows 4–7 spikes
 # per 200 ms step at every amplitude, with 150 ms rolling-mean V never
-# exceeding −70 mV.  Real SNc DA neurons enter depolarisation block above
+# exceeding −70 mV.  Real SNc DA neurons enter depolarization block above
 # ~100 pA sustained drive (Tucker et al. 2012, J. Neurophysiol. 108:288),
 # but reproducing this requires the dendritic Na inactivation pool that a
 # somatic single-compartment representation cannot supply.  Tracked in #323.
@@ -153,7 +153,7 @@ def test_da_ui_fi_protocol(
     """200 ms F-I step matches the UI default protocol — issue #304.
 
     The somatic single-compartment model fires tonically across the full
-    UI F-I sweep — depolarisation block is not reproduced (#323; missing
+    UI F-I sweep — depolarization block is not reproduced (#323; missing
     dendritic Na inactivation, Tucker et al. 2012).  Each step must
     therefore produce at least ``min_spikes`` action potentials and must
     never park above −40 mV in the 150 ms rolling mean.  ``min_spikes``
@@ -174,7 +174,7 @@ def test_da_ui_fi_protocol(
     rolling_mean = np.convolve(voltage, kernel, mode="valid")
     assert np.max(rolling_mean) < -40.0, (
         f"At I = {amplitude} µA/cm², 150 ms rolling-mean V reached "
-        f"{np.max(rolling_mean):.1f} mV — unexpected depolarisation block "
+        f"{np.max(rolling_mean):.1f} mV — unexpected depolarization block "
         f"plateau (the somatic model is not expected to enter block; #323)."
     )
 
@@ -212,15 +212,15 @@ def test_da_ap_peak_voltage_in_da_range(da_ap_shape_result) -> None:
     )
 
 
-def test_da_single_ap_repolarises_cleanly(da_neuron: Neuron) -> None:
-    """A single evoked AP repolarises within ~5 ms; no Cav1.3-driven plateau.
+def test_da_single_ap_repolarizes_cleanly(da_neuron: Neuron) -> None:
+    """A single evoked AP repolarizes within ~5 ms; no Cav1.3-driven plateau.
 
     Drives a single AP with a 5 ms × 4 µA/cm² step (the UI ACTION_POTENTIAL
     protocol) and asserts that within 5 ms after the peak the voltage has
     dropped below −60 mV.  Real SNc DA APs are <3 ms wide with a clean
     medium AHP at −60 to −75 mV (Grace & Bunney 1984; Putzier et al. 2009).
     A long plateau hanging at ~−30 mV after the spike means Cav1.3 + Na
-    window currents are dominating repolarisation — a symptom of an
+    window currents are dominating repolarization — a symptom of an
     unphysiologically large persistent inward current that the half-width
     metric does not catch (half-width is computed at the spike midpoint,
     which the trace can cross cleanly even when V parks at −30 mV after).
@@ -285,12 +285,12 @@ def test_da_inap_slow_inactivation_engages_under_depol_clamp(
 
     Direct mechanism check for #330: the Khaliq & Bean 2010 / Magistretti &
     Alonso 1999 slow inactivation gate baked into ``make_snc_inap_channel``
-    must close significantly when the membrane is held depolarised.  Voltage
+    must close significantly when the membrane is held depolarized.  Voltage
     clamp from a −75 mV hold (slow gate ≈ 0.94 available) to −15 mV for
     300 ms is enough time for the τ_floor ≈ 20 ms gate to settle below 5%
     availability.  Under current clamp the SNc cell continues firing through
     the F-I-upper-bound drive (the somatic model resists depol-block, #323),
-    so the slow gate spends most of the cycle near hyperpolarised AHPs and
+    so the slow gate spends most of the cycle near hyperpolarized AHPs and
     does not engage strongly — voltage clamp is the cleaner mechanism check.
     """
     hold_ms, step_ms = 100.0, 300.0
@@ -324,7 +324,7 @@ def test_da_fast_na_slow_inactivation_engages_under_depol_clamp(
 
     Direct mechanism check for #330: the Khaliq & Bean 2010 slow voltage-
     dependent inactivation gate baked into ``make_dopaminergic_na_channel``
-    must close significantly when the membrane is held depolarised.  Khaliq
+    must close significantly when the membrane is held depolarized.  Khaliq
     & Bean 2010 directly studied SNc DA neurons.  Voltage clamp at −15 mV
     is used (rather than current clamp) because the SNc cell continues
     firing through the F-I-upper-bound drive (#323) so the slow gate stays

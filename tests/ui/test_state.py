@@ -443,7 +443,7 @@ async def test_build_neuron_forwards_preset_calcium_dynamics(preset_name: str) -
     rebound burst (preset wants alpha_ca=1.2e-5 / tau_ca=20 ms — 8.3× and
     10× different from defaults).  This test asserts the bug class is
     fixed at the build-neuron level rather than only verifying the
-    downstream simulation behaviour.
+    downstream simulation behavior.
 
     Args:
         preset_name: Name of a preset that overrides calcium_dynamics.
@@ -957,7 +957,7 @@ def test_set_step_multi_sweep_on_restores_remembered_range() -> None:
 
 
 def test_set_step_multi_sweep_on_uses_defaults_on_first_toggle() -> None:
-    """Toggling fresh single → multi uses the initialised memo defaults."""
+    """Toggling fresh single → multi uses the initialized memo defaults."""
     ps = _make_protocol_state()
     # Initial state: min == max == 10, step == 0 (single sweep).
     ps.set_step_multi_sweep(True)
@@ -1297,7 +1297,7 @@ async def test_load_neuron_preset_reapplies_active_protocol_overrides() -> None:
     Load 'Repetitive Firing' (Squid defaults: duration=180 ms), then switch to
     SNc Dopaminergic which has a longer 3000 ms duration override and lower
     0.3 µA/cm² stimulus (post-#318 review the cell is a Cav1.3+SK tonic
-    pacemaker; ≳1 µA/cm² drives depolarisation block, mid-range drive can
+    pacemaker; ≳1 µA/cm² drives depolarization block, mid-range drive can
     produce abortive doublets).  The protocol params should update
     automatically.
     """
@@ -1467,7 +1467,7 @@ async def test_protocol_override_restored_on_protocol_switch() -> None:
     """
     ns = _make_neuron_state()
     ns._apply_neuron_preset(CORTICAL_PYRAMIDAL)
-    # User customises mskv_g_max away from the preset baseline (1.8).
+    # User customizes mskv_g_max away from the preset baseline (1.8).
     ns.mskv_g_max = 5.0
     # Activate Na+ Channel Activation: slider drops to 0.
     ns._apply_protocol_overrides(NA_CHANNEL_ACTIVATION)

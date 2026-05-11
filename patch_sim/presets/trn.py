@@ -84,8 +84,8 @@ def make_trn() -> Neuron:
     LTS burst mechanism:
         ICaT (``make_trn_icat_channel``, g=2.85 mS/cm²) produces a
         low-threshold Ca²⁺ spike plateau when ft is de-inactivated by prior
-        hyperpolarisation.  Ih (g=0.020 mS/cm²; Bal & McCormick 1993 report
-        ≈0.025 for cat TRN) activates during the hyperpolarising step and
+        hyperpolarization.  Ih (g=0.020 mS/cm²; Bal & McCormick 1993 report
+        ≈0.025 for cat TRN) activates during the hyperpolarizing step and
         drives V across the LTS threshold on release — without Ih, passive
         relaxation does not overshoot the threshold and the LTS does not fire.
         IKCa (HP92, g=0.3 mS/cm²) converts ICaT-mediated Ca²⁺ entry into
@@ -95,7 +95,7 @@ def make_trn() -> Neuron:
     ICaT factory and inactivation time constant:
         ``make_trn_icat_channel`` replaces the default cosh-shaped Destexhe
         (1994) ft tau with a sigmoid-shaped tau — small (~20 ms) at
-        hyperpolarised V and large (~200 ms) at LTS-plateau V.  This sustains
+        hyperpolarized V and large (~200 ms) at LTS-plateau V.  This sustains
         the LTS plateau long enough to support the 5–15 spike HP92 burst.
         ft_inf(V) is unchanged from Destexhe (1994).
 
@@ -112,7 +112,7 @@ def make_trn() -> Neuron:
     Passive properties:
         g_NaL=0.0066 / g_KL=0.0634 mS/cm² (total 0.07) gives τ_m ≈ 14.3 ms
         and R_in ≈ 14.3 kΩ·cm².  At v_rest=−80 mV the ft gate is near its
-        half-inactivation point (ft_inf ≈ 0.50), favouring post-inhibitory
+        half-inactivation point (ft_inf ≈ 0.50), favoring post-inhibitory
         rebound bursting.
 
     Known limitations:

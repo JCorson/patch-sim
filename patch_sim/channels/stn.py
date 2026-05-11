@@ -118,13 +118,13 @@ _stn_beta_h = VoltageOnlyFn(_stn_beta_h_impl)
 # inactivation on top of the fast h gate (Fleidervish & Gutnick 1996;
 # Mickus, Jung & Spruston 1999; Do & Bean 2003 demonstrate the same in STN
 # pacemaker channels).  This second gate only engages on sustained
-# depolarisation and provides the missing escape route at the −15 mV
+# depolarization and provides the missing escape route at the −15 mV
 # attractor.
 #
-# Parameters: V½ = −50 mV (depolarised end of the −60 to −50 mV slow-
+# Parameters: V½ = −50 mV (depolarized end of the −60 to −50 mV slow-
 # inactivation V½ range reported by Fleidervish & Gutnick 1996 / Mickus
 # et al. 1999); slope 8 mV (mid-range 6–10 mV); inverted Boltzmann so the
-# gate is open at hyperpolarised potentials.  At V = −65 mV s_inf ≈ 0.87
+# gate is open at hyperpolarized potentials.  At V = −65 mV s_inf ≈ 0.87
 # (autonomous pacemaking is minimally perturbed); at V = −15 mV s_inf ≈ 0.01
 # (residual h-tail abolished).  τ_scale = 200 ms / τ_floor = 20 ms is
 # reduced from literature (~seconds) because in STN the gate co-acts with
@@ -157,9 +157,9 @@ def make_stn_na_channel(g_max: float) -> IonChannel:
     The channel always includes three gates: ``"m"`` (activation, power 3),
     ``"h"`` (fast inactivation, power 1), and ``"sNa"`` (slow voltage-
     dependent inactivation, power 1; V½ = −50 mV, slope 8 mV, inverted
-    Boltzmann).  The slow gate is mostly available at hyperpolarised
-    potentials and decays towards zero on sustained depolarisation,
-    providing the escape mechanism that lets the membrane repolarise after
+    Boltzmann).  The slow gate is mostly available at hyperpolarized
+    potentials and decays toward zero on sustained depolarization,
+    providing the escape mechanism that lets the membrane repolarize after
     a prolonged suprathreshold step (#324).  The simulation column is
     named ``sNa`` rather than ``s`` to avoid colliding with
     :func:`~patch_sim.channels.auxiliary.make_inar_channel`'s activation

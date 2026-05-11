@@ -34,7 +34,7 @@ class IonSpecies(Enum):
     CALCIUM = ("Ca", 2)
 
     def __init__(self, symbol: str, valence: int) -> None:
-        """Initialise the enum member with its symbol and valence.
+        """Initialize the enum member with its symbol and valence.
 
         Args:
             symbol: Chemical symbol string (e.g. ``'Na'``).

@@ -6,7 +6,7 @@ are physiologically plausible.  Unit tests with synthetic data live in
 tests/unit/test_tau_v.py.
 
 A note on total-current vs. isolated-channel kinetics:
-    HH total current at strong depolarisations is dominated by the much
+    HH total current at strong depolarizations is dominated by the much
     larger sustained K⁺ outward current, which masks the brief inward Na⁺
     inactivation phase.  Real experiments isolate channels pharmacologically
     (e.g. TTX subtraction).  These integration tests assert what is actually
@@ -26,9 +26,9 @@ def test_tau_v_integration_hh_neuron(hh_model):
 
     Runs a step voltage-clamp multi-sweep protocol and verifies that the
     pipeline returns one :class:`TauVPoint` per step, that strong-
-    depolarisation steps yield convergent activation fits, and that the
+    depolarization steps yield convergent activation fits, and that the
     fitted τ values are within a physiologically plausible range
-    (sub-ms at strong depolarisations dominated by K⁺ activation).
+    (sub-ms at strong depolarizations dominated by K⁺ activation).
     """
     pre_ms, stim_ms = 5.0, 30.0
     min_v, max_v, step_v = -80.0, 60.0, 10.0
@@ -64,7 +64,7 @@ def test_tau_v_integration_hh_neuron(hh_model):
     activated_taus = [
         p.tau_activation_ms for p in strong_steps if p.tau_activation_ms is not None
     ]
-    # Strongly depolarised steps should produce convergent activation fits
+    # Strongly depolarized steps should produce convergent activation fits
     # for the rising phase of the K⁺-dominated total current.
     assert len(activated_taus) >= 3
     assert all(0.05 <= t <= 5.0 for t in activated_taus)

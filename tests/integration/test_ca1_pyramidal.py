@@ -224,7 +224,7 @@ def test_ca1_fast_na_slow_inactivation_engages_during_drive(
     voltage-dependent inactivation gate baked into ``make_nav12_channel``
     must lose at least half its rest availability by the end of a sustained
     suprathreshold step, abolishing the residual fast-Na h-tail that would
-    otherwise pin the cell on a depolarisation plateau.  Mickus 1999
+    otherwise pin the cell on a depolarization plateau.  Mickus 1999
     directly studied CA1 pyramidal cells, so this is the cell type the
     paper actually characterised.
     """
@@ -257,7 +257,7 @@ def test_ca1_fast_na_slow_inactivation_engages_during_drive(
 def test_ca1_recovers_from_sustained_suprathreshold_drive(
     ca1_neuron: Neuron,
 ) -> None:
-    """CA1 pyramidal repolarises after +30 µA/cm² × 200 ms (#328 regression).
+    """CA1 pyramidal repolarizes after +30 µA/cm² × 200 ms (#328 regression).
 
     Without slow Na inactivation the cell can hang on a depol-block
     plateau under sustained drive.  With sNaP (Magistretti & Alonso 1999)

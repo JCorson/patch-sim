@@ -68,7 +68,7 @@ def _membrane_test_section() -> rx.Component:
     A tooltip explains the active mode.
 
     Returns:
-        A three-column grid of labelled passive property values, or an empty
+        A three-column grid of labeled passive property values, or an empty
         box when no membrane test results are available.
     """
     s = AnalysisState

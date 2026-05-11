@@ -84,7 +84,7 @@ def test_find_zero_current_voltage_no_bracket() -> None:
 # CORTICAL_PYRAMIDAL is excluded: after the #311 fix replaced the Pospischil
 # delayed rectifier with the slow Mainen-Sejnowski Kv (closed at rest, opens
 # only above ~0 mV) as the sole K conductance, the cell has no active outward
-# current at depolarised voltages.  Pospischil Na's window current drives
+# current at depolarized voltages.  Pospischil Na's window current drives
 # I_total(V=-20 mV) negative, so the default bracket [-100, -20] no longer
 # spans a sign change at the resting equilibrium near -70 mV (additional
 # zero crossings appear between -65 and -50 mV).  The cell rests stably at
@@ -92,7 +92,7 @@ def test_find_zero_current_voltage_no_bracket() -> None:
 # tests/integration/test_cortical_pyramidal.py and test_all_presets_stable_at_rest.
 #
 # STN is excluded post-#305: the autonomous-pacemaker preset uses INaP and Ih
-# to destabilise rest near −60 mV, and the Mainen-Sejnowski Kv replaces the
+# to destabilize rest near −60 mV, and the Mainen-Sejnowski Kv replaces the
 # Otsuka K factory as the sole delayed rectifier (closed at rest).  I_total
 # has no Brent-findable root in the default [−100, −20] mV bracket — the cell
 # fires spontaneously from v_rest = −60 mV.  See test_stn_spontaneous_pacemaking

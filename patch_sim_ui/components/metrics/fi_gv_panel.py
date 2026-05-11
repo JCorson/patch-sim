@@ -77,7 +77,7 @@ def _iv_curve_tab() -> rx.Component:
 
     Shows a Plotly I-V curve with peak inward, peak outward, and steady-state
     traces when voltage clamp multi-sweep data is available.  When g-V data is
-    also available, a normalised conductance plot with Boltzmann fit is shown
+    also available, a normalized conductance plot with Boltzmann fit is shown
     below the I-V curve.  When calcium dynamics were active, the calcium
     transient summary is shown above the I-V curve.  Displays a placeholder
     message when no data exists.

@@ -42,7 +42,7 @@ def _ca_transient_summary() -> rx.Component:
     """Render the calcium-transient summary statistics section.
 
     Returns:
-        A compact grid of labelled metric values from
+        A compact grid of labeled metric values from
         AnalysisState.ca_transient_summary.  All concentrations are in µM
         and all times in ms.
     """

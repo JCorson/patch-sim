@@ -1,7 +1,7 @@
 """Integration tests for patch_sim.analysis.passive_properties with real HH simulations.
 
 Verifies that passive property analysis (R_in, τ_m, C_m) returns physiologically
-plausible values and correct guard behaviour when run on simulate_current_clamp output.
+plausible values and correct guard behavior when run on simulate_current_clamp output.
 Unit tests with synthetic traces live in tests/unit/test_passive_properties.py.
 """
 

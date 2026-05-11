@@ -14,7 +14,7 @@ def _channel_row(
     g_setter,
     param_key: str,
 ) -> rx.Component:
-    """Render a channel's max-conductance input + slider, labelled by the channel name.
+    """Render a channel's max-conductance input + slider, labeled by the channel name.
 
     Per the design, channel composition is preset-baked: the panel
     only shows rows for channels the active preset includes, so an
@@ -29,7 +29,7 @@ def _channel_row(
         param_key: Key into PARAM_RANGES for the conductance slider bounds.
 
     Returns:
-        A labelled g_max input + slider block for the channel.
+        A labeled g_max input + slider block for the channel.
     """
     min_val, max_val, step = PARAM_RANGES[param_key]
     return _param_row(
@@ -125,7 +125,7 @@ def _param_row(
         min_val: Minimum allowed value.
         max_val: Maximum allowed value.
         step: Increment step for the input and slider.
-        label_color: Colour for the label text (default ``"gray"``).
+        label_color: Color for the label text (default ``"gray"``).
 
     Returns:
         A vstack containing an hstack (label + input) and a slider.

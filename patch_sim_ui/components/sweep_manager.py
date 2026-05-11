@@ -191,12 +191,12 @@ def _per_channel_section(*, include_current: bool = True) -> rx.Component:
 def _cc_popover_content() -> rx.Component:
     """Popover content for current clamp trace visibility.
 
-    Organises checkboxes into a Response section followed by a per-channel
+    Organizes checkboxes into a Response section followed by a per-channel
     sub-group for each channel on the active preset that has gating
     variables to toggle.
 
     Returns:
-        A scrollable vstack of labelled checkbox groups.
+        A scrollable vstack of labeled checkbox groups.
     """
     return rx.vstack(
         _section_label("Response"),
@@ -216,11 +216,11 @@ def _cc_popover_content() -> rx.Component:
 def _vc_popover_content() -> rx.Component:
     """Popover content for voltage clamp trace visibility.
 
-    Organises checkboxes into a Currents section (Total current followed
+    Organizes checkboxes into a Currents section (Total current followed
     by a per-channel sub-group for each channel on the active preset).
 
     Returns:
-        A scrollable vstack of labelled checkbox groups.
+        A scrollable vstack of labeled checkbox groups.
     """
     return rx.vstack(
         _section_label("Currents"),
@@ -263,7 +263,7 @@ def _trace_visibility_popover() -> rx.Component:
 
 
 def _chip(sweep, color_scheme: str | None = None) -> rx.Component:
-    """Render a colour-coded badge for a sweep or stored trace.
+    """Render a color-coded badge for a sweep or stored trace.
 
     Args:
         sweep: A ``Sweep`` instance.
@@ -271,7 +271,7 @@ def _chip(sweep, color_scheme: str | None = None) -> rx.Component:
             traces).
 
     Returns:
-        A badge component showing the sweep colour dot and label.
+        A badge component showing the sweep color dot and label.
     """
     extra = {"color_scheme": color_scheme} if color_scheme is not None else {}
     return rx.badge(

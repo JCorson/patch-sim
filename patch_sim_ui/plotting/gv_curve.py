@@ -8,7 +8,7 @@ from patch_sim_ui.plotting._layout import ANALYSIS_FIGURE_LAYOUT
 def build_gv_figure(gv_data: dict) -> go.Figure:
     """Build a Plotly g-V curve figure with optional Boltzmann fit overlay.
 
-    Renders the normalised conductance (G/G_max) data points as a scatter
+    Renders the normalized conductance (G/G_max) data points as a scatter
     trace.  When the Boltzmann fit converged, a smooth fit curve is overlaid
     as a dashed line and the half-activation voltage (V_half) and slope factor
     (k) are shown as an annotation.

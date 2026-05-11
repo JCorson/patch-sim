@@ -178,7 +178,7 @@ def _fallback_tau(
     """Estimate τₘ from the 63.2%-deflection crossing when curve_fit fails.
 
     Finds the first time at which the voltage has covered 63.2% of the total
-    deflection from baseline towards steady state, which equals one time
+    deflection from baseline toward steady state, which equals one time
     constant for a pure exponential.
 
     Args:
@@ -198,10 +198,10 @@ def _fallback_tau(
     target = v_baseline + 0.632 * deflection
     # Search for first crossing of the 63.2% level.
     if deflection > 0:
-        # Depolarising: voltage rising toward v_ss
+        # Depolarizing: voltage rising toward v_ss
         crossings = np.where(v_fit >= target)[0]
     else:
-        # Hyperpolarising: voltage falling toward v_ss
+        # Hyperpolarizing: voltage falling toward v_ss
         crossings = np.where(v_fit <= target)[0]
 
     if len(crossings) == 0:

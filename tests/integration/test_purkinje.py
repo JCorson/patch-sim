@@ -73,7 +73,7 @@ def test_fires_spontaneously(pk_neuron: Neuron) -> None:
     """Purkinje cell fires spontaneously with zero external current.
 
     With Ih (g=1.0 mS/cm²) recovering the cell from the post-AP AHP and INaP
-    destabilising the rest near −65 mV, the cell should sustain autonomous
+    destabilizing the rest near −65 mV, the cell should sustain autonomous
     pacemaking.  At least 5 APs must occur in 500 ms of zero current,
     confirming a mean inter-spike interval ≤ 100 ms (≥ 10 Hz).
     Ref: Häusser & Clark (1997), J. Neurosci. 17:2358.
@@ -317,7 +317,7 @@ def test_pk_fast_na_slow_inactivation_engages_during_drive(
     dependent inactivation gate baked into ``make_purkinje_na_channel``
     must lose at least half its rest availability by the end of a sustained
     suprathreshold step, abolishing the residual fast-Na h-tail that would
-    otherwise pin the cell on a depolarisation plateau.  Carter & Bean 2009
+    otherwise pin the cell on a depolarization plateau.  Carter & Bean 2009
     directly studied cerebellar Purkinje cells, so this is the cell type
     the paper actually characterised.
     """
@@ -350,7 +350,7 @@ def test_pk_fast_na_slow_inactivation_engages_during_drive(
 def test_pk_recovers_from_sustained_suprathreshold_drive(
     pk_neuron: Neuron,
 ) -> None:
-    """Purkinje repolarises after +10 µA/cm² × 200 ms (#329 regression).
+    """Purkinje repolarizes after +10 µA/cm² × 200 ms (#329 regression).
 
     Without slow Na inactivation the cell can hang on a depol-block
     plateau under sustained drive (cf. STN #324, cortical pyramidal

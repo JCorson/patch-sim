@@ -1,7 +1,7 @@
 """Integration tests for burst-metric analysis with real simulations.
 
 Drives :func:`analyze_bursts_from_result` through the full
-simulate-then-analyse pipeline using rebound-bursting and tonic-firing
+simulate-then-analyze pipeline using rebound-bursting and tonic-firing
 presets.  Unit tests with synthetic AP results live in
 tests/unit/test_burst_metrics.py.
 """
@@ -28,25 +28,25 @@ from patch_sim.protocols import step_current
 
 
 def test_purkinje_tonic_firing_reports_zero_bursts() -> None:
-    """Purkinje under a depolarising step is tonic — zero bursts, all unburst.
+    """Purkinje under a depolarizing step is tonic — zero bursts, all unburst.
 
     Purkinje is a tonic pacemaker (Raman & Bean 1999).  Under a moderate
-    depolarising current it produces a regular tonic spike train with a
-    unimodal ISI distribution, so the analyser cannot place an
+    depolarizing current it produces a regular tonic spike train with a
+    unimodal ISI distribution, so the analyzer cannot place an
     auto-histogram threshold and falls back to ``"default-fixed"``.  In
-    that case the burst analyser short-circuits to zero bursts and
+    that case the burst analyzer short-circuits to zero bursts and
     surfaces every spike via ``unburst_spike_count`` (issue #290).
 
-    Complex-spike bursts in vivo are climbing-fibre driven and cannot be
+    Complex-spike bursts in vivo are climbing-fiber driven and cannot be
     produced by this single-compartment, current-clamp preset.
 
     The first ~50 ms of the trace is discarded before analysis so the
     test sees only steady-state stepped firing: during the 10 ms zero-
     current pre-step window the autonomous oscillator pacemakes at its
-    slow ~26 ms ISI, then the step depolarises it and steady-state ISIs
+    slow ~26 ms ISI, then the step depolarizes it and steady-state ISIs
     collapse to ~3.6 ms.  The first stepped spike's ISI relative to the
     preceding spontaneous spike (~7.3 ms) is well above the steady-state
-    interval, and the analyser would correctly classify those two spikes
+    interval, and the analyzer would correctly classify those two spikes
     as a 2-spike burst — masking the steady-state tonic phenotype this
     test is pinning.
     """
@@ -82,7 +82,7 @@ def test_classic_hh_tonic_firing_reports_zero_bursts(
     """Tonic-firing HH reports zero bursts with all spikes surfaced as unburst.
 
     HH at +10 µA/cm² fires a regular tonic train with a unimodal ISI
-    distribution; the analyser falls back to ``"default-fixed"`` and the
+    distribution; the analyzer falls back to ``"default-fixed"`` and the
     short-circuit reports zero bursts (issue #290).
 
     Args:
@@ -113,7 +113,7 @@ def test_classic_hh_short_stimulus_tonic_does_not_trip_tight_cluster(
 ) -> None:
     """A short HH tonic train must not be misread as a tight-cluster burst.
 
-    Regression guard for the tight-cluster carve-out: a brief depolarising
+    Regression guard for the tight-cluster carve-out: a brief depolarizing
     step that produces only a handful of tonic spikes must still report
     zero bursts.  HH at +10 µA/cm² fires at ~210 Hz in this simulator, so
     a 50 ms step accumulates enough ISIs to exceed the
@@ -153,12 +153,12 @@ def test_classic_hh_short_stimulus_tonic_does_not_trip_tight_cluster(
 
 
 def test_thalamic_relay_step_release_produces_multi_spike_lts_burst() -> None:
-    """Thalamic Relay fires a multi-spike LTS burst after hyperpolarising release.
+    """Thalamic Relay fires a multi-spike LTS burst after hyperpolarizing release.
 
     McCormick & Huguenard (1992), J. Neurophysiol. 68:1384 describe the TC
     low-threshold-spike (LTS) burst as 3–7 Na⁺ spikes at 200–500 Hz riding on
-    the ICaT-driven calcium plateau.  Sustained hyperpolarisation
-    de-inactivates the ICaT ``ft`` gate; on release the LTS depolarises the
+    the ICaT-driven calcium plateau.  Sustained hyperpolarization
+    de-inactivates the ICaT ``ft`` gate; on release the LTS depolarizes the
     membrane and the TC-tuned slow ICaT inactivation
     (:func:`~patch_sim.channels.thalamic.make_thalamic_relay_icat_channel`)
     sustains the plateau long enough for several Na⁺ spikes to fire.
@@ -200,13 +200,13 @@ def test_thalamic_relay_step_release_produces_multi_spike_lts_burst() -> None:
 
 
 def test_trn_step_release_produces_hp92_rebound_burst() -> None:
-    """TRN fires a 5–15 spike LTS rebound burst on hyperpolarising step release.
+    """TRN fires a 5–15 spike LTS rebound burst on hyperpolarizing step release.
 
     Huguenard & Prince (1992), J. Neurosci. 12:3804 describe the TRN burst
     phenotype as 5–15 Na⁺ spikes at 200–600 Hz riding on the ICaT-driven
     LTS plateau, terminated by IKCa-driven AHP.  The rebound mechanism
-    requires both Ih (activates during hyperpolarisation, provides
-    depolarising drive on release — Bal & McCormick 1993) and the
+    requires both Ih (activates during hyperpolarization, provides
+    depolarizing drive on release — Bal & McCormick 1993) and the
     sigmoid-shaped ICaT inactivation tau (sustains the LTS plateau long
     enough to fit 5+ spikes —
     :func:`~patch_sim.channels.trn.make_trn_icat_channel`).
@@ -264,7 +264,7 @@ def test_trn_hyperpolarization_steps_protocol_produces_burst_per_sweep() -> None
       TRN-specific overrides
     - Simulate every sweep through :func:`simulate_batch` (the multi-sweep
       executor used by the UI's run handler)
-    - Analyse APs per sweep with :func:`analyze_aps`
+    - Analyze APs per sweep with :func:`analyze_aps`
 
     For each sweep at -3 to -5 µA/cm², asserts the burst-detection result
     finds a burst with spike_count in [5, 15] and intra-burst frequency in
@@ -295,7 +295,7 @@ def test_trn_hyperpolarization_steps_protocol_produces_burst_per_sweep() -> None
         )
 
         assert analysis.burst_count >= 1, (
-            f"Sweep {sweep_idx} (deeper hyperpolarisation): expected ≥1 LTS "
+            f"Sweep {sweep_idx} (deeper hyperpolarization): expected ≥1 LTS "
             f"rebound burst, got burst_count={analysis.burst_count}.  Total "
             f"APs in sweep: {ap_result.spike_count}.  This indicates the TRN "
             f"preset is not delivering the HP92 rebound phenotype on the "
@@ -371,13 +371,13 @@ def test_user_supplied_threshold_changes_grouping() -> None:
     assert fine.burst_count <= coarse.burst_count
 
 
-def test_stn_conditional_burst_mode_under_hyperpolarising_step_release() -> None:
-    """STN fires a multi-spike rebound burst after a hyperpolarising step.
+def test_stn_conditional_burst_mode_under_hyperpolarizing_step_release() -> None:
+    """STN fires a multi-spike rebound burst after a hyperpolarizing step.
 
     STN is a tonic pacemaker with conditional burst mode (Beurrier et al.
     1999, J. Neurosci. 19:599; Otsuka et al. 2004, J. Neurophysiol.
-    92:255).  Burst mode is unreachable under depolarising steps in this
-    preset (NMDA is not modelled), but a sufficiently deep hyperpolarising
+    92:255).  Burst mode is unreachable under depolarizing steps in this
+    preset (NMDA is not modeled), but a sufficiently deep hyperpolarizing
     step de-inactivates the ICaT ``ft`` gate; on release the high
     ``g_CaT`` (5 mS/cm²) drives a high-frequency rebound burst.  Sanity
     check that the secondary firing mode is wired in.
@@ -400,5 +400,5 @@ def test_stn_conditional_burst_mode_under_hyperpolarising_step_release() -> None
     analysis = analyze_bursts_from_result(result)
     assert analysis.burst_count >= 1, (
         "STN: expected ≥1 rebound burst after −10 µA/cm² × 300 ms "
-        f"hyperpolarisation, got burst_count={analysis.burst_count}"
+        f"hyperpolarization, got burst_count={analysis.burst_count}"
     )

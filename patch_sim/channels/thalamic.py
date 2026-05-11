@@ -183,7 +183,7 @@ def make_thalamic_relay_na_channel(g_max: float) -> IonChannel:
 
     Used as the Thalamic Relay preset's Na⁺ channel.  Compared with the
     default HH52 Na⁺ channel (fitted to squid axon at 22 °C), the Traub-Miles
-    form with VT = −52 mV shifts the activation threshold ~13 mV depolarised
+    form with VT = −52 mV shifts the activation threshold ~13 mV depolarized
     and slows inactivation, preventing the ~5.2× Q10 overcorrection that
     caused premature Na⁺ inactivation.
 
@@ -255,7 +255,7 @@ def make_thalamic_relay_k_channel(g_max: float) -> IonChannel:
 
 # Thalamic-relay-specific ICaT inactivation: 5× slower than the Destexhe
 # (1994) global default (tau_scale=20 ms).  McCormick & Huguenard (1992) report
-# tau_h_T ≈ 25–40 ms in the depolarised range used during the LTS plateau,
+# tau_h_T ≈ 25–40 ms in the depolarized range used during the LTS plateau,
 # which is necessary to sustain the plateau long enough for 3–7 Na⁺ spikes
 # (issue #287).  Activation kinetics (dt half-point, slope, and tau) are
 # unchanged from the global ICaT.
@@ -274,7 +274,7 @@ def make_thalamic_relay_icat_channel(
     McCormick & Huguenard (1992) recordings of guinea-pig dorsal LGN relay
     neurons.  The slower inactivation sustains the low-threshold spike (LTS)
     plateau long enough to support a multi-spike burst (3–7 Na⁺ spikes at
-    200–500 Hz) on hyperpolarising-step release — the defining feature of
+    200–500 Hz) on hyperpolarizing-step release — the defining feature of
     TC burst mode (Sherman & Guillery 1996; Llinás & Jahnsen 1982).
 
     Activation half-point and slope are unchanged from the global ICaT

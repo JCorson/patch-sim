@@ -1,6 +1,6 @@
 """Dedicated membrane test for passive membrane property characterisation.
 
-Provides :func:`run_membrane_test` which applies a fixed small hyperpolarising
+Provides :func:`run_membrane_test` which applies a fixed small hyperpolarizing
 current step to a **passive-only** copy of the neuron and extracts its input
 resistance, membrane time constant, and membrane capacitance via
 :mod:`~patch_sim.analysis.passive_properties`.
@@ -18,7 +18,7 @@ resulting R_in, τ_m, and C_m match the set membrane parameters rather than the
 apparent (gating-contaminated) values from the full model.
 
 Constants:
-    MEMBRANE_TEST_CURRENT: Fixed step amplitude in µA/cm² (hyperpolarising).
+    MEMBRANE_TEST_CURRENT: Fixed step amplitude in µA/cm² (hyperpolarizing).
     MEMBRANE_TEST_PRE_MS: Pre-stimulus duration in ms.
     MEMBRANE_TEST_STEP_MS: Step duration in ms.
     MEMBRANE_TEST_POST_MS: Post-stimulus duration in ms.
@@ -36,7 +36,7 @@ from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clam
 from patch_sim.neuron import Neuron
 from patch_sim.protocols.current import step_current
 
-#: Injected current amplitude in µA/cm².  Negative (hyperpolarising) to avoid
+#: Injected current amplitude in µA/cm².  Negative (hyperpolarizing) to avoid
 #: activating any residual conductances.  Small enough to stay well below the
 #: rheobase of any standard preset (minimum rheobase ≈ 0.27 µA/cm²).
 MEMBRANE_TEST_CURRENT: float = -0.5

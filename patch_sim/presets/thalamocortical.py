@@ -21,7 +21,7 @@ from patch_sim.neuron import Neuron
 PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
     # Burst-mode TC has a very low rheobase (~0.012 µA/cm²) because the
     # slow-inactivating ICaT (issue #287) and reduced g_K (=10) combine to
-    # amplify any depolarisation through the LTS.  0.01 µA/cm² stays below
+    # amplify any depolarization through the LTS.  0.01 µA/cm² stays below
     # threshold while still giving a visible voltage deflection.  The
     # subthreshold margin is narrow: any stimulus ≥ ~0.05 µA/cm² already
     # crosses LTS threshold and fires an AP, so a UI user nudging this
@@ -58,7 +58,7 @@ PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
         "stimulus_duration": 100.0,
     },
     # Inherits the base HYPERPOLARIZATION_STEPS range (−10 → −2 µA/cm²).
-    # Sustained hyperpolarisation de-inactivates the TC-tuned ICaT
+    # Sustained hyperpolarization de-inactivates the TC-tuned ICaT
     # (g=2.5 mS/cm²); on release a textbook post-inhibitory LTS burst
     # fires (issue #287; McCormick & Huguenard 1992).  Ih (g=1.0 mS/cm²)
     # also contributes via sag and post-step overshoot.
@@ -77,16 +77,16 @@ def make_thalamic_relay() -> Neuron:
     LTS burst mechanism:
         ICaT (``make_thalamic_relay_icat_channel``, g=2.5 mS/cm²) produces a
         low-threshold Ca²⁺ spike plateau when the ft gate is de-inactivated by
-        prior hyperpolarisation.  Ih (g=1.0 mS/cm²) activates during
-        hyperpolarisation and provides depolarising drive on release, ensuring
-        the membrane crosses the LTS threshold after a hyperpolarising step.
+        prior hyperpolarization.  Ih (g=1.0 mS/cm²) activates during
+        hyperpolarization and provides depolarizing drive on release, ensuring
+        the membrane crosses the LTS threshold after a hyperpolarizing step.
         Without Ih, passive relaxation does not overshoot the LTS threshold.
 
     ICaT factory and slow inactivation:
         ``make_thalamic_relay_icat_channel`` uses a sigmoid-shaped ft
         inactivation time constant (tau_scale=100 ms) rather than the
         cosh-shaped Destexhe (1994) default.  McCormick & Huguenard (1992)
-        report tau_h_T ≈ 25–40 ms in the depolarised range; the slower
+        report tau_h_T ≈ 25–40 ms in the depolarized range; the slower
         inactivation sustains the LTS plateau long enough to support the full
         multi-spike burst.
 

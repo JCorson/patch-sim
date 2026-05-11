@@ -2,7 +2,7 @@
 
 Each :class:`ChannelMeta` entry in :data:`CHANNELS` is the single source of
 truth for one channel — its label, field names, gating variables, slider
-range, and display colours.  All other modules derive their per-channel
+range, and display colors.  All other modules derive their per-channel
 lists and dicts from this registry rather than maintaining parallel
 enumerations.
 
@@ -24,8 +24,8 @@ class ChannelMeta:
         label: Display name shown in the UI panels, e.g. ``"Ih (HCN)"``.
         gating_vars: Gating variable names produced by this channel's model.
         g_max_range: ``(min, max, step)`` for the conductance slider (mS/cm²).
-        current_color: Hex colour string for the current trace in the plot.
-        gating_var_colors: Mapping of gating variable name to hex colour.
+        current_color: Hex color string for the current trace in the plot.
+        gating_var_colors: Mapping of gating variable name to hex color.
     """
 
     id: str

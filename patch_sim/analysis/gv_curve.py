@@ -1,6 +1,6 @@
 """g-V curve analysis for voltage clamp multi-sweep simulations.
 
-Computes normalised peak conductance (G/G_max) at each voltage step from an
+Computes normalized peak conductance (G/G_max) at each voltage step from an
 existing :class:`~patch_sim.analysis.iv_curve.IVAnalysisResult` and fits a
 two-parameter Boltzmann sigmoid to characterise voltage-dependent activation.
 
@@ -36,7 +36,7 @@ class GVPoint:
     Attributes:
         voltage_step: Command voltage applied during the step (mV).
         conductance: Chord conductance at this step (mS/cm²).
-        g_normalized: Conductance normalised to G/G_max (dimensionless, 0–1).
+        g_normalized: Conductance normalized to G/G_max (dimensionless, 0–1).
     """
 
     voltage_step: float
@@ -127,7 +127,7 @@ def compute_gv(
     reversal_potential: float,
     driving_force_threshold: float = 5.0,
 ) -> GVAnalysisResult:
-    """Compute normalised conductance vs. voltage from I-V analysis results.
+    """Compute normalized conductance vs. voltage from I-V analysis results.
 
     For each voltage step the chord conductance is::
 
@@ -139,7 +139,7 @@ def compute_gv(
     produce non-positive conductances (physically implausible for the inward
     activation curve) are also excluded.
 
-    The retained conductances are normalised to G/G_max, then a Boltzmann
+    The retained conductances are normalized to G/G_max, then a Boltzmann
     sigmoid is fitted via ``scipy.optimize.curve_fit``.  If the fit does not
     converge, :attr:`BoltzmannFit.converged` is ``False`` and the parameter
     values are ``0.0`` and ``1.0`` respectively.

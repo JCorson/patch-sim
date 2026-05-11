@@ -51,7 +51,7 @@ def test_purkinje_preset_produces_calcium_transients() -> None:
     """Purkinje preset under strong current injection produces ≥1 transient.
 
     Purkinje is a tonic pacemaker with both ICaL and ICaT.  A moderate
-    depolarising step drives high-frequency tonic firing and generates
+    depolarizing step drives high-frequency tonic firing and generates
     clear calcium transients.  We do not pin the exact count (it depends
     on integration details), only that the analysis recovers at least
     one transient with a peak above baseline.
@@ -102,10 +102,10 @@ def test_classic_hh_returns_none(hh_model: Neuron) -> None:
 
 
 def test_mock_ca_channel_step_produces_recoverable_transient() -> None:
-    """A depolarising step on a Ca-channel-only neuron yields one transient.
+    """A depolarizing step on a Ca-channel-only neuron yields one transient.
 
     The mock-Ca neuron has a single Ca²⁺-permeable channel with a slow
-    (10 ms) gate.  A 50 ms depolarising step opens the gate, drives an
+    (10 ms) gate.  A 50 ms depolarizing step opens the gate, drives an
     inward Ca²⁺ flux that ramps ca_i up; when the step ends the Ca²⁺
     concentration relaxes back toward ``ca_rest`` with the configured
     ``tau_ca``.  The analysis should recover a single transient whose

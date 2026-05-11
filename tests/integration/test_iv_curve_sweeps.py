@@ -290,8 +290,8 @@ def test_batch_with_calcium_channels() -> None:
         assert "ca_i" in df.dtype.names
         assert "d" in df.dtype.names
         assert "f" in df.dtype.names
-    # Calcium should accumulate above resting level during the depolarising
-    # step (ICaL activates with depolarisation).
+    # Calcium should accumulate above resting level during the depolarizing
+    # step (ICaL activates with depolarization).
     ca_rest = cd.ca_rest
     assert any(float(df["ca_i"].max()) > ca_rest for df in results)
 
