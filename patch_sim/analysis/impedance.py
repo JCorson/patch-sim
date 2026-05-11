@@ -21,6 +21,7 @@ import numpy as np
 from patch_sim.analysis.passive_properties import (
     density_to_absolute_r_in,
     is_subthreshold,
+    longest_subthreshold_run,
 )
 
 logger = logging.getLogger(__name__)
@@ -84,8 +85,15 @@ class ImpedanceProfile:
             supplied and an interior peak exists; ``None`` otherwise.
         area_cm2: Membrane surface area in cm² used for the absolute
             conversion.  ``None`` when only per-area values were requested.
-        f_start: Lower edge of the analysis band in Hz.
-        f_end: Upper edge of the analysis band in Hz.
+        f_start: Lower edge of the requested analysis band in Hz.
+        f_end: Upper edge of the requested analysis band in Hz.
+        analyzed_window_ms: ``None`` when the full chirp window was analyzed.
+            Otherwise the duration in ms of the spike-free sub-window that was
+            analyzed instead (the chirp contained spikes; impedance was
+            recovered from the longest contiguous spike-free segment, which
+            covers only a sub-band of ``[f_start, f_end]`` — see
+            ``frequencies[0]`` / ``frequencies[-1]`` for the actually-covered
+            band).
     """
 
     frequencies: list[float]
@@ -99,6 +107,7 @@ class ImpedanceProfile:
     area_cm2: float | None = None
     f_start: float = 0.0
     f_end: float = 0.0
+    analyzed_window_ms: float | None = None
 
 
 def _half_power_crossing(
@@ -172,6 +181,120 @@ def _quality_factor(
     return float(frequencies[peak_idx]) / fwhm
 
 
+def _impedance_unavailable_reason(
+    time: np.ndarray,
+    voltage: np.ndarray,
+    injected_current: np.ndarray,
+    stim_start_ms: float,
+    stim_end_ms: float,
+    f_start: float,
+    f_end: float,
+) -> str | None:
+    """Return a human-readable reason why impedance analysis can't proceed.
+
+    Covers the cheap pre-FFT failure modes — shape / NaN / band sanity, a
+    too-short chirp window, and a suprathreshold response with no spike-free
+    fallback segment long enough for the FFT.  The post-FFT failures (no
+    stimulus power in the band, too few in-band bins after trimming) are not
+    detected here and must be diagnosed by running :func:`analyze_impedance`
+    itself.
+
+    Args:
+        time: Time axis in ms.
+        voltage: Membrane voltage response in mV.
+        injected_current: Injected chirp current in µA/cm².
+        stim_start_ms: Start of the chirp stimulus window in ms.
+        stim_end_ms: End of the chirp stimulus window in ms.
+        f_start: Starting frequency of the chirp sweep in Hz.
+        f_end: Ending frequency of the chirp sweep in Hz.
+
+    Returns:
+        ``None`` when the preamble checks pass and the analysis can proceed; a
+        single-sentence reason string otherwise.
+    """
+    t = np.asarray(time, dtype=float)
+    v = np.asarray(voltage, dtype=float)
+    i = np.asarray(injected_current, dtype=float)
+    if v.shape != t.shape or i.shape != t.shape:
+        return "internal: trace length mismatch."
+    if not (np.all(np.isfinite(v)) and np.all(np.isfinite(i))):
+        return "internal: trace contains non-finite values."
+    if f_end <= f_start or f_start < 0.0:
+        return f"invalid frequency band [{f_start}, {f_end}] Hz."
+    window_ms = stim_end_ms - stim_start_ms
+    if window_ms < _MIN_WINDOW_MS:
+        return (
+            f"the chirp window ({window_ms:.1f} ms) is shorter than the "
+            f"minimum {_MIN_WINDOW_MS:.1f} ms needed for a meaningful spectrum."
+        )
+    mask = (t >= stim_start_ms) & (t < stim_end_ms)
+    if int(mask.sum()) < 4:
+        return "too few samples in the chirp window."
+    t_win, v_win = t[mask], v[mask]
+    if is_subthreshold(t_win, v_win):
+        return None
+    run = longest_subthreshold_run(t_win, v_win)
+    if run is None:
+        return (
+            "the cell fired throughout the chirp — reduce the amplitude or "
+            "apply a hyperpolarizing holding current."
+        )
+    lo, hi = run
+    span = float(t_win[hi - 1] - t_win[lo])
+    if span < _MIN_WINDOW_MS:
+        return (
+            f"the longest spike-free segment ({span:.1f} ms) is shorter than the "
+            f"minimum {_MIN_WINDOW_MS:.1f} ms — reduce the amplitude or apply a "
+            "hyperpolarizing holding current."
+        )
+    return None
+
+
+def impedance_unavailable_reason(
+    time: np.ndarray,
+    voltage: np.ndarray,
+    injected_current: np.ndarray,
+    stim_start_ms: float,
+    stim_end_ms: float,
+    f_start: float,
+    f_end: float,
+) -> str:
+    """Public wrapper around :func:`_impedance_unavailable_reason`.
+
+    Returns the empty string when the preamble checks pass (and the analysis
+    would proceed past the windowing / suprathreshold guards), so callers can
+    use the result directly as UI copy.  Only the cheap pre-FFT failure modes
+    are reported — when this returns ``""`` and :func:`analyze_impedance` still
+    returns ``None``, the caller should fall back to a generic
+    "too little usable signal in the band" message.
+
+    Args:
+        time: Time axis in ms.
+        voltage: Membrane voltage response in mV.
+        injected_current: Injected chirp current in µA/cm².
+        stim_start_ms: Start of the chirp stimulus window in ms.
+        stim_end_ms: End of the chirp stimulus window in ms.
+        f_start: Starting frequency of the chirp sweep in Hz.
+        f_end: Ending frequency of the chirp sweep in Hz.
+
+    Returns:
+        The reason string from :func:`_impedance_unavailable_reason`, or ``""``
+        when that function returns ``None``.
+    """
+    return (
+        _impedance_unavailable_reason(
+            time,
+            voltage,
+            injected_current,
+            stim_start_ms,
+            stim_end_ms,
+            f_start,
+            f_end,
+        )
+        or ""
+    )
+
+
 def analyze_impedance(
     time: np.ndarray,
     voltage: np.ndarray,
@@ -192,9 +315,14 @@ def analyze_impedance(
     ``|Z|``, only when it is an interior maximum that rises above the
     low-frequency reference) and quality factor.
 
-    Membrane impedance is a linear, small-signal quantity: the analysis bails
-    out (returns ``None``) when the windowed response is suprathreshold, since
-    spike transients dominate the spectrum and the result would be meaningless.
+    Membrane impedance is a linear, small-signal quantity, so spike transients
+    are excluded: when the windowed response contains spikes the analysis falls
+    back to the longest contiguous spike-free sub-window (a linear chirp's
+    frequency is time-dependent, so the recovered profile then covers only a
+    sub-band of ``[f_start, f_end]`` — surfaced via
+    :attr:`ImpedanceProfile.analyzed_window_ms`).  The analysis bails out
+    (returns ``None``) when no such spike-free segment is long enough — see
+    :func:`impedance_unavailable_reason` for the user-facing reason.
 
     Args:
         time: Time axis in ms (uniformly sampled).
@@ -212,44 +340,42 @@ def analyze_impedance(
         An :class:`ImpedanceProfile`, or ``None`` when the inputs are
         inconsistent (mismatched lengths, non-finite values), the band is
         invalid (``f_end <= f_start`` or ``f_start < 0``), the chirp window is
-        shorter than :data:`_MIN_WINDOW_MS`, the windowed response is
-        suprathreshold, the stimulus has no spectral power in the band, or
-        fewer than :data:`_MIN_BAND_BINS` FFT bins remain after trimming.
+        shorter than :data:`_MIN_WINDOW_MS`, the response fires throughout the
+        chirp (no spike-free segment of at least :data:`_MIN_WINDOW_MS`), the
+        stimulus has no spectral power in the band, or fewer than
+        :data:`_MIN_BAND_BINS` FFT bins remain after band-edge trimming.
     """
+    reason = _impedance_unavailable_reason(
+        time,
+        voltage,
+        injected_current,
+        stim_start_ms,
+        stim_end_ms,
+        f_start,
+        f_end,
+    )
+    if reason is not None:
+        logger.warning("analyze_impedance: %s", reason)
+        return None
+
     t = np.asarray(time, dtype=float)
     v = np.asarray(voltage, dtype=float)
     i = np.asarray(injected_current, dtype=float)
-    if v.shape != t.shape or i.shape != t.shape:
-        logger.warning("analyze_impedance: trace length mismatch; skipping.")
-        return None
-    if not (np.all(np.isfinite(v)) and np.all(np.isfinite(i))):
-        logger.warning("analyze_impedance: non-finite trace values; skipping.")
-        return None
-    if f_end <= f_start or f_start < 0.0:
-        logger.warning(
-            "analyze_impedance: invalid band [%s, %s] Hz; skipping.", f_start, f_end
-        )
-        return None
-    if stim_end_ms - stim_start_ms < _MIN_WINDOW_MS:
-        logger.warning(
-            "analyze_impedance: chirp window %.1f ms shorter than %.1f ms; skipping.",
-            stim_end_ms - stim_start_ms,
-            _MIN_WINDOW_MS,
-        )
-        return None
-
     mask = (t >= stim_start_ms) & (t < stim_end_ms)
-    if int(mask.sum()) < 4:
-        logger.warning("analyze_impedance: too few samples in chirp window; skipping.")
-        return None
     t_win, v_win, i_win = t[mask], v[mask], i[mask]
 
-    if not is_subthreshold(t_win, v_win):
-        logger.warning(
-            "analyze_impedance: response is suprathreshold; impedance is only "
-            "defined in the subthreshold regime; skipping."
-        )
-        return None
+    analyzed_window_ms: float | None
+    if is_subthreshold(t_win, v_win):
+        analyzed_window_ms = None
+    else:
+        # _impedance_unavailable_reason already verified that a long-enough
+        # spike-free run exists; fall back to it.
+        run = longest_subthreshold_run(t_win, v_win)
+        if run is None:  # defensive — guarded above
+            return None
+        lo, hi = run
+        t_win, v_win, i_win = t_win[lo:hi], v_win[lo:hi], i_win[lo:hi]
+        analyzed_window_ms = float(t_win[-1] - t_win[0])
 
     dt_ms = float(np.mean(np.diff(t_win)))
     if dt_ms <= 0.0:
@@ -348,4 +474,5 @@ def analyze_impedance(
         area_cm2=area_cm2,
         f_start=float(f_start),
         f_end=float(f_end),
+        analyzed_window_ms=analyzed_window_ms,
     )
