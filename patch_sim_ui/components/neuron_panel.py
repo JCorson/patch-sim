@@ -14,12 +14,13 @@ def _channel_row(
     g_setter,
     param_key: str,
 ) -> rx.Component:
-    """Render a channel label + conductance slider row.
+    """Render a channel's max-conductance input + slider, labelled by the channel name.
 
     Per the design, channel composition is preset-baked: the panel
     only shows rows for channels the active preset includes, so an
     enable/disable checkbox is unnecessary.  The g_max slider modifies
-    the channel's ``g_max`` on the next simulation run.
+    the channel's ``g_max`` on the next simulation run.  The unit is
+    shown once as a caption above the rows rather than per row.
 
     Args:
         label: Display name for the channel (e.g. ``"Ih (HCN)"``).
@@ -28,21 +29,17 @@ def _channel_row(
         param_key: Key into PARAM_RANGES for the conductance slider bounds.
 
     Returns:
-        A vstack containing a channel label and its g_max slider.
+        A labelled g_max input + slider block for the channel.
     """
     min_val, max_val, step = PARAM_RANGES[param_key]
-    return rx.vstack(
-        rx.text(label, size="2"),
-        _param_row(
-            "Max conductance (mS/cm²)",
-            g_var,
-            g_setter,
-            min_val,
-            max_val,
-            step,
-        ),
-        spacing="1",
-        width="100%",
+    return _param_row(
+        label,
+        g_var,
+        g_setter,
+        min_val,
+        max_val,
+        step,
+        label_color=rx.color("blue", 11),
     )
 
 
@@ -117,6 +114,7 @@ def _param_row(
     min_val: float,
     max_val: float,
     step: float,
+    label_color: str = "gray",
 ) -> rx.Component:
     """Render a parameter label, number input, and slider as a grouped block.
 
@@ -127,13 +125,14 @@ def _param_row(
         min_val: Minimum allowed value.
         max_val: Maximum allowed value.
         step: Increment step for the input and slider.
+        label_color: Colour for the label text (default ``"gray"``).
 
     Returns:
         A vstack containing an hstack (label + input) and a slider.
     """
     return rx.vstack(
         rx.hstack(
-            rx.text(label, size="2", color="gray"),
+            rx.text(label, size="2", color=label_color),
             rx.spacer(),
             rx.input(
                 value=var,
@@ -293,6 +292,11 @@ def neuron_panel() -> rx.Component:
                             color="var(--gray-12)",
                         ),
                         content=rx.vstack(
+                            rx.text(
+                                "Max conductance (mS/cm²)",
+                                size="2",
+                                color="gray",
+                            ),
                             *[
                                 rx.cond(
                                     NeuronState.visible_channel_ids.contains(ch_id),
