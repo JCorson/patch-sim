@@ -168,7 +168,7 @@ def test_fs_single_ap_repolarizes_cleanly(fs_neuron: Neuron) -> None:
     current = np.zeros(total_samples)
     pre_n = _ms_to_samples(pre_ms)
     stim_n = _ms_to_samples(stim_ms)
-    current[pre_n : pre_n + stim_n] = _FS_STEP_CURRENT
+    current[pre_n : pre_n + stim_n] = 30.0
     result = simulate_current_clamp(fs_neuron, current_external=current)
     t = np.asarray(result["time"])
     v = np.asarray(result["voltage"])
