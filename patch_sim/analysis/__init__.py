@@ -9,6 +9,7 @@ Modules:
     derivatives: General-purpose derivative utilities (e.g. dV/dt).
     fi_curve: F-I curve construction from current clamp multi-sweep results.
     hyperpolarization: Sag and rebound analysis from hyperpolarization sweeps.
+    impedance: Impedance-profile analysis from a chirp current-clamp run.
     iv_curve: I-V curve construction from voltage clamp multi-sweep results.
     membrane_test: Dedicated membrane test for passive property characterisation.
     passive_properties: Passive membrane property extraction (R_in, τₘ, Cₘ).
@@ -55,6 +56,7 @@ from .hyperpolarization import (
     analyze_hyperpolarization,
     compute_sag_point,
 )
+from .impedance import ImpedanceProfile, analyze_impedance
 from .iv_curve import IVAnalysisResult, IVPoint, analyze_iv, compute_iv_point
 from .membrane_test import (
     MEMBRANE_TEST_CURRENT,
@@ -92,6 +94,7 @@ __all__ = [
     "analyze_calcium_transients_from_result",
     "analyze_fi",
     "analyze_hyperpolarization",
+    "analyze_impedance",
     "analyze_iv",
     "analyze_passive_properties",
     "analyze_sfa",
@@ -123,6 +126,7 @@ __all__ = [
     "FIAnalysisResult",
     "FIPoint",
     "HyperpolarizationAnalysisResult",
+    "ImpedanceProfile",
     "SagPoint",
     "GVAnalysisResult",
     "GVPoint",
