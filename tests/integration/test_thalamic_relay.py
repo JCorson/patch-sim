@@ -161,6 +161,51 @@ def test_tc_ap_ahp_depth_in_tc_tonic_range(tc_tonic_ap_result) -> None:
     )
 
 
+def test_tc_single_ap_repolarizes_cleanly(tc_neuron: Neuron) -> None:
+    """A single tonic-mode AP repolarizes within 4 ms; no post-spike plateau.
+
+    Drives a single AP with the UI ACTION_POTENTIAL protocol (8 µA/cm² ×
+    0.5 ms) and asserts that within 4 ms after the peak the voltage has
+    dropped below −53 mV.  TC tonic-mode APs are ~0.5–1.5 ms half-width
+    with a fast AHP to −55 to −75 mV reached within a few ms (McCormick &
+    Huguenard 1992, J. Neurophysiol. 68:1384).  Tonic mode only — driven
+    from rest with no prior hyperpolarization, so ICaT is inactivated at
+    v_rest and the LTS rebound burst (separately pinned by
+    ``test_thalamic_relay_step_release_produces_multi_spike_lts_burst`` in
+    ``test_burst_metrics_simulation.py``) is not exercised; the 0.5 ms
+    pulse width was specifically chosen (#307) so it does not trigger an
+    LTS-coupled rebound spike.  Do not "improve" this test by adding a
+    hyperpolarizing prepulse — that would conflate the real LTS plateau
+    with a pathological Na-window plateau (cf. SNc DA, PR #318), which is
+    exactly what this test guards against.  A long plateau hanging at
+    ~−30 mV after the spike would mean a window current is dominating
+    repolarization — a pathology the mean half-width and AHP-depth metrics
+    do not catch (half-width is measured at the spike midpoint, which the
+    trace can cross cleanly even when V parks at −30 mV afterward).
+    """
+    pre_ms, stim_ms, post_ms = 10.0, 0.5, 50.0
+    total_samples = _ms_to_samples(pre_ms + stim_ms + post_ms) + 1
+    current = np.zeros(total_samples)
+    pre_n = _ms_to_samples(pre_ms)
+    stim_n = _ms_to_samples(stim_ms)
+    current[pre_n : pre_n + stim_n] = 8.0
+    result = simulate_current_clamp(tc_neuron, current_external=current)
+    t = np.asarray(result["time"])
+    v = np.asarray(result["voltage"])
+
+    peak_idx = int(np.argmax(v))
+    peak_t = float(t[peak_idx])
+    after_mask = (t > peak_t) & (t <= peak_t + 4.0)
+    v_after = v[after_mask]
+    assert v_after.size > 0, "post-peak window is empty"
+    min_v = float(np.min(v_after))
+    assert min_v < -53.0, (
+        f"AP plateau detected: V never falls below −53 mV in 4 ms after the "
+        f"peak (min V = {min_v:.2f} mV at peak={peak_t:.2f} ms).  "
+        f"Reference: {_TC_REFERENCE}."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Intra-burst AP shape during the LTS rebound burst.
 # ---------------------------------------------------------------------------
