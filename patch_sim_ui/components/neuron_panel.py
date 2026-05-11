@@ -34,7 +34,7 @@ def _channel_row(
     return rx.vstack(
         rx.text(label, size="2"),
         _param_row(
-            "g_max (mS/cm²)",
+            "Max conductance (mS/cm²)",
             g_var,
             g_setter,
             min_val,
@@ -96,7 +96,7 @@ def _reversal_str(label: str, value: rx.Var, unit: str = "mV") -> rx.Component:
     """Render a read-only reversal potential display row.
 
     Args:
-        label: Ion species label (e.g. ``"E_Na"``).
+        label: Ion species label (e.g. ``"Na⁺ reversal"``).
         value: Reactive float var holding the computed reversal potential.
         unit: Unit string appended after the value (default ``"mV"``).
 
@@ -200,19 +200,19 @@ def neuron_panel() -> rx.Component:
                 ),
                 content=rx.vstack(
                     _param_row(
-                        "C_m (µF/cm²)",
+                        "Membrane capacitance (µF/cm²)",
                         NeuronState.C_m,
                         NeuronState.set_C_m,
                         *PARAM_RANGES["C_m"],
                     ),
                     _param_row(
-                        "v_rest (mV)",
+                        "Resting potential (mV)",
                         NeuronState.v_rest,
                         NeuronState.set_v_rest,
                         *PARAM_RANGES["v_rest"],
                     ),
                     _param_row(
-                        "T (K)",
+                        "Temperature (K)",
                         NeuronState.T,
                         NeuronState.set_T,
                         *PARAM_RANGES["T"],
@@ -319,10 +319,10 @@ def neuron_panel() -> rx.Component:
         rx.separator(),
         rx.text("Reversal Potentials", size="2", weight="bold"),
         rx.grid(
-            _reversal_str("E_Na", NeuronState.E_Na),
-            _reversal_str("E_K", NeuronState.E_K),
-            _reversal_str("E_L", NeuronState.E_L),
-            _reversal_str("E_Ca", NeuronState.E_Ca),
+            _reversal_str("Na⁺ reversal", NeuronState.E_Na),
+            _reversal_str("K⁺ reversal", NeuronState.E_K),
+            _reversal_str("Leak reversal", NeuronState.E_L),
+            _reversal_str("Ca²⁺ reversal", NeuronState.E_Ca),
             spacing="1",
             width="100%",
             columns="2",

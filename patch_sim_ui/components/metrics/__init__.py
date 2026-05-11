@@ -69,11 +69,11 @@ def _membrane_test_section() -> rx.Component:
         AnalysisState.has_membrane_test,
         rx.tooltip(
             rx.hstack(
-                rx.text("R_in", size="1", color="gray"),
+                rx.text("Input resistance", size="1", color="gray"),
                 rx.text(s.mt_input_resistance + " " + s.mt_r_units, size="1"),
-                rx.text("τ_m", size="1", color="gray", padding_left="2"),
+                rx.text("Time constant", size="1", color="gray", padding_left="2"),
                 rx.text(s.mt_time_constant + " ms", size="1"),
-                rx.text("C_m", size="1", color="gray", padding_left="2"),
+                rx.text("Capacitance", size="1", color="gray", padding_left="2"),
                 rx.text(s.mt_membrane_capacitance + " " + s.mt_c_units, size="1"),
                 padding_x="3",
                 padding_y="2",
