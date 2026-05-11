@@ -148,17 +148,29 @@ async def test_subthreshold_chirp_populates_impedance(state_tree: StateTree) -> 
     assert len(impedance["frequencies"]) > 0
 
 
-async def test_suprathreshold_chirp_leaves_impedance_empty(
+async def test_oversized_chirp_surfaces_unavailable_reason(
     state_tree: StateTree,
 ) -> None:
-    """The default (large) Frequency Response chirp drives spiking → no impedance."""
-    await run_flow(
-        state_tree,
-        neuron_preset=SQUID_GIANT_AXON,
-        protocol_preset=FREQUENCY_RESPONSE,
-    )
+    """A chirp that drives sustained spiking populates an ``unavailable_reason``.
 
-    assert state_tree.analysis.impedance_data == {}
+    With the tuned global default the squid axon now stays subthreshold, so we
+    crank the chirp up explicitly to drive a suprathreshold-throughout
+    response.  ``impedance_data`` carries the reason string but no
+    ``frequencies`` key, so the panel falls through to the reason-aware
+    placeholder.
+    """
+    async with patch_get_state(state_tree):
+        [_ async for _ in state_tree.neuron.load_neuron_preset(SQUID_GIANT_AXON)]
+        [_ async for _ in state_tree.protocol.load_protocol_preset(FREQUENCY_RESPONSE)]
+    state_tree.protocol.dc_offset = 30.0
+    state_tree.protocol.amplitude = 10.0
+
+    simulate_and_apply(state_tree)
+
+    impedance = state_tree.analysis.impedance_data
+    assert "frequencies" not in impedance
+    assert "unavailable_reason" in impedance
+    assert impedance["unavailable_reason"]  # non-empty
 
 
 async def test_action_potential_preset_leaves_impedance_empty(

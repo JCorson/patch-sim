@@ -230,19 +230,93 @@ def test_returns_none_too_few_band_bins() -> None:
     assert result is None
 
 
-def test_returns_none_when_suprathreshold() -> None:
-    """A response that crosses spike threshold returns None (impedance undefined)."""
+def test_returns_none_when_spikes_throughout() -> None:
+    """Spikes covering the entire window leave no spike-free segment → None.
+
+    A single isolated spike is now tolerated via the spike-free sub-window
+    fallback (covered by ``test_recovers_profile_from_spike_free_segment``); to
+    exercise the genuine "no usable segment" path we tile spikes every 50 ms
+    so every excised guard window butts against the next.
+    """
     time, current = _chirp_and_time(amplitude=1.0)
-    # A short +30 mV depolarization with a sharp upstroke reads as a spike.
     voltage = np.full_like(time, _BASELINE_MV)
-    spike_window = (time >= 1000.0) & (time < 1005.0)
-    voltage[spike_window] = 30.0
+    # Spike every 50 ms (= _REFRACTORY_SAMPLES at this 1 kHz sample rate, so
+    # each event is detected) across the entire trace.
+    for centre_ms in np.arange(50.0, _DURATION_MS, 50.0):
+        spike_window = (time >= centre_ms) & (time < centre_ms + 5.0)
+        voltage[spike_window] = 30.0
 
     result = analyze_impedance(
         time, voltage, current, 0.0, _window_end(time), _F_START, _F_END
     )
 
     assert result is None
+
+
+def test_recovers_profile_from_spike_free_segment() -> None:
+    """A brief spike + a quiet resonator recovers via the sub-window fallback.
+
+    The full chirp window contains a spike, but the spike-free remainder is long
+    enough (≫ the 50 ms minimum) to carry an FFT, so ``analyze_impedance``
+    returns a profile and reports the analyzed sub-window duration.  The
+    reported band is narrower than the requested band because the recovered
+    segment covers only the late portion of the linear frequency sweep.
+    """
+    f0 = 8.0
+    q0 = 2.0
+    time, current = _chirp_and_time()
+    freqs = np.fft.rfftfreq(current.size, d=1.0 / _FS_HZ)
+    ratio = freqs / f0
+    transfer = 1.0 / (1.0 - ratio**2 + 1j * ratio / q0)
+    voltage = _BASELINE_MV + _apply_transfer_function(current, transfer)
+    # Inject one synthetic spike near the start of the trace.
+    spike_window = (time >= 100.0) & (time < 105.0)
+    voltage[spike_window] = 30.0
+
+    result = analyze_impedance(
+        time, voltage, current, 0.0, _window_end(time), _F_START, _F_END
+    )
+
+    assert result is not None
+    assert result.analyzed_window_ms is not None
+    # The recovered window covers everything past the spike + guard padding,
+    # which on a 4000 ms trace is well over 3500 ms.
+    assert result.analyzed_window_ms > _DURATION_MS - 200.0
+    # ``f_start`` / ``f_end`` report the requested band; the actually-covered
+    # band lives in ``frequencies``.
+    assert result.f_start == _F_START
+    assert result.f_end == _F_END
+    assert min(result.frequencies) >= _F_START
+
+
+def test_impedance_unavailable_reason_messages() -> None:
+    """The public reason wrapper returns "" for OK inputs and a sentence otherwise."""
+    time, current = _chirp_and_time()
+    clean_voltage = _BASELINE_MV + 10.0 * current
+
+    # OK case → empty string.
+    assert (
+        patch_sim.impedance_unavailable_reason(
+            time, clean_voltage, current, 0.0, _window_end(time), _F_START, _F_END
+        )
+        == ""
+    )
+
+    # Window shorter than _MIN_WINDOW_MS → "shorter than the minimum".
+    short_reason = patch_sim.impedance_unavailable_reason(
+        time, clean_voltage, current, 0.0, 10.0, _F_START, _F_END
+    )
+    assert "shorter than the minimum" in short_reason
+
+    # Spikes throughout → "fired throughout" message.
+    busy_voltage = np.full_like(time, _BASELINE_MV)
+    for centre_ms in np.arange(50.0, _DURATION_MS, 50.0):
+        sp = (time >= centre_ms) & (time < centre_ms + 5.0)
+        busy_voltage[sp] = 30.0
+    busy_reason = patch_sim.impedance_unavailable_reason(
+        time, busy_voltage, current, 0.0, _window_end(time), _F_START, _F_END
+    )
+    assert "fired throughout" in busy_reason or "spike-free segment" in busy_reason
 
 
 def test_absolute_conversion_with_area() -> None:

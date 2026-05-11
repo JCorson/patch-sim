@@ -7,10 +7,16 @@ Unit tests with synthetic signals live in tests/unit/test_impedance.py.
 """
 
 import numpy as np
+import pytest
 
 import patch_sim
 from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ
-from patch_sim.presets import make_ca1_pyramidal, make_thalamic_relay
+from patch_sim.constants import FREQUENCY_RESPONSE
+from patch_sim.presets import (
+    NEURON_PRESETS,
+    make_ca1_pyramidal,
+)
+from patch_sim.presets.protocols import build_protocol_from_preset
 
 _DURATION_MS = 500.0
 _F_START = 1.0
@@ -88,14 +94,40 @@ def test_ca1_chirp_shows_resonance_and_high_impedance(hh_model) -> None:
     assert ca1_profile.magnitude[0] > 5.0 * squid_profile.magnitude[0]
 
 
-def test_suprathreshold_chirp_returns_none() -> None:
-    """A chirp that drives spiking yields no impedance profile (linear regime only).
+# Integration-level coverage for the "no usable spike-free segment → None"
+# branch lives at the unit level (tests/unit/test_impedance.py
+# ``test_returns_none_when_spikes_throughout``) because the size/duration
+# combination needed to wipe out every 50 ms gap is sensitive to preset
+# excitability and gating kinetics, making a stable integration test brittle.
+# The parametrized test below gives the cleaner positive-direction coverage —
+# every shipped preset yields a profile out of the box.
 
-    A thalamic relay neuron fires low-threshold Ca²⁺ spikes in response to even
-    a small chirp around rest, so ``analyze_impedance`` declines to report a
-    profile.
+
+@pytest.mark.parametrize("name", list(NEURON_PRESETS.keys()))
+def test_frequency_response_preset_yields_profile_for_every_neuron(name: str) -> None:
+    """``FREQUENCY_RESPONSE`` + per-neuron overrides recover a profile for every preset.
+
+    Regression guard for the tuned global default plus the per-pacemaker
+    holding-current overrides: building the chirp via
+    ``build_protocol_from_preset`` (same code path the UI uses) and running it
+    through ``analyze_impedance`` must yield a non-``None`` profile with finite,
+    positive magnitudes for every preset.
     """
-    profile, voltage = _run_chirp_profile(make_thalamic_relay(), amplitude=1.0)
+    neuron = NEURON_PRESETS[name]()
+    stim = build_protocol_from_preset(
+        FREQUENCY_RESPONSE,
+        neuron_preset=name,
+        sampling_frequency=SIM_SAMPLING_FREQ,
+    )[0]
+    result = patch_sim.simulate_current_clamp(neuron, stim)
+    time = np.asarray(result["time"])
+    voltage = np.asarray(result["voltage"])
+    duration = float(time[-1])
+    profile = patch_sim.analyze_impedance(
+        time, voltage, stim, 0.0, duration, _F_START, _F_END, area_cm2=neuron.area_cm2
+    )
 
-    assert voltage.max() > -20.0  # the cell spiked
-    assert profile is None
+    assert profile is not None, f"{name}: analyze_impedance returned None"
+    mag = np.asarray(profile.magnitude)
+    assert mag.size >= 8
+    assert np.all(np.isfinite(mag)) and np.all(mag > 0.0)

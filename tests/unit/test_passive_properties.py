@@ -9,10 +9,12 @@ import numpy as np
 import pytest
 
 from patch_sim.analysis.passive_properties import (
+    _SPIKE_GUARD_POST_MS,
     analyze_passive_properties,
     density_to_absolute_c_m,
     density_to_absolute_r_in,
     is_subthreshold,
+    longest_subthreshold_run,
 )
 
 # ---------------------------------------------------------------------------
@@ -103,6 +105,64 @@ def test_is_subthreshold_flat_trace() -> None:
     """Flat constant-voltage trace contains no spikes and is subthreshold."""
     time, voltage = _flat_trace(duration_ms=100.0, v=-65.0)
     assert is_subthreshold(time, voltage) is True
+
+
+# ---------------------------------------------------------------------------
+# longest_subthreshold_run
+# ---------------------------------------------------------------------------
+
+
+def _inject_spike(voltage: np.ndarray, time: np.ndarray, centre_ms: float) -> None:
+    """Inject a brief synthetic spike around ``centre_ms`` into a flat voltage trace.
+
+    The spike is a 1 ms-wide +30 mV pulse — sharp enough to read as a
+    threshold-crossing event for ``analyze_aps`` at the default
+    ``dvdt_threshold=20`` mV/ms.
+
+    Args:
+        voltage: Voltage trace to modify in place.
+        time: Time axis aligned with ``voltage``.
+        centre_ms: Centre of the spike in ms.
+    """
+    mask = (time >= centre_ms) & (time < centre_ms + 1.0)
+    voltage[mask] = 30.0
+
+
+def test_longest_subthreshold_run_no_spikes_returns_whole_trace() -> None:
+    """A spike-free trace returns the full ``(0, N)`` index range."""
+    time, voltage = _flat_trace(duration_ms=200.0)
+    run = longest_subthreshold_run(time, voltage)
+    assert run == (0, time.size)
+
+
+def test_longest_subthreshold_run_one_spike_returns_trailing_gap() -> None:
+    """One early spike leaves a long trailing spike-free segment past the AHP guard."""
+    time, voltage = _flat_trace(duration_ms=500.0)
+    _inject_spike(voltage, time, centre_ms=50.0)
+
+    run = longest_subthreshold_run(time, voltage)
+
+    assert run is not None
+    start_idx, stop_idx = run
+    # The recovered segment must start well after the spike's peak time +
+    # the post-guard window.
+    assert float(time[start_idx]) >= 50.0 + _SPIKE_GUARD_POST_MS
+    assert stop_idx == time.size
+    # And it should cover most of the remaining trace duration.
+    assert float(time[stop_idx - 1] - time[start_idx]) > 400.0
+
+
+def test_longest_subthreshold_run_spikes_throughout_returns_none() -> None:
+    """Tightly-packed spikes leave no spike-free span; the function returns ``None``."""
+    time, voltage = _flat_trace(duration_ms=300.0)
+    # Refractory at 40 kHz is 1 ms, so 5 ms spacing is comfortably resolved.
+    # Spaced 5 ms apart, guard windows (~22 ms wide) fully overlap into one
+    # merged excision interval — and we start at 1 ms and extend past the end
+    # of the trace so the leading and trailing gaps both collapse to empty.
+    for centre in np.arange(1.0, 305.0, 5.0):
+        _inject_spike(voltage, time, centre_ms=float(centre))
+
+    assert longest_subthreshold_run(time, voltage) is None
 
 
 # ---------------------------------------------------------------------------

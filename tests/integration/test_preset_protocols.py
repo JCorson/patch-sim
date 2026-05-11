@@ -289,10 +289,14 @@ def test_fi_curve_preset(preset_name: str) -> None:
 def test_frequency_response_preset(preset_name: str) -> None:
     """Frequency Response protocol produces a measurable voltage response.
 
-    The chirp stimulus sweeps from 1 to 100 Hz and elicits a mixture of
-    subthreshold and suprathreshold responses.  The test asserts that the
-    voltage trace is not flat: voltage range must exceed 2 mV and standard
-    deviation must exceed 0.5 mV.
+    The tuned chirp deliberately uses a small amplitude (0.25 µA/cm² by
+    default) plus per-pacemaker hyperpolarizing-holding-current overrides so
+    the response stays in the linear subthreshold regime — small-R_in cells
+    like the squid axon and FSI swing by only a few tenths of a mV, so the
+    threshold for "responding" is lenient here.  The companion test
+    ``test_frequency_response_preset_yields_profile_for_every_neuron``
+    (tests/integration/test_impedance_simulation.py) provides the stronger
+    positive-direction check that ``analyze_impedance`` recovers a profile.
 
     Args:
         preset_name: Name of the neuron preset under test.
@@ -308,12 +312,12 @@ def test_frequency_response_preset(preset_name: str) -> None:
     v_std = float(np.std(result["voltage"]))
     v_range = float(result["voltage"].max() - result["voltage"].min())
 
-    assert v_std > 0.5, (
-        f"{preset_name}: Frequency Response voltage std {v_std:.3f} mV ≤ 0.5 mV "
+    assert v_std > 0.05, (
+        f"{preset_name}: Frequency Response voltage std {v_std:.3f} mV ≤ 0.05 mV "
         "(neuron may not be responding to the chirp stimulus)"
     )
-    assert v_range > 2.0, (
-        f"{preset_name}: Frequency Response voltage range {v_range:.3f} mV ≤ 2.0 mV "
+    assert v_range > 0.2, (
+        f"{preset_name}: Frequency Response voltage range {v_range:.3f} mV ≤ 0.2 mV "
         "(neuron may not be responding to the chirp stimulus)"
     )
 
