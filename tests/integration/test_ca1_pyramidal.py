@@ -141,6 +141,49 @@ def test_ca1_ap_ahp_depth_in_rs_range(ca1_ap_shape_result) -> None:
     )
 
 
+def test_ca1_single_ap_repolarizes_cleanly(ca1_neuron: Neuron) -> None:
+    """A single evoked AP repolarizes within 6 ms; no post-spike plateau.
+
+    Drives a single AP with the UI ACTION_POTENTIAL protocol (2 µA/cm² ×
+    15 ms) and asserts that within 6 ms after the peak the voltage has
+    dropped below −52 mV.  CA1 pyramidal APs are ~0.7–1.5 ms half-width
+    followed by a fast/medium AHP to roughly −55 to −75 mV; the Ca²⁺/IKCa
+    interaction makes it deeper and a little slower than the cortical RS
+    AHP but it is still reached within ~3–6 ms (Spruston & Johnston 2008,
+    J. Neurophysiol. 99:2782; Storm 1990, Prog. Brain Res. 83:161; Bean
+    2007, Nat. Rev. Neurosci. 8:451, Fig. 2 — hippocampal pyramidal single
+    APs repolarize below threshold within ~3–5 ms).  −52 mV is a
+    conservative bound below the resting/threshold band so a single
+    weakly-driven AP with a shallow fAHP still clears it; a long plateau
+    hanging at ~−30 mV after the spike would mean a window current is
+    dominating repolarization — a pathology the mean half-width and
+    AHP-depth metrics do not catch (half-width is measured at the spike
+    midpoint, which the trace can cross cleanly even when V parks at
+    −30 mV afterward; cf. SNc DA, PR #318).
+    """
+    pre_ms, stim_ms, post_ms = 10.0, 15.0, 60.0
+    total_samples = _ms_to_samples(pre_ms + stim_ms + post_ms) + 1
+    current = np.zeros(total_samples)
+    pre_n = _ms_to_samples(pre_ms)
+    stim_n = _ms_to_samples(stim_ms)
+    current[pre_n : pre_n + stim_n] = 2.0
+    result = simulate_current_clamp(ca1_neuron, current_external=current)
+    t = np.asarray(result["time"])
+    v = np.asarray(result["voltage"])
+
+    peak_idx = int(np.argmax(v))
+    peak_t = float(t[peak_idx])
+    after_mask = (t > peak_t) & (t <= peak_t + 6.0)
+    v_after = v[after_mask]
+    assert v_after.size > 0, "post-peak window is empty"
+    min_v = float(np.min(v_after))
+    assert min_v < -52.0, (
+        f"AP plateau detected: V never falls below −52 mV in 6 ms after the "
+        f"peak (min V = {min_v:.2f} mV at peak={peak_t:.2f} ms).  "
+        f"Reference: {_CA1_REFERENCE}; Bean 2007."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Firing pattern — adapting (IM + IKCa drive SFA in CA1).
 # ---------------------------------------------------------------------------
