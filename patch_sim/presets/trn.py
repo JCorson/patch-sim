@@ -15,6 +15,7 @@ from patch_sim.channels import (
 from patch_sim.constants import (
     ACTION_POTENTIAL,
     FI_CURVE,
+    FREQUENCY_RESPONSE,
     HYPERPOLARIZATION_STEPS,
     REPETITIVE_FIRING,
     SUBTHRESHOLD_RESPONSE,
@@ -67,6 +68,16 @@ PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
         "min_stimulus": -5.0,
         "max_stimulus": -1.0,
         "stimulus_step": 1.0,
+    },
+    # Autonomous pacemaker: a small hyperpolarizing holding current
+    # silences the tonic train during the chirp (mirrors a real ZAP
+    # experiment under current-clamp hold).  −0.5 µA/cm² parks the cell
+    # near −81 mV, slightly below v_rest = −80 mV — far enough to suppress
+    # firing while still keeping ICaT partially de-inactivated; amp=0.25
+    # keeps every chirp swing below the LTS threshold.
+    FREQUENCY_RESPONSE: {
+        "dc_offset": -0.5,
+        "amplitude": 0.25,
     },
 }
 

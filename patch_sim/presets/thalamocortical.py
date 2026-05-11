@@ -13,6 +13,7 @@ from patch_sim.channels import (
 from patch_sim.constants import (
     ACTION_POTENTIAL,
     FI_CURVE,
+    FREQUENCY_RESPONSE,
     REPETITIVE_FIRING,
     SUBTHRESHOLD_RESPONSE,
 )
@@ -62,6 +63,17 @@ PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
     # (g=2.5 mS/cm²); on release a textbook post-inhibitory LTS burst
     # fires (issue #287; McCormick & Huguenard 1992).  Ih (g=1.0 mS/cm²)
     # also contributes via sag and post-step overshoot.
+    # Very low LTS rheobase (≈ 0.05 µA/cm² with slow-inactivating ICaT,
+    # see SUBTHRESHOLD_RESPONSE) makes the global chirp default fire an
+    # LTS even at amp=0.1, so a small hyperpolarizing hold is applied.
+    # −1 µA/cm² parks the cell near −71 mV (further de-inactivating ICaT
+    # without crossing the LTS threshold during the chirp swing); amp=0.25
+    # then yields a ≈ 5 mV peak-to-peak subthreshold response over the
+    # full chirp window.
+    FREQUENCY_RESPONSE: {
+        "dc_offset": -1.0,
+        "amplitude": 0.25,
+    },
 }
 
 
