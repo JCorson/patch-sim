@@ -14,12 +14,13 @@ def _channel_row(
     g_setter,
     param_key: str,
 ) -> rx.Component:
-    """Render a channel label + conductance slider row.
+    """Render a channel's max-conductance input + slider, labeled by the channel name.
 
     Per the design, channel composition is preset-baked: the panel
     only shows rows for channels the active preset includes, so an
     enable/disable checkbox is unnecessary.  The g_max slider modifies
-    the channel's ``g_max`` on the next simulation run.
+    the channel's ``g_max`` on the next simulation run.  The unit is
+    shown once as a caption above the rows rather than per row.
 
     Args:
         label: Display name for the channel (e.g. ``"Ih (HCN)"``).
@@ -28,21 +29,17 @@ def _channel_row(
         param_key: Key into PARAM_RANGES for the conductance slider bounds.
 
     Returns:
-        A vstack containing a channel label and its g_max slider.
+        A labeled g_max input + slider block for the channel.
     """
     min_val, max_val, step = PARAM_RANGES[param_key]
-    return rx.vstack(
-        rx.text(label, size="2"),
-        _param_row(
-            "g_max (mS/cm²)",
-            g_var,
-            g_setter,
-            min_val,
-            max_val,
-            step,
-        ),
-        spacing="1",
-        width="100%",
+    return _param_row(
+        label,
+        g_var,
+        g_setter,
+        min_val,
+        max_val,
+        step,
+        label_color=rx.color("blue", 11),
     )
 
 
@@ -92,13 +89,12 @@ def _ion_row(
     )
 
 
-def _reversal_str(label: str, value: rx.Var, unit: str = "mV") -> rx.Component:
+def _reversal_str(label: str, value: rx.Var) -> rx.Component:
     """Render a read-only reversal potential display row.
 
     Args:
-        label: Ion species label (e.g. ``"E_Na"``).
+        label: Ion species label (e.g. ``"Na⁺"``).
         value: Reactive float var holding the computed reversal potential.
-        unit: Unit string appended after the value (default ``"mV"``).
 
     Returns:
         An hstack showing the label, formatted value, and unit.
@@ -106,7 +102,7 @@ def _reversal_str(label: str, value: rx.Var, unit: str = "mV") -> rx.Component:
     return rx.hstack(
         rx.text(label, size="2", color="gray"),
         rx.text(f"{value:.2f}", size="2"),
-        rx.text(f" {unit}", size="1", color="gray"),
+        rx.text(" mV", size="1", color="gray"),
         width="100%",
     )
 
@@ -118,6 +114,7 @@ def _param_row(
     min_val: float,
     max_val: float,
     step: float,
+    label_color: str = "gray",
 ) -> rx.Component:
     """Render a parameter label, number input, and slider as a grouped block.
 
@@ -128,18 +125,19 @@ def _param_row(
         min_val: Minimum allowed value.
         max_val: Maximum allowed value.
         step: Increment step for the input and slider.
+        label_color: Color for the label text (default ``"gray"``).
 
     Returns:
         A vstack containing an hstack (label + input) and a slider.
     """
     return rx.vstack(
         rx.hstack(
-            rx.text(label, size="2", color="gray"),
+            rx.text(label, size="2", color=label_color),
             rx.spacer(),
             rx.input(
                 value=var,
                 on_change=handler,
-                width="90px",
+                width="64px",
                 size="1",
                 type="number",
                 min=str(min_val),
@@ -200,19 +198,19 @@ def neuron_panel() -> rx.Component:
                 ),
                 content=rx.vstack(
                     _param_row(
-                        "C_m (µF/cm²)",
+                        "Capacitance (µF/cm²)",
                         NeuronState.C_m,
                         NeuronState.set_C_m,
                         *PARAM_RANGES["C_m"],
                     ),
                     _param_row(
-                        "v_rest (mV)",
+                        "Resting potential (mV)",
                         NeuronState.v_rest,
                         NeuronState.set_v_rest,
                         *PARAM_RANGES["v_rest"],
                     ),
                     _param_row(
-                        "T (K)",
+                        "Temperature (K)",
                         NeuronState.T,
                         NeuronState.set_T,
                         *PARAM_RANGES["T"],
@@ -294,6 +292,11 @@ def neuron_panel() -> rx.Component:
                             color="var(--gray-12)",
                         ),
                         content=rx.vstack(
+                            rx.text(
+                                "Max conductance (mS/cm²)",
+                                size="2",
+                                color="gray",
+                            ),
                             *[
                                 rx.cond(
                                     NeuronState.visible_channel_ids.contains(ch_id),
@@ -319,10 +322,10 @@ def neuron_panel() -> rx.Component:
         rx.separator(),
         rx.text("Reversal Potentials", size="2", weight="bold"),
         rx.grid(
-            _reversal_str("E_Na", NeuronState.E_Na),
-            _reversal_str("E_K", NeuronState.E_K),
-            _reversal_str("E_L", NeuronState.E_L),
-            _reversal_str("E_Ca", NeuronState.E_Ca),
+            _reversal_str("Na⁺", NeuronState.E_Na),
+            _reversal_str("K⁺", NeuronState.E_K),
+            _reversal_str("Leak", NeuronState.E_L),
+            _reversal_str("Ca²⁺", NeuronState.E_Ca),
             spacing="1",
             width="100%",
             columns="2",

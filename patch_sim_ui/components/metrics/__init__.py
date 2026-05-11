@@ -37,19 +37,38 @@ _PANEL_WIDTH = "300px"
 _COLLAPSED_WIDTH = "36px"
 
 
+def _passive_metric(label: str, value: rx.Var) -> rx.Component:
+    """Render one passive-property metric as a label stacked above its value.
+
+    Args:
+        label: Metric name shown above the value (e.g. ``"Input resistance"``).
+        value: Reactive string var holding the formatted value with units.
+
+    Returns:
+        A small vstack with the gray label on top and the value below.
+    """
+    return rx.vstack(
+        rx.text(label, size="1", color="gray"),
+        rx.text(value, size="1"),
+        spacing="0",
+        align="start",
+        min_width="0",
+    )
+
+
 def _membrane_test_section() -> rx.Component:
     """Render the always-visible passive membrane properties section.
 
-    Displays R_in, τₘ, and Cₘ from the dedicated membrane test on a single
-    compact row.  The displayed units depend on whether the active preset
-    declares a cell surface area: absolute MΩ / pF when present, per-area
-    kΩ·cm² / µF/cm² otherwise.  τₘ is always in ms and is invariant to the
-    conversion.
+    Displays R_in, τₘ, and Cₘ from the dedicated membrane test as three
+    columns, each with the value below its label.  The displayed units
+    depend on whether the active preset declares a cell surface area:
+    absolute MΩ / pF when present, per-area kΩ·cm² / µF/cm² otherwise.
+    τₘ is always in ms and is invariant to the conversion.
 
     A tooltip explains the active mode.
 
     Returns:
-        A single-row hstack of labeled passive property values, or an empty
+        A three-column grid of labeled passive property values, or an empty
         box when no membrane test results are available.
     """
     s = AnalysisState
@@ -68,19 +87,20 @@ def _membrane_test_section() -> rx.Component:
     return rx.cond(
         AnalysisState.has_membrane_test,
         rx.tooltip(
-            rx.hstack(
-                rx.text("R_in", size="1", color="gray"),
-                rx.text(s.mt_input_resistance + " " + s.mt_r_units, size="1"),
-                rx.text("τ_m", size="1", color="gray", padding_left="2"),
-                rx.text(s.mt_time_constant + " ms", size="1"),
-                rx.text("C_m", size="1", color="gray", padding_left="2"),
-                rx.text(s.mt_membrane_capacitance + " " + s.mt_c_units, size="1"),
+            rx.grid(
+                _passive_metric(
+                    "Input resistance", s.mt_input_resistance + " " + s.mt_r_units
+                ),
+                _passive_metric("Time constant", s.mt_time_constant + " ms"),
+                _passive_metric(
+                    "Capacitance", s.mt_membrane_capacitance + " " + s.mt_c_units
+                ),
+                columns="3",
+                spacing="2",
                 padding_x="3",
                 padding_y="2",
                 border_bottom="1px solid var(--gray-4)",
                 width="100%",
-                align="center",
-                wrap="nowrap",
             ),
             content=tooltip_text,
         ),
