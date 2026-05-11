@@ -146,6 +146,46 @@ def test_fs_ap_ahp_depth_in_fs_range(fs_ap_shape_result) -> None:
     )
 
 
+def test_fs_single_ap_repolarizes_cleanly(fs_neuron: Neuron) -> None:
+    """A single evoked AP repolarizes within 2 ms; no post-spike plateau.
+
+    Drives a single AP with the UI ACTION_POTENTIAL protocol (30 µA/cm² ×
+    5 ms) and asserts that within 2 ms after the peak the voltage has
+    dropped below −58 mV.  Cortical fast-spiking (PV⁺) interneuron APs are
+    ~0.4 ms half-width with a deep, fast Kv3-driven AHP reaching −60 to
+    −75 mV within ~1 ms of the peak (Erisir et al. 1999, J. Neurophysiol.
+    82:2476; Wang & Buzsáki 1996, J. Neurosci. 16:6402); the >100 Hz
+    sustained firing this preset supports requires each AP to clear
+    threshold within ~1–2 ms.  A long plateau hanging at ~−30 mV after the
+    spike would mean a window current is dominating repolarization — a
+    pathology the mean half-width and AHP-depth metrics do not catch
+    (half-width is measured at the spike midpoint, which the trace can
+    cross cleanly even when V parks at −30 mV afterward; cf. SNc DA,
+    PR #318).
+    """
+    pre_ms, stim_ms, post_ms = 10.0, 5.0, 50.0
+    total_samples = _ms_to_samples(pre_ms + stim_ms + post_ms) + 1
+    current = np.zeros(total_samples)
+    pre_n = _ms_to_samples(pre_ms)
+    stim_n = _ms_to_samples(stim_ms)
+    current[pre_n : pre_n + stim_n] = 30.0
+    result = simulate_current_clamp(fs_neuron, current_external=current)
+    t = np.asarray(result["time"])
+    v = np.asarray(result["voltage"])
+
+    peak_idx = int(np.argmax(v))
+    peak_t = float(t[peak_idx])
+    after_mask = (t > peak_t) & (t <= peak_t + 2.0)
+    v_after = v[after_mask]
+    assert v_after.size > 0, "post-peak window is empty"
+    min_v = float(np.min(v_after))
+    assert min_v < -58.0, (
+        f"AP plateau detected: V never falls below −58 mV in 2 ms after the "
+        f"peak (min V = {min_v:.2f} mV at peak={peak_t:.2f} ms).  "
+        f"Reference: {_FS_REFERENCE}."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Firing pattern — non-adapting (Erisir et al. 1999).
 # ---------------------------------------------------------------------------

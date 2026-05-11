@@ -262,6 +262,48 @@ def test_pk_ap_ahp_depth_in_pacemaker_range(pk_pacemaker_ap_result) -> None:
     )
 
 
+def test_pk_single_ap_repolarizes_cleanly(pk_neuron: Neuron) -> None:
+    """A single AP repolarizes within 3 ms of the peak; no post-spike plateau.
+
+    Drives a depolarizing step with the UI ACTION_POTENTIAL protocol
+    (5 µA/cm² × 5 ms) on top of the autonomous pacemaking and asserts that
+    within 3 ms after the global voltage peak V has dropped below −53 mV.
+    Purkinje APs are exceptionally narrow (0.2–0.5 ms half-width) with a
+    fast AHP to roughly −55 to −70 mV reached within ~1–2 ms; the
+    resurgent-Na "kink" briefly slows late repolarization but the trough
+    is reached within 2–3 ms (Raman & Bean 1999, J. Neurosci. 19:1663;
+    Häusser & Clark 1997, Neuron 19:665).  The cell pacemakes at 10–50 Hz
+    (ISI ≥ 20 ms ≫ 3 ms), so the next spontaneous AP cannot intrude into
+    the post-peak window.  A long plateau hanging at ~−30 mV after the
+    spike would mean a window current is dominating repolarization — a
+    pathology the mean half-width and AHP-depth metrics do not catch
+    (half-width is measured at the spike midpoint, which the trace can
+    cross cleanly even when V parks at −30 mV afterward; cf. SNc DA,
+    PR #318).
+    """
+    pre_ms, stim_ms, post_ms = 10.0, 5.0, 50.0
+    total_samples = _ms_to_samples(pre_ms + stim_ms + post_ms) + 1
+    current = np.zeros(total_samples)
+    pre_n = _ms_to_samples(pre_ms)
+    stim_n = _ms_to_samples(stim_ms)
+    current[pre_n : pre_n + stim_n] = 5.0
+    result = simulate_current_clamp(pk_neuron, current_external=current)
+    t = np.asarray(result["time"])
+    v = np.asarray(result["voltage"])
+
+    peak_idx = int(np.argmax(v))
+    peak_t = float(t[peak_idx])
+    after_mask = (t > peak_t) & (t <= peak_t + 3.0)
+    v_after = v[after_mask]
+    assert v_after.size > 0, "post-peak window is empty"
+    min_v = float(np.min(v_after))
+    assert min_v < -53.0, (
+        f"AP plateau detected: V never falls below −53 mV in 3 ms after the "
+        f"peak (min V = {min_v:.2f} mV at peak={peak_t:.2f} ms).  "
+        f"Reference: {_PK_REFERENCE}."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Slow Na inactivation engagement and depol-block recovery — issue #329.
 # ---------------------------------------------------------------------------
