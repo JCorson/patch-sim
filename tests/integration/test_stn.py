@@ -159,6 +159,49 @@ def test_stn_ap_ahp_depth_in_stn_range(stn_ap_shape_result) -> None:
     )
 
 
+def test_stn_single_ap_repolarizes_cleanly(stn_neuron: Neuron) -> None:
+    """A single AP repolarizes within 5 ms of the peak; no post-spike plateau.
+
+    Drives a depolarizing step with the UI ACTION_POTENTIAL protocol
+    (2 µA/cm² × 5 ms) on top of the autonomous tonic pacemaking and
+    asserts that within 5 ms after the global voltage peak V has dropped
+    below −53 mV.  STN tonic-mode APs are ~0.4–1.2 ms half-width with a
+    fast AHP to roughly −55 to −80 mV reached within a few ms (Bevan &
+    Wilson 1999, J. Neurosci. 19:7617; Beurrier et al. 1999, J. Neurosci.
+    19:599).  The cell pacemakes regularly at 5–50 Hz (ISI ≥ 20 ms ≫ 5 ms),
+    so the next spontaneous AP cannot intrude into the post-peak window;
+    the conditional rebound-burst mode (Beurrier 1999) requires prior
+    hyperpolarization and is not exercised here.  A long plateau hanging
+    at ~−30 mV after the spike would mean a window current is dominating
+    repolarization — a pathology the mean half-width and AHP-depth metrics
+    do not catch (half-width is measured at the spike midpoint, which the
+    trace can cross cleanly even when V parks at −30 mV afterward; cf. SNc
+    DA, PR #318; the depol-block plateau is separately guarded by
+    ``test_stn_recovers_from_sustained_suprathreshold_drive``).
+    """
+    pre_ms, stim_ms, post_ms = 10.0, 5.0, 50.0
+    total_samples = _ms_to_samples(pre_ms + stim_ms + post_ms) + 1
+    current = np.zeros(total_samples)
+    pre_n = _ms_to_samples(pre_ms)
+    stim_n = _ms_to_samples(stim_ms)
+    current[pre_n : pre_n + stim_n] = 2.0
+    result = simulate_current_clamp(stn_neuron, current_external=current)
+    t = np.asarray(result["time"])
+    v = np.asarray(result["voltage"])
+
+    peak_idx = int(np.argmax(v))
+    peak_t = float(t[peak_idx])
+    after_mask = (t > peak_t) & (t <= peak_t + 5.0)
+    v_after = v[after_mask]
+    assert v_after.size > 0, "post-peak window is empty"
+    min_v = float(np.min(v_after))
+    assert min_v < -53.0, (
+        f"AP plateau detected: V never falls below −53 mV in 5 ms after the "
+        f"peak (min V = {min_v:.2f} mV at peak={peak_t:.2f} ms).  "
+        f"Reference: {_STN_REFERENCE}."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Slow INaP inactivation engages during sustained drive — issue #324.
 # ---------------------------------------------------------------------------
