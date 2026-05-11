@@ -97,6 +97,11 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "max_stimulus": 60.0,
         "stimulus_step": 10.0,
     },
+    # NOTE: this DC offset / amplitude drives most presets above spike
+    # threshold, so the FFT-based impedance analysis (valid only in the linear
+    # subthreshold regime) reports nothing for those cells.  To measure a clean
+    # impedance / subthreshold-resonance profile, reduce the amplitude (and zero
+    # the DC offset) so the chirp response stays below threshold.
     FREQUENCY_RESPONSE: {
         "clamp_mode": CURRENT_CLAMP,
         "protocol_type": "Chirp",

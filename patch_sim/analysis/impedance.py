@@ -18,7 +18,10 @@ import logging
 
 import numpy as np
 
-from patch_sim.analysis.passive_properties import density_to_absolute_r_in
+from patch_sim.analysis.passive_properties import (
+    density_to_absolute_r_in,
+    is_subthreshold,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +35,15 @@ _MIN_WINDOW_MS: float = 50.0
 _MIN_BAND_BINS: int = 8
 
 #: Fractional margin by which the ``|Z|`` peak must exceed the low-frequency
-#: band edge to count as a genuine resonance (rather than measurement ripple
-#: on an otherwise monotone passive response).
+#: reference to count as a genuine resonance (rather than measurement ripple on
+#: an otherwise monotone passive response).
 _RESONANCE_REL_MARGIN: float = 0.01
+
+#: A linear chirp's spectral power tapers toward the band edges.  Contiguous
+#: leading/trailing FFT bins whose stimulus magnitude falls below this fraction
+#: of the in-band maximum are trimmed before forming ``Z(f)``, so that dividing
+#: by a near-zero stimulus does not inflate the band-edge impedance estimate.
+_MIN_STIM_FRAC: float = 0.05
 
 
 @dataclasses.dataclass
@@ -49,7 +58,7 @@ class ImpedanceProfile:
 
     ``resonance_frequency``, ``peak_impedance`` and ``quality_factor`` are all
     ``None`` when ``|Z(f)|`` has no interior peak that rises meaningfully above
-    the low-frequency band edge — the hallmark of a passive low-pass cell with
+    the low-frequency reference — the hallmark of a passive low-pass cell with
     no resonance.  ``quality_factor`` may additionally be ``None`` when an
     interior peak exists but its half-power width cannot be bracketed inside
     the analysis band.
@@ -177,10 +186,15 @@ def analyze_impedance(
 
     Extracts the chirp window from the traces, removes the DC component from
     both signals, takes the real FFT of each (``numpy.fft.rfft``), forms
-    ``Z(f) = V̂(f) / Î(f)`` over the swept band ``[f_start, f_end]``, and
-    reports the magnitude and phase spectra plus the resonance frequency
-    (argmax of ``|Z|``, only when it is an interior maximum that rises above
-    the low-frequency band edge) and quality factor.
+    ``Z(f) = V̂(f) / Î(f)`` over the swept band ``[f_start, f_end]`` (trimming
+    band-edge bins where the chirp has negligible spectral power), and reports
+    the magnitude and phase spectra plus the resonance frequency (argmax of
+    ``|Z|``, only when it is an interior maximum that rises above the
+    low-frequency reference) and quality factor.
+
+    Membrane impedance is a linear, small-signal quantity: the analysis bails
+    out (returns ``None``) when the windowed response is suprathreshold, since
+    spike transients dominate the spectrum and the result would be meaningless.
 
     Args:
         time: Time axis in ms (uniformly sampled).
@@ -198,9 +212,9 @@ def analyze_impedance(
         An :class:`ImpedanceProfile`, or ``None`` when the inputs are
         inconsistent (mismatched lengths, non-finite values), the band is
         invalid (``f_end <= f_start`` or ``f_start < 0``), the chirp window is
-        shorter than :data:`_MIN_WINDOW_MS`, fewer than :data:`_MIN_BAND_BINS`
-        FFT bins fall inside the band, or the stimulus has no spectral power in
-        the band.
+        shorter than :data:`_MIN_WINDOW_MS`, the windowed response is
+        suprathreshold, the stimulus has no spectral power in the band, or
+        fewer than :data:`_MIN_BAND_BINS` FFT bins remain after trimming.
     """
     t = np.asarray(time, dtype=float)
     v = np.asarray(voltage, dtype=float)
@@ -229,6 +243,13 @@ def analyze_impedance(
         logger.warning("analyze_impedance: too few samples in chirp window; skipping.")
         return None
     t_win, v_win, i_win = t[mask], v[mask], i[mask]
+
+    if not is_subthreshold(t_win, v_win):
+        logger.warning(
+            "analyze_impedance: response is suprathreshold; impedance is only "
+            "defined in the subthreshold regime; skipping."
+        )
+        return None
 
     dt_ms = float(np.mean(np.diff(t_win)))
     if dt_ms <= 0.0:
@@ -263,17 +284,36 @@ def analyze_impedance(
     v_band = v_fft[band]
     i_band = i_fft[band]
 
-    if float(np.max(np.abs(i_band))) <= 0.0:
+    i_mag = np.abs(i_band)
+    i_max = float(np.max(i_mag))
+    if i_max <= 0.0:
         logger.warning("analyze_impedance: stimulus has no power in band; skipping.")
         return None
+    # Trim contiguous band-edge bins where the chirp has negligible power so
+    # that dividing by a near-zero stimulus does not inflate the estimate.
+    keep = np.flatnonzero(i_mag >= _MIN_STIM_FRAC * i_max)
+    lo, hi = int(keep[0]), int(keep[-1]) + 1
+    if hi - lo < _MIN_BAND_BINS:
+        logger.warning(
+            "analyze_impedance: only %d FFT bins with usable stimulus power; "
+            "need %d; skipping.",
+            hi - lo,
+            _MIN_BAND_BINS,
+        )
+        return None
+    fb = fb[lo:hi]
+    v_band = v_band[lo:hi]
+    i_band = i_band[lo:hi]
 
     z = v_band / i_band
     mag = np.abs(z)
     phase_deg = np.degrees(np.angle(z))
 
     peak_idx = int(np.argmax(mag))
-    low_edge = float(mag[0])
-    is_resonant = 0 < peak_idx < mag.size - 1 and float(mag[peak_idx]) > low_edge * (
+    # Reference the low-frequency end with a small average to be robust to
+    # spectral leakage in the first bin.
+    low_ref = float(np.mean(mag[: min(3, mag.size)]))
+    is_resonant = 0 < peak_idx < mag.size - 1 and float(mag[peak_idx]) > low_ref * (
         1.0 + _RESONANCE_REL_MARGIN
     )
     if is_resonant:
@@ -286,6 +326,7 @@ def analyze_impedance(
         quality_factor = None
 
     if area_cm2 is not None and area_cm2 > 0.0:
+        # Per the density_to_absolute_r_in derivation: kΩ·cm² / area / 1000 = MΩ.
         magnitude_mohm: list[float] | None = [float(m) / area_cm2 / 1000.0 for m in mag]
     else:
         magnitude_mohm = None

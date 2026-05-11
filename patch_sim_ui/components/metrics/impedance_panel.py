@@ -82,7 +82,8 @@ def impedance_tab() -> rx.Component:
         rx.flex(
             rx.text(
                 "Run a Frequency Response (chirp) current clamp simulation to "
-                "see the impedance profile.",
+                "see the impedance profile.  The chirp must keep the cell "
+                "subthreshold — reduce the amplitude if the response spikes.",
                 size="1",
                 color="gray",
                 text_align="center",

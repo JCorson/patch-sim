@@ -20,13 +20,15 @@ _DT_MS = 1000.0 / _FS_HZ
 _DURATION_MS = 4000.0
 _F_START = 1.0
 _F_END = 100.0
+_AMP = 0.05  # Small chirp amplitude so |Z|·amplitude stays subthreshold.
+_BASELINE_MV = -65.0  # Physiological resting potential for the response trace.
 
 
 def _chirp_and_time(
     duration_ms: float = _DURATION_MS,
     f_start: float = _F_START,
     f_end: float = _F_END,
-    amplitude: float = 1.0,
+    amplitude: float = _AMP,
     dc_offset: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Build a chirp stimulus and matching time axis at ``_FS_HZ``.
@@ -66,19 +68,32 @@ def _apply_transfer_function(current: np.ndarray, transfer: np.ndarray) -> np.nd
     return np.fft.irfft(transfer * np.fft.rfft(current), n=current.size)
 
 
+def _window_end(time: np.ndarray) -> float:
+    """Return a window-end time that includes the final sample of ``time``.
+
+    Args:
+        time: Ascending time axis in ms.
+
+    Returns:
+        A value slightly past ``time[-1]`` so the ``t < stim_end`` mask keeps
+        every sample.
+    """
+    return float(time[-1]) + _DT_MS
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 
 
 def test_pure_resistor_flat_magnitude() -> None:
-    """A pure resistor (V = R·I) yields flat |Z| ≈ R and zero phase."""
+    """A pure resistor (V = R·I + V_rest) yields flat |Z| ≈ R and zero phase."""
     resistance = 50.0  # kΩ·cm²
     time, current = _chirp_and_time()
-    voltage = resistance * current
+    voltage = _BASELINE_MV + resistance * current
 
     result = analyze_impedance(
-        time, voltage, current, 0.0, time[-1] + _DT_MS, _F_START, _F_END
+        time, voltage, current, 0.0, _window_end(time), _F_START, _F_END
     )
 
     assert result is not None
@@ -94,11 +109,12 @@ def test_pure_resistor_flat_magnitude() -> None:
 def test_resistor_with_dc_offset_subtracted() -> None:
     """DC offsets on V and I are removed before the FFT, leaving |Z| ≈ R."""
     resistance = 30.0  # kΩ·cm²
-    time, current = _chirp_and_time(dc_offset=5.0)
-    voltage = resistance * current + 12.0
+    time, chirp_ac = _chirp_and_time()
+    current = chirp_ac + 5.0  # I carries a DC offset of 5.0.
+    voltage = _BASELINE_MV + resistance * chirp_ac  # V carries a different offset.
 
     result = analyze_impedance(
-        time, voltage, current, 0.0, time[-1] + _DT_MS, _F_START, _F_END
+        time, voltage, current, 0.0, _window_end(time), _F_START, _F_END
     )
 
     assert result is not None
@@ -112,10 +128,10 @@ def test_first_order_lowpass_no_interior_peak() -> None:
     time, current = _chirp_and_time()
     freqs = np.fft.rfftfreq(current.size, d=1.0 / _FS_HZ)
     transfer = 1.0 / (1.0 + 1j * 2.0 * np.pi * freqs * tau_s)
-    voltage = _apply_transfer_function(current, transfer)
+    voltage = _BASELINE_MV + _apply_transfer_function(current, transfer)
 
     result = analyze_impedance(
-        time, voltage, current, 0.0, time[-1] + _DT_MS, _F_START, _F_END
+        time, voltage, current, 0.0, _window_end(time), _F_START, _F_END
     )
 
     assert result is not None
@@ -134,10 +150,10 @@ def test_synthetic_resonance_detects_f_r() -> None:
     freqs = np.fft.rfftfreq(current.size, d=1.0 / _FS_HZ)
     ratio = freqs / f0
     transfer = 1.0 / (1.0 - ratio**2 + 1j * ratio / q0)
-    voltage = _apply_transfer_function(current, transfer)
+    voltage = _BASELINE_MV + _apply_transfer_function(current, transfer)
 
     result = analyze_impedance(
-        time, voltage, current, 0.0, time[-1] + _DT_MS, _F_START, _F_END
+        time, voltage, current, 0.0, _window_end(time), _F_START, _F_END
     )
 
     assert result is not None
@@ -154,10 +170,10 @@ def test_synthetic_resonance_detects_f_r() -> None:
 def test_band_restriction() -> None:
     """The analysis band is clipped to [f_start, f_end]."""
     time, current = _chirp_and_time()
-    voltage = 10.0 * current
+    voltage = _BASELINE_MV + 10.0 * current
 
     result = analyze_impedance(
-        time, voltage, current, 0.0, time[-1] + _DT_MS, 10.0, 50.0
+        time, voltage, current, 0.0, _window_end(time), 10.0, 50.0
     )
 
     assert result is not None
@@ -171,7 +187,7 @@ def test_band_restriction() -> None:
 def test_returns_none_short_window() -> None:
     """A chirp window shorter than the minimum returns None."""
     time, current = _chirp_and_time()
-    voltage = 10.0 * current
+    voltage = _BASELINE_MV + 10.0 * current
 
     result = analyze_impedance(time, voltage, current, 0.0, 10.0, _F_START, _F_END)
 
@@ -181,10 +197,10 @@ def test_returns_none_short_window() -> None:
 def test_returns_none_invalid_band() -> None:
     """A band with f_end <= f_start returns None."""
     time, current = _chirp_and_time()
-    voltage = 10.0 * current
+    voltage = _BASELINE_MV + 10.0 * current
 
     result = analyze_impedance(
-        time, voltage, current, 0.0, time[-1] + _DT_MS, 50.0, 50.0
+        time, voltage, current, 0.0, _window_end(time), 50.0, 50.0
     )
 
     assert result is None
@@ -193,11 +209,11 @@ def test_returns_none_invalid_band() -> None:
 def test_returns_none_with_nans() -> None:
     """Non-finite values in the voltage trace return None."""
     time, current = _chirp_and_time()
-    voltage = 10.0 * current
+    voltage = _BASELINE_MV + 10.0 * current
     voltage[100] = np.nan
 
     result = analyze_impedance(
-        time, voltage, current, 0.0, time[-1] + _DT_MS, _F_START, _F_END
+        time, voltage, current, 0.0, _window_end(time), _F_START, _F_END
     )
 
     assert result is None
@@ -206,10 +222,25 @@ def test_returns_none_with_nans() -> None:
 def test_returns_none_too_few_band_bins() -> None:
     """A band wide enough in Hz but with too few FFT bins returns None."""
     time, current = _chirp_and_time(duration_ms=200.0)
-    voltage = 10.0 * current
+    voltage = _BASELINE_MV + 10.0 * current
 
     # 200 ms at 1 kHz → 5 Hz frequency resolution → a 1 Hz band holds < 8 bins.
     result = analyze_impedance(time, voltage, current, 0.0, 200.0, 49.0, 50.0)
+
+    assert result is None
+
+
+def test_returns_none_when_suprathreshold() -> None:
+    """A response that crosses spike threshold returns None (impedance undefined)."""
+    time, current = _chirp_and_time(amplitude=1.0)
+    # A short +30 mV depolarization with a sharp upstroke reads as a spike.
+    voltage = np.full_like(time, _BASELINE_MV)
+    spike_window = (time >= 1000.0) & (time < 1005.0)
+    voltage[spike_window] = 30.0
+
+    result = analyze_impedance(
+        time, voltage, current, 0.0, _window_end(time), _F_START, _F_END
+    )
 
     assert result is None
 
@@ -219,13 +250,13 @@ def test_absolute_conversion_with_area() -> None:
     resistance = 40.0  # kΩ·cm²
     area_cm2 = 2.0e-5
     time, current = _chirp_and_time()
-    voltage = resistance * current
+    voltage = _BASELINE_MV + resistance * current
 
     with_area = analyze_impedance(
-        time, voltage, current, 0.0, time[-1] + _DT_MS, _F_START, _F_END, area_cm2
+        time, voltage, current, 0.0, _window_end(time), _F_START, _F_END, area_cm2
     )
     without_area = analyze_impedance(
-        time, voltage, current, 0.0, time[-1] + _DT_MS, _F_START, _F_END
+        time, voltage, current, 0.0, _window_end(time), _F_START, _F_END
     )
 
     assert with_area is not None and without_area is not None

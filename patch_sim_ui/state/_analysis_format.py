@@ -466,6 +466,8 @@ def _build_phase_plane_data(sweeps: "list[Sweep]") -> dict[str, Any]:
 
 def _compute_impedance_data(
     sweep: "Sweep",
+    pre_stimulus_duration: float,
+    stimulus_duration: float,
     start_frequency: float,
     end_frequency: float,
     area_cm2: "float | None",
@@ -473,14 +475,18 @@ def _compute_impedance_data(
     """Serialise a chirp current-clamp sweep into impedance data for AnalysisState.
 
     Computes the FFT-based membrane impedance over the chirp's swept band via
-    :func:`patch_sim.analyze_impedance`.  The whole recording is treated as the
-    chirp window (the Frequency Response preset has no pre/post-stimulus
-    padding).  Absolute MΩ values are used when the neuron declares a surface
-    area, otherwise the per-area kΩ·cm² spectrum is reported.
+    :func:`patch_sim.analyze_impedance`, restricting the analysis to the chirp
+    window ``[pre_stimulus_duration, pre_stimulus_duration + stimulus_duration]``
+    (or to the whole recording when ``stimulus_duration`` is zero, matching the
+    chirp builder).  Absolute MΩ values are used when the neuron declares a
+    surface area, otherwise the per-area kΩ·cm² spectrum is reported.
 
     Args:
         sweep: The single current-clamp sweep produced by a chirp protocol;
             its ``stimulus`` field holds the injected current (µA/cm²).
+        pre_stimulus_duration: Pre-stimulus padding before the chirp (ms).
+        stimulus_duration: Duration of the chirp stimulus (ms); zero means the
+            chirp fills the recording from ``pre_stimulus_duration`` onward.
         start_frequency: Chirp sweep start frequency in Hz.
         end_frequency: Chirp sweep end frequency in Hz.
         area_cm2: Membrane surface area in cm², or ``None`` when undeclared.
@@ -496,12 +502,18 @@ def _compute_impedance_data(
         return {}
     voltage_arr = np.asarray(sweep.voltage, dtype=float)
     current_arr = np.asarray(sweep.stimulus, dtype=float)
+    stim_start_ms = float(pre_stimulus_duration)
+    stim_end_ms = (
+        float(pre_stimulus_duration + stimulus_duration)
+        if stimulus_duration > 0.0
+        else float(time_arr[-1])
+    )
     profile = patch_sim.analyze_impedance(
         time_arr,
         voltage_arr,
         current_arr,
-        float(time_arr[0]),
-        float(time_arr[-1]),
+        stim_start_ms,
+        stim_end_ms,
         start_frequency,
         end_frequency,
         area_cm2=area_cm2,

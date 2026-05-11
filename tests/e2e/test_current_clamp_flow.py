@@ -18,7 +18,12 @@ from patch_sim.constants import (
     SQUID_GIANT_AXON,
     THALAMIC_RELAY,
 )
-from tests.e2e.conftest import StateTree, run_flow
+from tests.e2e.conftest import (
+    StateTree,
+    patch_get_state,
+    run_flow,
+    simulate_and_apply,
+)
 
 
 @pytest.mark.parametrize(
@@ -112,15 +117,20 @@ async def test_repetitive_firing_populates_phase_plane(state_tree: StateTree) ->
     assert state_tree.analysis.phase_plane_data != {}
 
 
-async def test_frequency_response_preset_populates_impedance(
-    state_tree: StateTree,
-) -> None:
-    """The Frequency Response (chirp) preset populates impedance_data after a run."""
-    await run_flow(
-        state_tree,
-        neuron_preset=SQUID_GIANT_AXON,
-        protocol_preset=FREQUENCY_RESPONSE,
-    )
+async def test_subthreshold_chirp_populates_impedance(state_tree: StateTree) -> None:
+    """A subthreshold chirp through the full pipeline populates impedance_data.
+
+    Loads the Frequency Response (chirp) preset on the squid axon, then dials
+    the chirp down to a subthreshold amplitude so ``analyze_impedance`` has a
+    valid linear response to work with.
+    """
+    async with patch_get_state(state_tree):
+        [_ async for _ in state_tree.neuron.load_neuron_preset(SQUID_GIANT_AXON)]
+        [_ async for _ in state_tree.protocol.load_protocol_preset(FREQUENCY_RESPONSE)]
+    state_tree.protocol.dc_offset = 0.0
+    state_tree.protocol.amplitude = 1.0
+
+    simulate_and_apply(state_tree)
 
     impedance = state_tree.analysis.impedance_data
     assert impedance != {}
@@ -136,6 +146,19 @@ async def test_frequency_response_preset_populates_impedance(
     assert expected_keys.issubset(impedance.keys())
     assert len(impedance["frequencies"]) == len(impedance["magnitude"])
     assert len(impedance["frequencies"]) > 0
+
+
+async def test_suprathreshold_chirp_leaves_impedance_empty(
+    state_tree: StateTree,
+) -> None:
+    """The default (large) Frequency Response chirp drives spiking → no impedance."""
+    await run_flow(
+        state_tree,
+        neuron_preset=SQUID_GIANT_AXON,
+        protocol_preset=FREQUENCY_RESPONSE,
+    )
+
+    assert state_tree.analysis.impedance_data == {}
 
 
 async def test_action_potential_preset_leaves_impedance_empty(

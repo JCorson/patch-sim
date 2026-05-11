@@ -253,7 +253,12 @@ def _compute_simulation(
         # "Chirp" is the protocol-type name from constants.CURRENT_PROTOCOLS.
         impedance_data = (
             _compute_impedance_data(
-                sweep, start_frequency, end_frequency, neuron.area_cm2
+                sweep,
+                pre_stimulus_duration,
+                stimulus_duration,
+                start_frequency,
+                end_frequency,
+                neuron.area_cm2,
             )
             if protocol_type == "Chirp"
             else {}
