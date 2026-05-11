@@ -19,26 +19,27 @@ _NEURON_FLOAT_FIELDS: list[str] = list(presets.NEURON_CONFIG_SCALAR_FIELDS)
 _CHANNEL_FLOAT_FIELDS: list[str] = [ch.g_max_field for ch in CHANNELS]
 
 
-#: The NeuronState fields that determine the passive-only membrane test result.
-#: Only these fields are included in ``neuron_fingerprint`` so that changing
-#: active conductances (na_g_max, k_g_max, v_rest, auxiliary channels) does
-#: not invalidate the membrane test cache.
+#: NeuronState scalar fields that affect the passive-only membrane test.
+#: Per-channel ``g_max`` values for ungated channels are appended dynamically
+#: in :meth:`NeuronState._compute_fingerprint` by walking the active baseline's
+#: channels — this stays correct if a future preset adds a new ungated
+#: channel (e.g. a Ca²⁺-leak) and matches ``run_membrane_test``'s
+#: ``not ch.gating_variables`` filter exactly.
 #:
 #: Ca²⁺ concentrations are omitted: no Ca²⁺ channels survive the passive
-#: filter (membrane_test only retains channels with no gating variables), so
-#: their reversal potentials carry no current.  Na⁺ and K⁺ concentrations ARE
-#: included because E_NaL and E_KL are used to compute the effective E_L for
-#: the passive RC circuit.
-_PASSIVE_PARAM_FIELDS: list[str] = [
-    "nal_g_max",
-    "kl_g_max",
+#: filter, so their reversal potentials carry no current.  Na⁺ and K⁺
+#: concentrations ARE included because E_NaL and E_KL are used to compute
+#: the effective E_L for the passive RC circuit.  Q10 / T_ref are omitted
+#: because they only scale gating kinetics and ungated channels have no
+#: gates to scale.
+_PASSIVE_SCALAR_FIELDS: tuple[str, ...] = (
     "C_m",
     "Na_out",
     "Na_in",
     "K_out",
     "K_in",
     "T",
-]
+)
 
 
 def _make_neuron_float_setter(field_name: str):
@@ -51,8 +52,8 @@ def _make_neuron_float_setter(field_name: str):
     from generators; returning an event from a sync handler has no effect.
 
     The fingerprint-based cache inside ``run_membrane_test`` ensures the
-    simulation only re-runs when passive-relevant parameters (nal_g_max, kl_g_max,
-    C_m, ion concentrations, T) actually change.
+    simulation only re-runs when passive-relevant parameters (the ungated
+    channels' g_max, C_m, ion concentrations, T) actually change.
 
     Args:
         field_name: Name of the ``NeuronState`` attribute to update.
@@ -176,14 +177,41 @@ class NeuronState(rx.State):
         and may return a stale digest if called from a background task before
         the cache has been invalidated by the latest state flush.
 
-        Only hashes the fields that determine the passive-only membrane
-        test result (nal_g_max, kl_g_max, C_m, ion concentrations, T).  Active
-        conductances are excluded because the membrane test blocks them.
+        Hashes :data:`_PASSIVE_SCALAR_FIELDS`, the baseline's ``area_cm2``,
+        and the slider ``g_max`` of every ungated channel on the active
+        baseline.  A channel is only picked up if it is registered in
+        :data:`patch_sim_ui.channels.CHANNELS` (so it has a UI slider) — the
+        baseline-wired-only case has no slider to move and cannot change
+        between calls.  The channel walk mirrors
+        :func:`patch_sim.analysis.membrane_test.run_membrane_test`'s
+        ``not ch.gating_variables`` filter.  Active (gated) conductances are
+        excluded because the membrane test blocks them.  ``v_rest`` is also
+        excluded because the membrane test overrides it with the
+        leak-conductance-weighted E_L; the only case where ``v_rest`` would
+        change the output is the pathological one where every ungated
+        channel's ``g_max`` is zero, and the leak-channel sliders already
+        invalidate the digest before that boundary is crossed.
 
         Returns:
             A hex digest string that changes only when passive parameters change.
         """
-        parts = [repr(getattr(self, f)) for f in _PASSIVE_PARAM_FIELDS]
+        parts = [f"{name}={getattr(self, name)!r}" for name in _PASSIVE_SCALAR_FIELDS]
+        factory = NEURON_PRESETS.get(self.active_neuron_type)
+        baseline = factory() if factory is not None else None
+        parts.append(
+            f"area_cm2={(baseline.area_cm2 if baseline is not None else None)!r}"
+        )
+        baseline_channels = baseline.channels if baseline is not None else ()
+        for ch in baseline_channels:
+            if ch.gating_variables:
+                continue
+            ui_id = presets.CHANNEL_NAME_TO_ID.get(ch.name)
+            if ui_id is None:
+                continue
+            g_max = getattr(self, f"{ui_id}_g_max", None)
+            if g_max is None:
+                continue
+            parts.append(f"{ui_id}_g_max={g_max!r}")
         return hashlib.sha256("|".join(parts).encode()).hexdigest()
 
     @rx.var
