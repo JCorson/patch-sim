@@ -53,7 +53,7 @@ def _ap_summary() -> rx.Component:
     shown per-sweep in the F-I curve.
 
     Returns:
-        A compact grid of labelled metric values drawn from AnalysisState.ap_summary.
+        A compact grid of labeled metric values drawn from AnalysisState.ap_summary.
     """
     s = AnalysisState.ap_summary
     return rx.box(
@@ -150,7 +150,7 @@ def _ap_phase_plane_plot() -> rx.Component:
 
     Shows the membrane voltage on the x-axis against its time derivative on
     the y-axis.  One trajectory is drawn per sweep; multi-sweep runs display
-    trajectories in their respective sweep colours.
+    trajectories in their respective sweep colors.
 
     Returns:
         A flex container holding the phase-plane Plotly figure.

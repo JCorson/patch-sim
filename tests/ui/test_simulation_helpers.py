@@ -3,7 +3,7 @@
 These tests cover edge cases and documented invariants that the e2e suite
 (``tests/e2e/``) and integration tests (``tests/integration/``) cannot catch:
 em-dash and asterisk display conventions, branch selection between F-I and
-hyperpolarisation analysis, guard returns when sweeps and protocol steps
+hyperpolarization analysis, guard returns when sweeps and protocol steps
 disagree, and the duty-cycle invariant that silent CC sweeps still count
 toward the denominator.
 
@@ -232,7 +232,7 @@ def test_format_ca_transient_dict_none_tau_is_em_dash() -> None:
 def test_serialise_burst_summary_always_emits_threshold_and_method() -> None:
     """The summary surfaces the threshold + method even when no bursts exist.
 
-    The UI relies on this so it can show *which* threshold the analyser
+    The UI relies on this so it can show *which* threshold the analyzer
     applied and how it was chosen, even on traces where zero bursts were
     detected.
     """

@@ -13,12 +13,12 @@ from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS, make_squid_gi
 # Purkinje is a pacemaker with an UNSTABLE zero-current equilibrium at v_rest.
 # Starting from v_rest = −65 mV it drifts below threshold — the stability
 # criterion does not apply.  See test_fires_spontaneously in
-# tests/integration/test_purkinje.py for the pacemaking behaviour check.
+# tests/integration/test_purkinje.py for the pacemaking behavior check.
 #
 # TRN is excluded for the same reason after issue #295 added Ih: the cell is
 # spontaneously active at ~3 Hz (consistent with the tonic firing reported in
 # HP92 and B&M93 slice recordings) and has no stable zero-current
-# equilibrium.  The HP92 rebound-burst phenotype (the key TRN behaviour) is
+# equilibrium.  The HP92 rebound-burst phenotype (the key TRN behavior) is
 # exercised by ``test_trn_step_release_produces_hp92_rebound_burst`` in
 # tests/integration/test_burst_metrics_simulation.py.
 #
@@ -29,7 +29,7 @@ from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS, make_squid_gi
 # tests/integration/test_dopaminergic.py.
 #
 # STN is excluded post-#305: the autonomous-pacemaker preset uses INaP and
-# Ih to destabilise rest near −60 mV and fires spontaneously at ~11 Hz from
+# Ih to destabilize rest near −60 mV and fires spontaneously at ~11 Hz from
 # v_rest = −60 mV (Bevan & Wilson 1999: 5–50 Hz autonomous firing in slice).
 # See test_stn_spontaneous_pacemaking in tests/integration/test_stn.py.
 _STABLE_PRESET_NAMES = [

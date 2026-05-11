@@ -28,7 +28,7 @@ Patch clamp experiment simulator with a core library (`patch_sim/`) and a Reflex
 
 ## Biological accuracy
 
-**Prioritise biological accuracy** when designing or modifying neuron presets. If a preset produces behaviour that doesn't match known physiology (wrong resting potential, wrong firing pattern, missing channels), fix the underlying biology rather than working around it. When a full biological fix is out of scope (e.g. a channel type not yet implemented), document the known limitation explicitly in the preset comment and in an issue — do not silently accept a biologically wrong default.
+**Prioritize biological accuracy** when designing or modifying neuron presets. If a preset produces behavior that doesn't match known physiology (wrong resting potential, wrong firing pattern, missing channels), fix the underlying biology rather than working around it. When a full biological fix is out of scope (e.g. a channel type not yet implemented), document the known limitation explicitly in the preset comment and in an issue — do not silently accept a biologically wrong default.
 
 ## Architecture
 

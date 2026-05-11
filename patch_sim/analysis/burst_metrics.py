@@ -78,10 +78,10 @@ _MIN_PEAK_COUNT: int = 2
 #: that are typical of noisy unimodal data.
 _VALLEY_DEPTH_FRACTION: float = 0.5
 
-#: Minimum ratio (in log10 ISI space) between the centres of the two
+#: Minimum ratio (in log10 ISI space) between the centers of the two
 #: candidate peaks.  Genuine burst/pause distributions are typically
 #: separated by an order of magnitude or more (e.g. 5 ms intra-burst vs
-#: 200 ms inter-burst); narrow noisy unimodal data sees its peak centres
+#: 200 ms inter-burst); narrow noisy unimodal data sees its peak centers
 #: only fractions of a log unit apart.  log10(3.0) ≈ 0.48 corresponds to
 #: a 3× ratio in linear ISI space, which comfortably accepts real bursts
 #: while rejecting noise.
@@ -211,7 +211,7 @@ def _estimate_isi_threshold(isis: list[float]) -> tuple[float, str]:
 
     hist, edges = np.histogram(log_isi, bins=_HISTOGRAM_BINS)
 
-    # Find local maxima: bins strictly greater than the left neighbour and
+    # Find local maxima: bins strictly greater than the left neighbor and
     # at least as great as the right, populated above _MIN_PEAK_COUNT.  The
     # asymmetric ``> left`` / ``>= right`` tie-breaker is intentional: on a
     # plateau (e.g. ``[2, 3, 3, 2]``) it registers a single peak at the
@@ -238,11 +238,11 @@ def _estimate_isi_threshold(isis: list[float]) -> tuple[float, str]:
     # peak-to-peak ratio is rejected.
     peaks_sorted = sorted(peaks, key=lambda b: hist[b], reverse=True)
     left_peak = right_peak = -1
-    bin_centres = 0.5 * (edges[:-1] + edges[1:])
+    bin_centers = 0.5 * (edges[:-1] + edges[1:])
     for i in range(len(peaks_sorted)):
         for j in range(i + 1, len(peaks_sorted)):
             a, b = sorted((peaks_sorted[i], peaks_sorted[j]))
-            log_gap = float(bin_centres[b] - bin_centres[a])
+            log_gap = float(bin_centers[b] - bin_centers[a])
             if b - a >= _MIN_PEAK_SEPARATION_BINS and log_gap >= _MIN_PEAK_LOG_RATIO:
                 left_peak, right_peak = a, b
                 break
@@ -314,7 +314,7 @@ def _group_spikes_into_bursts(
     group_isis: list[float] = []
 
     def _close_group(end_idx: int) -> None:
-        """Finalise the current candidate group ending at ``end_idx``.
+        """Finalize the current candidate group ending at ``end_idx``.
 
         Promotes the group to a :class:`BurstMetrics` when its spike count
         meets ``min_spikes_per_burst``; otherwise its spikes are added to

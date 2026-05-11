@@ -11,8 +11,8 @@ def build_phase_plane_figure(phase_plane_data: dict) -> go.Figure:
     """Build a V vs dV/dt phase-plane figure from serialised sweep data.
 
     Renders one trace per sweep.  In single-sweep runs the trace uses the
-    standard current-clamp colour; in multi-sweep runs each sweep is drawn
-    with its stored colour so the trajectories are distinguishable.
+    standard current-clamp color; in multi-sweep runs each sweep is drawn
+    with its stored color so the trajectories are distinguishable.
 
     Args:
         phase_plane_data: Dict with key ``"sweeps"``, a list of dicts each

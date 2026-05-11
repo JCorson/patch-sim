@@ -45,7 +45,7 @@ def safe_cosh(x: float) -> float:
     Clips the input to [-SAFE_COSH_CLIP, SAFE_COSH_CLIP] before computing
     cosh.  Since cosh is symmetric and monotonically increasing away from
     zero, clipping at ±100 returns cosh(100) ≈ 1.34e43 for extreme inputs,
-    which is finite and preserves the qualitative behaviour (very large tau
+    which is finite and preserves the qualitative behavior (very large tau
     denominator → very small time constant).
 
     Args:

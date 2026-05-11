@@ -144,7 +144,7 @@ def test_returns_none_for_short_stimulus() -> None:
 def test_synthetic_exponential_recovers_tau() -> None:
     """Exponential fit recovers the true time constant from a synthetic trace."""
     v_baseline = -65.0
-    v_ss = -75.0  # hyperpolarising step
+    v_ss = -75.0  # hyperpolarizing step
     true_tau = 10.0  # ms
     time, voltage = _synthetic_step_trace(v_baseline, v_ss, true_tau)
 
@@ -188,10 +188,10 @@ def test_synthetic_exponential_membrane_capacitance() -> None:
     assert props.membrane_capacitance == pytest.approx(expected_cm, rel=0.05)
 
 
-def test_depolarising_step_gives_positive_rin() -> None:
-    """Depolarising subthreshold step yields a positive R_in."""
+def test_depolarizing_step_gives_positive_rin() -> None:
+    """Depolarizing subthreshold step yields a positive R_in."""
     v_baseline = -65.0
-    v_ss = -60.0  # depolarising (+5 mV)
+    v_ss = -60.0  # depolarizing (+5 mV)
     true_tau = 5.0
     current_amplitude = 1.0  # +1 µA/cm²
     time, voltage = _synthetic_step_trace(v_baseline, v_ss, true_tau)
@@ -207,10 +207,10 @@ def test_depolarising_step_gives_positive_rin() -> None:
     assert props.input_resistance > 0.0
 
 
-def test_hyperpolarising_step_gives_positive_rin() -> None:
-    """Hyperpolarising step (negative current) also yields a positive R_in."""
+def test_hyperpolarizing_step_gives_positive_rin() -> None:
+    """Hyperpolarizing step (negative current) also yields a positive R_in."""
     v_baseline = -65.0
-    v_ss = -75.0  # hyperpolarising (-10 mV)
+    v_ss = -75.0  # hyperpolarizing (-10 mV)
     true_tau = 5.0
     current_amplitude = -2.0  # -2 µA/cm²; R_in = 5.0 (positive)
     time, voltage = _synthetic_step_trace(v_baseline, v_ss, true_tau)

@@ -346,14 +346,14 @@ def build_figure(
 
     Both **Current Clamp** and **Voltage Clamp** use a fixed 3-row layout.
     In Voltage Clamp mode all ion current channels are overlaid on a single
-    subplot (row 1) with each channel identified by a fixed colour from
+    subplot (row 1) with each channel identified by a fixed color from
     ``CHANNEL_COLORS`` and a legend entry.
 
     When there are multiple current sweeps (multi-sweep mode), hover on all
     real traces is suppressed and replaced with invisible carrier traces that
     display a monospace HTML table — sweeps as rows, quantities as columns —
     via ``hovertemplate``/``customdata``.  Single-sweep modes keep the
-    standard ``hovermode="x unified"`` behaviour.
+    standard ``hovermode="x unified"`` behavior.
 
     Args:
         current_sweeps: Latest simulation result (1 sweep for standard runs,
@@ -424,7 +424,7 @@ def build_figure(
             y: Y-axis data values.
             name: Trace name shown in the legend / hover.
             row: Subplot row number (1-based).
-            color: Line colour string; ``None`` lets Plotly choose.
+            color: Line color string; ``None`` lets Plotly choose.
             visible: Whether the trace is initially visible.
             dash: Line dash style (e.g. ``"dash"``); ``None`` for solid.
             width: Line width in pixels; ``None`` uses the default.
@@ -541,7 +541,7 @@ def build_figure(
             "Stimulus (µA/cm²)" if sweep_mode == CURRENT_CLAMP else "Command (mV)"
         )
         # Show legend only for the first sweep; subsequent sweeps share the
-        # same colours so their legend entries would be duplicates.
+        # same colors so their legend entries would be duplicates.
         sl = sweep_idx == 0
 
         if sweep_mode == CURRENT_CLAMP:
@@ -557,7 +557,7 @@ def build_figure(
                 sweep_index=sweep_idx,
             )
         else:
-            # Voltage Clamp: all currents overlaid on row 1 with channel colours.
+            # Voltage Clamp: all currents overlaid on row 1 with channel colors.
             # Legend-eligible traces (first sweep) use an empty prefix so the
             # voltage-clamp command level doesn't appear in the legend label
             # (e.g. "I_total" not "100 mV I_total").  Individual hover is

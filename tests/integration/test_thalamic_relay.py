@@ -1,6 +1,6 @@
 """Behavioral tests for the Thalamic Relay (TC) neuron preset.
 
-Pins the TC tonic-firing AP shape under depolarising step and the
+Pins the TC tonic-firing AP shape under depolarizing step and the
 intra-burst AP shape during the LTS rebound burst.  The burst structure
 itself (3–7 spikes, 200–500 Hz) is already pinned by
 ``test_thalamic_relay_step_release_produces_multi_spike_lts_burst`` in
@@ -41,7 +41,7 @@ def tc_neuron() -> Neuron:
 
 @pytest.fixture
 def tc_tonic_ap_result(tc_neuron: Neuron):
-    """AP analysis under a 1 µA/cm² depolarising step (tonic mode)."""
+    """AP analysis under a 1 µA/cm² depolarizing step (tonic mode)."""
     protocol = step_current(
         duration=_TC_TONIC_STEP_DURATION_MS,
         current_amplitude=_TC_TONIC_STEP_CURRENT,
@@ -171,7 +171,7 @@ def test_tc_intra_burst_ap_threshold_in_tc_range(tc_intra_burst_ap_result) -> No
 
     Each Na⁺ spike during the LTS plateau still triggers from the same
     Pospischil/MH92 voltage threshold; the LTS just provides the
-    depolarising drive that brings V there repeatedly.
+    depolarizing drive that brings V there repeatedly.
     """
     assert_ap_shape(
         tc_intra_burst_ap_result,

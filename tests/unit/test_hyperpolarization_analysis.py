@@ -76,7 +76,7 @@ def _sag_voltage(
     Args:
         time: Time axis in ms.
         v_rest: Resting voltage before and after the step (mV).
-        v_peak: Initial hyperpolarisation peak (most negative voltage, mV).
+        v_peak: Initial hyperpolarization peak (most negative voltage, mV).
         v_steady: Steady-state voltage during the step (mV, less negative than
             peak).
         stim_start_ms: Step onset in ms.
@@ -103,14 +103,14 @@ def _add_spike(
 ) -> np.ndarray:
     """Insert a synthetic action potential into a voltage trace.
 
-    Inserts a narrow Gaussian-shaped spike centred at ``spike_time_ms``.
+    Inserts a narrow Gaussian-shaped spike centered at ``spike_time_ms``.
     The spike is placed on top of the existing trace, so the baseline
     reflects the surrounding voltage.
 
     Args:
         voltage: Voltage array to modify (copy is returned, original unchanged).
         time: Time axis in ms, same length as ``voltage``.
-        spike_time_ms: Centre of the spike in ms.
+        spike_time_ms: Center of the spike in ms.
         spike_width_ms: Standard deviation of the Gaussian in ms.
         spike_peak_mv: Target peak of the spike in mV.
         threshold_mv: Threshold voltage used to set spike amplitude.

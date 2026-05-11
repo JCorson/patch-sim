@@ -187,7 +187,7 @@ _MAINEN_SEJNOWSKI_NA_RG: float = 0.0091 * MAINEN_SEJNOWSKI_KV_PRESCALE
 #: h-gate steady-state Boltzmann V_½ (mV) (na.mod ``thinf``).  Combined
 #: with ``qinf=6.2`` gives h_inf ≈ 7×10⁻⁴ at V = -20 mV — far smaller
 #: than the Pospischil h_inf ≈ 0.034 at the same voltage.  M-S Na
-#: therefore carries only a tiny window current at sustained depolarised
+#: therefore carries only a tiny window current at sustained depolarized
 #: V relative to Pospischil Na.
 _MAINEN_SEJNOWSKI_NA_THINF: float = -65.0
 
@@ -269,8 +269,8 @@ def _ms_na_h_inf(V: float) -> float:
     """Steady-state h gate value for Mainen-Sejnowski Na.
 
     ``h_inf(V) = 1 / (1 + exp((V - thinf) / qinf))`` with thinf = -65 mV
-    and qinf = 6.2 mV.  Approaches 1 at hyperpolarised voltages (Na
-    available) and 0 at depolarised voltages (Na inactivated).
+    and qinf = 6.2 mV.  Approaches 1 at hyperpolarized voltages (Na
+    available) and 0 at depolarized voltages (Na inactivated).
 
     Args:
         V: Membrane voltage in mV.
@@ -353,16 +353,16 @@ def make_mainen_sejnowski_na_channel(g_max: float) -> IonChannel:
     activation gate ``m`` (power 3) and inactivation gate ``h`` (power 1).
     Distinctive features relative to the Pospischil Na channel:
 
-    * **Stronger steady-state inactivation at depolarised V** — h_inf
+    * **Stronger steady-state inactivation at depolarized V** — h_inf
       passes through 0.5 at V = -65 mV (vs -56 for Pospischil) and
       collapses to ~7×10⁻⁴ at V = -20 mV (vs ~0.034 for Pospischil), so
-      the steady-state Na window current at sustained depolarised V is
+      the steady-state Na window current at sustained depolarized V is
       ~50× smaller than Pospischil's.
 
     Currently no preset wires this Na factory in — it is provided as a
     building block alongside :func:`make_mainen_sejnowski_kv_channel`
     (issue #311) for any future cortical-style preset that needs the
-    weaker depolarised-V window current.
+    weaker depolarized-V window current.
 
     Rate constants are pre-scaled from the published 23 °C kinetics to
     34 °C using Q10 = 2.3, matching the cortical pyramidal preset's

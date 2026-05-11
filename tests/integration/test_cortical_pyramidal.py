@@ -240,7 +240,7 @@ def test_suprathreshold_fires_action_potentials(cp_neuron: Neuron) -> None:
         f"AP peak {voltage.max():.1f} mV is below expected +20 mV"
     )
 
-    # Repolarisation must return below -50 mV after the peak.
+    # Repolarization must return below -50 mV after the peak.
     peak_idx = int(np.argmax(voltage))
     post_peak = voltage[peak_idx:]
     assert float(post_peak.min()) < -50.0, (
@@ -383,7 +383,7 @@ def test_cp_fast_na_slow_inactivation_engages_during_drive(
     voltage-dependent inactivation gate baked into ``make_nav12_channel``
     must lose at least half its rest availability by the end of a sustained
     suprathreshold step, abolishing the residual fast-Na h-tail that would
-    otherwise pin the cell on a depolarisation plateau.
+    otherwise pin the cell on a depolarization plateau.
     """
     n_pre = _ms_to_samples(100.0)
     n_step = _ms_to_samples(200.0)
@@ -409,7 +409,7 @@ def test_cp_fast_na_slow_inactivation_engages_during_drive(
 def test_cp_recovers_from_sustained_suprathreshold_drive(
     cp_neuron: Neuron,
 ) -> None:
-    """Cortical pyramidal repolarises after +12 µA/cm² × 200 ms (#327 regression).
+    """Cortical pyramidal repolarizes after +12 µA/cm² × 200 ms (#327 regression).
 
     Without slow Na inactivation the cell can hang on a depol-block
     plateau under sustained drive.  With sNaP (Magistretti & Alonso 1999,

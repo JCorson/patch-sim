@@ -142,7 +142,7 @@ def test_voltage_step_single_via_equal_range_returns_single_sweep() -> None:
 
 
 def test_unknown_current_protocol_raises() -> None:
-    """Unrecognised CC protocol type raises ValueError."""
+    """Unrecognized CC protocol type raises ValueError."""
     with pytest.raises(ValueError, match="Unknown current protocol"):
         build_current_protocol(
             protocol_type="BadType",
@@ -151,7 +151,7 @@ def test_unknown_current_protocol_raises() -> None:
 
 
 def test_unknown_voltage_protocol_raises() -> None:
-    """Unrecognised VC protocol type raises ValueError."""
+    """Unrecognized VC protocol type raises ValueError."""
     with pytest.raises(ValueError, match="Unknown voltage protocol"):
         build_voltage_protocol(
             protocol_type="BadType",

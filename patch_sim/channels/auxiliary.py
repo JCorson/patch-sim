@@ -299,11 +299,11 @@ def make_ih_channel(
 #
 # Slow inactivation gate ``sNaP`` is also from Magistretti & Alonso 1999
 # §"Slow inactivation": V½ = −45 mV, slope 7 mV (inverted Boltzmann;
-# values picked from the depolarised end of the experimental −47 to −54
+# values picked from the depolarized end of the experimental −47 to −54
 # mV / k = 7-10 mV spread to leave near-rest availability high,
 # s_inf(−65 mV) ≈ 0.94).  The paper reports τ on the order of seconds at
 # the V½ peak; the implementation uses a faster tau_scale (≈200 ms peak)
-# so the gate produces a useful escape from a depolarisation plateau
+# so the gate produces a useful escape from a depolarization plateau
 # within a single sustained step rather than over multiple seconds.  The
 # gate is part of the standard topology because native INaP biologically
 # undergoes this slow inactivation (Magistretti & Alonso 1999).
@@ -331,7 +331,7 @@ def make_ih_channel(
 # channels' gating variables.
 #
 # Slow inactivation is opt-in (default off) so that presets tuned without it
-# keep their existing phenotypes.  Enable it on presets where depolarisation-
+# keep their existing phenotypes.  Enable it on presets where depolarization-
 # block recovery matters — STN (#324), cortical pyramidal (#327), CA1
 # pyramidal (#328), and Purkinje (#329).
 
@@ -360,9 +360,9 @@ def make_inap_channel(g_max: float = DEFAULT_G_NAP) -> IonChannel:
     voltage-dependent inactivation gate ``sNaP`` (also Magistretti &
     Alonso 1999, §"Slow inactivation"; V½ = −45 mV, slope 7 mV, inverted
     Boltzmann; τ_scale = 200 ms / τ_floor = 20 ms).  The slow gate is
-    mostly available at hyperpolarised potentials and decays towards zero
-    during sustained depolarisation, providing the escape mechanism that
-    lets the membrane repolarise after a prolonged suprathreshold step.
+    mostly available at hyperpolarized potentials and decays toward zero
+    during sustained depolarization, providing the escape mechanism that
+    lets the membrane repolarize after a prolonged suprathreshold step.
     Native INaP biologically undergoes this slow inactivation (Magistretti
     & Alonso 1999), so the gate is part of the standard topology rather
     than an opt-in feature.  The simulation column is named ``sNaP``
@@ -535,7 +535,7 @@ def make_im_channel(
     gating variable ``w`` (power 1).
 
     Kinetics follow Adams et al. (1982) / Traub & Miles (1991) with a
-    Boltzmann activation centred at -35 mV and a slow cosh-based time
+    Boltzmann activation centered at -35 mV and a slow cosh-based time
     constant (~150 ms near -35 mV).
 
     The reversal potential is computed dynamically from the neuron's K⁺
@@ -563,9 +563,9 @@ def make_im_channel(
 #
 # Real K_ATP channels (Kir6.x/SUR) are gated by intracellular ATP/ADP
 # stoichiometry, opening when [ATP] falls relative to [ADP] during
-# metabolic stress.  In STN cells they contribute to depolarisation-block
+# metabolic stress.  In STN cells they contribute to depolarization-block
 # recovery and to the membrane response under sustained suprathreshold
-# drive (Stanford & Lacey 1996; Bevan & Wilson 1999).  Modelling them
+# drive (Stanford & Lacey 1996; Bevan & Wilson 1999).  Modeling them
 # faithfully would require an ATP/ADP state variable coupled to firing
 # activity (Erecińska & Silver 1989); since the simulator doesn't track
 # metabolic state, this factory uses a voltage-driven slow-activation
@@ -598,10 +598,10 @@ def make_katp_channel(
     activated by low [ATP]/[ADP]); this factory models them
     phenomenologically with voltage-driven slow activation, since the
     simulator does not track metabolic state.  The channel engages at
-    sustained depolarisation (V½ = −25 mV, well above autonomous
+    sustained depolarization (V½ = −25 mV, well above autonomous
     pacemaking threshold) with a slow time constant (~400 ms peak),
     providing an outward K⁺ drive that helps the membrane escape
-    depolarisation block (#324 in STN).
+    depolarization block (#324 in STN).
 
     Uses a single gating variable ``kATP`` (power 1).  The reversal
     potential is computed dynamically from the neuron's K⁺ concentrations
@@ -653,7 +653,7 @@ def make_ikir_channel(
     It uses a single gating variable ``kir`` (power 1).
 
     Kinetics follow Hagiwara & Takahashi (1974) / Steephen & Bhalla (2009),
-    with an inverted Boltzmann activation centred at -80 mV and a fast
+    with an inverted Boltzmann activation centered at -80 mV and a fast
     cosh-based time constant.
 
     The reversal potential is computed dynamically from the neuron's K⁺
@@ -820,8 +820,8 @@ def make_ical_channel(
     and :meth:`~patch_sim.channels.IonChannel.compute_current` uses live
     ``ca_i`` for a dynamic E_Ca.
 
-    Kinetics use Boltzmann-cosh rate functions with activation centred at
-    -10 mV (slope 6.2 mV) and inactivation centred at -35 mV (slope -9 mV,
+    Kinetics use Boltzmann-cosh rate functions with activation centered at
+    -10 mV (slope 6.2 mV) and inactivation centered at -35 mV (slope -9 mV,
     inverted).
 
     The reversal potential is computed dynamically from the neuron's Ca²⁺
@@ -864,7 +864,7 @@ def make_icat_channel(
 
     ICaT is a low-voltage-activated, transient Ca²⁺ channel.  It activates
     near the resting potential and contributes to burst firing and
-    oscillatory behaviour (e.g. in thalamic neurons).  It uses two gating
+    oscillatory behavior (e.g. in thalamic neurons).  It uses two gating
     variables: ``dt`` (activation, power 2) and ``ft`` (inactivation, power 1).
 
     Kinetics follow Destexhe et al. (1994) with activation half-point at
@@ -914,8 +914,8 @@ def make_ican_channel(
     It uses two gating variables: ``dn`` (activation, power 2) and
     ``fn`` (inactivation, power 1).
 
-    Kinetics use Boltzmann-cosh rate functions with activation centred at
-    -20 mV and inactivation centred at -40 mV.
+    Kinetics use Boltzmann-cosh rate functions with activation centered at
+    -20 mV and inactivation centered at -40 mV.
 
     The reversal potential is computed dynamically from the neuron's Ca²⁺
     concentrations using the Nernst equation.
@@ -1027,7 +1027,7 @@ def make_sk_channel(
     SK is gated purely by intracellular Ca²⁺ (no voltage dependence) via a
     Hill function (K_d = 0.3 µM, Hill coefficient n = 4 — Drion et al. 2011).
     The kinetics are fast (τ ≈ 10 ms), so the channel follows each AP's Ca²⁺
-    transient and shapes the medium afterhyperpolarisation.
+    transient and shapes the medium afterhyperpolarization.
 
     In SNc DA neurons SK couples tightly to Cav1.3 Ca²⁺ entry: each spike
     loads Ca²⁺, SK opens to produce the medium AHP, the AHP closes Cav1.3,

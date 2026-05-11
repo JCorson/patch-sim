@@ -157,7 +157,7 @@ pospischil_beta_n = VoltageOnlyFn(_pospischil_beta_n_impl)
 # ---------------------------------------------------------------------------
 #
 # The Pospischil 2008 / Traub-Miles fast Na⁺ kinetics retain a small but
-# non-zero h-availability at depolarised plateau voltages.  All neuronal
+# non-zero h-availability at depolarized plateau voltages.  All neuronal
 # Nav isoforms also undergo a second, slow voltage-dependent inactivation
 # process on top of the fast h gate — Fleidervish & Gutnick (1996),
 # J. Physiol. 493:83 first demonstrated it in cortical pyramidal cells —
@@ -169,7 +169,7 @@ pospischil_beta_n = VoltageOnlyFn(_pospischil_beta_n_impl)
 #   * Nav1.2 (somatic in cortical / CA1 pyramidal): V½ = −50 mV, slope
 #     8 mV, τ_scale = 200 ms, τ_floor = 20 ms. Matches Fleidervish &
 #     Gutnick (1996) within rounding; the gate fully equilibrates within
-#     ~1 s of sustained depolarisation, providing the depolarisation-block
+#     ~1 s of sustained depolarization, providing the depolarization-block
 #     escape route required by the cortical/CA1 presets (#327, #328).
 #
 #   * Nav1.1 (PV+ fast-spiking interneurons): V½ = −45 mV, slope 8 mV,
@@ -178,13 +178,13 @@ pospischil_beta_n = VoltageOnlyFn(_pospischil_beta_n_impl)
 #     rates typical of FSI.  Patel et al. 2015 (PLOS ONE 10:e0133485)
 #     report Nav1.1 slow inactivation V½ ≈ −68 mV in HEK293; native
 #     PV+ interneurons express Nav1.1 with β1/β2 subunits and lipid
-#     environments that depolarise V½ by ~20 mV, putting the native
+#     environments that depolarize V½ by ~20 mV, putting the native
 #     V½ in the −45 mV range used here.  τ_floor = 5000 ms (effectively
 #     a near-constant gate over 1 s) ensures that per-spike inactivation
 #     closure during a high-frequency train accumulates only a few
 #     percent of the rest availability rather than collapsing the cell
 #     after a handful of APs.  Captures the biological fact that Nav1.1
-#     has slow inactivation while not dominating FSI behaviour.  Note:
+#     has slow inactivation while not dominating FSI behavior.  Note:
 #     the activation/fast-inactivation kinetics are still
 #     Pospischil/Traub-Miles, not isoform-specific HEK fits.  A
 #     higher-fidelity isoform-fitted overhaul is tracked separately.
@@ -240,7 +240,7 @@ def make_nav12_channel(g_max: float) -> IonChannel:
     (V½ = −50 mV, slope 8 mV, inverted Boltzmann; τ_scale = 200 ms /
     τ_floor = 20 ms).  At V = −70 mV (cortical rest) sNa12_inf ≈ 0.92; at
     V = −15 mV sNa12_inf ≈ 0.01.  The slow gate provides the
-    depolarisation-block escape route required by cortical/CA1 presets
+    depolarization-block escape route required by cortical/CA1 presets
     (#327, #328) and matches Fleidervish & Gutnick's native cortical
     pyramidal recordings within rounding.
 
@@ -295,7 +295,7 @@ def make_nav11_channel(g_max: float) -> IonChannel:
     capturing the biological fact that Nav1.1 has slow inactivation
     (Patel et al. 2015 report Nav1.1 slow inactivation V½ ≈ −68 mV in
     HEK293; native PV+ interneurons express Nav1.1 with β1/β2 subunits
-    that depolarise V½ by ~20 mV) without dominating FSI behaviour.
+    that depolarize V½ by ~20 mV) without dominating FSI behavior.
 
     The activation/fast-inactivation kinetics are Pospischil/Traub-Miles
     rather than isoform-specific Nav1.1 HEK fits — a fuller isoform-fitted

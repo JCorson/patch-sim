@@ -19,7 +19,7 @@ _LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR"]
 def _log_entry(entry: UILogRecord) -> rx.Component:
     """Render a single log entry row.
 
-    Each row shows the timestamp, level badge, and message, colour-coded
+    Each row shows the timestamp, level badge, and message, color-coded
     by severity.
 
     Args:

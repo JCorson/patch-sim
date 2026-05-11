@@ -625,7 +625,7 @@ def analyze_tau_v(
         When ``currents`` is the total membrane current (rather than an
         isolated channel current obtained via, e.g. TTX subtraction), the
         recovered τ values reflect the dominant channel at each voltage.
-        At strong depolarisations of an HH-style neuron the total current is
+        At strong depolarizations of an HH-style neuron the total current is
         dominated by the much larger sustained K⁺ outward current, which
         masks the brief inward Na⁺ inactivation; the τ_inactivation values
         at those voltages should not be interpreted as the isolated Na⁺

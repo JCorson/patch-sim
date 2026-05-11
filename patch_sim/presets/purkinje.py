@@ -40,8 +40,8 @@ PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
     },
     # 10 µA/cm² for 180 ms drives sustained tonic firing with prominent
     # Ca²⁺ contributions (ICaL/ICaT/IKCa).  This is intrinsic tonic
-    # firing, not the climbing-fibre-driven "complex spike" of in-vivo
-    # Purkinje cells (which is unmodelled here).
+    # firing, not the climbing-fiber-driven "complex spike" of in-vivo
+    # Purkinje cells (which is unmodeled here).
     REPETITIVE_FIRING: {
         "min_stimulus": 10.0,
         "max_stimulus": 10.0,
@@ -65,13 +65,13 @@ def make_purkinje() -> Neuron:
     tree, area_cm2=250e-6 cm²; C ≈ 250 pF, matching Roth & Häusser 2001
     somatic recordings).  The preset reproduces autonomous tonic simple-spike
     pacemaking at ~10–50 Hz (in vivo rate 50–100 Hz requires dendritic inputs
-    and network drive not modelled here).
+    and network drive not modeled here).
 
     Pacemaking mechanism:
         INaP (Magistretti & Alonso 1999, V½ = −52.6 mV) provides a persistent
-        Na⁺ window current that destabilises any rest near −65 mV.  Ih
+        Na⁺ window current that destabilizes any rest near −65 mV.  Ih
         (Destexhe et al. 1993, V½ ≈ −82 mV, g=1.0 mS/cm²) activates during
-        the deep post-AP AHP and drives slow depolarisation back to threshold,
+        the deep post-AP AHP and drives slow depolarization back to threshold,
         sustaining autonomous rhythmic firing.  v_rest=−65 mV is the simulation
         starting point; this cell has no stable zero-current resting potential.
 
@@ -85,12 +85,12 @@ def make_purkinje() -> Neuron:
         place the AP peak inside the +10 to +40 mV band and the AHP near
         −68 mV (Häusser & Clark 1997; Raman & Bean 1999).
 
-    Slow Na inactivation and depolarisation-block recovery:
-        Two complementary slow gates ensure the cell repolarises after
+    Slow Na inactivation and depolarization-block recovery:
+        Two complementary slow gates ensure the cell repolarizes after
         sustained suprathreshold drive rather than hanging on a plateau:
 
         1. Fast-Na slow inactivation (sNa, via ``make_purkinje_na_channel``) —
-           closes the residual fast-Na h-tail during prolonged depolarisation.
+           closes the residual fast-Na h-tail during prolonged depolarization.
            Carter & Bean (2009) directly demonstrated cumulative slow
            inactivation in cerebellar Purkinje somatic Na⁺ channels.
         2. INaP slow inactivation (sNaP, via ``make_inap_channel``) — removes
@@ -102,9 +102,9 @@ def make_purkinje() -> Neuron:
         biologically motivated for Purkinje cells.
 
     Known limitations:
-        Complex-spike "bursts" observed in vivo are climbing-fibre synaptic
+        Complex-spike "bursts" observed in vivo are climbing-fiber synaptic
         events (Raman & Bean 1997 — INaR-supported repriming under
-        climbing-fibre EPSPs).  They are NOT intrinsic and cannot be produced
+        climbing-fiber EPSPs).  They are NOT intrinsic and cannot be produced
         by this single-compartment current-clamp preset.
 
     References:

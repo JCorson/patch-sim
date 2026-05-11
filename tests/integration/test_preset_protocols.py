@@ -52,7 +52,7 @@ from patch_sim.presets import (
 # spontaneously at ~11 Hz from v_rest = −60 mV (Bevan & Wilson 1999).  The
 # tonic-pacemaker phenotype and conditional rebound-burst phenotype are
 # exercised by tests/integration/test_stn.py and
-# ``test_stn_conditional_burst_mode_under_hyperpolarising_step_release``.
+# ``test_stn_conditional_burst_mode_under_hyperpolarizing_step_release``.
 _QUIESCENT_PRESET_NAMES = [
     p for p in NEURON_PRESET_NAMES if p not in (PURKINJE, TRN, DOPAMINERGIC, STN)
 ]

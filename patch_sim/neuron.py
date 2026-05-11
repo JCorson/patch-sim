@@ -205,7 +205,7 @@ class Neuron:
             A ``(C_out, C_in)`` tuple of concentrations in mM.
 
         Raises:
-            ValueError: If *species* is not recognised.
+            ValueError: If *species* is not recognized.
         """
         if species is IonSpecies.SODIUM:
             return self.Na_out, self.Na_in

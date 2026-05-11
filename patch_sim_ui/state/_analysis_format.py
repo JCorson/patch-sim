@@ -155,7 +155,7 @@ def _compute_multi_sweep_ca_transient_data(
     """Pool calcium-transient analysis across a multi-sweep simulation result.
 
     Used for both multi-sweep current clamp and multi-sweep voltage clamp:
-    each sweep that exposes a ``ca_i`` trace is analysed in isolation, and
+    each sweep that exposes a ``ca_i`` trace is analyzed in isolation, and
     each per-transient display dict carries its 1-based ``sweep_index`` (in
     protocol order) so the UI can identify which sweep produced which
     transient.  Aggregate summary statistics are pooled across all sweeps.
@@ -304,7 +304,7 @@ def _compute_multi_sweep_burst_data(
 ) -> "tuple[list[dict[str, Any]], dict[str, Any]]":
     """Pool burst analysis across the current-clamp sweeps of a multi-sweep run.
 
-    Each current-clamp sweep is analysed in isolation; the resulting bursts
+    Each current-clamp sweep is analyzed in isolation; the resulting bursts
     are pooled with a 1-based ``sweep_index`` so the UI table can identify
     the source sweep.  Aggregate metrics are computed by pooling across all
     bursts (intra-burst frequency, spikes/burst) or all per-sweep IBIs
@@ -313,7 +313,7 @@ def _compute_multi_sweep_burst_data(
     ``duty_cycle`` is total burst time divided by total CC-sweep duration.
 
     The ``isi_threshold_ms`` shown in the summary is the median across
-    analysed sweeps; the ``threshold_method`` is a single label when every
+    analyzed sweeps; the ``threshold_method`` is a single label when every
     sweep agreed (``"auto-histogram"`` / ``"default-fixed"``) or
     ``"mixed: <a> N/M, <b> K/M"`` when sweeps used different methods.
 
@@ -342,7 +342,7 @@ def _compute_multi_sweep_burst_data(
             float(time_arr[-1] - time_arr[0]) if len(time_arr) > 1 else 0.0
         )
         # Every CC sweep contributes to the duty-cycle denominator, not just
-        # sweeps that fire enough spikes to run the burst analyser.  Otherwise
+        # sweeps that fire enough spikes to run the burst analyzer.  Otherwise
         # a 10-sweep run where 2 fire would report a duty cycle as a fraction
         # of those 2 sweeps' duration, overstating the active-burst time.
         total_window_ms += sweep_duration_ms
@@ -390,7 +390,7 @@ def _compute_multi_sweep_burst_data(
         float(total_burst_ms / total_window_ms) if total_window_ms > 0 else None
     )
 
-    # Median threshold across analysed sweeps; method is a single label when
+    # Median threshold across analyzed sweeps; method is a single label when
     # every sweep agreed, otherwise a "mixed: ..." breakdown.  This avoids
     # silently masking auto/fixed disagreement that would happen if we just
     # picked one sweep's threshold as representative.
@@ -550,7 +550,7 @@ def _compute_cc_multi_sweep_analysis(
         sfa_data = {}
 
     # Detect whether all steps are hyperpolarizing (negative).  When true,
-    # F-I analysis is skipped in favour of sag/rebound analysis.
+    # F-I analysis is skipped in favor of sag/rebound analysis.
     is_hyperpolarizing = max_stimulus < 0.0
 
     # --- F-I / hyperpolarization data ---
@@ -735,7 +735,7 @@ def _compute_gv_data(
 ) -> "dict[str, Any]":
     """Compute g-V analysis data from an I-V result and a reversal potential.
 
-    Calls :func:`patch_sim.compute_gv` to derive normalised conductance and fit
+    Calls :func:`patch_sim.compute_gv` to derive normalized conductance and fit
     a Boltzmann sigmoid.  A dense voltage array (:data:`_GV_FIT_POINTS` points)
     spanning the range of included steps is pre-computed so the plotting
     function can draw a smooth fit curve without importing scipy.

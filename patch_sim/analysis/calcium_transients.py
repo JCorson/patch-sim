@@ -51,7 +51,7 @@ _TAU_INITIAL_GUESS_MS: float = 50.0
 #: Upper bound on plausible calcium decay τ values in ms.  Single-compartment
 #: somatic Ca²⁺ transients in our presets have τ in the tens-to-hundreds of ms
 #: range; a 5 s ceiling is well above any biologically meaningful decay time
-#: constant for the dynamics modelled here.  Without this bound, ``curve_fit``
+#: constant for the dynamics modeled here.  Without this bound, ``curve_fit``
 #: can return a runaway τ when the post-peak window is too short to constrain
 #: the decay (the optimizer wanders toward τ → ∞, which makes the exponential
 #: term ≈ 1 and the model degenerates to a constant).  When the fit lands at

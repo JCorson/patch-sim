@@ -16,7 +16,7 @@ from patch_sim.presets import make_squid_giant_axon
 
 
 def test_initialization(hh_model: Neuron) -> None:
-    """The HH52 fixture initialises with the canonical Na/K/leak conductances."""
+    """The HH52 fixture initializes with the canonical Na/K/leak conductances."""
     assert hh_model.C_m == pytest.approx(1.0)
     by_name = {ch.name: ch for ch in hh_model.channels}
     assert by_name["Na"].g_max == pytest.approx(120.0)

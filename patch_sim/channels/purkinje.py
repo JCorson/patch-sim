@@ -175,10 +175,10 @@ purkinje_beta_n = VoltageOnlyFn(_purkinje_beta_n_impl)
 # (2009), Neuron 64:898 (the companion paper to Do & Bean 2003 on STN
 # pacemaker channels).  Without this second slow gate the De Schutter & Bower
 # (1994) Traub-Miles formulation can pin the membrane on a non-physiological
-# depol-block plateau under sustained climbing-fibre-style drive (#329).
+# depol-block plateau under sustained climbing-fiber-style drive (#329).
 #
 # Parameters mirror the STN and Pospischil sNa gates: V½ = −50 mV, slope
-# 8 mV, inverted Boltzmann so the gate is open at hyperpolarised potentials;
+# 8 mV, inverted Boltzmann so the gate is open at hyperpolarized potentials;
 # τ_scale = 200 ms / τ_floor = 20 ms.  At V = −65 mV (Purkinje rest)
 # s_inf ≈ 0.87 (autonomous pacemaking is minimally perturbed); at V = −15 mV
 # s_inf ≈ 0.01 (residual h-tail abolished).
@@ -218,8 +218,8 @@ def make_purkinje_na_channel(g_max: float) -> IonChannel:
     The channel exposes three gates: activation ``m`` (power 3), fast
     inactivation ``h`` (power 1), and slow voltage-dependent inactivation
     ``sNa`` (power 1; V½ = −50 mV, slope 8 mV, inverted Boltzmann).  The
-    slow gate is mostly available at hyperpolarised potentials and decays
-    towards zero on sustained depolarisation, providing the escape route
+    slow gate is mostly available at hyperpolarized potentials and decays
+    toward zero on sustained depolarization, providing the escape route
     from depol-block plateaus reported in real Purkinje cells (#329).  The
     column is named ``sNa`` rather than ``s`` to avoid colliding with
     :func:`~patch_sim.channels.auxiliary.make_inar_channel`'s activation
