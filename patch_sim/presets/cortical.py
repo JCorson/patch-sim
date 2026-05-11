@@ -61,7 +61,7 @@ PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
     # spike driven by two overlapping mechanisms: HH anode-break excitation
     # (h fully de-inactivates at −109 mV; n deactivates; m fires on release)
     # and Ih-driven overshoot (Ih activated during the step continues
-    # conducting after release, transiently depolarising the membrane).  The
+    # conducting after release, transiently depolarizing the membrane).  The
     # cell has no ICaT, so the rebound is not a low-threshold Ca²⁺ burst.
     HYPERPOLARIZATION_STEPS: {
         "min_stimulus": -5.0,
@@ -95,12 +95,12 @@ def make_cortical_pyramidal() -> Neuron:
         pre-scaled from 23→34 °C internally.  No further runtime scaling is
         applied.
 
-    Slow Na inactivation and depolarisation-block recovery:
-        Two complementary slow gates ensure the cell repolarises after
+    Slow Na inactivation and depolarization-block recovery:
+        Two complementary slow gates ensure the cell repolarizes after
         sustained suprathreshold drive rather than hanging on a plateau:
 
         1. Fast-Na slow inactivation (sNa12, via ``make_nav12_channel``) —
-           closes the residual fast-Na h-tail during prolonged depolarisation.
+           closes the residual fast-Na h-tail during prolonged depolarization.
            Fleidervish & Gutnick (1996) characterised this gate directly in
            cortical pyramidal cells; g_Na=70 mS/cm² compensates for the ~8 %
            rest-state availability reduction (sNa12_inf ≈ 0.92 at −70 mV).

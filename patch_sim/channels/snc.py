@@ -207,15 +207,15 @@ dopaminergic_beta_n = VoltageOnlyFn(_dopaminergic_beta_n_impl)
 # Williams (2012) confirmed the same in midbrain DA cells.  The Canavier
 # (1999) / Komendantov et al. (2004) Traub-Miles kinetics carry only the
 # fast h gate and therefore retain a residual h-tail under sustained
-# depolarisation.  Adding the slow gate makes the cell biologically more
+# depolarization.  Adding the slow gate makes the cell biologically more
 # accurate and guards against pathological depol-block plateaus.
 #
 # Parameters mirror the STN, Pospischil and Purkinje sNa gates: V½ = −50 mV
 # (within the −47 mV midpoint reported by Khaliq & Bean 2010), slope 8 mV,
-# inverted Boltzmann so the gate is open at hyperpolarised potentials;
-# τ_scale = 200 ms / τ_floor = 20 ms.  At the SNc oscillator's hyperpolarised
+# inverted Boltzmann so the gate is open at hyperpolarized potentials;
+# τ_scale = 200 ms / τ_floor = 20 ms.  At the SNc oscillator's hyperpolarized
 # trough (≈ −75 mV) s_inf > 0.93; at v_rest = −55 mV s_inf ≈ 0.65 (lower
-# margin than STN/Purkinje because SNc rests more depolarised); at the
+# margin than STN/Purkinje because SNc rests more depolarized); at the
 # −15 mV plateau s_inf < 0.02 (residual h-tail abolished).
 #
 # Gate name ``sNa_da`` follows the SNc-specific ``pSNc`` namespacing already
@@ -252,8 +252,8 @@ def make_dopaminergic_na_channel(g_max: float) -> IonChannel:
     The channel exposes three gates: activation ``m`` (power 3), fast
     inactivation ``h`` (power 1), and slow voltage-dependent inactivation
     ``sNa_da`` (power 1; V½ = −50 mV, slope 8 mV, inverted Boltzmann).  The
-    slow gate is mostly available at hyperpolarised potentials and decays
-    towards zero on sustained depolarisation, providing the escape route
+    slow gate is mostly available at hyperpolarized potentials and decays
+    toward zero on sustained depolarization, providing the escape route
     from depol-block plateaus reported in real SNc DA neurons (Khaliq &
     Bean 2010).  The column is named ``sNa_da`` rather than ``sNa`` to
     match the SNc-specific ``pSNc`` namespacing convention used by
@@ -354,12 +354,12 @@ def make_dopaminergic_k_channel(g_max: float) -> IonChannel:
 # ``sNaP_snc`` (V½ = −55 mV, slope 7 mV, inverted Boltzmann; τ_scale 200 ms /
 # τ_floor 20 ms).  Magistretti & Alonso (1999) §"Slow inactivation" report
 # the entorhinal INaP slow gate at V½ in the −47 to −54 mV range; the SNc
-# Drion fit shifts INaP activation V½ ~12 mV more hyperpolarised (−65 mV
+# Drion fit shifts INaP activation V½ ~12 mV more hyperpolarized (−65 mV
 # vs −52.6 mV).  Applying the same shift strictly would place the slow gate
 # at ≈ −57 mV; V½ = −55 mV is chosen as a round number just past the
-# hyperpolarised edge of the Magistretti-Alonso band, preserving the
+# hyperpolarized edge of the Magistretti-Alonso band, preserving the
 # activation/slow-inactivation overlap that underlies the INaP escape from
-# sustained depolarisation.  Slow inactivation in SNc
+# sustained depolarization.  Slow inactivation in SNc
 # DA Na⁺ currents is documented by Khaliq & Bean (2010) and Tucker, Hagiwara
 # & Williams (2012); the gate makes the cell biologically more accurate.
 # Always on because ``make_snc_inap_channel`` is dedicated to the SNc
@@ -398,7 +398,7 @@ def make_snc_inap_channel(
     Drion et al. 2011 fit SNc DA INaP at V½ = −65 mV (slope k = 5 mV), well
     below firing threshold.  In this regime INaP carries a subthreshold
     ramp-up current that, together with Cav1.3, drives the inter-spike
-    depolarisation in the Putzier+Drion reconciliation of SNc pacemaking.
+    depolarization in the Putzier+Drion reconciliation of SNc pacemaking.
 
     The channel exposes two gates: activation ``pSNc`` (power 1) and slow
     voltage-dependent inactivation ``sNaP_snc`` (power 1; V½ = −55 mV,
@@ -450,7 +450,7 @@ def make_snc_inap_channel(
 # Activation midpoint sits well below the canonical Cav1.2 ICaL, so a small
 # persistent window current flows at sub-threshold voltages near the SNc DA
 # pacemaker potential.  This window current is the slow inward driver of the
-# inter-spike depolarisation that ramps from the post-AP AHP back to threshold
+# inter-spike depolarization that ramps from the post-AP AHP back to threshold
 # (Putzier et al. 2009).  Inactivation is slow (τ ≈ 200 ms) and incomplete, so
 # the residual window persists through the inter-spike interval.
 #

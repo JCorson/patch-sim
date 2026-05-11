@@ -266,7 +266,7 @@ def test_current_conservation(hh_model):
     duration = 5  # ms
     time_step = 0.01  # ms
     num_steps = int(duration / time_step) + 1
-    voltage = np.full(num_steps, 0.0)  # depolarised to maximise channel activity
+    voltage = np.full(num_steps, 0.0)  # depolarized to maximize channel activity
 
     result = simulate_voltage_clamp(hh_model, voltage_protocol=voltage)
 
@@ -274,7 +274,7 @@ def test_current_conservation(hh_model):
     assert np.allclose(result["Itotal"], reconstructed)
 
 
-def test_gating_variable_initialisation(hh_model):
+def test_gating_variable_initialization(hh_model):
     """At t=0, gating variables must equal the steady-state for the starting voltage."""
     v_start = -80.0
     voltage = np.full(3, v_start)

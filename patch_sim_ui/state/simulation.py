@@ -62,7 +62,7 @@ class SimulationState(rx.State):
     """State for simulation results, sweep collections, and figure rendering."""
 
     # Synced copy of NeuronState.active_neuron_type used by store_trace for
-    # labelling (avoids making those handlers async).
+    # labeling (avoids making those handlers async).
     _label_neuron_type: str = "Squid Giant Axon (Classic HH)"
     # Synced copy of ProtocolState.clamp_mode used by _rebuild_figure_and_fetch_js
     # and _apply_visibility_js (both are synchronous, cannot call get_state).
@@ -104,7 +104,7 @@ class SimulationState(rx.State):
     # rebuild (-1 = none selected).  Selection state is managed entirely
     # client-side by ``window._psSweep``; this field is only written by
     # Python (reset on run/clamp-mode change) so that the correct seed value
-    # is injected when the JS module is re-initialised after a figure rebuild.
+    # is injected when the JS module is re-initialized after a figure rebuild.
     #
     # Known limitation: this field is never updated from the client side, so
     # any figure rebuild triggered by a Python state change while the user has
@@ -777,7 +777,7 @@ class SimulationState(rx.State):
 
         Builds the neuron from current NeuronState parameters, checks whether
         the neuron fingerprint has changed since the last run (cache hit → skip),
-        and if stale runs a fixed small hyperpolarising current step via
+        and if stale runs a fixed small hyperpolarizing current step via
         :func:`patch_sim.run_membrane_test`.  Results are stored in
         ``AnalysisState.mt_*`` fields and persist across protocol and simulation
         changes until the neuron parameters change.

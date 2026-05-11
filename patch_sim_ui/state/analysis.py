@@ -95,7 +95,7 @@ class AnalysisState(rx.State):
         """Return True when a burst-analysis summary is available for display.
 
         The summary is emitted whenever the spike train was long enough to
-        run the burst analyser (≥1 spike) — even a zero-burst result still
+        run the burst analyzer (≥1 spike) — even a zero-burst result still
         carries the threshold and method, so the UI can show that the
         analysis ran.  ``burst_metrics`` is a separate list (one entry per
         detected burst) and is empty when ``burst_count == 0``.

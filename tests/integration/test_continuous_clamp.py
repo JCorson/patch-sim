@@ -165,7 +165,7 @@ def test_cc_from_state_mismatched_gating_keys_raises(hh_model):
     Guards against a stale gating dict from a different neuron (e.g. after a
     neuron switch mid-iteration in continuous mode) silently corrupting the
     simulation.  The check must fail loudly rather than leave index 0
-    uninitialised or silently drop values.
+    uninitialized or silently drop values.
     """
     gating = _initialize_gating_variables(hh_model, hh_model.v_rest)
     bad = {**gating, "r": 0.5}  # extra key absent from HH gating variables
@@ -197,7 +197,7 @@ def test_vc_from_state_gating_continuity(hh_model):
 
     Verifies that voltage clamp gating state is faithfully carried forward.
     """
-    protocol = _make_voltage_steps(10.0, voltage=0.0)  # depolarised hold
+    protocol = _make_voltage_steps(10.0, voltage=0.0)  # depolarized hold
 
     df1 = simulate_voltage_clamp(hh_model, protocol)
 

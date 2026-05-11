@@ -1,7 +1,7 @@
 """Unit tests for the patch_sim.analysis.calcium_transients module.
 
 Verifies calcium transient detection, peak / time-to-peak / decay-τ
-extraction, and edge-case behaviour using synthetic [Ca²⁺]ᵢ traces.
+extraction, and edge-case behavior using synthetic [Ca²⁺]ᵢ traces.
 Tests that drive a real simulation live in
 tests/integration/test_calcium_transients_simulation.py.
 """
@@ -346,7 +346,7 @@ def test_short_decay_window_falls_back_or_returns_none():
     # fell back; the test guarantees the fit is reported as not-converged
     # OR (when curve_fit happens to succeed on the short data) τ is at least
     # very inaccurate compared to the true 80 ms.  We accept both: the key
-    # contract is graceful behaviour, not perfect numerical recovery here.
+    # contract is graceful behavior, not perfect numerical recovery here.
     if transient.decay_fit_converged:
         # Short window sometimes still converges but to a wildly off τ.
         assert transient.decay_tau is not None

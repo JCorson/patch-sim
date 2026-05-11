@@ -1,6 +1,6 @@
 """Sag and rebound analysis for hyperpolarization multi-sweep simulations.
 
-Provides functions to measure voltage sag (Ih-driven depolarising drift during a
+Provides functions to measure voltage sag (Ih-driven depolarizing drift during a
 negative current step) and count rebound spikes at step offset from each sweep of
 a multi-sweep current-clamp experiment.
 
@@ -11,13 +11,13 @@ Rebound spikes arise from several distinct biophysical mechanisms depending on t
 neuron model:
 
 - **ICaT de-inactivation** (thalamic relay, TRN, STN, Purkinje): sustained
-  hyperpolarisation removes T-type Ca²⁺ channel inactivation; on release the
+  hyperpolarization removes T-type Ca²⁺ channel inactivation; on release the
   low-threshold ICaT activates and drives a post-inhibitory burst.
 - **Ih-driven overshoot** (dopaminergic, cortical pyramidal): Ih activated during
-  the step continues to conduct after release, transiently depolarising the
+  the step continues to conduct after release, transiently depolarizing the
   membrane above threshold in high-excitability cells.
 - **HH anode-break excitation** (squid giant axon, cortical pyramidal): deep
-  hyperpolarisation fully de-inactivates the Na⁺ h-gate and deactivates the K⁺
+  hyperpolarization fully de-inactivates the Na⁺ h-gate and deactivates the K⁺
   n-gate; on release m activates before h re-inactivates, triggering an action
   potential (Hodgkin & Huxley, 1952).
 
@@ -48,7 +48,7 @@ class SagPoint:
             (mV).
         steady_state_voltage: Mean membrane voltage over the last 50 ms of the
             step (mV).
-        sag_amplitude: Depolarising drift during the step in mV
+        sag_amplitude: Depolarizing drift during the step in mV
             (``steady_state_voltage − peak_voltage``; ≥ 0 when sag is
             present).
         rebound_spike_count: Number of action potentials detected in the

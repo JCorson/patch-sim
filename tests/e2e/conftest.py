@@ -91,7 +91,7 @@ class StateTree:
     """
 
     def __init__(self) -> None:
-        """Initialise all substates as fresh bare instances."""
+        """Initialize all substates as fresh bare instances."""
         self.sim = make_sim_state()
         self.neuron = make_neuron_state()
         self.protocol = make_protocol_state()
@@ -136,7 +136,7 @@ def state_tree() -> StateTree:
     """Provide a fresh StateTree for each test.
 
     Returns:
-        A :class:`StateTree` with all substates initialised to defaults.
+        A :class:`StateTree` with all substates initialized to defaults.
     """
     return StateTree()
 
@@ -190,7 +190,7 @@ async def run_flow(
     results via :meth:`~SimulationState._do_apply_simulation`.
 
     Args:
-        tree: Fully initialised :class:`StateTree` for this test.
+        tree: Fully initialized :class:`StateTree` for this test.
         neuron_preset: Name of the neuron preset to load (e.g. ``SQUID_GIANT_AXON``).
         protocol_preset: Protocol preset name (e.g. ``ACTION_POTENTIAL``).
 

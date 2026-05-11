@@ -25,7 +25,7 @@ from patch_sim.neuron import Neuron
 PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
     # Subthreshold: Canavier/Komendantov kinetics (VT=-67 mV) lower the
     # firing threshold to ~0.3 µA/cm² for a 30 ms step; 0.1 µA/cm² is
-    # comfortably sub-threshold and produces a passive depolarisation.
+    # comfortably sub-threshold and produces a passive depolarization.
     SUBTHRESHOLD_RESPONSE: {
         "min_stimulus": 0.1,
         "max_stimulus": 0.1,
@@ -38,8 +38,8 @@ PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
         "stimulus_duration": 5.0,
     },
     # SNc DA pacemaker: tonic firing throughout, accelerating modestly
-    # with depolarising drive.  The somatic single-compartment model
-    # does not reproduce depolarisation block at any tested amplitude
+    # with depolarizing drive.  The somatic single-compartment model
+    # does not reproduce depolarization block at any tested amplitude
     # × duration (empirical sweep in scratch/characterize_da_block.py
     # — tonic firing up to 15 µA/cm² × 5 s and 2 µA/cm² × 10 s).
     # Real SNc DA neurons enter block above ~100 pA sustained drive
@@ -64,7 +64,7 @@ PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
     },
     # R_in ≈ 3.3 kΩ·cm²; −20 → −5 µA/cm² gives peaks of −106 to −71 mV
     # with clear Ih-driven sag (25–8 mV).  At step release, Ih (g=2.0 mS/cm²
-    # activated during the step) drives a transient depolarisation above
+    # activated during the step) drives a transient depolarization above
     # threshold, producing a rebound spike at the most-negative step.  This is
     # an Ih-mediated rebound using Canavier/Komendantov Na⁺ kinetics (VT = −67 mV
     # gives m_inf ≈ 27% at −48 mV, enough for Ih to trigger firing).  The cell
@@ -90,7 +90,7 @@ def make_dopaminergic() -> Neuron:
         interchangeable negative-slope conductances; both are required for a
         faithful model.  Pacemaking proceeds as:
 
-        1. INaP_SNc (V½ = −65 mV) initiates the subthreshold depolarising
+        1. INaP_SNc (V½ = −65 mV) initiates the subthreshold depolarizing
            ramp from the AHP; Cav1.3 (V½ = −31.1 mV) takes over near threshold
            and loads Ca²⁺ into the cell.
         2. An AP fires; ca_i peaks at ~0.6 µM (α_ca = 5e-5 mM·cm²/µA).
@@ -106,7 +106,7 @@ def make_dopaminergic() -> Neuron:
         Canavier (1999) / Komendantov (2004) kinetics (VT = −67 mV) replace
         the HH52 defaults.  Q10=1.0 with T_ref=308.15 K (35 °C) holds the
         rate constants at the published Komendantov reference temperature.
-        Repolarisation is carried by the Komendantov Kdr alone; IM and M-S Kv
+        Repolarization is carried by the Komendantov Kdr alone; IM and M-S Kv
         are excluded as cortical-specific channels inappropriate for SNc DA.
 
     Slow Na inactivation:
@@ -118,7 +118,7 @@ def make_dopaminergic() -> Neuron:
         from depol-block in a more complete model.
 
     Known limitations:
-        Real SNc DA neurons enter depolarisation block above ~100 pA sustained
+        Real SNc DA neurons enter depolarization block above ~100 pA sustained
         drive (Tucker et al. 2012).  This single-compartment somatic model does
         not reproduce block onset: empirical sweeps confirm tonic firing at all
         tested amplitudes.  Block onset requires the dendritic Na inactivation

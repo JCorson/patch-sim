@@ -176,7 +176,7 @@ def test_gating_variable_steady_state_in_bounds():
         assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}"
 
 
-def test_ih_kinetics_alpha_increases_with_hyperpolarisation():
+def test_ih_kinetics_alpha_increases_with_hyperpolarization():
     """alpha_r should increase as voltage becomes more negative (Ih is HCN-type)."""
     alpha_at_minus100 = _alpha_r(-100.0, 0.0)
     alpha_at_minus65 = _alpha_r(-65.0, 0.0)
@@ -184,7 +184,7 @@ def test_ih_kinetics_alpha_increases_with_hyperpolarisation():
     assert alpha_at_minus100 > alpha_at_minus65 > alpha_at_minus40
 
 
-def test_ih_kinetics_steady_state_higher_at_hyperpolarised():
+def test_ih_kinetics_steady_state_higher_at_hyperpolarized():
     """Ih r steady state is higher at -100 mV than at -65 mV."""
     a65, b65 = _alpha_r(-65.0, 0.0), _beta_r(-65.0, 0.0)
     a100, b100 = _alpha_r(-100.0, 0.0), _beta_r(-100.0, 0.0)
@@ -682,8 +682,8 @@ def test_ika_gating_variable_steady_state_in_bounds():
             assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}"
 
 
-def test_ika_kinetics_activation_increases_with_depolarisation():
-    """IKa a_inf (activation) is higher at depolarised voltages."""
+def test_ika_kinetics_activation_increases_with_depolarization():
+    """IKa a_inf (activation) is higher at depolarized voltages."""
 
     def a_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
@@ -693,8 +693,8 @@ def test_ika_kinetics_activation_increases_with_depolarisation():
     assert a_inf(-20.0) > a_inf(-65.0) > a_inf(-100.0)
 
 
-def test_ika_kinetics_inactivation_decreases_with_depolarisation():
-    """IKa b_inf (inactivation) is lower at depolarised voltages."""
+def test_ika_kinetics_inactivation_decreases_with_depolarization():
+    """IKa b_inf (inactivation) is lower at depolarized voltages."""
 
     def b_inf(V: float) -> float:
         """Inactivation steady-state at voltage V."""
@@ -889,8 +889,8 @@ def test_inap_gating_variable_steady_state_in_bounds():
         assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}"
 
 
-def test_inap_activation_increases_with_depolarisation():
-    """INaP p_inf (activation) is higher at depolarised voltages."""
+def test_inap_activation_increases_with_depolarization():
+    """INaP p_inf (activation) is higher at depolarized voltages."""
 
     def p_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
@@ -937,8 +937,8 @@ def test_inap_slow_inactivation_steady_state_in_bounds():
         assert 0.0 <= ss <= 1.0, f"sNaP steady state {ss} out of [0,1] at V={V}"
 
 
-def test_inap_slow_inactivation_decreases_with_depolarisation():
-    """Availability is highest at hyperpolarised voltages (inactivation)."""
+def test_inap_slow_inactivation_decreases_with_depolarization():
+    """Availability is highest at hyperpolarized voltages (inactivation)."""
     assert _sNaP_inf(-80.0) > _sNaP_inf(-45.0) > _sNaP_inf(-10.0)
 
 
@@ -956,7 +956,7 @@ def test_inap_slow_inactivation_resting_availability():
 
 
 def test_inap_slow_inactivation_blocks_depol_plateau():
-    """At depolarised plateau voltages sNaP closes, providing block escape."""
+    """At depolarized plateau voltages sNaP closes, providing block escape."""
     # The depol-block plateau in #324 hung at ≈ −15 mV; sNaP must close
     # firmly there so g_INaP_eff = g_max * p * sNaP collapses.
     assert _sNaP_inf(-15.0) < 0.05
@@ -1029,8 +1029,8 @@ def test_snc_inap_slow_inactivation_steady_state_in_bounds():
         assert 0.0 <= ss <= 1.0, f"sNaP_snc steady state {ss} out of [0,1] at V={V}"
 
 
-def test_snc_inap_slow_inactivation_decreases_with_depolarisation():
-    """The sNaP_snc availability decreases monotonically with depolarisation."""
+def test_snc_inap_slow_inactivation_decreases_with_depolarization():
+    """The sNaP_snc availability decreases monotonically with depolarization."""
     assert _sNaP_snc_inf(-80.0) > _sNaP_snc_inf(-55.0) > _sNaP_snc_inf(-15.0)
 
 
@@ -1043,8 +1043,8 @@ def test_snc_inap_slow_inactivation_resting_availability():
     """SNc DA cycles through −90 to −55 mV; sNaP_snc must stay open in the trough.
 
     The looser lower bound at v_rest = −55 mV (vs entorhinal sNaP at 0.94
-    at −65 mV) is expected: SNc rests more depolarised, and the SNc-shifted
-    V½ tracks.  The cycle hyperpolarised end (≈ −75 mV) is what matters
+    at −65 mV) is expected: SNc rests more depolarized, and the SNc-shifted
+    V½ tracks.  The cycle hyperpolarized end (≈ −75 mV) is what matters
     for recovery between spikes, and there sNaP_snc > 0.94.
     """
     assert _sNaP_snc_inf(-75.0) > 0.94
@@ -1052,7 +1052,7 @@ def test_snc_inap_slow_inactivation_resting_availability():
 
 
 def test_snc_inap_slow_inactivation_blocks_depol_plateau():
-    """At depolarised plateau voltages sNaP_snc closes, providing block escape."""
+    """At depolarized plateau voltages sNaP_snc closes, providing block escape."""
     # At ≈ −15 mV the slow gate must close firmly so the residual SNc
     # persistent Na current (g_NaP_SNc * pSNc * sNaP_snc) collapses.
     assert _sNaP_snc_inf(-15.0) < 0.05
@@ -1190,8 +1190,8 @@ def test_inar_hr_gating_steady_state_in_bounds():
         assert 0.0 <= ss <= 1.0, f"hr steady state {ss} out of [0,1] at V={V}"
 
 
-def test_inar_activation_increases_with_depolarisation():
-    """INaR s_inf (activation) is higher at depolarised voltages."""
+def test_inar_activation_increases_with_depolarization():
+    """INaR s_inf (activation) is higher at depolarized voltages."""
 
     def s_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
@@ -1201,8 +1201,8 @@ def test_inar_activation_increases_with_depolarisation():
     assert s_inf(-20.0) > s_inf(-42.0) > s_inf(-100.0)
 
 
-def test_inar_unblocking_decreases_with_depolarisation():
-    """INaR hr_inf (unblocking) is lower at depolarised voltages (more blocked)."""
+def test_inar_unblocking_decreases_with_depolarization():
+    """INaR hr_inf (unblocking) is lower at depolarized voltages (more blocked)."""
 
     def hr_inf(V: float) -> float:
         """Unblocking steady-state at voltage V."""
@@ -1402,8 +1402,8 @@ def test_im_gating_variable_steady_state_in_bounds():
         assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}"
 
 
-def test_im_activation_increases_with_depolarisation():
-    """IM w_inf (activation) is higher at depolarised voltages."""
+def test_im_activation_increases_with_depolarization():
+    """IM w_inf (activation) is higher at depolarized voltages."""
 
     def w_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
@@ -1522,8 +1522,8 @@ def test_katp_steady_state_in_bounds():
         assert 0.0 <= ss <= 1.0, f"kATP steady state {ss} out of [0,1] at V={V}"
 
 
-def test_katp_increases_with_depolarisation():
-    """The kATP activation rises monotonically with depolarisation."""
+def test_katp_increases_with_depolarization():
+    """The kATP activation rises monotonically with depolarization."""
     assert _kATP_inf(-65.0) < _kATP_inf(-25.0) < _kATP_inf(0.0)
 
 
@@ -1597,8 +1597,8 @@ def test_ikir_gating_variable_steady_state_in_bounds():
         assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}"
 
 
-def test_ikir_activation_increases_with_hyperpolarisation():
-    """IKir kir_inf is higher at hyperpolarised voltages (inverted rectifier)."""
+def test_ikir_activation_increases_with_hyperpolarization():
+    """IKir kir_inf is higher at hyperpolarized voltages (inverted rectifier)."""
 
     def kir_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
@@ -1794,8 +1794,8 @@ def test_ikca_activation_increases_with_calcium():
     assert _ikca_q_inf(V, 1e-2) > _ikca_q_inf(V, 1e-3) > _ikca_q_inf(V, 1e-4)
 
 
-def test_ikca_activation_increases_with_depolarisation():
-    """IKCa q_inf is higher at depolarised voltages at fixed [Ca²⁺]ᵢ."""
+def test_ikca_activation_increases_with_depolarization():
+    """IKCa q_inf is higher at depolarized voltages at fixed [Ca²⁺]ᵢ."""
     from patch_sim.channels.auxiliary import _ikca_q_inf
 
     ca = 1e-3
@@ -1914,8 +1914,8 @@ def test_ical_gating_steady_state_in_bounds():
             assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}"
 
 
-def test_ical_activation_increases_with_depolarisation():
-    """ICaL d_inf (activation) is higher at depolarised voltages."""
+def test_ical_activation_increases_with_depolarization():
+    """ICaL d_inf (activation) is higher at depolarized voltages."""
 
     def d_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
@@ -2026,7 +2026,7 @@ def test_icat_gating_steady_state_in_bounds():
             assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}"
 
 
-def test_icat_activation_increases_with_depolarisation():
+def test_icat_activation_increases_with_depolarization():
     """ICaT dt_inf (activation) is higher at less-negative voltages."""
 
     def dt_inf(V: float) -> float:
@@ -2187,7 +2187,7 @@ def test_trn_icat_tau_ft_is_sigmoid_in_voltage():
 
     Sigmoid-shaped tau is the core invariant that distinguishes the TRN
     factory from the cosh-shaped Destexhe (1994) default: small at
-    hyperpolarised V (rest stability) and large at LTS-plateau V (sustained
+    hyperpolarized V (rest stability) and large at LTS-plateau V (sustained
     plateau for 5–15 Na⁺ spikes per Huguenard & Prince 1992).
     """
     tau_at_minus_90 = _trn_icat_tau_ft_at(-90.0)
@@ -2220,8 +2220,8 @@ def test_ican_gating_steady_state_in_bounds():
             assert 0.0 <= ss <= 1.0, f"steady state {ss} out of [0,1] at V={V}"
 
 
-def test_ican_activation_increases_with_depolarisation():
-    """ICaN dn_inf (activation) is higher at depolarised voltages."""
+def test_ican_activation_increases_with_depolarization():
+    """ICaN dn_inf (activation) is higher at depolarized voltages."""
 
     def dn_inf(V: float) -> float:
         """Activation steady-state at voltage V."""
@@ -2784,8 +2784,8 @@ def test_nav12_slow_na_inactivation_steady_state_in_bounds() -> None:
         assert 0.0 <= ss <= 1.0, f"sNa12 steady state {ss} out of [0,1] at V={V}"
 
 
-def test_nav12_slow_na_inactivation_decreases_with_depolarisation() -> None:
-    """The sNa12 availability decreases monotonically with depolarisation."""
+def test_nav12_slow_na_inactivation_decreases_with_depolarization() -> None:
+    """The sNa12 availability decreases monotonically with depolarization."""
     assert _nav12_sNa_inf(-80.0) > _nav12_sNa_inf(-50.0) > _nav12_sNa_inf(-15.0)
 
 
@@ -2804,7 +2804,7 @@ def test_nav12_slow_na_inactivation_resting_availability() -> None:
 
 
 def test_nav12_slow_na_inactivation_blocks_depol_plateau() -> None:
-    """At depolarised plateau voltages sNa12 closes, abolishing the residual h-tail."""
+    """At depolarized plateau voltages sNa12 closes, abolishing the residual h-tail."""
     # The depol-block plateau the gate must escape (mirroring #324) hangs at
     # ≈ −15 mV; sNa12 must close firmly there so g_Na_eff = g_max * m^3 * h
     # * sNa12 collapses below the leak + IM outward drive.
@@ -3032,12 +3032,12 @@ def test_mainen_sejnowski_n_inf_closed_at_rest() -> None:
 
 
 def test_mainen_sejnowski_n_inf_strongly_open_at_peak() -> None:
-    """n_inf > 0.9 above the AP peak voltage so K⁺ repolarises after the spike.
+    """n_inf > 0.9 above the AP peak voltage so K⁺ repolarizes after the spike.
 
     The published M-S Kv has α/β = 10 at V = ``MAINEN_SEJNOWSKI_KV_VHALF`` (the
     rate-function singularity), so n_inf ≈ 0.91 there.  This is intentional —
     the channel is essentially fully open above ~+10 mV, providing strong
-    repolarising drive once the AP threshold is crossed.
+    repolarizing drive once the AP threshold is crossed.
     """
     a = mainen_sejnowski_alpha_n(MAINEN_SEJNOWSKI_KV_VHALF, 0.0)
     b = mainen_sejnowski_beta_n(MAINEN_SEJNOWSKI_KV_VHALF, 0.0)
@@ -3309,8 +3309,8 @@ def test_stn_slow_na_inactivation_steady_state_in_bounds() -> None:
         assert 0.0 <= ss <= 1.0, f"sNa steady state {ss} out of [0,1] at V={V}"
 
 
-def test_stn_slow_na_inactivation_decreases_with_depolarisation() -> None:
-    """The sNa availability decreases monotonically with depolarisation."""
+def test_stn_slow_na_inactivation_decreases_with_depolarization() -> None:
+    """The sNa availability decreases monotonically with depolarization."""
     assert _sNa_inf(-80.0) > _sNa_inf(-50.0) > _sNa_inf(-15.0)
 
 
@@ -3328,7 +3328,7 @@ def test_stn_slow_na_inactivation_resting_availability() -> None:
 
 
 def test_stn_slow_na_inactivation_blocks_depol_plateau() -> None:
-    """At depolarised plateau voltages sNa closes, abolishing the residual h-tail."""
+    """At depolarized plateau voltages sNa closes, abolishing the residual h-tail."""
     # The depol-block plateau in #324 hung at ≈ −15 mV; sNa must close
     # firmly there so g_Na_eff = g_max * m^3 * h * sNa collapses.
     assert _sNa_inf(-15.0) < 0.05
@@ -3497,7 +3497,7 @@ def test_make_purkinje_na_channel_structure() -> None:
 # ---------------------------------------------------------------------------
 # Purkinje slow Na inactivation rate functions (sNa gate; Carter & Bean
 # 2009).  Always-on gate added in #329 to abolish the residual depol-block
-# plateau under sustained climbing-fibre-style drive.
+# plateau under sustained climbing-fiber-style drive.
 # ---------------------------------------------------------------------------
 
 
@@ -3525,8 +3525,8 @@ def test_purkinje_slow_na_inactivation_steady_state_in_bounds() -> None:
         assert 0.0 <= ss <= 1.0, f"sNa steady state {ss} out of [0,1] at V={V}"
 
 
-def test_purkinje_slow_na_inactivation_decreases_with_depolarisation() -> None:
-    """The sNa availability decreases monotonically with depolarisation."""
+def test_purkinje_slow_na_inactivation_decreases_with_depolarization() -> None:
+    """The sNa availability decreases monotonically with depolarization."""
     assert (
         _purkinje_sNa_inf(-80.0) > _purkinje_sNa_inf(-50.0) > _purkinje_sNa_inf(-15.0)
     )
@@ -3539,14 +3539,14 @@ def test_purkinje_slow_na_inactivation_half_voltage() -> None:
 
 def test_purkinje_slow_na_inactivation_resting_availability() -> None:
     """Purkinje rests near -65 mV — sNa must remain mostly open."""
-    # Purkinje v_rest = -65 mV (matches the STN cycle hyperpolarised end).
+    # Purkinje v_rest = -65 mV (matches the STN cycle hyperpolarized end).
     # Loss of >15 % rest availability would noticeably suppress AP amplitude
     # on every spontaneous beat.
     assert _purkinje_sNa_inf(-65.0) > 0.85
 
 
 def test_purkinje_slow_na_inactivation_blocks_depol_plateau() -> None:
-    """At depolarised plateau voltages sNa closes, abolishing the residual h-tail."""
+    """At depolarized plateau voltages sNa closes, abolishing the residual h-tail."""
     # The depol-block plateau the new gate must escape (mirroring #324) hangs
     # at ≈ −15 mV; sNa must close firmly there so g_Na_eff = g_max * m^3 * h
     # * sNa collapses below the leak + IK outward drive.
@@ -3783,8 +3783,8 @@ def test_dopaminergic_slow_na_inactivation_steady_state_in_bounds() -> None:
         assert 0.0 <= ss <= 1.0, f"sNa_da steady state {ss} out of [0,1] at V={V}"
 
 
-def test_dopaminergic_slow_na_inactivation_decreases_with_depolarisation() -> None:
-    """The sNa_da availability decreases monotonically with depolarisation."""
+def test_dopaminergic_slow_na_inactivation_decreases_with_depolarization() -> None:
+    """The sNa_da availability decreases monotonically with depolarization."""
     assert (
         _dopaminergic_sNa_inf(-80.0)
         > _dopaminergic_sNa_inf(-50.0)
@@ -3801,8 +3801,8 @@ def test_dopaminergic_slow_na_inactivation_resting_availability() -> None:
     """SNc DA cycles through −90 to −55 mV; sNa_da must stay open in the trough.
 
     The looser lower bound at v_rest = −55 mV (vs Purkinje 0.85 at −65 mV) is
-    expected: SNc rests more depolarised, so the slow gate sits closer to V½
-    at rest.  The cycle hyperpolarised end (≈ −75 mV) is what matters for
+    expected: SNc rests more depolarized, so the slow gate sits closer to V½
+    at rest.  The cycle hyperpolarized end (≈ −75 mV) is what matters for
     recovery between spikes, and there sNa_da > 0.93.
     """
     assert _dopaminergic_sNa_inf(-75.0) > 0.93
@@ -3810,7 +3810,7 @@ def test_dopaminergic_slow_na_inactivation_resting_availability() -> None:
 
 
 def test_dopaminergic_slow_na_inactivation_blocks_depol_plateau() -> None:
-    """At depolarised plateau voltages sNa_da closes, abolishing the residual h-tail."""
+    """At depolarized plateau voltages sNa_da closes, abolishing the residual h-tail."""
     # The depol-block plateau the new gate guards against (mirroring STN/
     # Purkinje rationale) hangs at ≈ −15 mV; sNa_da must close firmly there
     # so g_Na_eff = g_max * m^3 * h * sNa_da collapses below leak + IK.

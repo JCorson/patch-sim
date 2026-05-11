@@ -105,16 +105,16 @@ def make_ca1_pyramidal() -> Neuron:
            across spikes and reduces effective Na⁺ drive through the train.
 
         INaP (g=0.1 mS/cm²; Magistretti & Alonso 1999) provides a persistent
-        Na⁺ window current that overcomes post-AP IKCa hyperpolarisation,
+        Na⁺ window current that overcomes post-AP IKCa hyperpolarization,
         ensuring prompt second-AP recovery and maintaining a monotonic SFA
         ramp rather than a long post-burst pause.
 
-    Slow Na inactivation and depolarisation-block recovery:
-        Two complementary slow gates ensure the cell repolarises after
+    Slow Na inactivation and depolarization-block recovery:
+        Two complementary slow gates ensure the cell repolarizes after
         sustained suprathreshold drive rather than hanging on a plateau:
 
         1. Fast-Na slow inactivation (sNa12, via ``make_nav12_channel``) —
-           closes the residual fast-Na h-tail during prolonged depolarisation.
+           closes the residual fast-Na h-tail during prolonged depolarization.
            Mickus, Jung & Spruston (1999) characterised this gate directly
            in CA1 pyramidal cells.  g_Na=60 mS/cm² compensates for the
            train-long sNa12 accumulation.

@@ -16,7 +16,7 @@ class Sweep(BaseModel):
 
     Attributes:
         label: Display name shown in the plot legend.
-        color: Hex colour string; empty string means Plotly chooses the colour.
+        color: Hex color string; empty string means Plotly chooses the color.
         time: Time axis values in ms.
         voltage: Membrane voltage in mV.
         dvdt: Time derivative of membrane voltage in mV/ms.
@@ -61,7 +61,7 @@ class Sweep(BaseModel):
             result: Simulation result structured array with a ``"time"`` field.
             stimulus: Stimulus array (current or voltage command).
             label: Display name for this sweep in the legend.
-            color: Hex colour string; pass empty string to use Plotly default.
+            color: Hex color string; pass empty string to use Plotly default.
             mode: Clamp mode — CURRENT_CLAMP or VOLTAGE_CLAMP.
 
         Returns:

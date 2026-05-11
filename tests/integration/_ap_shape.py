@@ -1,6 +1,6 @@
 """Shared AP-shape assertion helper for integration tests.
 
-The :func:`assert_ap_shape` helper standardises how preset tests assert that a
+The :func:`assert_ap_shape` helper standardizes how preset tests assert that a
 neuron's mean AP-shape metrics fall within literature-cited tolerance bands.
 Each band kwarg is a ``(low, high)`` tuple; passing ``None`` skips that metric.
 The mandatory ``reference`` string is reproduced in every failure message so

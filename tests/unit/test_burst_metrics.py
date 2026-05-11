@@ -1,7 +1,7 @@
 """Unit tests for the patch_sim.analysis.burst_metrics module.
 
 Verifies burst detection, threshold estimation, per-burst and aggregate
-metric computation, and edge-case behaviour using synthetic
+metric computation, and edge-case behavior using synthetic
 :class:`APAnalysisResult` instances.  Tests that drive a real simulation
 live in tests/integration/test_burst_metrics_simulation.py.
 """
@@ -33,7 +33,7 @@ def _make_ap_result(peak_times: list[float]) -> APAnalysisResult:
     """Build a synthetic :class:`APAnalysisResult` from a list of peak times.
 
     The :class:`SpikeMetrics` records carry only the fields needed by the
-    burst analyser (``peak_time``).  Other fields are populated with
+    burst analyzer (``peak_time``).  Other fields are populated with
     plausible placeholder values so the dataclass remains valid.
 
     Args:
@@ -128,7 +128,7 @@ def test_single_spike_returns_zero_bursts_and_one_unburst_spike() -> None:
 def test_single_spike_with_min_one_returns_one_burst() -> None:
     """A single spike with min_spikes_per_burst=1 forms a single-spike burst."""
     ap = _make_ap_result([100.0])
-    # Pin isi_threshold_ms so the analyser does not short-circuit to zero
+    # Pin isi_threshold_ms so the analyzer does not short-circuit to zero
     # bursts on the ``default-fixed`` fallback (no ISIs to bisect).
     result = analyze_bursts(
         ap, total_duration_ms=500.0, isi_threshold_ms=50.0, min_spikes_per_burst=1
@@ -212,7 +212,7 @@ def test_duty_cycle_computation() -> None:
 def test_identical_isis_fall_back_to_default_threshold() -> None:
     """Identical ISIs fall back to the default and group as one tight cluster."""
     # All ISIs identical at 5 ms → log10 spread is 0; the np.ptp early
-    # exit must engage and the analyser must fall back to 100 ms.  Every
+    # exit must engage and the analyzer must fall back to 100 ms.  Every
     # ISI is below the tight-cluster maximum and there are ≤7 of them,
     # so the carve-out groups them into a single burst.
     peak_times = list(np.cumsum([10.0, *([5.0] * 6)]))
@@ -266,7 +266,7 @@ def test_unimodal_isis_fall_back_to_default() -> None:
     Regression guard for issue #290 — a tonic train with ISIs around 50 ms
     must not be regrouped as a single tight cluster.  ``max(isis)`` is well
     above the 25 ms tight-cluster maximum so the carve-out is bypassed and
-    the analyser short-circuits to zero bursts.
+    the analyzer short-circuits to zero bursts.
     """
     rng = np.random.default_rng(seed=0)
     isis = list(50.0 + rng.normal(0.0, 1.0, size=12))  # tightly clustered around 50
@@ -286,7 +286,7 @@ def test_uniform_short_isis_group_as_one_burst_via_default_fixed() -> None:
     here" — it conflates tonic firing (ISIs spread across the tonic range)
     with a real LTS-style tight cluster (every ISI well below the
     tight-cluster ISI maximum).  For a short cluster (≤7 ISIs) where every
-    ISI is below the tight-cluster threshold, the analyser falls through
+    ISI is below the tight-cluster threshold, the analyzer falls through
     to grouping with the 100 ms default and produces one burst.  Tonic
     protection is exercised by ``test_unimodal_isis_fall_back_to_default``
     and the integration tests.
@@ -350,7 +350,7 @@ def test_just_above_tight_cluster_max_isi_does_not_fall_through() -> None:
     """A unimodal cluster with ISIs just above the tight-cluster max stays unburst.
 
     Regression guard against the textbook tonic-firing band: HH at
-    +10 µA/cm² and Purkinje at depolarising step both fire at ~50–60 Hz
+    +10 µA/cm² and Purkinje at depolarizing step both fire at ~50–60 Hz
     in the literature (ISIs 17–20 ms; Raman & Bean 1999), well above the
     12 ms tight-cluster maximum.  A short snippet of textbook-rate tonic
     firing must therefore still short-circuit to zero bursts even when it

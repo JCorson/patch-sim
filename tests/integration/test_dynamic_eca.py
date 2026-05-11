@@ -5,7 +5,7 @@ Two property-based guards:
 1. A non-Ca preset's voltage trace is invariant to ``Neuron.Ca_in`` —
    proving the dynamic E_Ca plumbing does not accidentally couple non-Ca
    channels to the intracellular Ca²⁺ concentration.
-2. Under strong hyperpolarisation, a Ca-carrying preset's ``ca_i`` trace
+2. Under strong hyperpolarization, a Ca-carrying preset's ``ca_i`` trace
    stays pinned to ``ca_rest`` within tens of nanomolar — proving Ca²⁺
    activation collapses (and therefore Ca²⁺ influx is suppressed) when
    expected.
@@ -67,8 +67,8 @@ def test_non_ca_preset_invariant_to_ca_in() -> None:
     )
 
 
-def test_hyperpolarisation_suppresses_ca_influx() -> None:
-    """Strong Purkinje hyperpolarisation keeps ca_i pinned to ca_rest.
+def test_hyperpolarization_suppresses_ca_influx() -> None:
+    """Strong Purkinje hyperpolarization keeps ca_i pinned to ca_rest.
 
     Under −5 µA/cm² for 20 ms, V drops toward E_K (~−95 mV), the Ca²⁺
     activation gates (d for ICaL, ICaT) close, and Ca²⁺ influx vanishes.
@@ -93,5 +93,5 @@ def test_hyperpolarisation_suppresses_ca_influx() -> None:
     # regression that re-couples Ca²⁺ activation to rest.
     assert max_dev_mm < 5e-5, (
         f"ca_i deviated {max_dev_mm:.2e} mM from ca_rest under strong "
-        "hyperpolarisation — Ca²⁺ activation may not be properly suppressed."
+        "hyperpolarization — Ca²⁺ activation may not be properly suppressed."
     )

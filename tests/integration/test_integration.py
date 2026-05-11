@@ -207,7 +207,7 @@ def test_chirp_current_to_simulation(hh_model: Neuron) -> None:
     _assert_current_clamp_result(result)
     assert len(result) == len(protocol)
 
-    # DC offset provides a sustained depolarising drive; voltage should depart
+    # DC offset provides a sustained depolarizing drive; voltage should depart
     # noticeably from resting potential
     assert result["voltage"].max() - result["voltage"].min() > 5.0
 
@@ -230,7 +230,7 @@ def test_step_voltage_to_simulation(hh_model: Neuron) -> None:
     _assert_voltage_clamp_result(result)
     assert len(result) == len(protocol)
 
-    # During the depolarising step there should be inward Na⁺ current
+    # During the depolarizing step there should be inward Na⁺ current
     step_mask = np.isclose(result["voltage"], 0.0)
     assert step_mask.any(), "No rows matched the step voltage — mask is empty"
     assert result["INa"][step_mask].min() < -10.0
@@ -273,7 +273,7 @@ def test_pulse_train_voltage_to_simulation(hh_model: Neuron) -> None:
     _assert_voltage_clamp_result(result)
     assert len(result) == len(protocol)
 
-    # Each depolarising pulse should produce an inward Na⁺ transient
+    # Each depolarizing pulse should produce an inward Na⁺ transient
     # Verify at least one strong inward Na⁺ event occurred
     assert result["INa"].min() < -10.0
 
@@ -293,7 +293,7 @@ def test_action_potential_with_step_current(hh_model: Neuron) -> None:
     # AP peak must exceed +20 mV
     assert float(voltage.max()) > 20.0
 
-    # Repolarisation: voltage must return below -50 mV after the peak
+    # Repolarization: voltage must return below -50 mV after the peak
     peak_idx = int(np.argmax(voltage))
     post_peak_voltage = voltage[peak_idx:]
     assert float(post_peak_voltage.min()) < -50.0

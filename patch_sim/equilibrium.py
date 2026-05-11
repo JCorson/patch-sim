@@ -62,7 +62,7 @@ def find_zero_current_voltage(
     Ca²⁺ concentration when evaluating calcium-dependent gating variables.
     When *ca_i* is ``None`` (the default) the neuron's declared ``ca_rest``
     is used, consistent with how
-    :func:`~patch_sim.simulate_current_clamp` historically initialised the
+    :func:`~patch_sim.simulate_current_clamp` historically initialized the
     state.  Pass an explicit value (e.g. from
     :func:`find_coupled_equilibrium`) when you need to evaluate the
     zero-current voltage at a specific Ca²⁺ concentration.

@@ -142,7 +142,7 @@ class BoltzmannCoshRate(VoltageOnlyRate):
         tau_scale: Numerator of the time-constant expression in ms.
         tau_floor: Minimum allowed time constant in ms.
         inverted: If True the Boltzmann curve is inverted (gate open at
-            hyperpolarised potentials).
+            hyperpolarized potentials).
         cosh_scale: Voltage scale in the cosh denominator in mV.
         tau_rate: Extra multiplier in the tau denominator.
         is_alpha: If True, computes alpha = inf / tau; otherwise beta =
@@ -216,7 +216,7 @@ def boltzmann_cosh_rates(
         tau_scale: Numerator of the time-constant expression in ms.
         tau_floor: Minimum allowed time constant in ms.
         inverted: If True, use exp(+(V-half)/slope) so the gate is maximally
-            open at hyperpolarised potentials (e.g. IKir).
+            open at hyperpolarized potentials (e.g. IKir).
         tau_cosh_scale: Voltage scale in the cosh denominator in mV.
             Defaults to ``2 * slope``.
         tau_rate: Extra multiplier in the tau denominator.  Use this to

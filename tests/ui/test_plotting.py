@@ -97,7 +97,7 @@ def _make_sweep(
 
     Args:
         label: Sweep label string.
-        color: Hex colour string.
+        color: Hex color string.
         mode: Clamp mode string.
         n: Number of time points.
         extra_cols: Extra fields to include.
@@ -360,7 +360,7 @@ def test_build_figure_vc_single_sweep_trace_count() -> None:
 
 
 # ---------------------------------------------------------------------------
-# build_figure — CC voltage and stimulus/command trace colours
+# build_figure — CC voltage and stimulus/command trace colors
 # ---------------------------------------------------------------------------
 
 

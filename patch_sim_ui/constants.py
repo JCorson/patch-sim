@@ -1,4 +1,4 @@
-"""UI constants: parameter ranges and colour palettes."""
+"""UI constants: parameter ranges and color palettes."""
 
 # Re-export domain constants from core so existing UI imports continue to work.
 from patch_sim.constants import (  # noqa: F401
@@ -25,17 +25,17 @@ PARAM_RANGES: dict[str, tuple[float, float, float]] = {
     **{ch.g_max_field: ch.g_max_range for ch in CHANNELS},
 }
 
-# Fixed colour for the Current Clamp voltage trace.  Matches the blue used for
+# Fixed color for the Current Clamp voltage trace.  Matches the blue used for
 # I_total in Voltage Clamp so the primary response trace looks consistent across
 # both modes.
 CC_VOLTAGE_COLOR: str = "#1f77b4"
 
-# Colour for the stimulus/command trace in both clamp modes.  A neutral grey
+# Color for the stimulus/command trace in both clamp modes.  A neutral gray
 # keeps the stimulus visually unobtrusive relative to the physiologically
 # meaningful channel and gating-variable traces.
 STIMULUS_COLOR: str | None = "#888888"
 
-# Per-channel trace colours (used in the Voltage Clamp overlay plot).
+# Per-channel trace colors (used in the Voltage Clamp overlay plot).
 # Keys are simulation column names (``"INa"``, ``"IK"``, ``"Ih"``, …) so a
 # Sweep's ``channel_currents`` dict can be looked up directly.  The
 # ``"total_current"`` key keys the summed-current trace.
@@ -44,9 +44,9 @@ CHANNEL_COLORS: dict[str, str] = {
     **{ch.column_name: ch.current_color for ch in CHANNELS},
 }
 
-# Gating variable name → unique colour (each variable gets its own distinct
-# colour).  HH-classic gates (n / m / h) are listed explicitly; every other
-# gate's colour comes from the channel registry.
+# Gating variable name → unique color (each variable gets its own distinct
+# color).  HH-classic gates (n / m / h) are listed explicitly; every other
+# gate's color comes from the channel registry.
 GATING_VAR_COLORS: dict[str, str] = {
     "n": "#1f77b4",  # blue
     "m": "#ff7f0e",  # orange
@@ -71,8 +71,8 @@ STORED_TRACE_COLORS: list[str] = [
     "rgba(200, 60, 180, 0.45)",  # magenta
 ]
 
-# Neutral grey palette for multi-sweep I-V protocol trace coloring so each
-# sweep is visually distinct from the coloured channel / gating-variable traces.
+# Neutral gray palette for multi-sweep I-V protocol trace coloring so each
+# sweep is visually distinct from the colored channel / gating-variable traces.
 SWEEP_COLORS: list[str] = [
     "#888888",
     "#666666",
@@ -96,7 +96,7 @@ HIGHLIGHT_HOVER_WIDTH: float = 4.0
 HIGHLIGHT_DIM_WIDTH: float = 0.5
 """Line width (px) applied to dimmed (non-selected) sweep traces."""
 
-# Dark-mode axis colour overrides — single source of truth shared between the
+# Dark-mode axis color overrides — single source of truth shared between the
 # Python-side _LAYOUT_DARK dict (trace_display.py) and the server-generated JS
 # snippet in _build_fetch_figure_js (state/simulation.py).  Both sites import
 # this constant so a single edit propagates to both.

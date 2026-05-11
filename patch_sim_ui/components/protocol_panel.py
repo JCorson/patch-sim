@@ -21,7 +21,7 @@ def _num_field(
     unit: str = "",
     disabled: rx.Var | bool = False,
 ) -> rx.Component:
-    """Render a labelled numeric input field.
+    """Render a labeled numeric input field.
 
     Args:
         label: Display label shown to the left of the input.

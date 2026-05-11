@@ -243,7 +243,7 @@ def test_stn_katp_engages_during_drive(stn_neuron: Neuron) -> None:
     (Stanford & Lacey 1996; Bevan & Wilson 1999; Hahn & McIntyre 2010)
     must engage strongly during sustained suprathreshold drive so the
     outward K⁺ current it provides can dominate the residual fast-Na
-    drive at the depolarised plateau.  Subthreshold availability must
+    drive at the depolarized plateau.  Subthreshold availability must
     stay near zero or autonomous tonic firing would silence.
     """
     n_pre = _ms_to_samples(100.0)
@@ -267,10 +267,10 @@ def test_stn_katp_engages_during_drive(stn_neuron: Neuron) -> None:
         f"kATP not closed at autonomous rest: rest={kATP_at_rest:.3f} (expected < 0.05)"
     )
     # During sustained drive kATP doesn't reach steady-state because sNaP
-    # and sNa repolarise the cell before τ_kATP (≈400 ms at V½) has time
+    # and sNa repolarize the cell before τ_kATP (≈400 ms at V½) has time
     # to fully activate; engagement is still several-fold above rest.
     # The 0.08 floor reflects the post-#326 tuning, where a halved INaP
-    # makes the depolarisation-block plateau shallower and shorter-lived
+    # makes the depolarization-block plateau shallower and shorter-lived
     # — kATP engages a few-fold above rest rather than reaching the
     # ~0.19 it attained when INaP was holding the cell at the plateau
     # for longer.  The third assertion below (>4× rest) is the primary
@@ -286,18 +286,18 @@ def test_stn_katp_engages_during_drive(stn_neuron: Neuron) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Depolarisation-block recovery — issue #324 regression.
+# Depolarization-block recovery — issue #324 regression.
 # ---------------------------------------------------------------------------
 
 
 def test_stn_recovers_from_sustained_suprathreshold_drive(
     stn_neuron: Neuron,
 ) -> None:
-    """STN repolarises after +5 µA/cm² × 200 ms (full #324 regression).
+    """STN repolarizes after +5 µA/cm² × 200 ms (full #324 regression).
 
     Regression test for #324: the three opt-in mechanisms (INaP sNaP,
     fast-Na sNa, K_ATP) cooperate so the membrane escapes the
-    depolarisation-block plateau seeded by sustained suprathreshold
+    depolarization-block plateau seeded by sustained suprathreshold
     drive at the F-I sweep upper bound (+5 µA/cm²).  The cell should
     settle below −50 mV during the last 200 ms of a 700 ms post-stimulus
     epoch, confirming a return to the autonomous-oscillation regime

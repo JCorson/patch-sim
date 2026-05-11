@@ -61,7 +61,7 @@ def make_fast_spiking_interneuron() -> Neuron:
         Pospischil et al. (2008) Traub-Miles kinetics replace the HH52
         defaults.  HH52 kinetics were characterised at room temperature and
         over-accelerate Na⁺ inactivation at mammalian temperature (Q10=3.0,
-        22→37 °C, factor ~5.2×), causing depolarisation block after the first
+        22→37 °C, factor ~5.2×), causing depolarization block after the first
         AP in a fast-spiking cell.  Pospischil kinetics were characterised at
         34 °C; T_ref=307.15 K limits the runtime Q10 correction to ~1.4×,
         preserving the published non-adapting phenotype.
@@ -76,9 +76,9 @@ def make_fast_spiking_interneuron() -> Neuron:
 
     IKv3.1 delayed rectifier:
         Kv3.1-type K⁺ channel (V₁/₂ = −12.4 mV, fast deactivation) drives the
-        late-AP repolarisation and enables non-adapting high-frequency firing
+        late-AP repolarization and enables non-adapting high-frequency firing
         (Erisir et al. 1999; Wang & Buzsáki 1996).  The Pospischil delayed
-        rectifier handles early repolarisation; IKv3.1 sharpens the trailing
+        rectifier handles early repolarization; IKv3.1 sharpens the trailing
         edge and prevents inter-spike Na⁺ channel inactivation accumulation.
 
     Passive properties:

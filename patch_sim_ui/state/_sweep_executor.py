@@ -276,7 +276,7 @@ def _compute_simulation(
         )
 
     # Single VC sweep — IV/GV require multi-sweep, but calcium transients can
-    # still appear (e.g. a depolarising VC step opens Ca channels).
+    # still appear (e.g. a depolarizing VC step opens Ca channels).
     ca_metrics, ca_summary = _compute_ca_transient_data(result)
     return _SimResult(
         sweeps=[sweep],

@@ -15,8 +15,8 @@ def test_iv_curve_integration_hh_neuron(hh_model):
     """I-V curve from a real HH simulation has inward current at intermediate voltages.
 
     The HH model should produce a region of inward (negative) sodium current
-    at intermediate depolarised voltage steps (e.g. -10 to +20 mV), and
-    predominantly outward potassium current at strong depolarisations.
+    at intermediate depolarized voltage steps (e.g. -10 to +20 mV), and
+    predominantly outward potassium current at strong depolarizations.
     """
     pre_ms, stim_ms, post_ms = 5.0, 30.0, 5.0
     min_v, max_v, step_v = -80.0, 60.0, 20.0
@@ -46,7 +46,7 @@ def test_iv_curve_integration_hh_neuron(hh_model):
     assert len(iv.points) == len(voltage_steps)
     assert iv.voltage_steps == sorted(voltage_steps)
 
-    # At moderately depolarised steps, total peak should have an inward component
+    # At moderately depolarized steps, total peak should have an inward component
     # (the sodium current drives total inward in the -40 to +10 mV range for HH)
     any_inward = any(p < 0 for p in iv.peak_inward_currents)
     assert any_inward, "Expected at least one inward peak current in the HH I-V curve"

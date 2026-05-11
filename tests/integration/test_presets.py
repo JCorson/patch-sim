@@ -1,6 +1,6 @@
 """Tests for patch_sim.presets — preset data structures and build_protocol_from_preset.
 
-Focuses on the preset catalogue itself and verifies that neuron-specific
+Focuses on the preset catalog itself and verifies that neuron-specific
 protocol adjustments are actually applied (not just that the function runs
 without error).
 """
@@ -86,7 +86,7 @@ def _channel_by_name(neuron: Neuron, name: str) -> IonChannel:
 
 
 # ---------------------------------------------------------------------------
-# Preset catalogue integrity
+# Preset catalog integrity
 # ---------------------------------------------------------------------------
 
 
@@ -395,7 +395,7 @@ def test_trn_icat_ft_inf_at_vrest_enables_burst_firing() -> None:
 
     ft_inf = 0.50 at −80 mV (the ICaT half-inactivation voltage) means ICaT
     is half de-inactivated at rest, enabling the post-inhibitory rebound burst
-    and burst character on depolarising steps that define TRN firing.
+    and burst character on depolarizing steps that define TRN firing.
     Previously (K_out=7.8 mM, E_K ≈ −77 mV) v_rest settled at −66 mV where
     ft_inf ≈ 0.17 — too inactivated for reliable burst firing.
 
@@ -550,8 +550,8 @@ def test_purkinje_has_nar_channel() -> None:
     """Purkinje preset includes an INaR (resurgent Na⁺) channel.
 
     INaR enables the fast repriming and high-frequency repetitive firing
-    that characterises climbing-fibre-driven complex spikes in cerebellar
-    Purkinje cells.  Climbing-fibre input is not modelled in this
+    that characterises climbing-fiber-driven complex spikes in cerebellar
+    Purkinje cells.  Climbing-fiber input is not modeled in this
     single-compartment preset; INaR contributes here only by shaping
     intrinsic tonic spiking.
     Ref: Raman & Bean (1997), Neuron 19:881.

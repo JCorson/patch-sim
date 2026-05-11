@@ -218,7 +218,7 @@ def test_boltzmann_cosh_rates_tau_rate_scales_correctly():
 
 
 def test_boltzmann_cosh_rates_inverted_flips_boltzmann():
-    """inverted=True gives high steady state at hyperpolarised voltages."""
+    """inverted=True gives high steady state at hyperpolarized voltages."""
     alpha_std, beta_std = boltzmann_cosh_rates(
         half=-52.6, slope=4.6, tau_scale=6.0, tau_floor=0.1
     )
@@ -232,5 +232,5 @@ def test_boltzmann_cosh_rates_inverted_flips_boltzmann():
     ss_inv = alpha_inv(V_hyper, 0.0) / (
         alpha_inv(V_hyper, 0.0) + beta_inv(V_hyper, 0.0)
     )
-    assert ss_std < 0.1  # standard gate is mostly closed at hyperpolarisation
-    assert ss_inv > 0.9  # inverted gate is mostly open at hyperpolarisation
+    assert ss_std < 0.1  # standard gate is mostly closed at hyperpolarization
+    assert ss_inv > 0.9  # inverted gate is mostly open at hyperpolarization
