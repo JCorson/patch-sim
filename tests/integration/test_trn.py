@@ -79,6 +79,18 @@ def trn_intra_burst_ap_result(trn_neuron: Neuron):
     return analyze_aps(time[mask], voltage[mask])
 
 
+def _ms_to_samples(ms: float) -> int:
+    """Convert a duration in milliseconds to a simulation sample count.
+
+    Args:
+        ms: Duration in milliseconds.
+
+    Returns:
+        Number of samples at ``SIM_SAMPLING_FREQ``.
+    """
+    return int(ms * SIM_SAMPLING_FREQ / 1000.0)
+
+
 # ---------------------------------------------------------------------------
 # Spontaneous tonic firing — Huguenard & Prince (1992); Bal & McCormick
 # (1993). The preset is configured for ~3 Hz; we accept 1–15 Hz to allow
@@ -142,6 +154,52 @@ def test_trn_ap_ahp_depth_in_trn_tonic_range(trn_spontaneous_ap_result) -> None:
         trn_spontaneous_ap_result,
         reference=_TRN_REFERENCE,
         ahp_mv=(-75.0, -55.0),
+    )
+
+
+def test_trn_single_ap_repolarizes_cleanly(trn_neuron: Neuron) -> None:
+    """A single tonic-mode AP repolarizes within 3 ms; no post-spike plateau.
+
+    Drives a depolarizing step with the UI ACTION_POTENTIAL protocol
+    (5 µA/cm² × 2 ms) on top of the autonomous tonic pacemaking and
+    asserts that within 3 ms after the global voltage peak V has dropped
+    below −53 mV.  TRN tonic-mode APs are ~0.4–1.2 ms half-width with a
+    fast AHP to roughly −55 to −75 mV reached within a few ms (Huguenard &
+    Prince 1992, J. Neurosci. 12:3804; Bal & McCormick 1993, J. Physiol.
+    468:669).  Tonic mode only — driven from rest against the ~3 Hz
+    autonomous train with no prior hyperpolarization, so ICaT is
+    inactivated and the HP92 rebound burst (separately pinned by
+    ``test_trn_step_release_produces_hp92_rebound_burst`` in
+    ``test_burst_metrics_simulation.py``) is not exercised.  Do not
+    "improve" this test by adding a hyperpolarizing prepulse — that would
+    conflate the real LTS rebound plateau with a pathological Na-window
+    plateau (cf. SNc DA, PR #318), which is exactly what this test guards
+    against.  A long plateau hanging at ~−30 mV after the spike would mean
+    a window current is dominating repolarization — a pathology the mean
+    half-width and AHP-depth metrics do not catch (half-width is measured
+    at the spike midpoint, which the trace can cross cleanly even when V
+    parks at −30 mV afterward).
+    """
+    pre_ms, stim_ms, post_ms = 10.0, 2.0, 50.0
+    total_samples = _ms_to_samples(pre_ms + stim_ms + post_ms) + 1
+    current = np.zeros(total_samples)
+    pre_n = _ms_to_samples(pre_ms)
+    stim_n = _ms_to_samples(stim_ms)
+    current[pre_n : pre_n + stim_n] = 5.0
+    result = simulate_current_clamp(trn_neuron, current_external=current)
+    t = np.asarray(result["time"])
+    v = np.asarray(result["voltage"])
+
+    peak_idx = int(np.argmax(v))
+    peak_t = float(t[peak_idx])
+    after_mask = (t > peak_t) & (t <= peak_t + 3.0)
+    v_after = v[after_mask]
+    assert v_after.size > 0, "post-peak window is empty"
+    min_v = float(np.min(v_after))
+    assert min_v < -53.0, (
+        f"AP plateau detected: V never falls below −53 mV in 3 ms after the "
+        f"peak (min V = {min_v:.2f} mV at peak={peak_t:.2f} ms).  "
+        f"Reference: {_TRN_REFERENCE}."
     )
 
 
