@@ -10,6 +10,7 @@ from patch_sim_ui.plotting import (
     build_gv_figure,
     build_hyperpolarization_figure,
     build_impedance_figure,
+    build_inactivation_figure,
     build_iv_figure,
     build_phase_plane_figure,
     build_sfa_figure,
@@ -34,6 +35,8 @@ class AnalysisState(rx.State):
     fi_data: dict[str, Any] = {}  # Serialized FIAnalysisResult for the UI
     iv_data: dict[str, Any] = {}  # Serialized IVAnalysisResult for the UI
     gv_data: dict[str, Any] = {}  # Serialized GVAnalysisResult for the UI
+    # Serialized InactivationAnalysisResult (h∞ curve) for the UI.
+    inactivation_data: dict[str, Any] = {}
     tau_v_data: dict[str, Any] = {}  # Serialized TauVAnalysisResult for the UI
     sfa_data: dict[str, Any] = {}  # Serialized SFAAnalysisResult for the UI
     hyperpolarization_data: dict[str, Any] = {}  # Serialized sag/rebound analysis
@@ -67,6 +70,7 @@ class AnalysisState(rx.State):
         self.fi_data = {}
         self.iv_data = {}
         self.gv_data = {}
+        self.inactivation_data = {}
         self.tau_v_data = {}
         self.sfa_data = {}
         self.hyperpolarization_data = {}
@@ -130,6 +134,11 @@ class AnalysisState(rx.State):
         return len(self.gv_data) > 0
 
     @rx.var
+    def has_inactivation_data(self) -> bool:
+        """Return True when h∞ steady-state inactivation results are available."""
+        return len(self.inactivation_data) > 0
+
+    @rx.var
     def has_tau_v_data(self) -> bool:
         """Return True when τ-V analysis results are available for display."""
         return len(self.tau_v_data) > 0
@@ -163,6 +172,16 @@ class AnalysisState(rx.State):
         if not self.gv_data:
             return go.Figure()
         return build_gv_figure(self.gv_data)
+
+    @rx.var
+    def inactivation_figure(self) -> go.Figure:
+        """Return a Plotly h∞ curve figure with decreasing Boltzmann fit overlay.
+
+        Returns an empty figure when no inactivation data is available.
+        """
+        if not self.inactivation_data:
+            return go.Figure()
+        return build_inactivation_figure(self.inactivation_data)
 
     @rx.var
     def tau_v_figure(self) -> go.Figure:

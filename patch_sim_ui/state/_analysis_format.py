@@ -878,3 +878,52 @@ def _compute_gv_data(
         "fit_voltages": fit_voltages,
         "fit_g_normalized": fit_gn,
     }
+
+
+def _compute_inactivation_data(
+    iv_result: "patch_sim.IVAnalysisResult",
+) -> "dict[str, Any]":
+    """Compute steady-state inactivation (h∞) data from an I-V result.
+
+    Calls :func:`patch_sim.compute_inactivation` to derive normalized
+    availability per conditioning prepulse and fit a decreasing Boltzmann
+    sigmoid.  A dense prepulse-voltage array (:data:`_GV_FIT_POINTS` points)
+    spanning the range of measured prepulses is pre-computed so the plotting
+    function can draw a smooth fit curve without importing scipy.  Because the
+    fitted ``k`` is positive but the curve is decreasing, the dense curve is
+    evaluated as ``boltzmann(V, v_half, -k)``.
+
+    Args:
+        iv_result: Pre-computed I-V analysis result whose stimulus window is the
+            two-pulse protocol's fixed test pulse, with one point per
+            conditioning prepulse voltage.
+
+    Returns:
+        A dict with keys ``prepulse_voltages``, ``h_normalized``,
+        ``boltzmann_converged``, ``v_half``, ``k``, ``fit_voltages``, and
+        ``fit_h_normalized``.  Returns an empty dict when *iv_result* has no
+        points.
+    """
+    result = patch_sim.compute_inactivation(iv_result)
+    if not result.points:
+        return {}
+
+    fit = result.boltzmann
+    fit_voltages: list[float] = []
+    fit_h: list[float] = []
+    if fit.converged and len(result.prepulse_voltages) >= 2:
+        v_min = min(result.prepulse_voltages)
+        v_max = max(result.prepulse_voltages)
+        v_arr = np.linspace(v_min, v_max, _GV_FIT_POINTS)
+        fit_voltages = v_arr.tolist()
+        fit_h = [float(patch_sim.boltzmann(v, fit.v_half, -fit.k)) for v in v_arr]
+
+    return {
+        "prepulse_voltages": result.prepulse_voltages,
+        "h_normalized": result.h_normalized_values,
+        "boltzmann_converged": fit.converged,
+        "v_half": fit.v_half,
+        "k": fit.k,
+        "fit_voltages": fit_voltages,
+        "fit_h_normalized": fit_h,
+    }
