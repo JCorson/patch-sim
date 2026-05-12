@@ -1738,6 +1738,7 @@ def _prime_analysis(an_st: AnalysisState) -> None:
     an_st.fi_data = {"current_steps": [0.1]}
     an_st.iv_data = {"voltage_steps": [-70.0]}
     an_st.gv_data = {"conductance": [0.5]}
+    an_st.inactivation_data = {"h_normalized": [1.0, 0.5]}
     an_st.tau_v_data = {"voltages": [-40.0, -20.0]}
     an_st.sfa_data = {"isi": [10.0]}
     an_st.hyperpolarization_data = {"sag_ratio": 0.1}
@@ -1760,6 +1761,7 @@ def _assert_analysis_cleared(an_st: AnalysisState) -> None:
     assert an_st.fi_data == {}
     assert an_st.iv_data == {}
     assert an_st.gv_data == {}
+    assert an_st.inactivation_data == {}
     assert an_st.tau_v_data == {}
     assert an_st.sfa_data == {}
     assert an_st.hyperpolarization_data == {}
