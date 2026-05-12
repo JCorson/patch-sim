@@ -37,6 +37,16 @@ _MIN_STIM_DURATION_MS: float = 2.0
 #: Default initial guess for the membrane time constant (ms).
 _TAU_INITIAL_GUESS_MS: float = 5.0
 
+#: Guard padding (ms) trimmed *before* a detected spike's threshold crossing
+#: when carving out the spike-free portion of a trace.  Spike onset is sharp,
+#: so a small pad suffices.
+_SPIKE_GUARD_PRE_MS: float = 2.0
+
+#: Guard padding (ms) trimmed *after* a detected spike's peak.  Must be long
+#: enough to clear the after-hyperpolarization so the recovered segment carries
+#: only the linear subthreshold response.
+_SPIKE_GUARD_POST_MS: float = 20.0
+
 
 @dataclasses.dataclass
 class PassiveProperties:
@@ -148,6 +158,86 @@ def is_subthreshold(
         min_spike_height=min_spike_height,
     )
     return result.spike_count == 0
+
+
+def longest_subthreshold_run(
+    time: np.ndarray,
+    voltage: np.ndarray,
+    *,
+    dvdt_threshold: float = 20.0,
+    min_spike_height: float = -20.0,
+) -> tuple[int, int] | None:
+    """Find the longest contiguous spike-free span of a voltage trace.
+
+    Runs :func:`analyze_aps` to locate spikes, excises a guard-padded window
+    around each one — from :data:`_SPIKE_GUARD_PRE_MS` before its threshold
+    crossing to :data:`_SPIKE_GUARD_POST_MS` after its peak, so the
+    after-hyperpolarization transient is removed too — and returns the widest
+    remaining gap.  When the trace contains no spikes the whole trace is
+    returned.
+
+    Args:
+        time: Time array in ms, shape ``(N,)``, ascending.
+        voltage: Membrane voltage in mV, shape ``(N,)``, same length as
+            ``time``.
+        dvdt_threshold: dV/dt value (mV/ms) used to identify spike onset.
+        min_spike_height: Minimum peak voltage (mV) for a candidate event to be
+            classified as a spike.
+
+    Returns:
+        Half-open index bounds ``(start_idx, stop_idx)`` into ``time`` /
+        ``voltage`` of the longest spike-free span (``(0, N)`` when there are no
+        spikes), or ``None`` when no spike-free span exists — every sample falls
+        inside a guard window.
+    """
+    time = np.asarray(time, dtype=float)
+    voltage = np.asarray(voltage, dtype=float)
+    n = time.size
+    if n == 0:
+        return None
+
+    result = analyze_aps(
+        time,
+        voltage,
+        dvdt_threshold=dvdt_threshold,
+        min_spike_height=min_spike_height,
+    )
+    if result.spike_count == 0:
+        return (0, n)
+
+    # Merge the guard-padded "bad" time intervals around each spike.
+    intervals = sorted(
+        (s.threshold_time - _SPIKE_GUARD_PRE_MS, s.peak_time + _SPIKE_GUARD_POST_MS)
+        for s in result.spikes
+    )
+    merged: list[list[float]] = [list(intervals[0])]
+    for lo, hi in intervals[1:]:
+        if lo <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], hi)
+        else:
+            merged.append([lo, hi])
+
+    # Spike-free time gaps: before the first interval, between consecutive
+    # intervals, and after the last interval.
+    gaps: list[tuple[float, float]] = [(float(time[0]), merged[0][0])]
+    for idx in range(len(merged) - 1):
+        gaps.append((merged[idx][1], merged[idx + 1][0]))
+    gaps.append((merged[-1][1], float(time[-1])))
+
+    best: tuple[int, int] | None = None
+    best_span = 0.0
+    for gap_start, gap_end in gaps:
+        if gap_end <= gap_start:
+            continue
+        start_idx = int(np.searchsorted(time, gap_start, side="left"))
+        stop_idx = int(np.searchsorted(time, gap_end, side="right"))
+        if stop_idx - start_idx < 2:
+            continue
+        span = float(time[stop_idx - 1] - time[start_idx])
+        if span > best_span:
+            best_span = span
+            best = (start_idx, stop_idx)
+    return best
 
 
 def _exponential_model(t: np.ndarray, v_ss: float, a: float, tau: float) -> np.ndarray:

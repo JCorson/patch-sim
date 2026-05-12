@@ -12,12 +12,18 @@ from patch_sim.constants import (
     CORTICAL_PYRAMIDAL,
     DOPAMINERGIC,
     FAST_SPIKING_INTERNEURON,
+    FREQUENCY_RESPONSE,
     PURKINJE,
     REPETITIVE_FIRING,
     SQUID_GIANT_AXON,
     THALAMIC_RELAY,
 )
-from tests.e2e.conftest import StateTree, run_flow
+from tests.e2e.conftest import (
+    StateTree,
+    patch_get_state,
+    run_flow,
+    simulate_and_apply,
+)
 
 
 @pytest.mark.parametrize(
@@ -109,6 +115,75 @@ async def test_repetitive_firing_populates_phase_plane(state_tree: StateTree) ->
     )
 
     assert state_tree.analysis.phase_plane_data != {}
+
+
+async def test_subthreshold_chirp_populates_impedance(state_tree: StateTree) -> None:
+    """A subthreshold chirp through the full pipeline populates impedance_data.
+
+    Loads the Frequency Response (chirp) preset on the squid axon, then dials
+    the chirp down to a subthreshold amplitude so ``analyze_impedance`` has a
+    valid linear response to work with.
+    """
+    async with patch_get_state(state_tree):
+        [_ async for _ in state_tree.neuron.load_neuron_preset(SQUID_GIANT_AXON)]
+        [_ async for _ in state_tree.protocol.load_protocol_preset(FREQUENCY_RESPONSE)]
+    state_tree.protocol.dc_offset = 0.0
+    state_tree.protocol.amplitude = 1.0
+
+    simulate_and_apply(state_tree)
+
+    impedance = state_tree.analysis.impedance_data
+    assert impedance != {}
+    expected_keys = {
+        "frequencies",
+        "magnitude",
+        "phase",
+        "resonance_frequency",
+        "quality_factor",
+        "peak_impedance",
+        "units",
+    }
+    assert expected_keys.issubset(impedance.keys())
+    assert len(impedance["frequencies"]) == len(impedance["magnitude"])
+    assert len(impedance["frequencies"]) > 0
+
+
+async def test_oversized_chirp_surfaces_unavailable_reason(
+    state_tree: StateTree,
+) -> None:
+    """A chirp that drives sustained spiking populates an ``unavailable_reason``.
+
+    With the tuned global default the squid axon now stays subthreshold, so we
+    crank the chirp up explicitly to drive a suprathreshold-throughout
+    response.  ``impedance_data`` carries the reason string but no
+    ``frequencies`` key, so the panel falls through to the reason-aware
+    placeholder.
+    """
+    async with patch_get_state(state_tree):
+        [_ async for _ in state_tree.neuron.load_neuron_preset(SQUID_GIANT_AXON)]
+        [_ async for _ in state_tree.protocol.load_protocol_preset(FREQUENCY_RESPONSE)]
+    state_tree.protocol.dc_offset = 30.0
+    state_tree.protocol.amplitude = 10.0
+
+    simulate_and_apply(state_tree)
+
+    impedance = state_tree.analysis.impedance_data
+    assert "frequencies" not in impedance
+    assert "unavailable_reason" in impedance
+    assert impedance["unavailable_reason"]  # non-empty
+
+
+async def test_action_potential_preset_leaves_impedance_empty(
+    state_tree: StateTree,
+) -> None:
+    """A non-chirp protocol does not populate impedance_data."""
+    await run_flow(
+        state_tree,
+        neuron_preset=SQUID_GIANT_AXON,
+        protocol_preset=ACTION_POTENTIAL,
+    )
+
+    assert state_tree.analysis.impedance_data == {}
 
 
 async def test_apply_simulation_clears_previous_analysis(

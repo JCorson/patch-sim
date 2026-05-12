@@ -16,6 +16,7 @@ from patch_sim.channels import (
 from patch_sim.constants import (
     ACTION_POTENTIAL,
     FI_CURVE,
+    FREQUENCY_RESPONSE,
     HYPERPOLARIZATION_STEPS,
     REPETITIVE_FIRING,
     SUBTHRESHOLD_RESPONSE,
@@ -73,6 +74,15 @@ PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
         "min_stimulus": -20.0,
         "max_stimulus": -5.0,
         "stimulus_step": 5.0,
+    },
+    # Autonomous pacemaker: a hyperpolarizing holding current is required
+    # to silence tonic firing during the chirp (mirrors a real ZAP
+    # experiment under current-clamp hold).  −2 µA/cm² holds the cell at
+    # ≈ −72 mV (below the INaP/Cav1.3 oscillator window); amp=0.25 keeps
+    # the response in the linear regime.
+    FREQUENCY_RESPONSE: {
+        "dc_offset": -2.0,
+        "amplitude": 0.25,
     },
 }
 

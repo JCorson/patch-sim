@@ -464,6 +464,109 @@ def _build_phase_plane_data(sweeps: "list[Sweep]") -> dict[str, Any]:
     return {"sweeps": eligible} if eligible else {}
 
 
+def _compute_impedance_data(
+    sweep: "Sweep",
+    pre_stimulus_duration: float,
+    stimulus_duration: float,
+    start_frequency: float,
+    end_frequency: float,
+    area_cm2: "float | None",
+) -> dict[str, Any]:
+    """Serialise a chirp current-clamp sweep into impedance data for AnalysisState.
+
+    Computes the FFT-based membrane impedance over the chirp's swept band via
+    :func:`patch_sim.analyze_impedance`, restricting the analysis to the chirp
+    window ``[pre_stimulus_duration, pre_stimulus_duration + stimulus_duration]``
+    (or to the whole recording when ``stimulus_duration`` is zero, matching the
+    chirp builder).  Absolute MΩ values are used when the neuron declares a
+    surface area, otherwise the per-area kΩ·cm² spectrum is reported.
+
+    Args:
+        sweep: The single current-clamp sweep produced by a chirp protocol;
+            its ``stimulus`` field holds the injected current (µA/cm²).
+        pre_stimulus_duration: Pre-stimulus padding before the chirp (ms).
+        stimulus_duration: Duration of the chirp stimulus (ms); zero means the
+            chirp fills the recording from ``pre_stimulus_duration`` onward.
+        start_frequency: Chirp sweep start frequency in Hz.
+        end_frequency: Chirp sweep end frequency in Hz.
+        area_cm2: Membrane surface area in cm², or ``None`` when undeclared.
+
+    Returns:
+        On success, a dict with keys ``frequencies``, ``magnitude``, ``phase``
+        (lists), ``resonance_frequency``, ``quality_factor`` (pre-formatted
+        strings, ``"—"`` when there is no resonance), ``peak_impedance`` (the
+        band-maximum ``|Z|`` as a pre-formatted string — always populated; for
+        a resonant cell this is ``|Z(f_R)|``, otherwise the ≈ DC / input
+        impedance), and ``units`` — plus a ``caption`` string when the profile
+        was recovered from a spike-free sub-window rather than the full chirp
+        window.  On failure, a dict with a single ``unavailable_reason`` key
+        carrying a human-readable sentence.  Returns an empty dict only when the
+        sweep itself is too short to attempt analysis.
+    """
+    time_arr = np.asarray(sweep.time, dtype=float)
+    if len(time_arr) < 2:
+        return {}
+    voltage_arr = np.asarray(sweep.voltage, dtype=float)
+    current_arr = np.asarray(sweep.stimulus, dtype=float)
+    stim_start_ms = float(pre_stimulus_duration)
+    stim_end_ms = (
+        float(pre_stimulus_duration + stimulus_duration)
+        if stimulus_duration > 0.0
+        else float(time_arr[-1])
+    )
+    profile = patch_sim.analyze_impedance(
+        time_arr,
+        voltage_arr,
+        current_arr,
+        stim_start_ms,
+        stim_end_ms,
+        start_frequency,
+        end_frequency,
+        area_cm2=area_cm2,
+    )
+    if profile is None:
+        # impedance_unavailable_reason covers the cheap pre-FFT failures; if it
+        # is silent, the FFT itself rejected the band (no stimulus power, too
+        # few in-band bins after trimming) — fall back to a generic message.
+        reason = (
+            patch_sim.impedance_unavailable_reason(
+                time_arr,
+                voltage_arr,
+                current_arr,
+                stim_start_ms,
+                stim_end_ms,
+                start_frequency,
+                end_frequency,
+            )
+            or "the chirp produced too little usable signal in the swept band."
+        )
+        return {"unavailable_reason": reason}
+    if profile.magnitude_mohm is not None:
+        magnitude = profile.magnitude_mohm
+        peak = profile.max_impedance_mohm
+        units = "MΩ"
+    else:
+        magnitude = profile.magnitude
+        peak = profile.max_impedance
+        units = "kΩ·cm²"
+    result: dict[str, Any] = {
+        "frequencies": profile.frequencies,
+        "magnitude": magnitude,
+        "phase": profile.phase,
+        "resonance_frequency": _fmt_optional(profile.resonance_frequency, ".2f"),
+        "quality_factor": _fmt_optional(profile.quality_factor, ".2f"),
+        "peak_impedance": _fmt_optional(peak, ".3g"),
+        "units": units,
+    }
+    if profile.analyzed_window_ms is not None and profile.frequencies:
+        result["caption"] = (
+            f"Computed from a {profile.analyzed_window_ms:.0f} ms spike-free "
+            f"segment of the chirp ({profile.frequencies[0]:.1f}–"
+            f"{profile.frequencies[-1]:.1f} Hz)."
+        )
+    return result
+
+
 def _compute_cc_multi_sweep_analysis(
     sweeps: "list[Sweep]",
     min_stimulus: float,

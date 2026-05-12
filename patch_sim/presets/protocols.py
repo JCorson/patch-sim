@@ -97,14 +97,23 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "max_stimulus": 60.0,
         "stimulus_step": 10.0,
     },
+    # Tuned so the chirp response stays subthreshold for the quiescent-at-rest
+    # presets (Squid, FSI, Cortical Pyramidal, CA1) and produces a clean
+    # impedance profile without any user tweaking — amp=0.25 µA/cm² gives a
+    # few-mV peak-to-peak swing, small enough for the linear regime and large
+    # enough for usable SNR; 1000 ms is long enough to resolve the few-Hz Ih
+    # resonance band.  Autonomous pacemakers (Purkinje, SNc DA, STN, TRN) and
+    # the burst-mode Thalamic Relay still need a hyperpolarizing holding
+    # current; their per-neuron PROTOCOL_ADJUSTMENTS[FREQUENCY_RESPONSE]
+    # overrides supply it.
     FREQUENCY_RESPONSE: {
         "clamp_mode": CURRENT_CLAMP,
         "protocol_type": "Chirp",
         "pre_stimulus_duration": 0.0,
-        "stimulus_duration": 500.0,
+        "stimulus_duration": 1000.0,
         "post_stimulus_duration": 0.0,
-        "dc_offset": 8.0,
-        "amplitude": 4.0,
+        "dc_offset": 0.0,
+        "amplitude": 0.25,
         "start_frequency": 1.0,
         "end_frequency": 100.0,
     },

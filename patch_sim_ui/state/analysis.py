@@ -9,6 +9,7 @@ from patch_sim_ui.plotting import (
     build_fi_figure,
     build_gv_figure,
     build_hyperpolarization_figure,
+    build_impedance_figure,
     build_iv_figure,
     build_phase_plane_figure,
     build_sfa_figure,
@@ -17,7 +18,7 @@ from patch_sim_ui.plotting import (
 
 
 class AnalysisState(rx.State):
-    """State for AP, F-I, I-V, g-V, SFA, and phase-plane analysis results."""
+    """State for AP, F-I, I-V, g-V, SFA, phase-plane, and impedance results."""
 
     ap_metrics: list[dict[str, Any]] = []  # Per-spike metrics (serialized)
     ap_summary: dict[str, Any] = {}  # Aggregate summary statistics
@@ -37,6 +38,7 @@ class AnalysisState(rx.State):
     sfa_data: dict[str, Any] = {}  # Serialized SFAAnalysisResult for the UI
     hyperpolarization_data: dict[str, Any] = {}  # Serialized sag/rebound analysis
     phase_plane_data: dict[str, Any] = {}  # Serialized V vs dV/dt sweep data
+    impedance_data: dict[str, Any] = {}  # Serialized chirp impedance profile
 
     # Membrane test results — persisted across protocol/simulation changes.
     # Only invalidated when neuron parameters change (neuron_fingerprint mismatch).
@@ -69,6 +71,7 @@ class AnalysisState(rx.State):
         self.sfa_data = {}
         self.hyperpolarization_data = {}
         self.phase_plane_data = {}
+        self.impedance_data = {}
 
     @rx.var
     def has_membrane_test(self) -> bool:
@@ -215,3 +218,42 @@ class AnalysisState(rx.State):
         if not self.phase_plane_data:
             return go.Figure()
         return build_phase_plane_figure(self.phase_plane_data)
+
+    @rx.var
+    def has_impedance_data(self) -> bool:
+        """Return True when a renderable chirp impedance-profile is available.
+
+        A dict carrying only an ``unavailable_reason`` (the analysis bailed out)
+        is intentionally treated as *no* impedance data so the panel falls
+        through to the reason-aware placeholder.
+        """
+        return "frequencies" in self.impedance_data
+
+    @rx.var
+    def impedance_figure(self) -> go.Figure:
+        """Return a Plotly impedance-profile figure (|Z| and phase vs frequency).
+
+        Returns an empty figure when no impedance data is available.
+        """
+        if "frequencies" not in self.impedance_data:
+            return go.Figure()
+        return build_impedance_figure(self.impedance_data)
+
+    @rx.var
+    def impedance_unavailable_reason(self) -> str:
+        """Return the reason the chirp impedance analysis didn't run, or ``""``.
+
+        Set by :func:`patch_sim_ui.state._analysis_format._compute_impedance_data`
+        when :func:`patch_sim.analyze_impedance` returns ``None``; the impedance
+        panel renders this in place of the generic placeholder.
+        """
+        return self.impedance_data.get("unavailable_reason", "")
+
+    @rx.var
+    def impedance_caption(self) -> str:
+        """Return the sub-window caption for the impedance plot, or ``""``.
+
+        Populated when ``analyze_impedance`` recovered the profile from a
+        spike-free sub-window rather than the full chirp window.
+        """
+        return self.impedance_data.get("caption", "")

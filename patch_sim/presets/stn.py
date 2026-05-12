@@ -18,6 +18,7 @@ from patch_sim.channels import (
 from patch_sim.constants import (
     ACTION_POTENTIAL,
     FI_CURVE,
+    FREQUENCY_RESPONSE,
     REPETITIVE_FIRING,
     SUBTHRESHOLD_RESPONSE,
 )
@@ -56,6 +57,15 @@ PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
     # Very high ICaT conductance (g=5.0 mS/cm²) produces a prominent
     # post-inhibitory rebound burst on step release; Ih (g=1.0 mS/cm²)
     # adds a depolarizing overshoot that can trigger additional spikes.
+    # Autonomous pacemaker: a hyperpolarizing holding current silences
+    # tonic firing during the chirp (mirrors a real ZAP experiment under
+    # current-clamp hold).  −2 µA/cm² holds the cell at ≈ −69 mV (below
+    # the INaP-driven oscillator window); amp=0.25 keeps the response in
+    # the linear regime.
+    FREQUENCY_RESPONSE: {
+        "dc_offset": -2.0,
+        "amplitude": 0.25,
+    },
 }
 
 

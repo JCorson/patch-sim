@@ -9,6 +9,7 @@ Modules:
     derivatives: General-purpose derivative utilities (e.g. dV/dt).
     fi_curve: F-I curve construction from current clamp multi-sweep results.
     hyperpolarization: Sag and rebound analysis from hyperpolarization sweeps.
+    impedance: Impedance-profile analysis from a chirp current-clamp run.
     iv_curve: I-V curve construction from voltage clamp multi-sweep results.
     membrane_test: Dedicated membrane test for passive property characterisation.
     passive_properties: Passive membrane property extraction (R_in, τₘ, Cₘ).
@@ -55,6 +56,11 @@ from .hyperpolarization import (
     analyze_hyperpolarization,
     compute_sag_point,
 )
+from .impedance import (
+    ImpedanceProfile,
+    analyze_impedance,
+    impedance_unavailable_reason,
+)
 from .iv_curve import IVAnalysisResult, IVPoint, analyze_iv, compute_iv_point
 from .membrane_test import (
     MEMBRANE_TEST_CURRENT,
@@ -69,6 +75,7 @@ from .passive_properties import (
     density_to_absolute_c_m,
     density_to_absolute_r_in,
     is_subthreshold,
+    longest_subthreshold_run,
 )
 from .sfa import SFAAnalysisResult, SFACurve, analyze_sfa, compute_sfa
 from .tau_v import (
@@ -92,6 +99,7 @@ __all__ = [
     "analyze_calcium_transients_from_result",
     "analyze_fi",
     "analyze_hyperpolarization",
+    "analyze_impedance",
     "analyze_iv",
     "analyze_passive_properties",
     "analyze_sfa",
@@ -108,7 +116,9 @@ __all__ = [
     "density_to_absolute_r_in",
     "double_exp_decay",
     "estimate_rheobase",
+    "impedance_unavailable_reason",
     "is_subthreshold",
+    "longest_subthreshold_run",
     "run_membrane_test",
     "single_exp_decay",
     "single_exp_rise",
@@ -123,6 +133,7 @@ __all__ = [
     "FIAnalysisResult",
     "FIPoint",
     "HyperpolarizationAnalysisResult",
+    "ImpedanceProfile",
     "SagPoint",
     "GVAnalysisResult",
     "GVPoint",
