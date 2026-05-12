@@ -29,6 +29,7 @@ from patch_sim.constants import (
     DOPAMINERGIC,
     FAST_SPIKING_INTERNEURON,
     HYPERPOLARIZATION_STEPS,
+    INACTIVATION_PROTOCOL,
     NA_CHANNEL_ACTIVATION,
     PURKINJE,
     REPETITIVE_FIRING,
@@ -807,6 +808,13 @@ def test_can_run_continuous_true_for_ramp() -> None:
     ps = _make_protocol_state()
     ps.protocol_type = "Ramp"
     assert ps.can_run_continuous is True
+
+
+def test_can_run_continuous_false_for_inactivation() -> None:
+    """can_run_continuous is False for the multi-sweep Inactivation protocol."""
+    ps = _make_protocol_state()
+    ps.protocol_type = INACTIVATION_PROTOCOL
+    assert ps.can_run_continuous is False
 
 
 # ---------------------------------------------------------------------------

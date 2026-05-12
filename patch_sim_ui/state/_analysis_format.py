@@ -20,8 +20,9 @@ from patch_sim_ui.sweep import Sweep
 
 logger = logging.getLogger(__name__)
 
-#: Number of voltage points used for the pre-computed Boltzmann fit curve.
-_GV_FIT_POINTS = 200
+#: Number of voltage points used for a pre-computed Boltzmann fit curve
+#: (shared by the g-V activation curve and the h∞ inactivation curve).
+_BOLTZMANN_FIT_POINTS = 200
 
 
 def _fmt_optional(value: "float | None", fmt: str) -> str:
@@ -839,7 +840,7 @@ def _compute_gv_data(
     """Compute g-V analysis data from an I-V result and a reversal potential.
 
     Calls :func:`patch_sim.compute_gv` to derive normalized conductance and fit
-    a Boltzmann sigmoid.  A dense voltage array (:data:`_GV_FIT_POINTS` points)
+    a Boltzmann sigmoid.  A dense voltage array (:data:`_BOLTZMANN_FIT_POINTS` points)
     spanning the range of included steps is pre-computed so the plotting
     function can draw a smooth fit curve without importing scipy.
 
@@ -864,7 +865,7 @@ def _compute_gv_data(
     if fit.converged and len(gv_result.voltage_steps) >= 2:
         v_min = min(gv_result.voltage_steps)
         v_max = max(gv_result.voltage_steps)
-        v_arr = np.linspace(v_min, v_max, _GV_FIT_POINTS)
+        v_arr = np.linspace(v_min, v_max, _BOLTZMANN_FIT_POINTS)
         fit_voltages = v_arr.tolist()
         fit_gn = [float(patch_sim.boltzmann(v, fit.v_half, fit.k)) for v in v_arr]
 
@@ -887,7 +888,7 @@ def _compute_inactivation_data(
 
     Calls :func:`patch_sim.compute_inactivation` to derive normalized
     availability per conditioning prepulse and fit a decreasing Boltzmann
-    sigmoid.  A dense prepulse-voltage array (:data:`_GV_FIT_POINTS` points)
+    sigmoid.  A dense prepulse-voltage array (:data:`_BOLTZMANN_FIT_POINTS` points)
     spanning the range of measured prepulses is pre-computed so the plotting
     function can draw a smooth fit curve without importing scipy.  Because the
     fitted ``k`` is positive but the curve is decreasing, the dense curve is
@@ -914,7 +915,7 @@ def _compute_inactivation_data(
     if fit.converged and len(result.prepulse_voltages) >= 2:
         v_min = min(result.prepulse_voltages)
         v_max = max(result.prepulse_voltages)
-        v_arr = np.linspace(v_min, v_max, _GV_FIT_POINTS)
+        v_arr = np.linspace(v_min, v_max, _BOLTZMANN_FIT_POINTS)
         fit_voltages = v_arr.tolist()
         fit_h = [float(patch_sim.boltzmann(v, fit.v_half, -fit.k)) for v in v_arr]
 
