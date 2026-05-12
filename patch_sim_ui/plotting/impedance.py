@@ -6,7 +6,7 @@ from patch_sim_ui.plotting._layout import ANALYSIS_FIGURE_LAYOUT
 
 
 def build_impedance_figure(imp_data: dict) -> go.Figure:
-    """Build a Plotly impedance-profile figure from serialised chirp results.
+    """Build a Plotly impedance-profile figure from serialized chirp results.
 
     Renders the impedance magnitude (left y-axis, teal) and phase (right
     y-axis, orange, dashed) plotted against frequency (Hz).  When a resonance
@@ -19,7 +19,7 @@ def build_impedance_figure(imp_data: dict) -> go.Figure:
             ``resonance_frequency`` (pre-formatted string, ``"—"`` when none).
 
     Returns:
-        A Plotly :class:`go.Figure` ready to be serialised and sent to the UI.
+        A Plotly :class:`go.Figure` ready to be serialized and sent to the UI.
     """
     freqs = imp_data["frequencies"]
     magnitude = imp_data["magnitude"]

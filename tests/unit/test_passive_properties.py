@@ -112,8 +112,8 @@ def test_is_subthreshold_flat_trace() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _inject_spike(voltage: np.ndarray, time: np.ndarray, centre_ms: float) -> None:
-    """Inject a brief synthetic spike around ``centre_ms`` into a flat voltage trace.
+def _inject_spike(voltage: np.ndarray, time: np.ndarray, center_ms: float) -> None:
+    """Inject a brief synthetic spike around ``center_ms`` into a flat voltage trace.
 
     The spike is a 1 ms-wide +30 mV pulse — sharp enough to read as a
     threshold-crossing event for ``analyze_aps`` at the default
@@ -122,9 +122,9 @@ def _inject_spike(voltage: np.ndarray, time: np.ndarray, centre_ms: float) -> No
     Args:
         voltage: Voltage trace to modify in place.
         time: Time axis aligned with ``voltage``.
-        centre_ms: Centre of the spike in ms.
+        center_ms: Center of the spike in ms.
     """
-    mask = (time >= centre_ms) & (time < centre_ms + 1.0)
+    mask = (time >= center_ms) & (time < center_ms + 1.0)
     voltage[mask] = 30.0
 
 
@@ -138,7 +138,7 @@ def test_longest_subthreshold_run_no_spikes_returns_whole_trace() -> None:
 def test_longest_subthreshold_run_one_spike_returns_trailing_gap() -> None:
     """One early spike leaves a long trailing spike-free segment past the AHP guard."""
     time, voltage = _flat_trace(duration_ms=500.0)
-    _inject_spike(voltage, time, centre_ms=50.0)
+    _inject_spike(voltage, time, center_ms=50.0)
 
     run = longest_subthreshold_run(time, voltage)
 
@@ -159,8 +159,8 @@ def test_longest_subthreshold_run_spikes_throughout_returns_none() -> None:
     # Spaced 5 ms apart, guard windows (~22 ms wide) fully overlap into one
     # merged excision interval — and we start at 1 ms and extend past the end
     # of the trace so the leading and trailing gaps both collapse to empty.
-    for centre in np.arange(1.0, 305.0, 5.0):
-        _inject_spike(voltage, time, centre_ms=float(centre))
+    for center in np.arange(1.0, 305.0, 5.0):
+        _inject_spike(voltage, time, center_ms=float(center))
 
     assert longest_subthreshold_run(time, voltage) is None
 

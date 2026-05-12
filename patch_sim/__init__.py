@@ -73,6 +73,7 @@ from .clamp_simulations import (
     simulate_voltage_clamp_from_state,
 )
 from .constants import (
+    CHIRP_PROTOCOL,
     CURRENT_CLAMP,
     CURRENT_PROTOCOLS,
     DEFAULT_Q10,
@@ -162,6 +163,7 @@ __all__ = [
     "run_membrane_test",
     "single_exp_decay",
     "single_exp_rise",
+    "CHIRP_PROTOCOL",
     "CURRENT_CLAMP",
     "CURRENT_PROTOCOLS",
     "DEFAULT_Q10",

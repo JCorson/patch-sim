@@ -47,13 +47,19 @@ DEFAULT_CA_REST: float = 1e-4  # mM
 CURRENT_CLAMP: str = "Current Clamp"
 VOLTAGE_CLAMP: str = "Voltage Clamp"
 
+#: Protocol-type name for the chirp (linear frequency-sweep) current-clamp
+#: protocol; a member of :data:`CURRENT_PROTOCOLS`.  Referenced by name in the
+#: analysis layer (which runs impedance analysis only for this protocol) and
+#: the UI, so it gets its own constant rather than a bare string literal.
+CHIRP_PROTOCOL: str = "Chirp"
+
 #: Current clamp protocol type names.
 CURRENT_PROTOCOLS: list[str] = [
     "Step",
     "Ramp",
     "Pulse Train",
     "Sinusoidal",
-    "Chirp",
+    CHIRP_PROTOCOL,
     "Noise",
 ]
 

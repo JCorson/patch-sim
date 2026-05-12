@@ -100,6 +100,8 @@ def test_pure_resistor_flat_magnitude() -> None:
     assert result.resonance_frequency is None
     assert result.peak_impedance is None
     assert result.quality_factor is None
+    # max_impedance is always populated, even with no resonance.
+    assert result.max_impedance == pytest.approx(resistance, rel=1e-6)
     mag = np.asarray(result.magnitude)
     phase = np.asarray(result.phase)
     assert mag == pytest.approx(resistance, rel=1e-6)
@@ -161,6 +163,8 @@ def test_synthetic_resonance_detects_f_r() -> None:
     assert result.peak_impedance is not None
     assert result.quality_factor is not None
     assert result.quality_factor > 0.3
+    # When a resonance is reported, the resonance peak *is* the band maximum.
+    assert result.peak_impedance == pytest.approx(result.max_impedance)
     # The interior peak should clearly exceed the band edges.
     mag = np.asarray(result.magnitude)
     assert result.peak_impedance > mag[0]
@@ -216,6 +220,37 @@ def test_band_restriction() -> None:
     freqs = np.asarray(result.frequencies)
     assert freqs.min() >= 10.0
     assert freqs.max() <= 50.0
+
+
+def test_interior_stimulus_dropout_does_not_spike_the_estimate() -> None:
+    """A near-zero interior stimulus FFT bin is dropped, not divided through.
+
+    The voltage carries the full chirp's content (response of a pure resistor
+    R), but the *stimulus* trace has one in-band FFT bin zeroed out — so a naive
+    ``V̂ / Î`` would blow up to infinity at that bin and steal the resonance
+    peak.  Instead the analysis keeps only the longest contiguous run of usable
+    bins, so ``|Z|`` stays flat ≈ R, finite, with no spurious resonance.
+    """
+    resistance = 25.0  # kΩ·cm²
+    time, current = _chirp_and_time()
+    voltage = _BASELINE_MV + resistance * current  # response to the *full* chirp
+    # Knock out a single in-band FFT bin of the recorded stimulus only.
+    spectrum = np.fft.rfft(current)
+    band_freqs = np.fft.rfftfreq(current.size, d=1.0 / _FS_HZ)
+    in_band = np.flatnonzero((band_freqs >= _F_START) & (band_freqs <= _F_END))
+    spectrum[int(np.median(in_band))] = 0.0
+    notched_current = np.fft.irfft(spectrum, n=current.size)
+
+    result = analyze_impedance(
+        time, voltage, notched_current, 0.0, _window_end(time), _F_START, _F_END
+    )
+
+    assert result is not None
+    mag = np.asarray(result.magnitude)
+    assert np.all(np.isfinite(mag))
+    assert mag == pytest.approx(resistance, rel=1e-6)
+    assert result.resonance_frequency is None
+    assert result.max_impedance == pytest.approx(resistance, rel=1e-6)
 
 
 def test_returns_none_short_window() -> None:
@@ -276,8 +311,8 @@ def test_returns_none_when_spikes_throughout() -> None:
     voltage = np.full_like(time, _BASELINE_MV)
     # Spike every 50 ms (= _REFRACTORY_SAMPLES at this 1 kHz sample rate, so
     # each event is detected) across the entire trace.
-    for centre_ms in np.arange(50.0, _DURATION_MS, 50.0):
-        spike_window = (time >= centre_ms) & (time < centre_ms + 5.0)
+    for center_ms in np.arange(50.0, _DURATION_MS, 50.0):
+        spike_window = (time >= center_ms) & (time < center_ms + 5.0)
         voltage[spike_window] = 30.0
 
     result = analyze_impedance(
@@ -344,8 +379,8 @@ def test_impedance_unavailable_reason_messages() -> None:
 
     # Spikes throughout → "fired throughout" message.
     busy_voltage = np.full_like(time, _BASELINE_MV)
-    for centre_ms in np.arange(50.0, _DURATION_MS, 50.0):
-        sp = (time >= centre_ms) & (time < centre_ms + 5.0)
+    for center_ms in np.arange(50.0, _DURATION_MS, 50.0):
+        sp = (time >= center_ms) & (time < center_ms + 5.0)
         busy_voltage[sp] = 30.0
     busy_reason = patch_sim.impedance_unavailable_reason(
         time, busy_voltage, current, 0.0, _window_end(time), _F_START, _F_END
@@ -369,8 +404,10 @@ def test_absolute_conversion_with_area() -> None:
 
     assert with_area is not None and without_area is not None
     assert without_area.magnitude_mohm is None
+    assert without_area.max_impedance_mohm is None
     assert with_area.magnitude_mohm is not None
     assert len(with_area.magnitude_mohm) == len(with_area.magnitude)
     expected = resistance / area_cm2 / 1000.0
     assert np.asarray(with_area.magnitude_mohm) == pytest.approx(expected, rel=1e-6)
+    assert with_area.max_impedance_mohm == pytest.approx(expected, rel=1e-6)
     assert with_area.area_cm2 == area_cm2

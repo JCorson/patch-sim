@@ -493,13 +493,15 @@ def _compute_impedance_data(
 
     Returns:
         On success, a dict with keys ``frequencies``, ``magnitude``, ``phase``
-        (lists), ``resonance_frequency``, ``quality_factor``, ``peak_impedance``
-        (pre-formatted strings), and ``units`` — plus a ``caption`` string when
-        the profile was recovered from a spike-free sub-window rather than the
-        full chirp window.  On failure, a dict with a single
-        ``unavailable_reason`` key carrying a human-readable sentence.  Returns
-        an empty dict only when the sweep itself is too short to attempt
-        analysis.
+        (lists), ``resonance_frequency``, ``quality_factor`` (pre-formatted
+        strings, ``"—"`` when there is no resonance), ``peak_impedance`` (the
+        band-maximum ``|Z|`` as a pre-formatted string — always populated; for
+        a resonant cell this is ``|Z(f_R)|``, otherwise the ≈ DC / input
+        impedance), and ``units`` — plus a ``caption`` string when the profile
+        was recovered from a spike-free sub-window rather than the full chirp
+        window.  On failure, a dict with a single ``unavailable_reason`` key
+        carrying a human-readable sentence.  Returns an empty dict only when the
+        sweep itself is too short to attempt analysis.
     """
     time_arr = np.asarray(sweep.time, dtype=float)
     if len(time_arr) < 2:
@@ -541,11 +543,11 @@ def _compute_impedance_data(
         return {"unavailable_reason": reason}
     if profile.magnitude_mohm is not None:
         magnitude = profile.magnitude_mohm
-        peak = profile.peak_impedance_mohm
+        peak = profile.max_impedance_mohm
         units = "MΩ"
     else:
         magnitude = profile.magnitude
-        peak = profile.peak_impedance
+        peak = profile.max_impedance
         units = "kΩ·cm²"
     result: dict[str, Any] = {
         "frequencies": profile.frequencies,

@@ -21,7 +21,7 @@ Selected private helpers are re-exported so existing tests keep working.
 
 import reflex as rx
 
-from patch_sim.constants import CURRENT_CLAMP
+from patch_sim.constants import CHIRP_PROTOCOL, CURRENT_CLAMP
 from patch_sim_ui.components.metrics.ap_panel import _ap_metrics_tab, _spike_row
 from patch_sim_ui.components.metrics.burst_panel import _burst_row
 from patch_sim_ui.components.metrics.calcium_panel import _ca_transient_row
@@ -127,8 +127,7 @@ def _expanded_panel() -> rx.Component:
             rx.cond(
                 ProtocolState.clamp_mode == CURRENT_CLAMP,
                 rx.cond(
-                    # "Chirp" is the protocol-type name from CURRENT_PROTOCOLS.
-                    ProtocolState.protocol_type == "Chirp",
+                    ProtocolState.protocol_type == CHIRP_PROTOCOL,
                     rx.text("Impedance Analysis", size="4", weight="bold"),
                     rx.text("AP Analysis", size="4", weight="bold"),
                 ),
@@ -153,8 +152,7 @@ def _expanded_panel() -> rx.Component:
             rx.cond(
                 ProtocolState.clamp_mode == CURRENT_CLAMP,
                 rx.cond(
-                    # "Chirp" is the protocol-type name from CURRENT_PROTOCOLS.
-                    ProtocolState.protocol_type == "Chirp",
+                    ProtocolState.protocol_type == CHIRP_PROTOCOL,
                     impedance_tab(),
                     _ap_metrics_tab(),
                 ),

@@ -15,7 +15,7 @@ import numpy as np
 
 import patch_sim
 import patch_sim.channels
-from patch_sim.constants import CURRENT_CLAMP, VOLTAGE_CLAMP
+from patch_sim.constants import CHIRP_PROTOCOL, CURRENT_CLAMP, VOLTAGE_CLAMP
 from patch_sim_ui import constants
 from patch_sim_ui.api import traces
 from patch_sim_ui.plotting import TraceVisibility, build_figure
@@ -100,12 +100,13 @@ def _compute_simulation(
         stimulus_step: Stimulus step size for analysis range.
         pre_stimulus_duration: Pre-stimulus duration (ms) for analysis windows.
         stimulus_duration: Stimulus duration (ms) for analysis windows.
-        protocol_type: Protocol-type name (e.g. ``"Step"``, ``"Chirp"``).  Used
-            to decide which protocol-specific analyses to run.
-        start_frequency: Chirp sweep start frequency (Hz); only used when
-            ``protocol_type == "Chirp"``.
-        end_frequency: Chirp sweep end frequency (Hz); only used when
-            ``protocol_type == "Chirp"``.
+        protocol_type: Protocol-type name (e.g. ``"Step"``,
+            :data:`~patch_sim.constants.CHIRP_PROTOCOL`).  Used to decide which
+            protocol-specific analyses to run.
+        start_frequency: Chirp sweep start frequency (Hz); only used for the
+            chirp protocol.
+        end_frequency: Chirp sweep end frequency (Hz); only used for the chirp
+            protocol.
 
     Returns:
         A :class:`_SimResult` containing sweeps, figure token, and all
@@ -250,7 +251,8 @@ def _compute_simulation(
         burst_metrics, burst_summary = _compute_burst_data(
             ap_result, np.asarray(result["time"])
         )
-        # "Chirp" is the protocol-type name from constants.CURRENT_PROTOCOLS.
+        # The chirp protocol is always a single-sweep current clamp, so the
+        # impedance analysis only needs to be wired into this branch.
         impedance_data = (
             _compute_impedance_data(
                 sweep,
@@ -260,7 +262,7 @@ def _compute_simulation(
                 end_frequency,
                 neuron.area_cm2,
             )
-            if protocol_type == "Chirp"
+            if protocol_type == CHIRP_PROTOCOL
             else {}
         )
         return _SimResult(
