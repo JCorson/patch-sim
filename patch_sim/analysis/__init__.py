@@ -10,6 +10,7 @@ Modules:
     fi_curve: F-I curve construction from current clamp multi-sweep results.
     hyperpolarization: Sag and rebound analysis from hyperpolarization sweeps.
     impedance: Impedance-profile analysis from a chirp current-clamp run.
+    inactivation: Steady-state inactivation (h∞) curve from a two-pulse VC run.
     iv_curve: I-V curve construction from voltage clamp multi-sweep results.
     membrane_test: Dedicated membrane test for passive property characterisation.
     passive_properties: Passive membrane property extraction (R_in, τₘ, Cₘ).
@@ -61,6 +62,11 @@ from .impedance import (
     analyze_impedance,
     impedance_unavailable_reason,
 )
+from .inactivation import (
+    InactivationAnalysisResult,
+    InactivationPoint,
+    compute_inactivation,
+)
 from .iv_curve import IVAnalysisResult, IVPoint, analyze_iv, compute_iv_point
 from .membrane_test import (
     MEMBRANE_TEST_CURRENT,
@@ -108,6 +114,7 @@ __all__ = [
     "compute_dvdt",
     "compute_fi_point",
     "compute_gv",
+    "compute_inactivation",
     "compute_iv_point",
     "compute_sag_point",
     "compute_sfa",
@@ -134,6 +141,8 @@ __all__ = [
     "FIPoint",
     "HyperpolarizationAnalysisResult",
     "ImpedanceProfile",
+    "InactivationAnalysisResult",
+    "InactivationPoint",
     "SagPoint",
     "GVAnalysisResult",
     "GVPoint",
