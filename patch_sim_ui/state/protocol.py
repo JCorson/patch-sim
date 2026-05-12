@@ -39,7 +39,9 @@ _PROTOCOL_FLOAT_FIELDS: list[str] = [
     "vc_pulse_amplitude",
     "vc_pulse_width",
     "vc_pulse_interval",
-    "vc_test_pulse_voltage",
+    # No vc_ prefix: like ``holding_voltage`` it has no current-clamp twin, and
+    # protocol presets set it by this (builder-matching) name via setattr.
+    "test_pulse_voltage",
 ]
 
 logger = logging.getLogger(__name__)
@@ -95,7 +97,7 @@ class ProtocolState(rx.State):
     vc_pulse_width: float = 2.0
     vc_pulse_interval: float = 10.0
     # Fixed test-pulse voltage (mV) for the two-pulse "Inactivation" protocol.
-    vc_test_pulse_voltage: float = 0.0
+    test_pulse_voltage: float = 0.0
 
     # ------------------------------------------------------------------ #
     # Preset tracking                                                     #
@@ -444,7 +446,7 @@ class ProtocolState(rx.State):
                 pulse_amplitude=self.vc_pulse_amplitude,
                 pulse_width=self.vc_pulse_width,
                 pulse_interval=self.vc_pulse_interval,
-                test_pulse_voltage=self.vc_test_pulse_voltage,
+                test_pulse_voltage=self.test_pulse_voltage,
                 min_stimulus=self.min_stimulus,
                 max_stimulus=self.max_stimulus,
                 stimulus_step=self.stimulus_step,

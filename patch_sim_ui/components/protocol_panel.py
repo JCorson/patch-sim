@@ -144,7 +144,7 @@ _PROTOCOL_PARAM_SCHEMA: dict[tuple[str, str], tuple[ParamField, ...]] = {
         ParamField("Prepulse min (mV)", "min_stimulus"),
         ParamField("Prepulse max (mV)", "max_stimulus"),
         ParamField("Prepulse step (mV)", "stimulus_step"),
-        ParamField("Test pulse (mV)", "vc_test_pulse_voltage"),
+        ParamField("Test pulse (mV)", "test_pulse_voltage"),
     ),
 }
 
