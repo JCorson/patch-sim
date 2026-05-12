@@ -18,7 +18,11 @@ from patch_sim.presets import (
 )
 from patch_sim.presets.protocols import build_protocol_from_preset
 
-_DURATION_MS = 500.0
+# 1000 ms matches the tuned FREQUENCY_RESPONSE preset and gives 1 Hz frequency
+# resolution — fine enough to bracket the −3 dB width of CA1's few-Hz Ih
+# resonance (a 500 ms / 2 Hz-resolution chirp puts that peak too close to the
+# 1 Hz band edge to bracket its low-side half-power crossing).
+_DURATION_MS = 1000.0
 _F_START = 1.0
 _F_END = 100.0
 
@@ -74,11 +78,13 @@ def test_chirp_pipeline_produces_sane_impedance_profile(hh_model) -> None:
 
 
 def test_ca1_chirp_shows_resonance_and_high_impedance(hh_model) -> None:
-    """A hippocampal CA1 cell (with Ih) shows a low-frequency |Z| resonance.
+    """A hippocampal CA1 cell (with Ih) shows a genuine low-frequency |Z| resonance.
 
     The CA1 pyramidal preset has an Ih (HCN) conductance, so a subthreshold
-    chirp produces an interior peak in |Z(f)| in the few-Hz range, and its
-    low-frequency impedance is much larger than the low-resistance squid axon.
+    chirp produces an interior peak in |Z(f)| in the few-Hz range that is both
+    prominent and sharp enough to bracket a −3 dB width — so ``resonance_frequency``,
+    ``peak_impedance`` *and* ``quality_factor`` are all populated.  Its
+    low-frequency impedance is also much larger than the low-resistance squid axon.
     """
     ca1_profile, ca1_voltage = _run_chirp_profile(make_ca1_pyramidal(), amplitude=1.0)
     squid_profile, _ = _run_chirp_profile(hh_model, amplitude=1.0)
@@ -88,6 +94,8 @@ def test_ca1_chirp_shows_resonance_and_high_impedance(hh_model) -> None:
     assert ca1_profile.resonance_frequency is not None
     assert 1.0 < ca1_profile.resonance_frequency < 30.0
     assert ca1_profile.peak_impedance is not None
+    assert ca1_profile.quality_factor is not None
+    assert ca1_profile.quality_factor > 0.0
     mag = np.asarray(ca1_profile.magnitude)
     assert ca1_profile.peak_impedance > mag[0]
     assert ca1_profile.peak_impedance > mag[-1]

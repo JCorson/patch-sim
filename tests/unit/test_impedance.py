@@ -167,6 +167,40 @@ def test_synthetic_resonance_detects_f_r() -> None:
     assert result.peak_impedance > mag[-1]
 
 
+def test_shallow_interior_bump_reports_no_resonance() -> None:
+    """A barely-underdamped 2nd-order low-pass has an interior |Z| max but no resonance.
+
+    With ``Q0`` just above the ``1/√2`` threshold the response has a genuine
+    interior maximum, but it rises only a fraction of a percent above the
+    low-frequency reference — well below the prominence margin — so
+    ``resonance_frequency``, ``peak_impedance`` and ``quality_factor`` are all
+    ``None`` together (a "resonance" with no measurable −3 dB width is just
+    ripple on a passive response).  The magnitude/phase spectra are still
+    populated.
+    """
+    f0 = 30.0
+    q0 = 0.72  # just above 1/sqrt(2) ≈ 0.707 → a tiny interior peak exists
+    time, current = _chirp_and_time()
+    freqs = np.fft.rfftfreq(current.size, d=1.0 / _FS_HZ)
+    ratio = freqs / f0
+    transfer = 1.0 / (1.0 - ratio**2 + 1j * ratio / q0)
+    voltage = _BASELINE_MV + _apply_transfer_function(current, transfer)
+
+    result = analyze_impedance(
+        time, voltage, current, 0.0, _window_end(time), _F_START, _F_END
+    )
+
+    assert result is not None
+    mag = np.asarray(result.magnitude)
+    # There IS an interior maximum...
+    assert 0 < int(np.argmax(mag)) < mag.size - 1
+    # ...but it is too shallow to be reported as a resonance.
+    assert result.resonance_frequency is None
+    assert result.peak_impedance is None
+    assert result.quality_factor is None
+    assert len(result.magnitude) == len(result.phase) > 0
+
+
 def test_band_restriction() -> None:
     """The analysis band is clipped to [f_start, f_end]."""
     time, current = _chirp_and_time()

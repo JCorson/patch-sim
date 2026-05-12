@@ -36,9 +36,11 @@ _MIN_WINDOW_MS: float = 50.0
 _MIN_BAND_BINS: int = 8
 
 #: Fractional margin by which the ``|Z|`` peak must exceed the low-frequency
-#: reference to count as a genuine resonance (rather than measurement ripple on
-#: an otherwise monotone passive response).
-_RESONANCE_REL_MARGIN: float = 0.01
+#: reference to be considered for a genuine resonance (rather than measurement
+#: ripple on an otherwise monotone passive response).  Clearing this margin is
+#: necessary but not sufficient — a resonance is only reported when the peak
+#: also has a bracketable -3 dB half-power width (see :func:`_quality_factor`).
+_RESONANCE_REL_MARGIN: float = 0.05
 
 #: A linear chirp's spectral power tapers toward the band edges.  Contiguous
 #: leading/trailing FFT bins whose stimulus magnitude falls below this fraction
@@ -58,11 +60,11 @@ class ImpedanceProfile:
     :class:`~patch_sim.analysis.passive_properties.PassiveProperties`.
 
     ``resonance_frequency``, ``peak_impedance`` and ``quality_factor`` are all
-    ``None`` when ``|Z(f)|`` has no interior peak that rises meaningfully above
-    the low-frequency reference — the hallmark of a passive low-pass cell with
-    no resonance.  ``quality_factor`` may additionally be ``None`` when an
-    interior peak exists but its half-power width cannot be bracketed inside
-    the analysis band.
+    ``None`` together unless ``|Z(f)|`` has a genuine resonance — an interior
+    peak that both rises meaningfully above the low-frequency reference *and*
+    has a half-power (−3 dB) width that can be bracketed inside the analysis
+    band.  A passive low-pass cell, or one whose mild interior bump has no
+    bracketable bandwidth, reports ``None`` for all three.
 
     Attributes:
         frequencies: Analysis-band frequency axis in Hz, ascending.
@@ -70,19 +72,19 @@ class ImpedanceProfile:
             Î is in µA/cm²), aligned to ``frequencies``.
         phase: ``∠Z(f)`` in degrees, aligned to ``frequencies``; positive
             values mean the voltage leads the current.
-        resonance_frequency: Frequency of the ``|Z|`` peak in Hz, or ``None``
-            when the maximum lies at a band edge or does not rise meaningfully
-            above the low-frequency edge (no genuine resonance).
+        resonance_frequency: Frequency of the ``|Z|`` resonance peak in Hz, or
+            ``None`` when there is no genuine resonance (the maximum lies at a
+            band edge, does not clear the prominence margin, or has no
+            bracketable −3 dB width).
         peak_impedance: ``|Z|`` at ``resonance_frequency`` in kΩ·cm², or
-            ``None`` when there is no interior peak.
+            ``None`` when there is no genuine resonance.
         quality_factor: Dimensionless ``Q = f_R / FWHM`` where FWHM is the
             full width of the ``|Z|`` peak at the half-power (−3 dB) level, or
-            ``None`` when there is no interior peak or the half-power crossings
-            cannot be bracketed inside the band.
+            ``None`` when there is no genuine resonance.
         magnitude_mohm: ``|Z(f)|`` converted to absolute MΩ when ``area_cm2``
             is supplied; ``None`` otherwise.
         peak_impedance_mohm: Absolute peak impedance in MΩ when ``area_cm2`` is
-            supplied and an interior peak exists; ``None`` otherwise.
+            supplied and a genuine resonance exists; ``None`` otherwise.
         area_cm2: Membrane surface area in cm² used for the absolute
             conversion.  ``None`` when only per-area values were requested.
         f_start: Lower edge of the requested analysis band in Hz.
@@ -311,9 +313,12 @@ def analyze_impedance(
     both signals, takes the real FFT of each (``numpy.fft.rfft``), forms
     ``Z(f) = V̂(f) / Î(f)`` over the swept band ``[f_start, f_end]`` (trimming
     band-edge bins where the chirp has negligible spectral power), and reports
-    the magnitude and phase spectra plus the resonance frequency (argmax of
-    ``|Z|``, only when it is an interior maximum that rises above the
-    low-frequency reference) and quality factor.
+    the magnitude and phase spectra plus, when a genuine resonance is present,
+    the resonance frequency and quality factor.  A genuine resonance requires
+    an interior ``|Z|`` maximum that both clears the prominence margin over the
+    low-frequency reference and has a half-power (−3 dB) width bracketable
+    inside the band; ``resonance_frequency``, ``peak_impedance`` and
+    ``quality_factor`` are otherwise all ``None``.
 
     Membrane impedance is a linear, small-signal quantity, so spike transients
     are excluded: when the windowed response contains spikes the analysis falls
@@ -439,13 +444,19 @@ def analyze_impedance(
     # Reference the low-frequency end with a small average to be robust to
     # spectral leakage in the first bin.
     low_ref = float(np.mean(mag[: min(3, mag.size)]))
-    is_resonant = 0 < peak_idx < mag.size - 1 and float(mag[peak_idx]) > low_ref * (
+    # A resonance is reported only when the interior |Z| peak both clears the
+    # prominence margin and has a measurable -3 dB width, so that f_R, the peak
+    # impedance, and Q always populate (or blank) together — a "resonance" with
+    # no bracketable half-power bandwidth is just measurement ripple on an
+    # otherwise monotone passive response.
+    peak_prominent = 0 < peak_idx < mag.size - 1 and float(mag[peak_idx]) > low_ref * (
         1.0 + _RESONANCE_REL_MARGIN
     )
-    if is_resonant:
+    q = _quality_factor(fb, mag, peak_idx) if peak_prominent else None
+    if q is not None:
         resonance_frequency: float | None = float(fb[peak_idx])
         peak_impedance: float | None = float(mag[peak_idx])
-        quality_factor: float | None = _quality_factor(fb, mag, peak_idx)
+        quality_factor: float | None = q
     else:
         resonance_frequency = None
         peak_impedance = None
