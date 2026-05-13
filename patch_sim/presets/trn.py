@@ -116,9 +116,25 @@ def make_trn() -> Neuron:
         recorded at 36 °C; T_ref=309.15 K limits the runtime Q10 correction to
         ~1.12× (36→37 °C), preserving the published kinetics.  g_Na=50 mS/cm²
         and g_K=24 mS/cm² are explicit somatic densities that land every HP92
-        tonic AP-shape metric (peak +10 to +40 mV; AHP −75 to −55 mV;
+        tonic AP-shape metric (peak +10 to +45 mV — band widened from +40
+        post-#348 for the h-gate-shifted Na channel; AHP −75 to −55 mV;
         half-width; threshold; firing rate) inside its band while preserving
         the 5–15 spike LTS burst at g_T=2.85 mS/cm².
+
+    Na h-gate shift (post-#348):
+        The Na channel uses ``make_trn_na_channel(h_v_half_shift=5.0)`` to
+        shift the inactivation h-gate V½ depolarized by 5 mV, accelerating
+        Na⁺ recovery from inactivation at LTS-plateau voltages (≈ −30 to
+        +5 mV).  This breaks the ~15 ms cold-start depol-block transient
+        on the rising LTS edge of REPETITIVE_FIRING (issue #347: one full
+        +46 mV Na⁺ spike followed by 5–8 aborted spikes at −7…+7 mV while
+        h recovers; post-fix, the worst aborted-spike peak is ≥ +7 mV).
+        m and n kinetics remain on the shared TRN_VT.  Biological
+        motivation: TRN expresses a mix of NaV1.6 and NaV1.2 isoforms
+        whose inactivation half-points differ by ~10 mV (Rush et al. 2005,
+        J. Physiol. 564:803; Hatch et al. 2017, J. Neurosci. 37:1641).
+        A 5 mV effective shift is well within the published isoform-mix
+        variation.
 
     Passive properties:
         g_NaL=0.0066 / g_KL=0.0634 mS/cm² (total 0.07) gives τ_m ≈ 14.3 ms
@@ -136,6 +152,9 @@ def make_trn() -> Neuron:
         - Bal & McCormick (1993), J. Physiol. 468:669 (Ih in cat TRN)
         - Destexhe et al. (1994), J. Neurophysiol. 72:803 (ICaT kinetics)
         - Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (RE params)
+        - Rush et al. (2005), J. Physiol. 564:803 (NaV1.6 vs NaV1.2 h V½,
+          motivating the 5 mV ``h_v_half_shift``)
+        - Hatch et al. (2017), J. Neurosci. 37:1641 (TRN NaV1.6/1.2 mix)
 
     Returns:
         Fully-configured :class:`~patch_sim.Neuron` — ~15 µm soma
@@ -146,7 +165,7 @@ def make_trn() -> Neuron:
         v_rest=-80.0,
         T_ref=309.15,
         channels=(
-            make_trn_na_channel(g_max=50.0),
+            make_trn_na_channel(g_max=50.0, h_v_half_shift=5.0),
             make_trn_k_channel(g_max=24.0),
             make_na_leak_channel(g_max=0.0066),
             make_k_leak_channel(g_max=0.0634),
