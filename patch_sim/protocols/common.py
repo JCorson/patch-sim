@@ -7,9 +7,18 @@ modules to avoid duplication.
 import numpy as np
 
 # Default sampling frequency (Hz) for all protocol and simulation functions.
-# 100 kHz gives a 10 µs time step, which is sufficient to resolve the fastest
-# Hodgkin-Huxley gating kinetics while keeping array sizes manageable.
-DEFAULT_SAMPLING_FREQUENCY = 100_000.0
+# Must equal :data:`~patch_sim.clamp_simulations.SIM_SAMPLING_FREQ` (40 kHz);
+# the simulator reinterprets a protocol array as samples at its own rate, so a
+# mismatched default silently stretches/compresses every protocol's duration
+# when it reaches the simulator.  Prior to this change the default was 100 kHz
+# while the simulator ran at 40 kHz, so a ``step_current(duration=900)`` call
+# in a test produced a 90001-sample array that the simulator treated as
+# 2250 ms instead of 900 ms — affecting depol-block timing on the rising LTS
+# edge (#348), peak Ca²⁺ measurements during finite-duration stimuli, and
+# passive-property fits whose stim windows are sized in absolute time.
+# 40 kHz (dt = 25 µs) resolves Hodgkin-Huxley gating kinetics while keeping
+# array sizes manageable.
+DEFAULT_SAMPLING_FREQUENCY = 40_000.0
 
 
 def _calculate_time_parameters(

@@ -34,7 +34,7 @@ def step_voltage(
         step_duration: Duration of the voltage step in milliseconds.
             If None, the step lasts for the entire duration.
         holding_voltage: Holding voltage in mV. Default is -70.0 mV.
-        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
+        sampling_frequency: Sampling frequency in Hz. Default is 40 kHz, matching SIM_SAMPLING_FREQ.
 
     Returns:
         Array of voltage values in mV.
@@ -71,7 +71,7 @@ def ramp_voltage(
         ramp_duration: Duration of the ramp in milliseconds.
             If None, the ramp lasts for the entire duration.
         holding_voltage: Holding voltage in mV. Default is -70.0 mV.
-        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
+        sampling_frequency: Sampling frequency in Hz. Default is 40 kHz, matching SIM_SAMPLING_FREQ.
 
     Returns:
         Array of voltage values in mV.
@@ -113,7 +113,7 @@ def pulse_train_voltage(
         num_pulses: Number of pulses in the train. If None, pulses
             continue until the end of the duration.
         holding_voltage: Holding voltage in mV. Default is -70.0 mV.
-        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
+        sampling_frequency: Sampling frequency in Hz. Default is 40 kHz, matching SIM_SAMPLING_FREQ.
 
     Returns:
         Array of voltage values in mV.
