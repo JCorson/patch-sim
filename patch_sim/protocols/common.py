@@ -2,23 +2,17 @@
 
 These private functions are used by both current and voltage clamp protocol
 modules to avoid duplication.
+
+The default sampling frequency for every protocol generator is the
+simulator's :data:`~patch_sim.clamp_simulations.SIM_SAMPLING_FREQ` (40 kHz).
+There was previously a separate ``DEFAULT_SAMPLING_FREQUENCY`` here at
+100 kHz which silently stretched every protocol 2.5× when the simulator
+re-interpreted the array at its own rate — see #348 for the investigation.
 """
 
 import numpy as np
 
-# Default sampling frequency (Hz) for all protocol and simulation functions.
-# Must equal :data:`~patch_sim.clamp_simulations.SIM_SAMPLING_FREQ` (40 kHz);
-# the simulator reinterprets a protocol array as samples at its own rate, so a
-# mismatched default silently stretches/compresses every protocol's duration
-# when it reaches the simulator.  Prior to this change the default was 100 kHz
-# while the simulator ran at 40 kHz, so a ``step_current(duration=900)`` call
-# in a test produced a 90001-sample array that the simulator treated as
-# 2250 ms instead of 900 ms — affecting depol-block timing on the rising LTS
-# edge (#348), peak Ca²⁺ measurements during finite-duration stimuli, and
-# passive-property fits whose stim windows are sized in absolute time.
-# 40 kHz (dt = 25 µs) resolves Hodgkin-Huxley gating kinetics while keeping
-# array sizes manageable.
-DEFAULT_SAMPLING_FREQUENCY = 40_000.0
+from ..clamp_simulations import SIM_SAMPLING_FREQ
 
 
 def _calculate_time_parameters(
@@ -68,7 +62,7 @@ def _generate_step_protocol(
     baseline: float = 0.0,
     step_start: float = 0.0,
     step_duration: float | None = None,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a generic step protocol (current or voltage).
 
@@ -107,7 +101,7 @@ def _generate_ramp_protocol(
     baseline: float = 0.0,
     ramp_start: float = 0.0,
     ramp_duration: float | None = None,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a generic ramp protocol (current or voltage).
 
@@ -157,7 +151,7 @@ def _generate_pulse_train_protocol(
     baseline: float = 0.0,
     train_start: float = 0.0,
     num_pulses: int | None = None,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a generic pulse train protocol (current or voltage).
 

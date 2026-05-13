@@ -38,7 +38,7 @@ _CA_PEAK_MAX_UM_DEFAULT = 5.0
 # IKCa-driven burst termination, so a downward drift that would silently
 # break the burst phenotype must be caught here.
 # Upper bound widened from 12 → 16 µM at correct sampling (40 kHz,
-# post-#348 alignment).  Prior to the DEFAULT_SAMPLING_FREQUENCY alignment,
+# post-#348 alignment with SIM_SAMPLING_FREQ).  Prior to the alignment,
 # the test protocol was silently stretched 2.5× longer than nominal, so
 # the cell reached a quasi-steady-state during the (effective 500 ms) step
 # and the peak Ca²⁺ settled around ~9 µM.  At correct (200 ms) timing the

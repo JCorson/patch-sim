@@ -7,8 +7,8 @@ protocols that can be used with current clamp simulations.
 import numpy as np
 from scipy.signal import chirp
 
+from ..clamp_simulations import SIM_SAMPLING_FREQ
 from .common import (
-    DEFAULT_SAMPLING_FREQUENCY,
     _apply_time_window,
     _calculate_time_parameters,
     _generate_pulse_train_protocol,
@@ -22,7 +22,7 @@ def step_current(
     current_amplitude: float,
     step_start: float = 0.0,
     step_duration: float | None = None,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a step current protocol.
 
@@ -56,7 +56,7 @@ def ramp_current(
     end_current: float,
     ramp_start: float = 0.0,
     ramp_duration: float | None = None,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a ramp current protocol.
 
@@ -93,7 +93,7 @@ def pulse_train(
     pulse_interval: float,
     train_start: float = 0.0,
     num_pulses: int | None = None,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a pulse train current protocol.
 
@@ -135,7 +135,7 @@ def sinusoidal_current(
     phase: float = 0.0,
     stimulus_start: float = 0.0,
     stimulus_duration: float = 0.0,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a sinusoidal current protocol.
 
@@ -186,7 +186,7 @@ def chirp_current(
     end_frequency: float,
     stimulus_start: float = 0.0,
     stimulus_duration: float = 0.0,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a chirp (frequency sweep) current protocol.
 
@@ -244,7 +244,7 @@ def noise_current(
     std_current: float,
     stimulus_start: float = 0.0,
     stimulus_duration: float = 0.0,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
     seed: int | None = None,
 ) -> np.ndarray:
     """Generate a Gaussian white noise current protocol.

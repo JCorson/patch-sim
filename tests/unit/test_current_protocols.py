@@ -6,7 +6,6 @@ This module contains unit tests for all current clamp protocol functions.
 import numpy as np
 import pytest
 
-from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ
 from patch_sim.protocols import (
     chirp_current,
     noise_current,
@@ -15,28 +14,6 @@ from patch_sim.protocols import (
     sinusoidal_current,
     step_current,
 )
-from patch_sim.protocols.common import DEFAULT_SAMPLING_FREQUENCY
-
-
-def test_default_sampling_frequency_matches_simulator() -> None:
-    """``DEFAULT_SAMPLING_FREQUENCY`` must equal ``SIM_SAMPLING_FREQ``.
-
-    The simulator reinterprets every protocol array as samples at its own
-    rate (:data:`~patch_sim.clamp_simulations.SIM_SAMPLING_FREQ`), so any
-    drift between the two constants silently stretches or compresses
-    protocol durations.  See #348 for the original investigation and the
-    five-preset retune that landed once the constants were aligned.
-    """
-    assert DEFAULT_SAMPLING_FREQUENCY == SIM_SAMPLING_FREQ, (
-        f"DEFAULT_SAMPLING_FREQUENCY ({DEFAULT_SAMPLING_FREQUENCY} Hz) "
-        f"and SIM_SAMPLING_FREQ ({SIM_SAMPLING_FREQ} Hz) have drifted "
-        "apart.  The simulator silently re-interprets protocol arrays at "
-        "its own rate, so this mismatch causes every step_current() call "
-        "without an explicit sampling_frequency= to run a simulation of "
-        "the wrong duration.  Align the two constants in "
-        "patch_sim/protocols/common.py and "
-        "patch_sim/clamp_simulations.py."
-    )
 
 
 class TestStepCurrent:
