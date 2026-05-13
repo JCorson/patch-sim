@@ -35,7 +35,7 @@ def step_current(
         step_start: Time when the step begins in milliseconds. Default is 0.0.
         step_duration: Duration of the current step in milliseconds.
             If None, the step lasts for the entire duration.
-        sampling_frequency: Sampling frequency in Hz. Default is 40 kHz, matching SIM_SAMPLING_FREQ.
+        sampling_frequency: Sampling frequency in Hz; default SIM_SAMPLING_FREQ.
 
     Returns:
         Array of current values in uA/cm^2.
@@ -70,7 +70,7 @@ def ramp_current(
         ramp_start: Time when the ramp begins in milliseconds. Default is 0.0.
         ramp_duration: Duration of the ramp in milliseconds.
             If None, the ramp lasts for the entire duration.
-        sampling_frequency: Sampling frequency in Hz. Default is 40 kHz, matching SIM_SAMPLING_FREQ.
+        sampling_frequency: Sampling frequency in Hz; default SIM_SAMPLING_FREQ.
 
     Returns:
         Array of current values in uA/cm^2.
@@ -110,7 +110,7 @@ def pulse_train(
             Default is 0.0.
         num_pulses: Number of pulses in the train. If None, pulses
             continue until the end of the duration.
-        sampling_frequency: Sampling frequency in Hz. Default is 40 kHz, matching SIM_SAMPLING_FREQ.
+        sampling_frequency: Sampling frequency in Hz; default SIM_SAMPLING_FREQ.
 
     Returns:
         Array of current values in uA/cm^2.
@@ -158,7 +158,7 @@ def sinusoidal_current(
         stimulus_duration: Duration of the sinusoidal stimulus in milliseconds.
             Default is 0.0, which fills the recording from stimulus_start to
             the end of duration.
-        sampling_frequency: Sampling frequency in Hz. Default is 40 kHz, matching SIM_SAMPLING_FREQ.
+        sampling_frequency: Sampling frequency in Hz; default SIM_SAMPLING_FREQ.
 
     Returns:
         Array of current values in uA/cm^2.
@@ -210,7 +210,7 @@ def chirp_current(
         stimulus_duration: Duration of the chirp stimulus in milliseconds.
             Default is 0.0, which fills the recording from stimulus_start to
             the end of duration.
-        sampling_frequency: Sampling frequency in Hz. Default is 40 kHz, matching SIM_SAMPLING_FREQ.
+        sampling_frequency: Sampling frequency in Hz; default SIM_SAMPLING_FREQ.
 
     Returns:
         Array of current values in uA/cm^2.
@@ -266,7 +266,7 @@ def noise_current(
         stimulus_duration: Duration of the noise stimulus in milliseconds.
             Default is 0.0, which fills the recording from stimulus_start to
             the end of duration.
-        sampling_frequency: Sampling frequency in Hz. Default is 40 kHz, matching SIM_SAMPLING_FREQ.
+        sampling_frequency: Sampling frequency in Hz; default SIM_SAMPLING_FREQ.
         seed: Random seed for reproducibility. If None, uses random seed.
 
     Returns:
