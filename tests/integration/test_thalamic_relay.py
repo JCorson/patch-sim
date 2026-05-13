@@ -26,9 +26,16 @@ from tests.integration._ap_shape import assert_ap_shape
 # ---------------------------------------------------------------------------
 
 # Tonic-mode standard step: 1 µA/cm² is just above the rheobase for this
-# preset and gives ~9 Hz repetitive firing — within the in-vitro tonic
-# range reported for TC cells (McCormick & Huguenard 1992).
-_TC_TONIC_STEP_DURATION_MS = 200.0
+# preset and gives ~18 Hz steady-state repetitive firing — within the
+# in-vitro tonic range reported for TC cells (McCormick & Huguenard 1992).
+# Duration extended to 500 ms so the rate and AP-peak measurements are
+# taken from the adapted tonic train rather than the unadapted first
+# ~200 ms of firing (where rate is ~190 Hz and peaks ~+42 mV until slow
+# K/Na adaptation settles).  Prior to the DEFAULT_SAMPLING_FREQUENCY
+# alignment (40 kHz, matching SIM_SAMPLING_FREQ — see #348), the nominal
+# 200 ms duration was silently stretched to 500 ms by the simulator, so
+# this restores the train length the bands were originally calibrated against.
+_TC_TONIC_STEP_DURATION_MS = 500.0
 _TC_TONIC_STEP_CURRENT = 1.0
 _TC_REFERENCE = "McCormick & Huguenard 1992"
 

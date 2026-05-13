@@ -136,15 +136,22 @@ def test_da_modest_step_sustains_firing(da_neuron: Neuron) -> None:
 @pytest.mark.parametrize(
     "amplitude,min_spikes",
     [
-        (0.0, 3),
-        (1.5, 3),
-        (3.0, 3),
-        (4.5, 4),
-        (6.0, 4),
-        (7.5, 4),
-        (9.0, 4),
-        (10.5, 5),
-        (12.0, 5),
+        # min_spikes floors set ≥1 below the empirically observed spike
+        # counts at correct sampling (40 kHz, post-#348 alignment).  Prior
+        # to the alignment, the 200 ms protocol was silently stretched to
+        # 500 ms by the simulator, inflating the observed counts ~2.5× and
+        # giving the original (3–5) floors.  At correct timing the SNc
+        # somatic model fires 2 spikes at 0–3 µA/cm² and 3 spikes from
+        # 4.5 µA/cm² onward, so the floors are 1–2.
+        (0.0, 1),
+        (1.5, 1),
+        (3.0, 1),
+        (4.5, 2),
+        (6.0, 2),
+        (7.5, 2),
+        (9.0, 2),
+        (10.5, 2),
+        (12.0, 2),
     ],
 )
 def test_da_ui_fi_protocol(

@@ -127,11 +127,17 @@ def test_classic_hh_short_stimulus_tonic_does_not_trip_tight_cluster(
     Args:
         hh_model: Classic Hodgkin-Huxley neuron fixture.
     """
+    # Step duration sized to produce more ISIs than _TIGHT_CLUSTER_MAX_ISIS
+    # at HH's tonic firing rate (~66 Hz at +10 µA/cm²; the docstring's
+    # 210 Hz figure predates the sampling-frequency alignment in #348 — the
+    # earlier rate was a 100 kHz protocol silently re-interpreted as 40 kHz
+    # samples by the simulator).  ~150 ms of step at 66 Hz yields ~10 spikes
+    # → 9 ISIs, comfortably above the count cap.
     protocol = step_current(
-        duration=70.0,
+        duration=170.0,
         current_amplitude=10.0,
         step_start=10.0,
-        step_duration=50.0,
+        step_duration=150.0,
     )
     result = simulate_current_clamp(hh_model, protocol)
     time = np.asarray(result["time"])
