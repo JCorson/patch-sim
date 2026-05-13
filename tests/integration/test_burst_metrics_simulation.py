@@ -11,6 +11,7 @@ import numpy as np
 import patch_sim
 from patch_sim.analysis.burst_metrics import (
     _TIGHT_CLUSTER_MAX_ISIS,
+    BurstMetrics,
     analyze_bursts,
     analyze_bursts_from_result,
 )
@@ -258,8 +259,17 @@ def test_trn_step_release_produces_hp92_rebound_burst() -> None:
         f"tonic-like firing or failed to trigger."
     )
 
-    def _matches_hp92(burst) -> bool:
-        """Return True iff ``burst`` matches the HP92 LTS-burst phenotype."""
+    def _matches_hp92(burst: BurstMetrics) -> bool:
+        """Return True iff ``burst`` matches the HP92 LTS-burst phenotype.
+
+        Args:
+            burst: A :class:`~patch_sim.analysis.burst_metrics.BurstMetrics`
+                instance from the burst-detector output.
+
+        Returns:
+            True when the burst has 5–15 spikes and an intra-burst frequency
+            in the 200–600 Hz range (Huguenard & Prince 1992 LTS phenotype).
+        """
         if not (5 <= burst.spike_count <= 15):
             return False
         if burst.intra_burst_frequency is None:

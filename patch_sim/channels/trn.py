@@ -292,6 +292,11 @@ def make_trn_na_channel(g_max: float, h_v_half_shift: float = 0.0) -> IonChannel
         An :class:`~patch_sim.channels.IonChannel` representing the TRN fast
         Na⁺ channel.
     """
+    # ``== 0.0`` is the default-arg fast path: preserves object identity of
+    # the cached module-level ``trn_alpha_h`` / ``trn_beta_h`` so callers
+    # that never pass ``h_v_half_shift`` see exactly the same rate
+    # references they did before this parameter was added.  Any non-zero
+    # shift (including denormals) wraps in the picklable dataclass.
     if h_v_half_shift == 0.0:
         alpha_h = trn_alpha_h
         beta_h = trn_beta_h
