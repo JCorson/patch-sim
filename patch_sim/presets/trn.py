@@ -154,14 +154,18 @@ def make_trn() -> Neuron:
             make_ikca_channel(g_max=0.3),
             make_ih_channel(g_max=0.020),
         ),
-        # Peak ca_i reaches ~9–10 µM under REPETITIVE_FIRING and 8–18 µM under
+        # Peak ca_i reaches ~14–15 µM under REPETITIVE_FIRING and 8–18 µM under
         # HYPERPOLARIZATION_STEPS (LTS rebound burst) — physiologically
         # consistent with TRN somatic Ca during high-frequency burst trains
         # (Cueni et al. 2008, Nat. Neurosci. 11:683).  The elevated Ca is
         # load-bearing: lower alpha_ca collapses the burst phenotype because
         # IKCa (g_KCa=0.3 mS/cm²) cannot terminate the burst cleanly without
         # sufficient Ca²⁺ drive.  ``test_calcium_calibration.py`` uses a
-        # TRN-specific 12 µM upper bound to accommodate this realistic Ca level.
+        # TRN-specific 5–16 µM band to accommodate this realistic Ca level
+        # (post-#348 the protocol durations match the simulator's nominal
+        # rate, so the REPETITIVE_FIRING peak is the transient buildup
+        # rather than the lower quasi-steady-state of the previous stretched
+        # protocol).
         calcium_dynamics=CalciumDynamics(alpha_ca=1.2e-5, tau_ca=20.0, ca_rest=1e-4),
         area_cm2=7e-6,
     )
