@@ -27,6 +27,7 @@ from patch_sim_ui.components.metrics.burst_panel import _burst_row
 from patch_sim_ui.components.metrics.calcium_panel import _ca_transient_row
 from patch_sim_ui.components.metrics.fi_gv_panel import (
     _gv_plot,
+    _inactivation_plot,
     _iv_curve_tab,
     _tau_v_plot,
 )
@@ -224,6 +225,7 @@ __all__ = [
     "_burst_row",
     "_ca_transient_row",
     "_gv_plot",
+    "_inactivation_plot",
     "_iv_curve_tab",
     "_spike_row",
     "_tau_v_plot",

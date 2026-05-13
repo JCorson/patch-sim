@@ -136,6 +136,16 @@ _PROTOCOL_PARAM_SCHEMA: dict[tuple[str, str], tuple[ParamField, ...]] = {
         ParamField("Pulse interval (ms)", "vc_pulse_interval"),
         ParamField("Holding voltage (mV)", "holding_voltage"),
     ),
+    # Two-pulse steady-state-inactivation protocol.  The shared duration fields
+    # double as the conditioning-prepulse duration ("Pre-stimulus") and the
+    # test-pulse duration ("Stimulus"); the min/max/step trio sweeps the
+    # conditioning prepulse voltage and "Test pulse" is the fixed test voltage.
+    (VOLTAGE_CLAMP, "Inactivation"): (
+        ParamField("Prepulse min (mV)", "min_stimulus"),
+        ParamField("Prepulse max (mV)", "max_stimulus"),
+        ParamField("Prepulse step (mV)", "stimulus_step"),
+        ParamField("Test pulse (mV)", "test_pulse_voltage"),
+    ),
 }
 
 # Single-sweep amplitude fields for the Step protocol.  In single-sweep mode

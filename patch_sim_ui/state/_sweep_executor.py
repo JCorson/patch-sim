@@ -15,7 +15,12 @@ import numpy as np
 
 import patch_sim
 import patch_sim.channels
-from patch_sim.constants import CHIRP_PROTOCOL, CURRENT_CLAMP, VOLTAGE_CLAMP
+from patch_sim.constants import (
+    CHIRP_PROTOCOL,
+    CURRENT_CLAMP,
+    INACTIVATION_PROTOCOL,
+    VOLTAGE_CLAMP,
+)
 from patch_sim_ui import constants
 from patch_sim_ui.api import traces
 from patch_sim_ui.plotting import TraceVisibility, build_figure
@@ -26,6 +31,7 @@ from patch_sim_ui.state._analysis_format import (
     _compute_cc_multi_sweep_analysis,
     _compute_gv_data,
     _compute_impedance_data,
+    _compute_inactivation_data,
     _compute_iv_data,
     _compute_multi_sweep_burst_data,
     _compute_multi_sweep_ca_transient_data,
@@ -52,6 +58,7 @@ class _SimResult:
     iv_data: dict[str, Any] = dataclasses.field(default_factory=dict)
     gv_data: dict[str, Any] = dataclasses.field(default_factory=dict)
     tau_v_data: dict[str, Any] = dataclasses.field(default_factory=dict)
+    inactivation_data: dict[str, Any] = dataclasses.field(default_factory=dict)
     ap_metrics: list[dict[str, Any]] = dataclasses.field(default_factory=list)
     ap_summary: dict[str, Any] = dataclasses.field(default_factory=dict)
     ap_is_multi_sweep: bool = False
@@ -155,7 +162,18 @@ def _compute_simulation(
                 pre_stimulus_duration,
                 stimulus_duration,
             )
-            if iv_result is not None:
+            gv_data: dict[str, Any] = {}
+            tau_v_data: dict[str, Any] = {}
+            inactivation_data: dict[str, Any] = {}
+            if protocol_type == INACTIVATION_PROTOCOL:
+                # For the two-pulse protocol the swept command voltage is the
+                # conditioning prepulse, not the test voltage, so the g-V and
+                # τ-V analyses (which assume the swept voltage *is* the test
+                # voltage) would be meaningless — skip them and run the
+                # steady-state inactivation (h∞) analysis instead.
+                if iv_result is not None:
+                    inactivation_data = _compute_inactivation_data(iv_result)
+            elif iv_result is not None:
                 # Pick the first *gated* Na⁺ channel — the leak channel "NaL"
                 # also has NernstSpec(SODIUM) but has no gating variables, so
                 # filtering on gating_variables avoids feeding E_NaL into the
@@ -171,21 +189,18 @@ def _compute_simulation(
                     ),
                     None,
                 )
-                gv_data = (
-                    _compute_gv_data(iv_result, na_channel.reversal_potential(neuron))
-                    if na_channel is not None
-                    else {}
+                if na_channel is not None:
+                    gv_data = _compute_gv_data(
+                        iv_result, na_channel.reversal_potential(neuron)
+                    )
+                tau_v_data = _compute_tau_v_data(
+                    new_sweeps,
+                    min_stimulus,
+                    max_stimulus,
+                    stimulus_step,
+                    pre_stimulus_duration,
+                    stimulus_duration,
                 )
-            else:
-                gv_data = {}
-            tau_v_data = _compute_tau_v_data(
-                new_sweeps,
-                min_stimulus,
-                max_stimulus,
-                stimulus_step,
-                pre_stimulus_duration,
-                stimulus_duration,
-            )
             ms_ca_metrics, ms_ca_summary = _compute_multi_sweep_ca_transient_data(
                 new_sweeps
             )
@@ -195,6 +210,7 @@ def _compute_simulation(
                 iv_data=iv_data,
                 gv_data=gv_data,
                 tau_v_data=tau_v_data,
+                inactivation_data=inactivation_data,
                 ca_transient_metrics=ms_ca_metrics,
                 ca_transient_summary=ms_ca_summary,
             )

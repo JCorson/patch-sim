@@ -8,6 +8,7 @@ from patch_sim.constants import (
     IV_CURVE,
     NA_CHANNEL_ACTIVATION,
     SQUID_GIANT_AXON,
+    STEADY_STATE_INACTIVATION,
 )
 from tests.e2e.conftest import StateTree, run_flow
 
@@ -118,3 +119,52 @@ async def test_voltage_clamp_sim_token_is_set(state_tree: StateTree) -> None:
     )
 
     assert state_tree.sim.sim_token != ""
+
+
+async def test_steady_state_inactivation_preset_produces_multi_sweep(
+    state_tree: StateTree,
+) -> None:
+    """The Steady-State Inactivation preset produces multiple sweeps."""
+    result = await run_flow(
+        state_tree,
+        neuron_preset=SQUID_GIANT_AXON,
+        protocol_preset=STEADY_STATE_INACTIVATION,
+    )
+
+    assert len(result.sweeps) > 1
+
+
+async def test_steady_state_inactivation_preset_populates_inactivation_data(
+    state_tree: StateTree,
+) -> None:
+    """The Steady-State Inactivation preset populates inactivation_data after run."""
+    await run_flow(
+        state_tree,
+        neuron_preset=SQUID_GIANT_AXON,
+        protocol_preset=STEADY_STATE_INACTIVATION,
+    )
+
+    inact = state_tree.analysis.inactivation_data
+    assert inact != {}
+    assert "prepulse_voltages" in inact
+    assert "h_normalized" in inact
+    assert len(inact["prepulse_voltages"]) > 1
+
+
+async def test_steady_state_inactivation_preset_skips_gv_and_tau_v(
+    state_tree: StateTree,
+) -> None:
+    """The Inactivation protocol does not populate g-V or τ-V data.
+
+    Those analyses treat the swept command voltage as the test voltage, which
+    is false for the two-pulse protocol (the swept voltage is the conditioning
+    prepulse), so the sweep executor skips them.
+    """
+    await run_flow(
+        state_tree,
+        neuron_preset=SQUID_GIANT_AXON,
+        protocol_preset=STEADY_STATE_INACTIVATION,
+    )
+
+    assert state_tree.analysis.gv_data == {}
+    assert state_tree.analysis.tau_v_data == {}

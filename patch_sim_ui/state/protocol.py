@@ -8,7 +8,7 @@ import reflex as rx
 
 import patch_sim
 import patch_sim.clamp_simulations
-from patch_sim.constants import CURRENT_CLAMP
+from patch_sim.constants import CURRENT_CLAMP, INACTIVATION_PROTOCOL
 from patch_sim.presets import NEURON_PROTOCOL_ADJUSTMENTS, PROTOCOL_PRESETS
 from patch_sim.protocols.builders import build_current_protocol, build_voltage_protocol
 from patch_sim_ui import constants
@@ -39,6 +39,9 @@ _PROTOCOL_FLOAT_FIELDS: list[str] = [
     "vc_pulse_amplitude",
     "vc_pulse_width",
     "vc_pulse_interval",
+    # No vc_ prefix: like ``holding_voltage`` it has no current-clamp twin, and
+    # protocol presets set it by this (builder-matching) name via setattr.
+    "test_pulse_voltage",
 ]
 
 logger = logging.getLogger(__name__)
@@ -93,6 +96,8 @@ class ProtocolState(rx.State):
     vc_pulse_amplitude: float = 20.0
     vc_pulse_width: float = 2.0
     vc_pulse_interval: float = 10.0
+    # Fixed test-pulse voltage (mV) for the two-pulse "Inactivation" protocol.
+    test_pulse_voltage: float = 0.0
 
     # ------------------------------------------------------------------ #
     # Preset tracking                                                     #
@@ -130,9 +135,13 @@ class ProtocolState(rx.State):
     def can_run_continuous(self) -> bool:
         """True when the active protocol is compatible with continuous mode.
 
-        Multi-sweep Step configurations (min_stimulus != max_stimulus) are
-        excluded; all other protocols run as a single sweep and are compatible.
+        Continuous mode streams a single sweep, so inherently multi-sweep
+        protocols are excluded: multi-sweep Step configurations
+        (min_stimulus != max_stimulus) and the two-pulse Inactivation protocol.
+        Every other protocol runs as a single sweep and is compatible.
         """
+        if self.protocol_type == INACTIVATION_PROTOCOL:
+            return False
         if self.protocol_type != "Step":
             return True
         return self.is_step_single_sweep
@@ -437,10 +446,16 @@ class ProtocolState(rx.State):
                 pulse_amplitude=self.vc_pulse_amplitude,
                 pulse_width=self.vc_pulse_width,
                 pulse_interval=self.vc_pulse_interval,
+                test_pulse_voltage=self.test_pulse_voltage,
                 min_stimulus=self.min_stimulus,
                 max_stimulus=self.max_stimulus,
                 stimulus_step=self.stimulus_step,
             )
             if arrays.shape[0] > 1:
-                return self._attach_step_labels(arrays, "{:+.0f} mV")
+                label_fmt = (
+                    "{:+.0f} mV prepulse"
+                    if self.protocol_type == INACTIVATION_PROTOCOL
+                    else "{:+.0f} mV"
+                )
+                return self._attach_step_labels(arrays, label_fmt)
             return [(arrays[0], "")]

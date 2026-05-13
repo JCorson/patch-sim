@@ -53,6 +53,15 @@ VOLTAGE_CLAMP: str = "Voltage Clamp"
 #: the UI, so it gets its own constant rather than a bare string literal.
 CHIRP_PROTOCOL: str = "Chirp"
 
+#: Protocol-type name for the two-pulse steady-state-inactivation voltage-clamp
+#: protocol; a member of :data:`VOLTAGE_PROTOCOLS`.  Each sweep holds at a
+#: different conditioning prepulse voltage and then steps to a fixed test pulse.
+#: Referenced by name in the analysis layer (the sweep executor runs the h∞
+#: inactivation analysis and skips the g-V / τ-V analyses only for this
+#: protocol) and the UI, so it gets its own constant rather than a bare string
+#: literal.
+INACTIVATION_PROTOCOL: str = "Inactivation"
+
 #: Current clamp protocol type names.
 CURRENT_PROTOCOLS: list[str] = [
     "Step",
@@ -68,6 +77,7 @@ VOLTAGE_PROTOCOLS: list[str] = [
     "Step",
     "Ramp",
     "Pulse Train",
+    INACTIVATION_PROTOCOL,
 ]
 
 # Neuron preset names
@@ -88,5 +98,6 @@ REPETITIVE_FIRING: str = "Repetitive Firing"
 FI_CURVE: str = "F-I Curve"
 IV_CURVE: str = "I-V Curve"
 NA_CHANNEL_ACTIVATION: str = "Na+ Channel Activation"
+STEADY_STATE_INACTIVATION: str = "Steady-State Inactivation"
 FREQUENCY_RESPONSE: str = "Frequency Response"
 HYPERPOLARIZATION_STEPS: str = "Hyperpolarization Steps"

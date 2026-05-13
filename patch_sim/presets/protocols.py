@@ -17,9 +17,11 @@ from patch_sim.constants import (
     FI_CURVE,
     FREQUENCY_RESPONSE,
     HYPERPOLARIZATION_STEPS,
+    INACTIVATION_PROTOCOL,
     IV_CURVE,
     NA_CHANNEL_ACTIVATION,
     REPETITIVE_FIRING,
+    STEADY_STATE_INACTIVATION,
     SUBTHRESHOLD_RESPONSE,
     VOLTAGE_CLAMP,
 )
@@ -96,6 +98,24 @@ PROTOCOL_PRESETS: dict[str, dict[str, Any]] = {
         "min_stimulus": -60.0,
         "max_stimulus": 60.0,
         "stimulus_step": 10.0,
+    },
+    # Two-pulse steady-state inactivation: a long conditioning prepulse (150 ms,
+    # ample for the Na+ h gate to reach steady state) at each voltage from -120
+    # to -20 mV in 10 mV steps, then a brief fixed test pulse to 0 mV (well past
+    # Na+ activation V½, near peak open probability) whose peak inward current
+    # measures the available (non-inactivated) channel fraction.  The post-test
+    # tail (30 ms) is generous so the test-pulse transient sits away from the
+    # right edge of the trace rather than crammed against it.
+    STEADY_STATE_INACTIVATION: {
+        "clamp_mode": VOLTAGE_CLAMP,
+        "protocol_type": INACTIVATION_PROTOCOL,
+        "pre_stimulus_duration": 150.0,
+        "stimulus_duration": 15.0,
+        "post_stimulus_duration": 30.0,
+        "min_stimulus": -120.0,
+        "max_stimulus": -20.0,
+        "stimulus_step": 10.0,
+        "test_pulse_voltage": 0.0,
     },
     # Tuned so the chirp response stays subthreshold for the quiescent-at-rest
     # presets (Squid, FSI, Cortical Pyramidal, CA1) and produces a clean

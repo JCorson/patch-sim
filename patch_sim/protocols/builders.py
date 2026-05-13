@@ -201,6 +201,7 @@ def build_voltage_protocol(
     pulse_amplitude: float = 20.0,
     pulse_width: float = 2.0,
     pulse_interval: float = 10.0,
+    test_pulse_voltage: float = 0.0,
     min_stimulus: float = 0.0,
     max_stimulus: float = 0.0,
     stimulus_step: float = 0.0,
@@ -208,28 +209,41 @@ def build_voltage_protocol(
     """Build voltage clamp protocol arrays from explicit parameters.
 
     Args:
-        protocol_type: One of "Step", "Ramp", or "Pulse Train".
+        protocol_type: One of "Step", "Ramp", "Pulse Train", or "Inactivation".
         sampling_frequency: Sampling frequency in Hz.
-        pre_stimulus_duration: Duration before the stimulus in ms.
-        stimulus_duration: Duration of the stimulus in ms.
+        pre_stimulus_duration: Duration before the stimulus in ms.  For the
+            "Inactivation" protocol this is the conditioning prepulse duration.
+        stimulus_duration: Duration of the stimulus in ms.  For the
+            "Inactivation" protocol this is the fixed test-pulse duration.
         post_stimulus_duration: Duration after the stimulus in ms.
-        holding_voltage: Holding voltage in mV.
+        holding_voltage: Holding voltage in mV.  Ignored by the "Inactivation"
+            protocol, which uses each sweep's conditioning prepulse as the
+            holding level.
         start_voltage: Ramp start voltage in mV.
         end_voltage: Ramp end voltage in mV.
         pulse_amplitude: Pulse amplitude in mV.
         pulse_width: Pulse width in ms.
         pulse_interval: Interval between pulse starts in ms.
+        test_pulse_voltage: Fixed test-pulse voltage in mV for the
+            "Inactivation" two-pulse protocol.  The swept ``min_stimulus`` /
+            ``max_stimulus`` / ``stimulus_step`` range then specifies the
+            conditioning prepulse voltage applied as each sweep's holding level.
         min_stimulus: Step voltage amplitude in mV for a single-step, or
-            minimum voltage when running a multi-sweep range.
+            minimum voltage when running a multi-sweep range.  For the
+            "Inactivation" protocol this is the most-hyperpolarized prepulse.
         max_stimulus: Maximum voltage for multi-sweep range in mV.  Must
-            be >= min_stimulus.
+            be >= min_stimulus.  For the "Inactivation" protocol this is the
+            most-depolarized prepulse.
         stimulus_step: Step size for multi-sweep range in mV.  Use 0.0
             (or set min_stimulus == max_stimulus) for a single-step protocol.
+            Must be > 0.0 for the "Inactivation" protocol, which is inherently
+            multi-sweep.
 
     Returns:
         2-D array of shape ``(n_sweeps, n_samples)``.  Single-step protocols
         return shape ``(1, n_samples)``.  Multi-sweep Step protocols return one
-        row per voltage level.
+        row per voltage level; the "Inactivation" protocol returns one row per
+        conditioning prepulse voltage.
 
     Raises:
         ValueError: If protocol_type is unrecognized or parameters are invalid.
@@ -296,6 +310,44 @@ def build_voltage_protocol(
                 holding_voltage=holding_voltage,
                 sampling_frequency=sampling_frequency,
             )
+        ]
+    elif protocol_type == "Inactivation":
+        # Two-pulse steady-state-inactivation protocol: each sweep holds at a
+        # different conditioning prepulse voltage (the swept min/max/step range)
+        # for the pre-stimulus duration, then steps to the fixed
+        # test_pulse_voltage for the stimulus duration, then returns to the
+        # prepulse level.  Built from ordinary step_voltage arrays so the
+        # standard I-V analysis can extract the test-pulse peak current per
+        # sweep over the [pre, pre + stimulus] window.  Unlike "Step", a
+        # single sweep is rejected — there is no inactivation curve to measure.
+        if stimulus_step < 0.0:
+            raise ValueError("stimulus_step must be >= 0.0")
+        if min_stimulus > max_stimulus:
+            raise ValueError(
+                f"min_stimulus ({min_stimulus}) must be"
+                f" <= max_stimulus ({max_stimulus})"
+            )
+        if min_stimulus == max_stimulus:
+            raise ValueError(
+                "Inactivation protocol requires a conditioning prepulse range "
+                "(min_stimulus must differ from max_stimulus)"
+            )
+        if stimulus_step == 0.0:
+            raise ValueError(
+                "stimulus_step must be > 0.0 for the Inactivation protocol"
+            )
+        n_steps = round((max_stimulus - min_stimulus) / stimulus_step) + 1
+        prepulse_voltages = np.linspace(min_stimulus, max_stimulus, n_steps)
+        sweeps = [
+            step_voltage(
+                duration=total_duration,
+                voltage_amplitude=test_pulse_voltage,
+                step_start=pre_stimulus_duration,
+                step_duration=stimulus_duration,
+                holding_voltage=float(prepulse),
+                sampling_frequency=sampling_frequency,
+            )
+            for prepulse in prepulse_voltages
         ]
     else:
         raise ValueError(f"Unknown voltage protocol type: {protocol_type!r}")

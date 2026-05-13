@@ -15,6 +15,7 @@ from patch_sim_ui.constants import CC_VOLTAGE_COLOR, STIMULUS_COLOR
 from patch_sim_ui.plotting import (
     TraceVisibility,
     build_figure,
+    build_inactivation_figure,
     build_tau_v_figure,
     compute_trace_visibility_map,
 )
@@ -1147,3 +1148,62 @@ def test_build_tau_v_figure_uses_log_y_axis_and_voltage_x_axis():
     assert fig.layout.yaxis.type == "log"
     assert "Voltage" in str(fig.layout.xaxis.title.text)
     assert "τ" in str(fig.layout.yaxis.title.text)
+
+
+# ---------------------------------------------------------------------------
+# build_inactivation_figure
+# ---------------------------------------------------------------------------
+
+
+def test_build_inactivation_figure_points_only_when_not_converged():
+    """Without a converged fit the figure has only the h∞ scatter trace."""
+    data = {
+        "prepulse_voltages": [-100.0, -60.0, -20.0],
+        "h_normalized": [1.0, 0.5, 0.05],
+        "boltzmann_converged": False,
+        "v_half": 0.0,
+        "k": 1.0,
+        "fit_voltages": [],
+        "fit_h_normalized": [],
+    }
+    fig = build_inactivation_figure(data)
+    assert isinstance(fig, go.Figure)
+    assert len(fig.data) == 1
+    assert "h" in str(fig.data[0].name)
+    assert len(fig.layout.annotations) == 0
+
+
+def test_build_inactivation_figure_includes_fit_trace_and_annotation():
+    """A converged fit adds a dashed Boltzmann trace and a V½ / k annotation."""
+    data = {
+        "prepulse_voltages": [-100.0, -60.0, -20.0],
+        "h_normalized": [1.0, 0.5, 0.05],
+        "boltzmann_converged": True,
+        "v_half": -62.0,
+        "k": 7.5,
+        "fit_voltages": [-100.0, -60.0, -20.0],
+        "fit_h_normalized": [0.99, 0.5, 0.01],
+    }
+    fig = build_inactivation_figure(data)
+    assert len(fig.data) == 2
+    trace_names = {trace.name for trace in fig.data}
+    assert "Boltzmann fit" in trace_names
+    assert len(fig.layout.annotations) == 1
+    text = fig.layout.annotations[0].text
+    assert "V" in text and "k" in text
+
+
+def test_build_inactivation_figure_axis_titles():
+    """The h∞ figure labels its axes Prepulse voltage (mV) and h∞."""
+    data = {
+        "prepulse_voltages": [-100.0, -20.0],
+        "h_normalized": [1.0, 0.05],
+        "boltzmann_converged": False,
+        "v_half": 0.0,
+        "k": 1.0,
+        "fit_voltages": [],
+        "fit_h_normalized": [],
+    }
+    fig = build_inactivation_figure(data)
+    assert "Prepulse voltage" in str(fig.layout.xaxis.title.text)
+    assert "h" in str(fig.layout.yaxis.title.text)

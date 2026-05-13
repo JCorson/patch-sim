@@ -463,6 +463,7 @@ class SimulationState(rx.State):
         analysis_st.iv_data = result.iv_data
         analysis_st.gv_data = result.gv_data
         analysis_st.tau_v_data = result.tau_v_data
+        analysis_st.inactivation_data = result.inactivation_data
         analysis_st.ap_metrics = result.ap_metrics
         analysis_st.ap_summary = result.ap_summary
         analysis_st.ap_is_multi_sweep = result.ap_is_multi_sweep
