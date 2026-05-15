@@ -9,6 +9,7 @@ Nav1.2, Mainen-Sejnowski, STN, Purkinje, Dopaminergic).
 
 import dataclasses
 import math
+import pickle
 from typing import Any
 
 import numpy as np
@@ -71,6 +72,7 @@ from patch_sim.channels import (
     make_snc_inap_channel,
     make_stn_na_channel,
     make_trn_icat_channel,
+    make_trn_na_channel,
     pospischil_alpha_h,
     pospischil_alpha_m,
     pospischil_alpha_n,
@@ -83,6 +85,9 @@ from patch_sim.channels import (
     purkinje_beta_h,
     purkinje_beta_m,
     purkinje_beta_n,
+    trn_alpha_h,
+    trn_alpha_m,
+    trn_beta_h,
 )
 from patch_sim.channels.auxiliary import (
     _alpha_a,
@@ -2201,6 +2206,69 @@ def test_trn_icat_tau_ft_is_sigmoid_in_voltage():
         f"tau_ft must be strictly increasing in V across [-90, 0] mV; "
         f"got non-monotonic samples taus={taus}"
     )
+
+
+# ---------------------------------------------------------------------------
+# TRN Na⁺ — optional depolarized h-gate V½ shift
+# ---------------------------------------------------------------------------
+
+
+def _trn_na_h_gate(channel: IonChannel) -> GatingVariable:
+    """Return the h gating variable of a TRN Na⁺ channel.
+
+    Args:
+        channel: An IonChannel produced by make_trn_na_channel.
+
+    Returns:
+        The ``h`` GatingVariable.
+    """
+    return next(gv for gv in channel.gating_variables if gv.name == "h")
+
+
+def test_trn_na_unshifted_h_gate_reuses_cached_rate_objects():
+    """h_v_half_shift=0.0 keeps the module-level trn_alpha_h/beta_h objects.
+
+    Object identity matters: the unshifted path must not allocate a wrapper
+    so callers relying on rate-object identity (e.g. the voltage-clamp
+    tabulation cache) keep hitting the shared instances.
+    """
+    h = _trn_na_h_gate(make_trn_na_channel(g_max=1.0))
+    assert h.alpha is trn_alpha_h
+    assert h.beta is trn_beta_h
+
+
+def test_trn_na_h_v_half_shift_evaluates_at_shifted_voltage():
+    """The shifted h gate evaluates Traub-Miles α_h/β_h at V − h_v_half_shift.
+
+    A +5 mV depolarized V½ shift means the gate at membrane voltage V
+    behaves as the unshifted gate at V − 5 mV — larger α_h (faster recovery
+    from inactivation) at the LTS-plateau voltages.  m kinetics stay on the
+    shared TRN_VT and must be untouched by the shift.
+    """
+    shift = 5.0
+    ch = make_trn_na_channel(g_max=1.0, h_v_half_shift=shift)
+    h = _trn_na_h_gate(ch)
+    m = next(gv for gv in ch.gating_variables if gv.name == "m")
+    for V in (-80.0, -65.0, -30.0, 0.0, 30.0):
+        assert h.alpha(V, 0.0) == pytest.approx(trn_alpha_h(V - shift, 0.0))
+        assert h.beta(V, 0.0) == pytest.approx(trn_beta_h(V - shift, 0.0))
+        assert m.alpha(V, 0.0) == pytest.approx(trn_alpha_m(V, 0.0))
+
+
+def test_trn_na_shifted_h_rate_survives_pickle_round_trip():
+    """Shifted h rates pickle cleanly (simulate_batch ships them to workers).
+
+    The shift is a frozen dataclass rather than a closure specifically so
+    simulate_batch can pickle the channel when handing it to a worker
+    process; a closure would raise PicklingError here.
+    """
+    shift = 5.0
+    h = _trn_na_h_gate(make_trn_na_channel(g_max=1.0, h_v_half_shift=shift))
+    alpha = pickle.loads(pickle.dumps(h.alpha))
+    beta = pickle.loads(pickle.dumps(h.beta))
+    for V in (-80.0, -30.0, 0.0, 30.0):
+        assert alpha(V, 0.0) == pytest.approx(trn_alpha_h(V - shift, 0.0))
+        assert beta(V, 0.0) == pytest.approx(trn_beta_h(V - shift, 0.0))
 
 
 # ---------------------------------------------------------------------------
