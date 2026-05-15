@@ -3,11 +3,10 @@
 These private functions are used by both current and voltage clamp protocol
 modules to avoid duplication.
 
-The default sampling frequency for every protocol generator is the
-simulator's :data:`~patch_sim.clamp_simulations.SIM_SAMPLING_FREQ` (40 kHz).
-There was previously a separate ``DEFAULT_SAMPLING_FREQUENCY`` here at
-100 kHz which silently stretched every protocol 2.5× when the simulator
-re-interpreted the array at its own rate — see #348 for the investigation.
+The default sampling frequency for every protocol generator is
+:data:`~patch_sim.constants.SIM_SAMPLING_FREQ` (40 kHz), matching the
+simulator's timebase so a protocol's nominal duration equals its simulated
+duration.
 """
 
 import numpy as np
