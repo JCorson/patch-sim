@@ -58,6 +58,7 @@ from patch_sim_ui.state.neuron import NeuronState  # noqa: E402
 from patch_sim_ui.state.protocol import ProtocolState  # noqa: E402
 from patch_sim_ui.state.visibility import VisibilityState  # noqa: E402
 from patch_sim_ui.sweep import Sweep  # noqa: E402
+from tests._rebound import post_release_rebound  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -515,7 +516,7 @@ async def test_trn_hyperpolarization_burst_via_ui_build_neuron() -> None:
     )
 
     # The deeper sweeps (indices 0, 1, 2 — currents -5, -4, -3 µA/cm²)
-    # must each produce a 5–15 spike, 200–600 Hz rebound burst.
+    # must each produce a post-release LTS rebound burst.
     for sweep_idx in (0, 1, 2):
         result = results[sweep_idx]
         time_arr = np.asarray(result["time"])
@@ -525,35 +526,32 @@ async def test_trn_hyperpolarization_burst_via_ui_build_neuron() -> None:
             ap_result, total_duration_ms=float(time_arr[-1] - time_arr[0])
         )
 
+        # Pipeline smoke check on the UI burst path.  The default-fixed
+        # size cap (issue #290) reclassifies the full LTS rebound as tonic,
+        # so the rebound itself is pinned from the spike train below — a
+        # phenotype-matching cold-start cluster must not be allowed to mask
+        # a regression in _build_neuron propagation.
         assert analysis.burst_count >= 1, (
-            f"UI-build-path sweep {sweep_idx}: expected ≥1 LTS rebound "
-            f"burst, got burst_count={analysis.burst_count}, "
-            f"total APs={ap_result.spike_count}.  This regression points "
-            f"at _build_neuron — most likely a preset attribute "
-            f"(calcium_dynamics, channel factory, etc.) is not being "
-            f"propagated to the built Neuron."
+            f"UI-build-path sweep {sweep_idx}: expected analyze_bursts to "
+            f"resolve ≥1 cluster, got burst_count={analysis.burst_count}, "
+            f"total APs={ap_result.spike_count}."
         )
-        # The detector may resolve multiple bursts (cold-start cluster +
-        # LTS rebound), so match *any* burst against the deep-HP rebound
-        # phenotype.  Upper bound 30 because deeper hyperpolarizations
-        # (-5 µA) produce larger rebound bursts (≥25 spikes); see
-        # tests/integration/test_burst_metrics_simulation.py for the
-        # underlying biological rationale.
-        matching = [
-            b
-            for b in analysis.bursts
-            if 5 <= b.spike_count <= 30
-            and b.intra_burst_frequency is not None
-            and 200.0 <= b.intra_burst_frequency <= 600.0
-        ]
-        assert matching, (
-            f"UI-build-path sweep {sweep_idx}: no detected burst matches "
-            "the deep-HP rebound phenotype (5–30 spikes, 200–600 Hz).  "
-            "Detected bursts: "
-            + ", ".join(
-                f"(n={b.spike_count}, f={b.intra_burst_frequency})"
-                for b in analysis.bursts
-            )
+
+        sweep = np.asarray(protocol[sweep_idx])
+        neg_idx = np.flatnonzero(sweep < 0.0)
+        release_idx = min(int(neg_idx[-1]) + 1, time_arr.size - 1)
+        release_ms = float(time_arr[release_idx])
+        n_spikes, freq = post_release_rebound(time_arr, v_arr, release_ms)
+        assert 5 <= n_spikes <= 35, (
+            f"UI-build-path sweep {sweep_idx}: expected a 5–35 spike "
+            f"post-release deep-HP rebound, got {n_spikes} spikes after "
+            f"release at {release_ms:.0f} ms.  This regression points at "
+            f"_build_neuron — a preset attribute (calcium_dynamics, channel "
+            f"factory, etc.) is likely not propagated to the built Neuron."
+        )
+        assert freq is not None and 200.0 <= freq <= 600.0, (
+            f"UI-build-path sweep {sweep_idx}: expected 200–600 Hz "
+            f"intra-burst frequency for the deep-HP rebound, got {freq} Hz."
         )
 
 
