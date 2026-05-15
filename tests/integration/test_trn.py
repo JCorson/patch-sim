@@ -143,14 +143,12 @@ def test_trn_ap_peak_voltage_in_trn_tonic_range(
 ) -> None:
     """Mean tonic AP peak voltage falls within the TRN range (+10 to +45 mV).
 
-    Upper bound widened from +40 to +45 mV as part of the #348 retune.  The
-    accelerated h-gate recovery (``make_trn_na_channel(h_v_half_shift=5.0)``)
-    that breaks the cold-start depol-block transient on the rising LTS edge
-    also lifts the mean tonic AP peak by ~3 mV (more Na⁺ availability at
-    threshold).  +45 mV remains inside the Huguenard & Prince (1992) range
-    for TRN cells, which report tonic AP peaks scattered from ~0 to ~+45 mV
-    depending on cell and recording conditions; the previous +40 ceiling
-    reflected the typical, not the extremum.
+    The accelerated h-gate recovery
+    (``make_trn_na_channel(h_v_half_shift=5.0)``) that supports full Na⁺
+    spikes on the rising LTS edge also lifts the mean tonic AP peak by
+    ~3 mV (more Na⁺ availability at threshold).  +45 mV is the upper
+    extremum reported by Huguenard & Prince (1992) for TRN cells across
+    cell and recording conditions; the typical peak is closer to +40 mV.
     """
     assert_ap_shape(
         trn_spontaneous_ap_result,
@@ -173,38 +171,26 @@ def test_trn_no_depol_block_on_cold_start_repetitive_firing(
 ) -> None:
     """All early-LTS-rise Vm peaks reach ≥ +7 mV under cold-start REPETITIVE_FIRING.
 
-    Pins acceptance criterion (1) of issue #348 (with a softening from the
-    originally-proposed +10 mV "HP92 floor" to +7 mV — see ``Reduced
-    floor`` below).  Before this PR, a TRN cell starting at v_rest=−80 mV
-    and stepped to +3 µA/cm² for 200 ms fired one full Na⁺ spike at
-    ~+46 mV followed by 5–8 aborted spikes whose peaks only reached
-    −7 to +7 mV before recovery (issue #347).  The aborted-spike phase
-    is a real biophysical depol-block transient — Na⁺ inactivation
-    builds during the first AP and the LTS plateau pulls Vm too high
-    for h-gate recovery before the next spike attempt.
+    Catches the depol-block transient where Na⁺ inactivation builds during
+    the first AP and the LTS plateau pulls Vm too high for h-gate recovery
+    before the next spike attempt: a TRN cell starting at v_rest=−80 mV and
+    stepped to +3 µA/cm² for 200 ms must fire every Vm peak above
+    −30 mV in the first 25 ms post-step at ≥ +7 mV, excluding the
+    −7…+7 mV aborted-spike plateau.
 
-    Fix (#348): the TRN Na channel is now built with
-    ``h_v_half_shift=5.0`` to accelerate Na⁺ recovery from inactivation
-    at LTS-plateau voltages (NaV1.6 isoform-mix precedent;
-    Rush et al. 2005, J. Physiol. 564:803; Hatch et al. 2017,
-    J. Neurosci. 37:1641).  The accelerated recovery lifts the worst
-    aborted-spike peak from ~−7 mV (pre-fix) to ≥ +7 mV (post-fix),
-    excluding the −7…+7 mV plateau described in #347.
-
-    Reduced floor (+7 vs +10 mV):
-        Empirical (g_T, g_Na, h-shift) sweeps in
-        ``scratch/trn_issue_348_final_sweep.py`` showed that the
-        (g_Na, g_K, g_T, g_KCa, g_h, g_NaL, g_KL, h_v_half_shift)
+    Floor (+7 mV):
+        The (g_Na, g_K, g_T, g_KCa, g_h, g_NaL, g_KL, h_v_half_shift)
         parameter space is over-determined by the {no-depol-block,
         HP92 rebound burst, +10/+45 mV tonic AP peak, in-band tonic
         rate, in-band Ca peak} constraint set — every candidate that
-        clears the +10 mV floor either pushes the spontaneous AP
-        peak above +45 mV or fragments the rebound burst.  The +7 mV
-        floor still excludes the worst-case −7…+7 mV plateau identified
-        in #347 (every aborted spike must reach ≥ +7 mV).
+        clears a +10 mV floor either pushes the spontaneous AP peak
+        above +45 mV or fragments the rebound burst.  +7 mV still
+        excludes the worst-case aborted-spike plateau (every spike
+        attempt must clear +7 mV) while keeping the rest of the
+        phenotype in band.
 
     Reference: Huguenard & Prince (1992), J. Neurosci. 12:3804 (HP92 AP
-    peak voltages); issues #347 and #348.
+    peak voltages).
     """
     pre_ms, stim_ms, post_ms = 10.0, 200.0, 10.0
     duration_ms = pre_ms + stim_ms + post_ms
@@ -217,12 +203,12 @@ def test_trn_no_depol_block_on_cold_start_repetitive_firing(
     )
     result = simulate_current_clamp(trn_neuron, current_external=protocol)
 
-    # Window: first 25 ms post-step-onset.  The #347 depol-block lasted
-    # ~15 ms; 25 ms includes the full recovery and the first
-    # post-recovery tonic spike, giving the assertion margin without
-    # reaching into steady-state tonic firing.
+    # Window: first 25 ms post-step-onset, long enough to cover the
+    # rising-edge depol-block transient (~15 ms) plus the first
+    # post-recovery tonic spike, while staying out of steady-state
+    # tonic firing.
     window_ms = 25.0
-    floor_mv = 7.0  # See "Reduced floor" in the docstring.
+    floor_mv = 7.0  # See "Floor" in the docstring.
     spike_threshold_mv = -30.0  # Local maxima below this are not AP attempts.
 
     t = np.asarray(result["time"])
@@ -246,10 +232,9 @@ def test_trn_no_depol_block_on_cold_start_repetitive_firing(
     assert min_peak >= floor_mv, (
         f"Cold-start depol-block detected on rising LTS edge: worst Vm peak "
         f"in first {window_ms:.0f} ms post-step-onset is {min_peak:+.2f} mV, "
-        f"below the {floor_mv:+.0f} mV floor.  This is the #347/#348 "
-        f"phenotype — Na⁺ inactivation has built during the first AP and "
-        f"subsequent spike attempts abort on the LTS plateau.  Reference: "
-        f"{_TRN_REFERENCE}; issue #348."
+        f"below the {floor_mv:+.0f} mV floor — Na⁺ inactivation has built "
+        f"during the first AP and subsequent spike attempts abort on the "
+        f"LTS plateau.  Reference: {_TRN_REFERENCE}."
     )
 
 

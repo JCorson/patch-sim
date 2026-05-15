@@ -20,10 +20,7 @@ _PRE_MS = 50.0
 # has active Na/K currents that produce a slow wiggle around the new
 # equilibrium; ~500 ms is required for the wiggle to die out enough for a
 # clean exponential fit to converge on τₘ instead of the oscillation
-# period.  (Prior to the sampling-frequency alignment the test ran for
-# 2.5× longer than nominal — see DEFAULT_SAMPLING_FREQUENCY in
-# patch_sim/protocols/common.py — and 200 ms nominal silently became
-# 500 ms actual; pinning the actual duration here keeps the test stable.)
+# period.
 _STIM_MS = 500.0
 _POST_MS = 50.0
 
@@ -153,14 +150,9 @@ def test_time_constant_hh_model(
     active conductances at rest (Na/K window currents and a slow K relaxation
     on subthreshold perturbation) so the single-exponential fit of the
     membrane response captures a *mixed* time constant — the fast capacitive
-    transient blended with the slower active relaxation.  Empirically this
-    fit returns τ ≈ 150–200 ms when the simulation is run at the correct
-    sampling frequency.  Prior to the DEFAULT_SAMPLING_FREQUENCY alignment
-    (40 kHz, matching SIM_SAMPLING_FREQ), the protocol was silently 2.5×
-    longer than nominal and the fit window opened *before* the actual step
-    onset, so :func:`scipy.optimize.curve_fit` converged to its initial
-    guess (~5 ms) and the test appeared to pass; the new bound (<400 ms)
-    accepts the well-fit τ from the corrected simulation.
+    transient blended with the slower active relaxation.  Empirically the
+    fit returns τ ≈ 150–200 ms; the bound (<400 ms) accepts this well-fit τ
+    with margin.
     """
     _, props = _subthreshold_passive
     assert props.time_constant > 0.0
@@ -173,11 +165,11 @@ def test_membrane_capacitance_hh_model(
     """Derived Cₘ from the HH model is positive and in a plausible range.
 
     Cₘ = τₘ / R_in.  With τₘ in the 150–200 ms range (see the time-constant
-    test for why this is the well-fit value at correct sampling) and
-    R_in ≈ 0.5–2 kΩ·cm² the derived Cₘ is in the 75–400 µF/cm² range — far
-    above the passive HH C_m = 1 µF/cm² because the fit captures the active
-    relaxation rather than the pure capacitive transient.  This test
-    verifies sign and rough order of magnitude only.
+    test for why this is the well-fit value) and R_in ≈ 0.5–2 kΩ·cm² the
+    derived Cₘ is in the 75–400 µF/cm² range — far above the passive HH
+    C_m = 1 µF/cm² because the fit captures the active relaxation rather
+    than the pure capacitive transient.  This test verifies sign and rough
+    order of magnitude only.
     """
     _, props = _subthreshold_passive
     assert props.membrane_capacitance is not None

@@ -419,13 +419,13 @@ def test_trn_uses_huguenard_na_factory() -> None:
     Na⁺ kinetics (VT = −67 mV, recorded at 36 °C) are used instead of the
     default HH52 squid axon kinetics.
 
-    Since #348, the TRN Na channel is built with ``h_v_half_shift=5.0`` to
-    accelerate Na⁺ recovery from inactivation at LTS-plateau voltages
-    (NaV1.6 isoform-mix precedent; Rush et al. 2005; Hatch et al. 2017).
-    The reference factory below passes the same shift so the kinetic
+    The TRN Na channel is built with ``h_v_half_shift=5.0`` to accelerate
+    Na⁺ recovery from inactivation at LTS-plateau voltages (NaV1.6
+    isoform-mix precedent; Rush et al. 2005; Hatch et al. 2017).  The
+    reference factory below passes the same shift so the kinetic
     comparison is between two correctly-parameterised TRN Na channels —
     a regression here means the preset has drifted off the Huguenard
-    factory or its h-gate shift, not that the shift itself is wrong.
+    factory or its h-gate shift.
     """
     _kinetics_match(
         _channel_by_name(NEURON_PRESETS[TRN](), "Na"),

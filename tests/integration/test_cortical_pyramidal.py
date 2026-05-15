@@ -150,14 +150,9 @@ def test_subthreshold_amplification(cp_neuron: Neuron) -> None:
     """
     protocol = step_current(
         duration=200.0,
-        # At the corrected sampling frequency (40 kHz, matching
-        # SIM_SAMPLING_FREQ; cf. #348) the AP threshold for this preset is
-        # ~0.22 µA/cm².  The legacy 0.3 µA value was nominally "well below
-        # threshold" but only because the previous 100 kHz protocol default
-        # was silently re-interpreted as 40 kHz samples by the simulator —
-        # stretching the test's check window into the pre-step region.
-        # 0.2 µA stays comfortably subthreshold at correct timing while
-        # still activating INaP enough to test the inward-current assertion.
+        # AP threshold for this preset is ~0.22 µA/cm²; 0.2 µA stays
+        # comfortably subthreshold while still activating INaP enough to
+        # test the inward-current assertion.
         current_amplitude=0.2,
         step_start=50.0,
         step_duration=100.0,
@@ -268,19 +263,14 @@ def test_suprathreshold_fires_action_potentials(cp_neuron: Neuron) -> None:
 # multi-assertion test.
 # ---------------------------------------------------------------------------
 
-# Suprathreshold step shared by the AP-shape battery: 5 µA/cm² for 800 ms,
-# matching the existing test_spike_frequency_adaptation stimulus.  This
-# stimulus reliably produces tens of APs across the step, giving a stable
-# mean for half-width / peak / threshold / AHP without being so strong that
-# it pins voltage at the Na⁺ reversal.
-# Step duration intentionally extended to 2000 ms so the spike train is long
-# enough for slow Na inactivation (sNa, #327) and IM (slow K) to accumulate,
+# Suprathreshold step shared by the AP-shape battery: 5 µA/cm² for 2000 ms.
+# This stimulus reliably produces tens of APs across the step, giving a
+# stable mean for half-width / peak / threshold / AHP without being so
+# strong that it pins voltage at the Na⁺ reversal.  The 2000 ms duration is
+# long enough for slow Na inactivation (sNa) and IM (slow K) to accumulate,
 # lowering the mean AP peak voltage from the unadapted early-train value
-# (~+45 mV) into the McCormick et al. (1985) RS-pyramidal range (+20 to
-# +45 mV).  Prior to the DEFAULT_SAMPLING_FREQUENCY alignment (40 kHz,
-# matching SIM_SAMPLING_FREQ — see #348), the nominal 800 ms duration was
-# silently stretched to 2000 ms by the simulator, so the 2000 ms here
-# restores the train length the band was originally calibrated against.
+# (~+45 mV) into the McCormick et al. (1985) RS-pyramidal range
+# (+20 to +45 mV).
 _AP_SHAPE_STEP_DURATION_MS = 2000.0
 _AP_SHAPE_STEP_CURRENT = 5.0
 _RS_REFERENCE = "McCormick et al. 1985 / Connors & Gutnick 1990"

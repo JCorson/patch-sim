@@ -116,25 +116,21 @@ def make_trn() -> Neuron:
         recorded at 36 °C; T_ref=309.15 K limits the runtime Q10 correction to
         ~1.12× (36→37 °C), preserving the published kinetics.  g_Na=50 mS/cm²
         and g_K=24 mS/cm² are explicit somatic densities that land every HP92
-        tonic AP-shape metric (peak +10 to +45 mV — band widened from +40
-        post-#348 for the h-gate-shifted Na channel; AHP −75 to −55 mV;
+        tonic AP-shape metric (peak +10 to +45 mV; AHP −75 to −55 mV;
         half-width; threshold; firing rate) inside its band while preserving
         the 5–15 spike LTS burst at g_T=2.85 mS/cm².
 
-    Na h-gate shift (post-#348):
+    Na h-gate shift:
         The Na channel uses ``make_trn_na_channel(h_v_half_shift=5.0)`` to
         shift the inactivation h-gate V½ depolarized by 5 mV, accelerating
         Na⁺ recovery from inactivation at LTS-plateau voltages (≈ −30 to
-        +5 mV).  This breaks the ~15 ms cold-start depol-block transient
-        on the rising LTS edge of REPETITIVE_FIRING (issue #347: one full
-        +46 mV Na⁺ spike followed by 5–8 aborted spikes at −7…+7 mV while
-        h recovers; post-fix, the worst aborted-spike peak is ≥ +7 mV).
-        m and n kinetics remain on the shared TRN_VT.  Biological
-        motivation: TRN expresses a mix of NaV1.6 and NaV1.2 isoforms
-        whose inactivation half-points differ by ~10 mV (Rush et al. 2005,
-        J. Physiol. 564:803; Hatch et al. 2017, J. Neurosci. 37:1641).
-        A 5 mV effective shift is well within the published isoform-mix
-        variation.
+        +5 mV) so the cell sustains full Na⁺ spikes on the rising LTS edge
+        of REPETITIVE_FIRING.  m and n kinetics remain on the shared
+        TRN_VT.  Biological motivation: TRN expresses a mix of NaV1.6 and
+        NaV1.2 isoforms whose inactivation half-points differ by ~10 mV
+        (Rush et al. 2005, J. Physiol. 564:803; Hatch et al. 2017,
+        J. Neurosci. 37:1641); a 5 mV effective shift is well within the
+        published isoform-mix variation.
 
     Passive properties:
         g_NaL=0.0066 / g_KL=0.0634 mS/cm² (total 0.07) gives τ_m ≈ 14.3 ms
@@ -180,11 +176,9 @@ def make_trn() -> Neuron:
         # load-bearing: lower alpha_ca collapses the burst phenotype because
         # IKCa (g_KCa=0.3 mS/cm²) cannot terminate the burst cleanly without
         # sufficient Ca²⁺ drive.  ``test_calcium_calibration.py`` uses a
-        # TRN-specific 5–16 µM band to accommodate this realistic Ca level
-        # (post-#348 the protocol durations match the simulator's nominal
-        # rate, so the REPETITIVE_FIRING peak is the transient buildup
-        # rather than the lower quasi-steady-state of the previous stretched
-        # protocol).
+        # TRN-specific 5–16 µM band: the REPETITIVE_FIRING peak here is the
+        # transient buildup before IKCa AHPs and tau_ca extrusion bring it
+        # back down, not a quasi-steady-state.
         calcium_dynamics=CalciumDynamics(alpha_ca=1.2e-5, tau_ca=20.0, ca_rest=1e-4),
         area_cm2=7e-6,
     )

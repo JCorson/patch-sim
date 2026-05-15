@@ -272,8 +272,8 @@ def make_trn_na_channel(g_max: float, h_v_half_shift: float = 0.0) -> IonChannel
     Rush et al. 2005, J. Physiol. 564:803; Hatch et al. 2017,
     J. Neurosci. 37:1641) — TRN expresses both isoforms, and the effective
     h V½ depends on isoform mix.  A positive shift accelerates recovery
-    from inactivation, breaking the early-LTS-rise depol-block transient
-    on REPETITIVE_FIRING cold start (#348).
+    from inactivation at LTS-plateau voltages, supporting full Na⁺ spikes
+    on the rising LTS edge of REPETITIVE_FIRING.
 
     Reference: Huguenard & Prince (1992), J. Neurosci. 12:3804;
     Destexhe et al. (1994), J. Neurophysiol. 72:803;
@@ -292,11 +292,10 @@ def make_trn_na_channel(g_max: float, h_v_half_shift: float = 0.0) -> IonChannel
         An :class:`~patch_sim.channels.IonChannel` representing the TRN fast
         Na⁺ channel.
     """
-    # ``== 0.0`` is the default-arg fast path: preserves object identity of
-    # the cached module-level ``trn_alpha_h`` / ``trn_beta_h`` so callers
-    # that never pass ``h_v_half_shift`` see exactly the same rate
-    # references they did before this parameter was added.  Any non-zero
-    # shift (including denormals) wraps in the picklable dataclass.
+    # ``== 0.0`` reuses the cached module-level ``trn_alpha_h`` /
+    # ``trn_beta_h`` rate objects, preserving object identity for unshifted
+    # callers.  Any non-zero shift (including denormals) wraps in the
+    # picklable dataclass.
     if h_v_half_shift == 0.0:
         alpha_h = trn_alpha_h
         beta_h = trn_beta_h
