@@ -150,13 +150,13 @@ def test_time_constant_hh_model(
     active conductances at rest (Na/K window currents and a slow K relaxation
     on subthreshold perturbation) so the single-exponential fit of the
     membrane response captures a *mixed* time constant — the fast capacitive
-    transient blended with the slower active relaxation.  Empirically the
-    fit returns τ ≈ 150–200 ms; the bound (<400 ms) accepts this well-fit τ
-    with margin.
+    transient blended with the slower active relaxation.  The fit returns
+    τ ≈ 173 ms for this preset; the 100–250 ms band brackets that value
+    closely enough to catch a regression to the pure-passive τ (a 50×
+    drop) or a fit blowup, while tolerating minor numerical drift.
     """
     _, props = _subthreshold_passive
-    assert props.time_constant > 0.0
-    assert props.time_constant < 400.0
+    assert 100.0 < props.time_constant < 250.0
 
 
 def test_membrane_capacitance_hh_model(
@@ -164,17 +164,16 @@ def test_membrane_capacitance_hh_model(
 ) -> None:
     """Derived Cₘ from the HH model is positive and in a plausible range.
 
-    Cₘ = τₘ / R_in.  With τₘ in the 150–200 ms range (see the time-constant
-    test for why this is the well-fit value) and R_in ≈ 0.5–2 kΩ·cm² the
-    derived Cₘ is in the 75–400 µF/cm² range — far above the passive HH
-    C_m = 1 µF/cm² because the fit captures the active relaxation rather
-    than the pure capacitive transient.  This test verifies sign and rough
-    order of magnitude only.
+    Cₘ = τₘ / R_in.  With the mixed-fit τₘ ≈ 173 ms (see the time-constant
+    test) and R_in ≈ 0.9 kΩ·cm² the derived Cₘ ≈ 190 µF/cm² — far above the
+    passive HH C_m = 1 µF/cm² because the fit captures the active relaxation
+    rather than the pure capacitive transient.  The 80–320 µF/cm² band
+    brackets that value and catches a collapse toward the pure-passive
+    C_m while tolerating minor numerical drift.
     """
     _, props = _subthreshold_passive
     assert props.membrane_capacitance is not None
-    assert props.membrane_capacitance > 0.0
-    assert props.membrane_capacitance < 400.0
+    assert 80.0 < props.membrane_capacitance < 320.0
 
 
 def test_fit_converged_flag_hh_model(
