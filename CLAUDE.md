@@ -34,6 +34,21 @@ Use **US English** in all code, comments, docstrings, and documentation. LLM-ass
 
 **Prioritize biological accuracy** when designing or modifying neuron presets. If a preset produces behavior that doesn't match known physiology (wrong resting potential, wrong firing pattern, missing channels), fix the underlying biology rather than working around it. When a full biological fix is out of scope (e.g. a channel type not yet implemented), document the known limitation explicitly in the preset comment and in an issue — do not silently accept a biologically wrong default.
 
+## Comments and docstrings
+
+Comments and docstrings explain the **current** design — what the code does and why it's biologically or numerically correct — in the present tense. They are not a changelog.
+
+Do **not** include:
+
+- Issue or PR numbers cited as "this fixes…" or "this changed in…" (`#347`, `#348`).
+- Temporal framing about prior states: "before this PR", "post-#348", "prior to the alignment", "was previously", "originally proposed", "legacy", "restores".
+- Descriptions of removed code or the bug that was fixed ("was silently stretched 2.5×", "the earlier rate was a 100 kHz protocol re-interpreted as 40 kHz").
+- "Widened from X to Y" or "extended from X to Y" framings — just state the current band/duration and why.
+
+Investigation history belongs in the PR body and the issue thread, not in source.
+
+Issue links **are** appropriate when documenting an open limitation that has not been fixed yet (see `## Biological accuracy`).
+
 ## Architecture
 
 - `patch_sim/` — pure Python library, **no Reflex dependency**. All simulation logic lives here. Notable subpackages: `patch_sim/analysis/` (post-hoc metrics: AP metrics, F-I, G-V, I-V, passive properties, burst metrics, etc.) and `patch_sim/protocols/` (current/voltage protocol builders).
