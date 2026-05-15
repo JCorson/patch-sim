@@ -128,12 +128,9 @@ def test_classic_hh_short_stimulus_tonic_does_not_trip_tight_cluster(
     Args:
         hh_model: Classic Hodgkin-Huxley neuron fixture.
     """
-    # Step duration sized to produce more ISIs than _TIGHT_CLUSTER_MAX_ISIS
-    # at HH's tonic firing rate (~66 Hz at +10 µA/cm²; the docstring's
-    # 210 Hz figure predates the sampling-frequency alignment in #348 — the
-    # earlier rate was a 100 kHz protocol silently re-interpreted as 40 kHz
-    # samples by the simulator).  ~150 ms of step at 66 Hz yields ~10 spikes
-    # → 9 ISIs, comfortably above the count cap.
+    # ~150 ms of step at HH's tonic ~66 Hz (+10 µA/cm²) yields ~10 spikes →
+    # 9 ISIs, comfortably above _TIGHT_CLUSTER_MAX_ISIS so the count cap is
+    # exercised.
     protocol = step_current(
         duration=170.0,
         current_amplitude=10.0,
@@ -244,15 +241,12 @@ def test_trn_step_release_produces_hp92_rebound_burst() -> None:
     )
     result = simulate_current_clamp(neuron, protocol)
     analysis = analyze_bursts_from_result(result)
-    # Post-#348 sampling alignment the trace duration matches its nominal
-    # 900 ms (rather than the silently-stretched 2250 ms before), so the
-    # default-fixed burst detector resolves three distinct clusters in
-    # the tonic + rebound trace: the cold-start cluster (~28 ms after
-    # cell start, depol-block recovery — what #347 documented and #348
-    # addresses), a tiny pre-rebound tonic doublet, and the actual LTS
-    # rebound burst after step release.  The test asserts that *at least
-    # one* of the detected bursts matches the HP92 phenotype (5–15 Na⁺
-    # spikes at 200–600 Hz), which is the real biological invariant.
+    # The default-fixed burst detector resolves three clusters in this trace:
+    # a cold-start cluster (~28 ms after cell start, depol-block recovery on
+    # the rising LTS edge), a small pre-rebound tonic doublet, and the LTS
+    # rebound burst after step release.  Assert that *at least one* burst
+    # matches the HP92 phenotype (5–15 Na⁺ spikes at 200–600 Hz) — the
+    # biological invariant — rather than fixing on a particular burst index.
     assert analysis.burst_count >= 1, (
         f"Expected at least one HP92-phenotype LTS burst, got burst_count="
         f"{analysis.burst_count}.  The rebound may have fragmented into "
@@ -332,17 +326,15 @@ def test_trn_hyperpolarization_steps_protocol_produces_burst_per_sweep() -> None
             f"preset is not delivering the HP92 rebound phenotype on the "
             f"multi-sweep UI path."
         )
-        # The detector may resolve more than one burst at correct sampling
-        # (cold-start cluster + LTS rebound burst), so search for *any*
-        # burst matching the HP92 phenotype rather than fixing on
-        # bursts[0].  Upper bound widened to 30 spikes post-#348: with
-        # the h-gate-shift Na channel, deeper hyperpolarizations (-5 µA)
-        # produce larger rebound bursts (≥25 spikes) because Na⁺ is more
-        # available after the long Ih-driven hyperpolarization; HP92's
-        # 5–15 was reported for "typical" hyperpolarization, and #295's
-        # 5–15 floor remains in
-        # test_trn_step_release_produces_hp92_rebound_burst for the
-        # canonical -4 µA × 500 ms protocol.
+        # The detector may resolve multiple bursts (cold-start cluster + LTS
+        # rebound), so match *any* burst against the HP92 phenotype rather
+        # than fixing on bursts[0].  Upper bound 30 because deeper
+        # hyperpolarizations (-5 µA) produce larger rebound bursts (≥25
+        # spikes): Na⁺ is more available after the long Ih-driven
+        # hyperpolarization, beyond the 5–15 range Huguenard & Prince
+        # (1992) reported for typical hyperpolarization.  The canonical
+        # 5–15 floor for the -4 µA × 500 ms protocol is enforced in
+        # test_trn_step_release_produces_hp92_rebound_burst above.
         matching = [
             b
             for b in analysis.bursts
@@ -351,8 +343,8 @@ def test_trn_hyperpolarization_steps_protocol_produces_burst_per_sweep() -> None
             and 200.0 <= b.intra_burst_frequency <= 600.0
         ]
         assert matching, (
-            f"Sweep {sweep_idx}: no detected burst matches the (widened) "
-            "HP92 phenotype (5–30 spikes, 200–600 Hz).  Detected bursts: "
+            f"Sweep {sweep_idx}: no detected burst matches the deep-HP "
+            "rebound phenotype (5–30 spikes, 200–600 Hz).  Detected bursts: "
             + ", ".join(
                 f"(n={b.spike_count}, f={b.intra_burst_frequency})"
                 for b in analysis.bursts
