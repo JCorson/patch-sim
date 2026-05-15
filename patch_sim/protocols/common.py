@@ -12,7 +12,7 @@ re-interpreted the array at its own rate — see #348 for the investigation.
 
 import numpy as np
 
-from ..clamp_simulations import SIM_SAMPLING_FREQ
+from ..constants import SIM_SAMPLING_FREQ
 
 
 def _calculate_time_parameters(

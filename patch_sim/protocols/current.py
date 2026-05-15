@@ -7,7 +7,7 @@ protocols that can be used with current clamp simulations.
 import numpy as np
 from scipy.signal import chirp
 
-from ..clamp_simulations import SIM_SAMPLING_FREQ
+from ..constants import SIM_SAMPLING_FREQ
 from .common import (
     _apply_time_window,
     _calculate_time_parameters,

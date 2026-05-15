@@ -6,9 +6,11 @@ from typing import Any, AsyncGenerator
 import numpy as np
 import reflex as rx
 
-import patch_sim
-import patch_sim.clamp_simulations
-from patch_sim.constants import CURRENT_CLAMP, INACTIVATION_PROTOCOL
+from patch_sim.constants import (
+    CURRENT_CLAMP,
+    INACTIVATION_PROTOCOL,
+    SIM_SAMPLING_FREQ,
+)
 from patch_sim.presets import NEURON_PROTOCOL_ADJUSTMENTS, PROTOCOL_PRESETS
 from patch_sim.protocols.builders import build_current_protocol, build_voltage_protocol
 from patch_sim_ui import constants
@@ -406,7 +408,7 @@ class ProtocolState(rx.State):
             return a one-element list with an empty label; multi-sweep protocols
             (e.g. I-V Curve) return one entry per sweep with a descriptive label.
         """
-        fs = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
+        fs = SIM_SAMPLING_FREQ
         if self.clamp_mode == "Current Clamp":
             arrays = build_current_protocol(
                 protocol_type=self.protocol_type,

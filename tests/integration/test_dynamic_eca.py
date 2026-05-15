@@ -16,7 +16,7 @@ import dataclasses
 import numpy as np
 
 from patch_sim import simulate_current_clamp
-from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ
+from patch_sim.constants import SIM_SAMPLING_FREQ
 from patch_sim.presets import CORTICAL_PYRAMIDAL, NEURON_PRESETS, PURKINJE
 
 

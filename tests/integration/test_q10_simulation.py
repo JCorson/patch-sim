@@ -18,10 +18,10 @@ import numpy as np
 import pytest
 
 from patch_sim.clamp_simulations import (
-    SIM_SAMPLING_FREQ,
     simulate_current_clamp,
     simulate_voltage_clamp,
 )
+from patch_sim.constants import SIM_SAMPLING_FREQ
 from patch_sim.neuron import Neuron
 from patch_sim.presets import make_squid_giant_axon
 from patch_sim.protocols import step_current, step_voltage

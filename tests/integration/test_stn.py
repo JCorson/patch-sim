@@ -11,7 +11,8 @@ import numpy as np
 import pytest
 
 from patch_sim.analysis.ap_metrics import analyze_aps_from_result
-from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+from patch_sim.clamp_simulations import simulate_current_clamp
+from patch_sim.constants import SIM_SAMPLING_FREQ
 from patch_sim.neuron import Neuron
 from patch_sim.presets import make_stn
 from tests.integration._ap_shape import assert_ap_shape

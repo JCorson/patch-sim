@@ -6,7 +6,7 @@ protocols that can be used with voltage clamp simulations.
 
 import numpy as np
 
-from ..clamp_simulations import SIM_SAMPLING_FREQ
+from ..constants import SIM_SAMPLING_FREQ
 from .common import (
     _generate_pulse_train_protocol,
     _generate_ramp_protocol,

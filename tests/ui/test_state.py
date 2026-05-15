@@ -1976,7 +1976,8 @@ async def test_stn_recovers_from_depol_block_via_ui_build_neuron() -> None:
     happily passes while the live UI silently loses sNaP and stalls
     around −30 mV.
     """
-    from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+    from patch_sim.clamp_simulations import simulate_current_clamp
+    from patch_sim.constants import SIM_SAMPLING_FREQ
 
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
@@ -2069,7 +2070,8 @@ async def test_cp_recovers_from_depol_block_via_ui_build_neuron() -> None:
     Without this test, an integration test that bypasses _build_neuron
     happily passes while the live UI silently loses sNa or sNaP.
     """
-    from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+    from patch_sim.clamp_simulations import simulate_current_clamp
+    from patch_sim.constants import SIM_SAMPLING_FREQ
 
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
@@ -2156,7 +2158,8 @@ async def test_ca1_recovers_from_depol_block_via_ui_build_neuron() -> None:
     Without this test, an integration test that bypasses _build_neuron
     happily passes while the live UI silently loses sNa or sNaP.
     """
-    from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+    from patch_sim.clamp_simulations import simulate_current_clamp
+    from patch_sim.constants import SIM_SAMPLING_FREQ
 
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):
@@ -2244,7 +2247,8 @@ async def test_purkinje_recovers_from_depol_block_via_ui_build_neuron() -> None:
     Without this test, an integration test that bypasses _build_neuron
     happily passes while the live UI silently loses sNa or sNaP.
     """
-    from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+    from patch_sim.clamp_simulations import simulate_current_clamp
+    from patch_sim.constants import SIM_SAMPLING_FREQ
 
     ns = _make_neuron_state()
     with patch.object(NeuronState, "get_state", new=_make_get_state_fn({})):

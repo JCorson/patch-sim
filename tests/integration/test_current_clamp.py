@@ -5,8 +5,8 @@ import dataclasses
 import numpy as np
 import pytest
 
-from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
-from patch_sim.constants import DOPAMINERGIC, PURKINJE, STN, TRN
+from patch_sim.clamp_simulations import simulate_current_clamp
+from patch_sim.constants import DOPAMINERGIC, PURKINJE, SIM_SAMPLING_FREQ, STN, TRN
 from patch_sim.neuron import Neuron  # noqa: F401  (used in type hints below)
 from patch_sim.presets import NEURON_PRESET_NAMES, NEURON_PRESETS, make_squid_giant_axon
 

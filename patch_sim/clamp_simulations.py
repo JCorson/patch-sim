@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
+from .constants import SIM_SAMPLING_FREQ
 from .rates import VoltageOnlyRate
 
 if TYPE_CHECKING:
@@ -40,10 +41,6 @@ else:
     SimulationResult = np.ndarray
 
 logger = logging.getLogger(__name__)
-
-#: Fixed simulation sampling frequency (Hz). dt = 1000 / SIM_SAMPLING_FREQ ms.
-#: 40 kHz (dt = 0.025 ms) is standard for conductance-based neuron models.
-SIM_SAMPLING_FREQ: float = 40_000.0
 
 #: Voltage clamp bounds for the current-clamp RK4 integrator (mV).
 #: Physiological voltages span ~[-90, +60] mV; ±150 mV covers all reversal
