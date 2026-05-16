@@ -294,7 +294,11 @@ def _compute_burst_data(
         return [], {}
 
     total_duration_ms = float(time_arr[-1] - time_arr[0]) if len(time_arr) > 1 else 0.0
-    analysis = patch_sim.analyze_bursts(ap_result, total_duration_ms=total_duration_ms)
+    analysis = patch_sim.analyze_bursts(
+        ap_result,
+        total_duration_ms=total_duration_ms,
+        _trace_end_time_ms=float(time_arr[-1]),
+    )
     metrics = [_format_burst_dict(i, b) for i, b in enumerate(analysis.bursts)]
     summary = _serialise_burst_summary(analysis)
     return metrics, summary
@@ -353,7 +357,9 @@ def _compute_multi_sweep_burst_data(
         if ap_result.spike_count < 2:
             continue
         analysis = patch_sim.analyze_bursts(
-            ap_result, total_duration_ms=sweep_duration_ms
+            ap_result,
+            total_duration_ms=sweep_duration_ms,
+            _trace_end_time_ms=float(time_arr[-1]),
         )
         per_sweep_results.append((sweep_idx, analysis))
         pooled.extend((sweep_idx, b) for b in analysis.bursts)
