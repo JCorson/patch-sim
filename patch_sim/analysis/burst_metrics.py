@@ -421,11 +421,9 @@ def _empty_result(
     Args:
         isi_threshold_ms: Threshold that was applied (ms).
         threshold_method: How the threshold was chosen.
-        unburst_spike_count: Spikes to surface as unburst.  Defaults to 0
-            for the no-spikes call site; the default-fixed tonic
-            short-circuit in :func:`analyze_bursts` (when the
-            tight-cluster carve-out does not apply) passes the full spike
-            count through.
+        unburst_spike_count: Number of spikes to surface as unburst.
+            Defaults to 0; the only caller is the zero-spike path in
+            :func:`analyze_bursts`, which always uses the default.
 
     Returns:
         A :class:`BurstAnalysisResult` with ``burst_count`` of 0 and all
@@ -468,6 +466,12 @@ def _is_terminating_lts_cluster(
         trace_end_time_ms: The last time point of the recording (ms).  Used
             as the quiescent-window reference when ``trailing_gap_ms`` is
             ``None``.
+
+    The single-gap assumption is intentional: a leading tonic segment
+    interrupted by one pause of at least :data:`_LTS_TERMINATION_GAP_RATIO`
+    × mean intra-burst ISI is treated as LTS termination and retained as a
+    burst.  This means only the trailing quiescence needs to be long enough;
+    the cluster need not be the last activity in the trace.
 
     Returns:
         ``True`` when the cluster should be retained as a burst; ``False``

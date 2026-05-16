@@ -14,6 +14,7 @@ import pytest
 from patch_sim.analysis.ap_metrics import APAnalysisResult, SpikeMetrics
 from patch_sim.analysis.burst_metrics import (
     _LTS_QUIESCENT_TAIL_MS,
+    _LTS_TERMINATION_GAP_RATIO,
     BurstAnalysisResult,
     analyze_bursts,
     analyze_bursts_from_result,
@@ -540,4 +541,37 @@ def test_oversized_tight_cluster_short_tail_rejected() -> None:
 
     assert result.threshold_method == "default-fixed"
     assert result.burst_count == 0
+    assert result.unburst_spike_count == 16
+
+
+def test_oversized_tight_cluster_short_interburst_gap_rejected_as_tonic() -> None:
+    """An oversized cluster followed by a gap below the LTS ratio threshold is tonic.
+
+    16 spikes at uniform 3 ms ISIs form an oversized cluster (mean ISI = 3 ms,
+    spike count > _TIGHT_CLUSTER_MAX_ISIS + 1 = 8).  A trailing gap of 13 ms
+    closes the group (13 > _TIGHT_CLUSTER_MAX_ISI_MS = 12 ms) but falls below
+    the LTS termination threshold of _LTS_TERMINATION_GAP_RATIO × mean_isi =
+    5 × 3 = 15 ms.  The cluster is therefore rejected as tonic and folded into
+    the unburst count; the subsequent fast spikes form a small burst.
+    """
+    # 16 spikes at 3 ms ISIs: mean_isi = 3 ms, ratio threshold = 5 × 3 = 15 ms.
+    # Trailing gap = 13 ms: closes the group (13 > 12) but below threshold (13 < 15).
+    cluster_isis = [3.0] * 15  # 16 spikes
+    cluster_times = list(np.cumsum([10.0, *cluster_isis]))  # t=10..55 ms
+    gap_ms = 13.0  # 13 > _TIGHT_CLUSTER_MAX_ISI_MS=12; 13 < 5×3=15
+    assert gap_ms > _DEFAULT_THRESHOLD_MS, "gap must close the burst group"
+    assert gap_ms < _LTS_TERMINATION_GAP_RATIO * 3.0, (
+        "gap must be below ratio threshold"
+    )
+    tail_times = [cluster_times[-1] + gap_ms + i * 3.0 for i in range(4)]
+
+    ap = _make_ap_result(cluster_times + tail_times)
+    result = analyze_bursts(
+        ap,
+        total_duration_ms=500.0,
+        _trace_end_time_ms=500.0,
+    )
+
+    assert result.threshold_method == "default-fixed"
+    # The oversized cluster is rejected; 16 spikes fold into unburst.
     assert result.unburst_spike_count == 16
