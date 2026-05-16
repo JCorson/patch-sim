@@ -242,17 +242,23 @@ def test_trn_step_release_produces_hp92_rebound_burst() -> None:
     result = simulate_current_clamp(neuron, protocol)
     release_ms = pre + stim
 
-    # analyze_bursts_from_result is the path the Reflex UI takes; assert it
-    # still resolves at least one cluster (pipeline smoke check).  Its
-    # default-fixed size cap (issue #290) reclassifies the full ~15-spike
-    # LTS rebound as sustained tonic firing, so it surfaces only the short
-    # cold-start cluster — the rebound itself is pinned from the spike
-    # train below, where a phenotype-matching cold-start cluster cannot
-    # mask a missing rebound.
+    # The terminating-cluster carve-out in analyze_bursts_from_result must
+    # now report the ~15-spike rebound burst directly.  Assert that at least
+    # one burst matches the HP92 TRN phenotype rather than just checking
+    # burst_count >= 1.  Do NOT assert burst_count == 1 because a cold-start
+    # cluster before the hyperpolarizing step may appear as a separate burst.
     analysis = analyze_bursts_from_result(result)
-    assert analysis.burst_count >= 1, (
-        f"Expected analyze_bursts_from_result to resolve at least one "
-        f"cluster, got burst_count={analysis.burst_count}."
+    rebound_bursts = [
+        b
+        for b in analysis.bursts
+        if 5 <= b.spike_count <= 35
+        and b.intra_burst_frequency is not None
+        and 200.0 <= b.intra_burst_frequency <= 600.0
+    ]
+    assert len(rebound_bursts) >= 1, (
+        f"Expected analyze_bursts_from_result to surface at least one HP92 "
+        f"rebound burst (5–35 spikes, 200–600 Hz), got bursts="
+        f"{[(b.spike_count, b.intra_burst_frequency) for b in analysis.bursts]}"
     )
 
     n_spikes, freq = post_release_rebound(result["time"], result["voltage"], release_ms)
@@ -308,18 +314,25 @@ def test_trn_hyperpolarization_steps_protocol_produces_burst_per_sweep() -> None
         v_arr = np.asarray(result["voltage"])
         ap_result = patch_sim.analyze_aps(time_arr, v_arr)
         analysis = analyze_bursts(
-            ap_result, total_duration_ms=float(time_arr[-1] - time_arr[0])
+            ap_result,
+            total_duration_ms=float(time_arr[-1] - time_arr[0]),
+            _trace_end_time_ms=float(time_arr[-1]),
         )
 
-        # Pipeline smoke check: analyze_bursts must resolve at least one
-        # cluster on the multi-sweep UI path.  Its default-fixed size cap
-        # (issue #290) reclassifies the full LTS rebound as tonic, so the
-        # rebound itself is pinned from the spike train below.
-        assert analysis.burst_count >= 1, (
-            f"Sweep {sweep_idx} (deeper hyperpolarization): expected "
-            f"analyze_bursts to resolve ≥1 cluster, got burst_count="
-            f"{analysis.burst_count}.  Total APs in sweep: "
-            f"{ap_result.spike_count}."
+        # The terminating-cluster carve-out must surface a HP92-phenotype
+        # rebound burst directly from analyze_bursts.  Do NOT assert
+        # burst_count == 1 because a cold-start cluster may appear separately.
+        rebound_bursts = [
+            b
+            for b in analysis.bursts
+            if 5 <= b.spike_count <= 35
+            and b.intra_burst_frequency is not None
+            and 200.0 <= b.intra_burst_frequency <= 600.0
+        ]
+        assert len(rebound_bursts) >= 1, (
+            f"Sweep {sweep_idx}: expected analyze_bursts to surface a HP92 "
+            f"rebound burst (5–35 spikes, 200–600 Hz), got bursts="
+            f"{[(b.spike_count, b.intra_burst_frequency) for b in analysis.bursts]}"
         )
 
         # Release is the last negative sample of this sweep's current array.
