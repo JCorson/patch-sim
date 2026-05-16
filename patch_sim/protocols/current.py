@@ -7,8 +7,8 @@ protocols that can be used with current clamp simulations.
 import numpy as np
 from scipy.signal import chirp
 
+from ..constants import SIM_SAMPLING_FREQ
 from .common import (
-    DEFAULT_SAMPLING_FREQUENCY,
     _apply_time_window,
     _calculate_time_parameters,
     _generate_pulse_train_protocol,
@@ -22,7 +22,7 @@ def step_current(
     current_amplitude: float,
     step_start: float = 0.0,
     step_duration: float | None = None,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a step current protocol.
 
@@ -35,7 +35,7 @@ def step_current(
         step_start: Time when the step begins in milliseconds. Default is 0.0.
         step_duration: Duration of the current step in milliseconds.
             If None, the step lasts for the entire duration.
-        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
+        sampling_frequency: Sampling frequency in Hz; default SIM_SAMPLING_FREQ.
 
     Returns:
         Array of current values in uA/cm^2.
@@ -56,7 +56,7 @@ def ramp_current(
     end_current: float,
     ramp_start: float = 0.0,
     ramp_duration: float | None = None,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a ramp current protocol.
 
@@ -70,7 +70,7 @@ def ramp_current(
         ramp_start: Time when the ramp begins in milliseconds. Default is 0.0.
         ramp_duration: Duration of the ramp in milliseconds.
             If None, the ramp lasts for the entire duration.
-        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
+        sampling_frequency: Sampling frequency in Hz; default SIM_SAMPLING_FREQ.
 
     Returns:
         Array of current values in uA/cm^2.
@@ -93,7 +93,7 @@ def pulse_train(
     pulse_interval: float,
     train_start: float = 0.0,
     num_pulses: int | None = None,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a pulse train current protocol.
 
@@ -110,7 +110,7 @@ def pulse_train(
             Default is 0.0.
         num_pulses: Number of pulses in the train. If None, pulses
             continue until the end of the duration.
-        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
+        sampling_frequency: Sampling frequency in Hz; default SIM_SAMPLING_FREQ.
 
     Returns:
         Array of current values in uA/cm^2.
@@ -135,7 +135,7 @@ def sinusoidal_current(
     phase: float = 0.0,
     stimulus_start: float = 0.0,
     stimulus_duration: float = 0.0,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a sinusoidal current protocol.
 
@@ -158,7 +158,7 @@ def sinusoidal_current(
         stimulus_duration: Duration of the sinusoidal stimulus in milliseconds.
             Default is 0.0, which fills the recording from stimulus_start to
             the end of duration.
-        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
+        sampling_frequency: Sampling frequency in Hz; default SIM_SAMPLING_FREQ.
 
     Returns:
         Array of current values in uA/cm^2.
@@ -186,7 +186,7 @@ def chirp_current(
     end_frequency: float,
     stimulus_start: float = 0.0,
     stimulus_duration: float = 0.0,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a chirp (frequency sweep) current protocol.
 
@@ -210,7 +210,7 @@ def chirp_current(
         stimulus_duration: Duration of the chirp stimulus in milliseconds.
             Default is 0.0, which fills the recording from stimulus_start to
             the end of duration.
-        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
+        sampling_frequency: Sampling frequency in Hz; default SIM_SAMPLING_FREQ.
 
     Returns:
         Array of current values in uA/cm^2.
@@ -244,7 +244,7 @@ def noise_current(
     std_current: float,
     stimulus_start: float = 0.0,
     stimulus_duration: float = 0.0,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
     seed: int | None = None,
 ) -> np.ndarray:
     """Generate a Gaussian white noise current protocol.
@@ -266,7 +266,7 @@ def noise_current(
         stimulus_duration: Duration of the noise stimulus in milliseconds.
             Default is 0.0, which fills the recording from stimulus_start to
             the end of duration.
-        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
+        sampling_frequency: Sampling frequency in Hz; default SIM_SAMPLING_FREQ.
         seed: Random seed for reproducibility. If None, uses random seed.
 
     Returns:

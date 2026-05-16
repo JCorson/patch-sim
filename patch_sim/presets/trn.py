@@ -116,9 +116,21 @@ def make_trn() -> Neuron:
         recorded at 36 °C; T_ref=309.15 K limits the runtime Q10 correction to
         ~1.12× (36→37 °C), preserving the published kinetics.  g_Na=50 mS/cm²
         and g_K=24 mS/cm² are explicit somatic densities that land every HP92
-        tonic AP-shape metric (peak +10 to +40 mV; AHP −75 to −55 mV;
+        tonic AP-shape metric (peak +10 to +45 mV; AHP −75 to −55 mV;
         half-width; threshold; firing rate) inside its band while preserving
         the 5–15 spike LTS burst at g_T=2.85 mS/cm².
+
+    Na h-gate shift:
+        The Na channel uses ``make_trn_na_channel(h_v_half_shift=5.0)`` to
+        shift the inactivation h-gate V½ depolarized by 5 mV, accelerating
+        Na⁺ recovery from inactivation at LTS-plateau voltages (≈ −30 to
+        +5 mV) so the cell sustains full Na⁺ spikes on the rising LTS edge
+        of REPETITIVE_FIRING.  m and n kinetics remain on the shared
+        TRN_VT.  Biological motivation: TRN expresses a mix of NaV1.6 and
+        NaV1.2 isoforms whose inactivation half-points differ by ~10 mV
+        (Rush et al. 2005, J. Physiol. 564:803; Hatch et al. 2017,
+        J. Neurosci. 37:1641); a 5 mV effective shift is well within the
+        published isoform-mix variation.
 
     Passive properties:
         g_NaL=0.0066 / g_KL=0.0634 mS/cm² (total 0.07) gives τ_m ≈ 14.3 ms
@@ -136,6 +148,9 @@ def make_trn() -> Neuron:
         - Bal & McCormick (1993), J. Physiol. 468:669 (Ih in cat TRN)
         - Destexhe et al. (1994), J. Neurophysiol. 72:803 (ICaT kinetics)
         - Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (RE params)
+        - Rush et al. (2005), J. Physiol. 564:803 (NaV1.6 vs NaV1.2 h V½,
+          motivating the 5 mV ``h_v_half_shift``)
+        - Hatch et al. (2017), J. Neurosci. 37:1641 (TRN NaV1.6/1.2 mix)
 
     Returns:
         Fully-configured :class:`~patch_sim.Neuron` — ~15 µm soma
@@ -146,7 +161,7 @@ def make_trn() -> Neuron:
         v_rest=-80.0,
         T_ref=309.15,
         channels=(
-            make_trn_na_channel(g_max=50.0),
+            make_trn_na_channel(g_max=50.0, h_v_half_shift=5.0),
             make_trn_k_channel(g_max=24.0),
             make_na_leak_channel(g_max=0.0066),
             make_k_leak_channel(g_max=0.0634),
@@ -154,14 +169,16 @@ def make_trn() -> Neuron:
             make_ikca_channel(g_max=0.3),
             make_ih_channel(g_max=0.020),
         ),
-        # Peak ca_i reaches ~9–10 µM under REPETITIVE_FIRING and 8–18 µM under
+        # Peak ca_i reaches ~14–15 µM under REPETITIVE_FIRING and 8–18 µM under
         # HYPERPOLARIZATION_STEPS (LTS rebound burst) — physiologically
         # consistent with TRN somatic Ca during high-frequency burst trains
         # (Cueni et al. 2008, Nat. Neurosci. 11:683).  The elevated Ca is
         # load-bearing: lower alpha_ca collapses the burst phenotype because
         # IKCa (g_KCa=0.3 mS/cm²) cannot terminate the burst cleanly without
         # sufficient Ca²⁺ drive.  ``test_calcium_calibration.py`` uses a
-        # TRN-specific 12 µM upper bound to accommodate this realistic Ca level.
+        # TRN-specific 5–16 µM band: the REPETITIVE_FIRING peak here is the
+        # transient buildup before IKCa AHPs and tau_ca extrusion bring it
+        # back down, not a quasi-steady-state.
         calcium_dynamics=CalciumDynamics(alpha_ca=1.2e-5, tau_ca=20.0, ca_rest=1e-4),
         area_cm2=7e-6,
     )

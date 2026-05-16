@@ -2,14 +2,16 @@
 
 These private functions are used by both current and voltage clamp protocol
 modules to avoid duplication.
+
+The default sampling frequency for every protocol generator is
+:data:`~patch_sim.constants.SIM_SAMPLING_FREQ` (40 kHz), matching the
+simulator's timebase so a protocol's nominal duration equals its simulated
+duration.
 """
 
 import numpy as np
 
-# Default sampling frequency (Hz) for all protocol and simulation functions.
-# 100 kHz gives a 10 µs time step, which is sufficient to resolve the fastest
-# Hodgkin-Huxley gating kinetics while keeping array sizes manageable.
-DEFAULT_SAMPLING_FREQUENCY = 100_000.0
+from ..constants import SIM_SAMPLING_FREQ
 
 
 def _calculate_time_parameters(
@@ -59,7 +61,7 @@ def _generate_step_protocol(
     baseline: float = 0.0,
     step_start: float = 0.0,
     step_duration: float | None = None,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a generic step protocol (current or voltage).
 
@@ -98,7 +100,7 @@ def _generate_ramp_protocol(
     baseline: float = 0.0,
     ramp_start: float = 0.0,
     ramp_duration: float | None = None,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a generic ramp protocol (current or voltage).
 
@@ -148,7 +150,7 @@ def _generate_pulse_train_protocol(
     baseline: float = 0.0,
     train_start: float = 0.0,
     num_pulses: int | None = None,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a generic pulse train protocol (current or voltage).
 

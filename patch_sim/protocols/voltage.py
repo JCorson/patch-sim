@@ -6,8 +6,8 @@ protocols that can be used with voltage clamp simulations.
 
 import numpy as np
 
+from ..constants import SIM_SAMPLING_FREQ
 from .common import (
-    DEFAULT_SAMPLING_FREQUENCY,
     _generate_pulse_train_protocol,
     _generate_ramp_protocol,
     _generate_step_protocol,
@@ -20,7 +20,7 @@ def step_voltage(
     step_start: float = 0.0,
     step_duration: float | None = None,
     holding_voltage: float = -70.0,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a step voltage protocol for voltage clamp experiments.
 
@@ -34,7 +34,7 @@ def step_voltage(
         step_duration: Duration of the voltage step in milliseconds.
             If None, the step lasts for the entire duration.
         holding_voltage: Holding voltage in mV. Default is -70.0 mV.
-        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
+        sampling_frequency: Sampling frequency in Hz; default SIM_SAMPLING_FREQ.
 
     Returns:
         Array of voltage values in mV.
@@ -56,7 +56,7 @@ def ramp_voltage(
     ramp_start: float = 0.0,
     ramp_duration: float | None = None,
     holding_voltage: float = -70.0,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a ramp voltage protocol for voltage clamp experiments.
 
@@ -71,7 +71,7 @@ def ramp_voltage(
         ramp_duration: Duration of the ramp in milliseconds.
             If None, the ramp lasts for the entire duration.
         holding_voltage: Holding voltage in mV. Default is -70.0 mV.
-        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
+        sampling_frequency: Sampling frequency in Hz; default SIM_SAMPLING_FREQ.
 
     Returns:
         Array of voltage values in mV.
@@ -95,7 +95,7 @@ def pulse_train_voltage(
     train_start: float = 0.0,
     num_pulses: int | None = None,
     holding_voltage: float = -70.0,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
+    sampling_frequency: float = SIM_SAMPLING_FREQ,
 ) -> np.ndarray:
     """Generate a pulse train voltage protocol for voltage clamp experiments.
 
@@ -113,7 +113,7 @@ def pulse_train_voltage(
         num_pulses: Number of pulses in the train. If None, pulses
             continue until the end of the duration.
         holding_voltage: Holding voltage in mV. Default is -70.0 mV.
-        sampling_frequency: Sampling frequency in Hz. Default is 100 kHz.
+        sampling_frequency: Sampling frequency in Hz; default SIM_SAMPLING_FREQ.
 
     Returns:
         Array of voltage values in mV.

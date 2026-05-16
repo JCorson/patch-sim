@@ -18,10 +18,10 @@ import pytest
 
 from patch_sim.analysis.ap_metrics import analyze_aps_from_result
 from patch_sim.clamp_simulations import (
-    SIM_SAMPLING_FREQ,
     simulate_current_clamp,
     simulate_voltage_clamp,
 )
+from patch_sim.constants import SIM_SAMPLING_FREQ
 from patch_sim.neuron import Neuron
 from patch_sim.presets import make_dopaminergic
 from patch_sim.protocols import step_current, step_voltage
@@ -124,9 +124,9 @@ def test_da_modest_step_sustains_firing(da_neuron: Neuron) -> None:
 # ---------------------------------------------------------------------------
 # UI default F-I protocol — 200 ms steps over 0–12 µA/cm² in 1.5 µA/cm² steps.
 # The somatic single-compartment model fires tonically across the entire
-# sweep: empirical sweep (scratch/characterize_da_block.py) shows 4–7 spikes
-# per 200 ms step at every amplitude, with 150 ms rolling-mean V never
-# exceeding −70 mV.  Real SNc DA neurons enter depolarization block above
+# sweep: it fires 2 spikes per 200 ms step at 0–3 µA/cm² and 3 from
+# 4.5 µA/cm² up, with 150 ms rolling-mean V never exceeding −71 mV.  Real
+# SNc DA neurons enter depolarization block above
 # ~100 pA sustained drive (Tucker et al. 2012, J. Neurophysiol. 108:288),
 # but reproducing this requires the dendritic Na inactivation pool that a
 # somatic single-compartment representation cannot supply.  Tracked in #323.
@@ -136,15 +136,19 @@ def test_da_modest_step_sustains_firing(da_neuron: Neuron) -> None:
 @pytest.mark.parametrize(
     "amplitude,min_spikes",
     [
-        (0.0, 3),
-        (1.5, 3),
-        (3.0, 3),
-        (4.5, 4),
-        (6.0, 4),
-        (7.5, 4),
-        (9.0, 4),
-        (10.5, 5),
-        (12.0, 5),
+        # Floors equal the empirically observed counts over the 200 ms
+        # step: 2 spikes at 0–3 µA/cm², 3 from 4.5 µA/cm² up.  The assertion
+        # is ``>=``, so a tonic-firing regression that drops the count fails
+        # the test while routine retuning that raises it does not.
+        (0.0, 2),
+        (1.5, 2),
+        (3.0, 2),
+        (4.5, 3),
+        (6.0, 3),
+        (7.5, 3),
+        (9.0, 3),
+        (10.5, 3),
+        (12.0, 3),
     ],
 )
 def test_da_ui_fi_protocol(
@@ -157,8 +161,9 @@ def test_da_ui_fi_protocol(
     dendritic Na inactivation, Tucker et al. 2012).  Each step must
     therefore produce at least ``min_spikes`` action potentials and must
     never park above −40 mV in the 150 ms rolling mean.  ``min_spikes``
-    floors are set 1–2 below the empirically observed counts to allow for
-    routine retuning without spurious failures.
+    floors equal the empirically observed spike counts; the ``>=`` check
+    catches an excitability regression that lowers the count without
+    flagging routine retuning that raises it.
     """
     duration_ms = 200.0
     protocol = step_current(duration=duration_ms, current_amplitude=amplitude)

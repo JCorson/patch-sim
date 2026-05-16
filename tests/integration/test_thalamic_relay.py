@@ -15,7 +15,8 @@ import pytest
 
 from patch_sim.analysis.ap_metrics import analyze_aps, analyze_aps_from_result
 from patch_sim.analysis.burst_metrics import analyze_bursts_from_result
-from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+from patch_sim.clamp_simulations import simulate_current_clamp
+from patch_sim.constants import SIM_SAMPLING_FREQ
 from patch_sim.neuron import Neuron
 from patch_sim.presets import make_thalamic_relay
 from patch_sim.protocols import step_current
@@ -26,9 +27,13 @@ from tests.integration._ap_shape import assert_ap_shape
 # ---------------------------------------------------------------------------
 
 # Tonic-mode standard step: 1 µA/cm² is just above the rheobase for this
-# preset and gives ~9 Hz repetitive firing — within the in-vitro tonic
-# range reported for TC cells (McCormick & Huguenard 1992).
-_TC_TONIC_STEP_DURATION_MS = 200.0
+# preset and gives ~18 Hz steady-state repetitive firing — within the
+# in-vitro tonic range reported for TC cells (McCormick & Huguenard 1992).
+# 500 ms duration so the rate and AP-peak measurements are taken from the
+# adapted tonic train rather than the unadapted first ~200 ms of firing
+# (where rate is ~190 Hz and peaks ~+42 mV until slow K/Na adaptation
+# settles).
+_TC_TONIC_STEP_DURATION_MS = 500.0
 _TC_TONIC_STEP_CURRENT = 1.0
 _TC_REFERENCE = "McCormick & Huguenard 1992"
 

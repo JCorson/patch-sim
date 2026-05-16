@@ -37,8 +37,13 @@ _CA_PEAK_MAX_UM_DEFAULT = 5.0
 # The lower bound is tightened too: alpha_ca/tau_ca are load-bearing for
 # IKCa-driven burst termination, so a downward drift that would silently
 # break the burst phenotype must be caught here.
+# Upper bound 16 µM: at the 200 ms REPETITIVE_FIRING step the transient
+# buildup phase peaks ~14.5 µM before IKCa-driven AHPs and tau_ca extrusion
+# bring it down.  The band covers the Cueni et al. (2008), Nat. Neurosci.
+# 11:683 physiological range for TRN somatic Ca during dense burst trains
+# (~10–20 µM transient peaks).
 _CA_PEAK_BAND_OVERRIDES: dict[str, tuple[float, float]] = {
-    TRN: (5.0, 12.0),
+    TRN: (5.0, 16.0),
 }
 
 # Pre/post-stimulus padding in ms common to all protocols.

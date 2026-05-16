@@ -43,6 +43,12 @@ DEFAULT_ALPHA_CA: float = 1e-4  # mM / (µA/cm² · ms)
 DEFAULT_TAU_CA: float = 200.0  # ms
 DEFAULT_CA_REST: float = 1e-4  # mM
 
+#: Fixed simulation sampling frequency (Hz). dt = 1000 / SIM_SAMPLING_FREQ ms.
+#: 40 kHz (dt = 0.025 ms) is standard for conductance-based neuron models.
+#: Protocol generators default to this rate so a protocol's nominal duration
+#: equals its simulated duration.
+SIM_SAMPLING_FREQ: float = 40_000.0
+
 #: Clamp mode identifier strings.
 CURRENT_CLAMP: str = "Current Clamp"
 VOLTAGE_CLAMP: str = "Voltage Clamp"

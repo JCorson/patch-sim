@@ -8,13 +8,13 @@ import numpy as np
 import pytest
 
 from patch_sim.clamp_simulations import (
-    SIM_SAMPLING_FREQ,
     _initialize_gating_variables,
     simulate_current_clamp,
     simulate_current_clamp_from_state,
     simulate_voltage_clamp,
     simulate_voltage_clamp_from_state,
 )
+from patch_sim.constants import SIM_SAMPLING_FREQ
 
 
 def _make_steps(duration_ms: float, current: float = 0.0) -> np.ndarray:

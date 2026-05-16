@@ -17,7 +17,8 @@ import numpy as np
 import pytest
 
 from patch_sim.analysis.ap_metrics import analyze_aps_from_result
-from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+from patch_sim.clamp_simulations import simulate_current_clamp
+from patch_sim.constants import SIM_SAMPLING_FREQ
 from patch_sim.neuron import Neuron
 from patch_sim.presets import make_cortical_pyramidal
 from patch_sim.protocols import step_current
@@ -149,7 +150,10 @@ def test_subthreshold_amplification(cp_neuron: Neuron) -> None:
     """
     protocol = step_current(
         duration=200.0,
-        current_amplitude=0.3,  # µA/cm² — well below AP threshold with g_L=0.05
+        # AP threshold for this preset is ~0.22 µA/cm²; 0.2 µA stays
+        # comfortably subthreshold while still activating INaP enough to
+        # test the inward-current assertion.
+        current_amplitude=0.2,
         step_start=50.0,
         step_duration=100.0,
     )
@@ -259,12 +263,15 @@ def test_suprathreshold_fires_action_potentials(cp_neuron: Neuron) -> None:
 # multi-assertion test.
 # ---------------------------------------------------------------------------
 
-# Suprathreshold step shared by the AP-shape battery: 5 µA/cm² for 800 ms,
-# matching the existing test_spike_frequency_adaptation stimulus.  This
-# stimulus reliably produces tens of APs across the step, giving a stable
-# mean for half-width / peak / threshold / AHP without being so strong that
-# it pins voltage at the Na⁺ reversal.
-_AP_SHAPE_STEP_DURATION_MS = 800.0
+# Suprathreshold step shared by the AP-shape battery: 5 µA/cm² for 2000 ms.
+# This stimulus reliably produces tens of APs across the step, giving a
+# stable mean for half-width / peak / threshold / AHP without being so
+# strong that it pins voltage at the Na⁺ reversal.  The 2000 ms duration is
+# long enough for slow Na inactivation (sNa) and IM (slow K) to accumulate,
+# lowering the mean AP peak voltage from the unadapted early-train value
+# (~+45 mV) into the McCormick et al. (1985) RS-pyramidal range
+# (+20 to +45 mV).
+_AP_SHAPE_STEP_DURATION_MS = 2000.0
 _AP_SHAPE_STEP_CURRENT = 5.0
 _RS_REFERENCE = "McCormick et al. 1985 / Connors & Gutnick 1990"
 

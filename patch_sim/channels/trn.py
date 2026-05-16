@@ -14,8 +14,10 @@ Parameterisation:
   Biol. Cybern. 99:427–441, Table 2 (RE cell, VT = −67 mV).
 """
 
+import dataclasses
+
 from ..constants import DEFAULT_G_ICAT
-from ..rates import VoltageOnlyFn
+from ..rates import VoltageOnlyFn, VoltageOnlyRate
 from ..utils import safe_exp
 from ._traub_miles import (
     _traub_miles_alpha_h,
@@ -190,7 +192,67 @@ def _trn_beta_n_impl(V: float, ca_i: float) -> float:
 trn_beta_n = VoltageOnlyFn(_trn_beta_n_impl)
 
 
-def make_trn_na_channel(g_max: float) -> IonChannel:
+@dataclasses.dataclass(frozen=True)
+class _ShiftedTrnAlphaH(VoltageOnlyRate):
+    """Picklable Traub-Miles ``alpha_h`` rate with h V½ shifted depolarized.
+
+    The shift evaluates the underlying Traub-Miles ``alpha_h`` at
+    ``V − h_v_half_shift``, so at any membrane voltage the gate behaves as
+    if V were ``h_v_half_shift`` mV more hyperpolarized — larger alpha
+    (faster recovery from inactivation) at the LTS-plateau voltages.
+
+    Implemented as a frozen dataclass (not a closure-wrapping
+    :class:`~patch_sim.rates.VoltageOnlyFn`) so that
+    :func:`~patch_sim.clamp_simulations.simulate_batch` can pickle the
+    instance when handing it to a worker process.
+
+    Attributes:
+        h_v_half_shift: Depolarized shift of h V½ in mV.
+    """
+
+    h_v_half_shift: float
+
+    def __call__(self, V: float, ca_i: float) -> float:
+        """Evaluate alpha_h at ``V − h_v_half_shift`` against ``TRN_VT``.
+
+        Args:
+            V: Membrane voltage in mV.
+            ca_i: Intracellular Ca²⁺ concentration in mM (ignored).
+
+        Returns:
+            Forward rate in 1/ms.
+        """
+        return _traub_miles_alpha_h(V - self.h_v_half_shift, TRN_VT)
+
+
+@dataclasses.dataclass(frozen=True)
+class _ShiftedTrnBetaH(VoltageOnlyRate):
+    """Picklable Traub-Miles ``beta_h`` rate with h V½ shifted depolarized.
+
+    Pairs with :class:`_ShiftedTrnAlphaH`: evaluating beta_h at
+    ``V − h_v_half_shift`` yields smaller beta at the LTS-plateau voltages
+    (slower inactivation), reinforcing the alpha_h gain.
+
+    Attributes:
+        h_v_half_shift: Depolarized shift of h V½ in mV.
+    """
+
+    h_v_half_shift: float
+
+    def __call__(self, V: float, ca_i: float) -> float:
+        """Evaluate beta_h at ``V − h_v_half_shift`` against ``TRN_VT``.
+
+        Args:
+            V: Membrane voltage in mV.
+            ca_i: Intracellular Ca²⁺ concentration in mM (ignored).
+
+        Returns:
+            Backward rate in 1/ms.
+        """
+        return _traub_miles_beta_h(V - self.h_v_half_shift, TRN_VT)
+
+
+def make_trn_na_channel(g_max: float, h_v_half_shift: float = 0.0) -> IonChannel:
     """Create the TRN fast sodium channel (Na⁺).
 
     Uses Traub-Miles kinetics with VT = −67 mV, parameterised for the
@@ -204,24 +266,46 @@ def make_trn_na_channel(g_max: float) -> IonChannel:
     inactivation, preventing the ~5.2× Q10 overcorrection that caused
     premature Na⁺ inactivation.
 
+    The optional ``h_v_half_shift`` parameter shifts the h-gate V½
+    depolarized while leaving m and n kinetics on the shared TRN_VT.  This
+    encodes an isoform-level kinetic difference (NaV1.6 vs NaV1.2;
+    Rush et al. 2005, J. Physiol. 564:803; Hatch et al. 2017,
+    J. Neurosci. 37:1641) — TRN expresses both isoforms, and the effective
+    h V½ depends on isoform mix.  A positive shift accelerates recovery
+    from inactivation at LTS-plateau voltages, supporting full Na⁺ spikes
+    on the rising LTS edge of REPETITIVE_FIRING.
+
     Reference: Huguenard & Prince (1992), J. Neurosci. 12:3804;
     Destexhe et al. (1994), J. Neurophysiol. 72:803;
-    Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (RE model).
+    Pospischil et al. (2008), Biol. Cybern. 99:427, Table 2 (RE model);
+    Rush et al. (2005), J. Physiol. 564:803 (NaV1.6 vs NaV1.2 h kinetics);
+    Hatch et al. (2017), J. Neurosci. 37:1641 (TRN NaV1.6/1.2 mix).
     Kinetics recorded at 36 °C — use T_ref = 309.15 K with this factory.
 
     Args:
         g_max: Maximum conductance in mS/cm².
+        h_v_half_shift: Depolarized shift of the h-gate V½ in mV.  Positive
+            values accelerate recovery from inactivation (NaV1.6-like).
+            Defaults to 0.0 (unshifted Pospischil RE kinetics).
 
     Returns:
         An :class:`~patch_sim.channels.IonChannel` representing the TRN fast
         Na⁺ channel.
     """
+    # Unshifted callers reuse the cached module-level rate objects so gate
+    # identity is preserved; any shift wraps in the picklable dataclass.
+    if h_v_half_shift == 0.0:
+        alpha_h = trn_alpha_h
+        beta_h = trn_beta_h
+    else:
+        alpha_h = _ShiftedTrnAlphaH(h_v_half_shift=h_v_half_shift)
+        beta_h = _ShiftedTrnBetaH(h_v_half_shift=h_v_half_shift)
     return IonChannel(
         name="Na",
         g_max=g_max,
         gating_variables=(
             GatingVariable(name="m", power=3, alpha=trn_alpha_m, beta=trn_beta_m),
-            GatingVariable(name="h", power=1, alpha=trn_alpha_h, beta=trn_beta_h),
+            GatingVariable(name="h", power=1, alpha=alpha_h, beta=beta_h),
         ),
         reversal_spec=NernstSpec(IonSpecies.SODIUM),
     )

@@ -32,7 +32,8 @@ from patch_sim.analysis.passive_properties import (
     PassiveProperties,
     analyze_passive_properties,
 )
-from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+from patch_sim.clamp_simulations import simulate_current_clamp
+from patch_sim.constants import SIM_SAMPLING_FREQ
 from patch_sim.neuron import Neuron
 from patch_sim.protocols.current import step_current
 

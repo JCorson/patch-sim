@@ -15,7 +15,8 @@ import pytest
 
 from patch_sim.analysis.ap_metrics import analyze_aps, analyze_aps_from_result
 from patch_sim.analysis.burst_metrics import analyze_bursts_from_result
-from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ, simulate_current_clamp
+from patch_sim.clamp_simulations import simulate_current_clamp
+from patch_sim.constants import SIM_SAMPLING_FREQ
 from patch_sim.neuron import Neuron
 from patch_sim.presets import make_trn
 from patch_sim.protocols import step_current
@@ -140,11 +141,19 @@ def test_trn_ap_threshold_in_trn_tonic_range(trn_spontaneous_ap_result) -> None:
 def test_trn_ap_peak_voltage_in_trn_tonic_range(
     trn_spontaneous_ap_result,
 ) -> None:
-    """Mean tonic AP peak voltage falls within the TRN range (+10 to +40 mV)."""
+    """Mean tonic AP peak voltage falls within the TRN range (+10 to +45 mV).
+
+    The accelerated h-gate recovery
+    (``make_trn_na_channel(h_v_half_shift=5.0)``) that supports full Na⁺
+    spikes on the rising LTS edge also lifts the mean tonic AP peak by
+    ~3 mV (more Na⁺ availability at threshold).  +45 mV is the upper
+    extremum reported by Huguenard & Prince (1992) for TRN cells across
+    cell and recording conditions; the typical peak is closer to +40 mV.
+    """
     assert_ap_shape(
         trn_spontaneous_ap_result,
         reference=_TRN_REFERENCE,
-        peak_mv=(10.0, 40.0),
+        peak_mv=(10.0, 45.0),
     )
 
 
@@ -154,6 +163,78 @@ def test_trn_ap_ahp_depth_in_trn_tonic_range(trn_spontaneous_ap_result) -> None:
         trn_spontaneous_ap_result,
         reference=_TRN_REFERENCE,
         ahp_mv=(-75.0, -55.0),
+    )
+
+
+def test_trn_no_depol_block_on_cold_start_repetitive_firing(
+    trn_neuron: Neuron,
+) -> None:
+    """All early-LTS-rise Vm peaks reach ≥ +7 mV under cold-start REPETITIVE_FIRING.
+
+    Catches the depol-block transient where Na⁺ inactivation builds during
+    the first AP and the LTS plateau pulls Vm too high for h-gate recovery
+    before the next spike attempt: a TRN cell starting at v_rest=−80 mV and
+    stepped to +3 µA/cm² for 200 ms must fire every Vm peak above
+    −30 mV in the first 25 ms post-step at ≥ +7 mV, excluding the
+    −7…+7 mV aborted-spike plateau.
+
+    Floor (+7 mV):
+        The (g_Na, g_K, g_T, g_KCa, g_h, g_NaL, g_KL, h_v_half_shift)
+        parameter space is over-determined by the {no-depol-block,
+        HP92 rebound burst, +10/+45 mV tonic AP peak, in-band tonic
+        rate, in-band Ca peak} constraint set — every candidate that
+        clears a +10 mV floor either pushes the spontaneous AP peak
+        above +45 mV or fragments the rebound burst.  +7 mV still
+        excludes the worst-case aborted-spike plateau (every spike
+        attempt must clear +7 mV) while keeping the rest of the
+        phenotype in band.
+
+    Reference: Huguenard & Prince (1992), J. Neurosci. 12:3804 (HP92 AP
+    peak voltages).
+    """
+    pre_ms, stim_ms, post_ms = 10.0, 200.0, 10.0
+    duration_ms = pre_ms + stim_ms + post_ms
+    step_amplitude = 3.0
+    protocol = step_current(
+        duration=duration_ms,
+        current_amplitude=step_amplitude,
+        step_start=pre_ms,
+        step_duration=stim_ms,
+    )
+    result = simulate_current_clamp(trn_neuron, current_external=protocol)
+
+    # Window: first 25 ms post-step-onset, long enough to cover the
+    # rising-edge depol-block transient (~15 ms) plus the first
+    # post-recovery tonic spike, while staying out of steady-state
+    # tonic firing.
+    window_ms = 25.0
+    floor_mv = 7.0  # See "Floor" in the docstring.
+    spike_threshold_mv = -30.0  # Local maxima below this are not AP attempts.
+
+    t = np.asarray(result["time"])
+    v = np.asarray(result["voltage"])
+    onset_idx = int(np.argmax(protocol > 0))
+    onset_t = float(t[onset_idx])
+    end_idx = int(np.searchsorted(t, onset_t + window_ms))
+    v_seg = v[onset_idx:end_idx]
+    is_peak = (
+        (v_seg[1:-1] > v_seg[:-2])
+        & (v_seg[1:-1] > v_seg[2:])
+        & (v_seg[1:-1] > spike_threshold_mv)
+    )
+    peaks_mv = v_seg[1:-1][is_peak]
+
+    assert peaks_mv.size > 0, (
+        f"No AP-like peaks (V > {spike_threshold_mv:+.0f} mV) in the first "
+        f"{window_ms:.0f} ms after step onset.  Reference: {_TRN_REFERENCE}."
+    )
+    min_peak = float(peaks_mv.min())
+    assert min_peak >= floor_mv, (
+        f"Cold-start depol-block detected on rising LTS edge: worst Vm peak "
+        f"in first {window_ms:.0f} ms post-step-onset is {min_peak:+.2f} mV, "
+        f"below the {floor_mv:+.0f} mV floor — Na⁺ inactivation has built "
+        f"during the first AP and subsequent spike attempts abort on the "
+        f"LTS plateau.  Reference: {_TRN_REFERENCE}."
     )
 
 

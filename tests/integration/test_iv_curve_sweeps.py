@@ -12,9 +12,9 @@ import pytest
 
 import patch_sim
 import patch_sim.channels
-import patch_sim.clamp_simulations
 from patch_sim.channels import IonChannel
 from patch_sim.clamp_simulations import simulate_current_clamp, simulate_voltage_clamp
+from patch_sim.constants import SIM_SAMPLING_FREQ
 from patch_sim.neuron import Neuron
 from patch_sim.presets import make_squid_giant_axon
 
@@ -29,7 +29,7 @@ def _hh_with(*extras: IonChannel, **overrides: object) -> Neuron:
 # Helpers
 # ---------------------------------------------------------------------------
 
-_FS = patch_sim.clamp_simulations.SIM_SAMPLING_FREQ
+_FS = SIM_SAMPLING_FREQ
 
 
 def _make_iv_protocols(

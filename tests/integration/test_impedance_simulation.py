@@ -10,8 +10,7 @@ import numpy as np
 import pytest
 
 import patch_sim
-from patch_sim.clamp_simulations import SIM_SAMPLING_FREQ
-from patch_sim.constants import FREQUENCY_RESPONSE
+from patch_sim.constants import FREQUENCY_RESPONSE, SIM_SAMPLING_FREQ
 from patch_sim.presets import (
     NEURON_PRESETS,
     make_ca1_pyramidal,
