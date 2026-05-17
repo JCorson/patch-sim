@@ -251,13 +251,13 @@ def test_trn_step_release_produces_hp92_rebound_burst() -> None:
     rebound_bursts = [
         b
         for b in analysis.bursts
-        if 5 <= b.spike_count <= 35
+        if 5 <= b.spike_count <= 20
         and b.intra_burst_frequency is not None
         and 200.0 <= b.intra_burst_frequency <= 600.0
     ]
     assert len(rebound_bursts) >= 1, (
         f"Expected analyze_bursts_from_result to surface at least one HP92 "
-        f"rebound burst (5–35 spikes, 200–600 Hz), got bursts="
+        f"rebound burst (5–20 spikes, 200–600 Hz), got bursts="
         f"{[(b.spike_count, b.intra_burst_frequency) for b in analysis.bursts]}"
     )
 
@@ -325,13 +325,13 @@ def test_trn_hyperpolarization_steps_protocol_produces_burst_per_sweep() -> None
         rebound_bursts = [
             b
             for b in analysis.bursts
-            if 5 <= b.spike_count <= 35
+            if 5 <= b.spike_count <= 20
             and b.intra_burst_frequency is not None
             and 200.0 <= b.intra_burst_frequency <= 600.0
         ]
         assert len(rebound_bursts) >= 1, (
             f"Sweep {sweep_idx}: expected analyze_bursts to surface a HP92 "
-            f"rebound burst (5–35 spikes, 200–600 Hz), got bursts="
+            f"rebound burst (5–20 spikes, 200–600 Hz), got bursts="
             f"{[(b.spike_count, b.intra_burst_frequency) for b in analysis.bursts]}"
         )
 
@@ -353,7 +353,7 @@ def test_trn_hyperpolarization_steps_protocol_produces_burst_per_sweep() -> None
         )
         assert freq is not None and 200.0 <= freq <= 600.0, (
             f"Sweep {sweep_idx}: expected 200–600 Hz intra-burst frequency "
-            f"for the deep-HP rebound, got {freq} Hz."
+            f"for the LTS rebound, got {freq} Hz."
         )
 
 
