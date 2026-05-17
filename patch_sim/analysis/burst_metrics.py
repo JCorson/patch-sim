@@ -15,9 +15,16 @@ The threshold can be supplied by the caller, or auto-detected from a
 log-spaced histogram of the inter-spike intervals.  When too few intervals
 exist or the distribution is unimodal, the default-fixed path falls back
 to the tight-cluster intra-burst cap (~12 ms): contiguous runs of ISIs at
-or below this group into bursts; longer ISIs end them.  A size cap on the
-default-fixed path (≤8 spikes per burst) prevents sustained high-frequency
-tonic firing from being fabricated as one giant burst (issue #290).
+or below this group into bursts; longer ISIs end them.  A primary size cap
+on the default-fixed path (≤8 spikes per burst) prevents sustained
+high-frequency tonic firing from being fabricated as one giant burst
+(issue #290).  Oversized tight clusters that match the LTS rebound
+phenotype — fast mean intra-burst ISI (≤ 6 ms, i.e. ≥ 167 Hz) followed by
+pronounced post-burst quiescence — are exempted from the size cap and
+retained as bursts via a terminating-cluster carve-out.  This correctly
+classifies the ~15-spike TRN rebound burst (Huguenard & Prince 1992,
+J. Neurosci. 12:3804) while keeping the issue #290 protection intact for
+tonic Purkinje and HH presets whose post-train quiescence is short.
 
 For non-bursting neurons (sub-threshold protocols, tonic firing) the
 analysis degrades gracefully: ``burst_count`` is 0 and aggregate metrics
@@ -107,6 +114,33 @@ _TIGHT_CLUSTER_MAX_ISI_MS: float = 12.0
 #: high-frequency tonic train, not a single burst.
 _TIGHT_CLUSTER_MAX_ISIS: int = 7
 
+#: Minimum ratio of the post-cluster gap to the cluster's mean intra-burst
+#: ISI for an oversized tight cluster to be retained as a terminating LTS
+#: rebound rather than reclassified as a segment of a sustained tonic train.
+#: A 5× gap-to-ISI ratio (~2 ms mean ISI / 10 ms gap) comfortably
+#: distinguishes LTS post-burst quiescence (Huguenard & Prince 1992 TRN:
+#: AHP-driven pause of 100–400 ms) from tonic inter-spike gaps (typically
+#: < 2× the mean ISI at steady state).
+_LTS_TERMINATION_GAP_RATIO: float = 5.0
+
+#: Maximum mean intra-burst ISI (ms) for an oversized cluster to qualify as
+#: an LTS rebound.  6 ms (~167 Hz) sits squarely in the LTS burst range
+#: (TRN: 200–600 Hz; Huguenard & Prince 1992, J. Neurosci. 12:3804) while
+#: excluding the slower tonic-firing bands (HH and Purkinje ~210 Hz in this
+#: simulator, ISIs ~4.8 ms, but tonic trains are rejected by the count cap
+#: or the terminating-gap check; textbook tonic rates 50–100 Hz are excluded
+#: by this ISI cap).
+_LTS_MAX_INTRA_BURST_ISI_MS: float = 6.0
+
+#: Minimum quiescent window (ms) after the final spike of an oversized
+#: cluster for the cluster to count as a terminated LTS rebound when no
+#: subsequent spike exists to provide a trailing gap.  30 ms is above the
+#: HH short-stimulus tonic train's measured post-last-spike tail (~11 ms at
+#: 170 ms total duration) and well below the TRN post-burst quiescence
+#: (~119 ms at 900 ms total duration), so this threshold cleanly separates
+#: the two cases without weakening the issue #290 tonic regression test.
+_LTS_QUIESCENT_TAIL_MS: float = 30.0
+
 
 @dataclasses.dataclass
 class BurstMetrics:
@@ -160,10 +194,13 @@ class BurstAnalysisResult:
         threshold_method: How :attr:`isi_threshold_ms` was determined.  One
             of ``"auto-histogram"``, ``"default-fixed"``, or ``"user"``.
             ``"default-fixed"`` carries the tight-cluster intra-burst cap
-            (12 ms): the grouper still finds bursts on this path whenever
-            a contiguous run of ISIs falls inside that cap.  See
-            :func:`analyze_bursts` for the size-cap rule that prevents
-            sustained tonic trains from being fabricated as bursts.
+            (12 ms): the grouper finds bursts whenever a contiguous run of
+            ISIs falls inside that cap.  Clusters with more than
+            :data:`_TIGHT_CLUSTER_MAX_ISIS` + 1 spikes are subject to the
+            terminating-cluster carve-out (see :func:`analyze_bursts`) —
+            retained as bursts only when they match the LTS rebound
+            phenotype, otherwise folded into the unburst count to preserve
+            tonic-train protection (issue #290).
     """
 
     burst_count: int
@@ -278,7 +315,7 @@ def _group_spikes_into_bursts(
     isis: list[float],
     threshold_ms: float,
     min_spikes_per_burst: int,
-) -> tuple[list[BurstMetrics], int]:
+) -> tuple[list[BurstMetrics], list[float | None], int]:
     """Walk the spike list and partition spikes into bursts.
 
     A burst extends through every spike whose preceding ISI is at or below
@@ -295,16 +332,21 @@ def _group_spikes_into_bursts(
         min_spikes_per_burst: Minimum spikes for a group to count as a burst.
 
     Returns:
-        Tuple ``(bursts, unburst_spike_count)``.  ``bursts`` is the list of
-        per-burst metrics in chronological order; ``unburst_spike_count`` is
-        the number of spikes that were dropped from short candidate groups.
+        Tuple ``(bursts, trailing_gaps, unburst_spike_count)``.  ``bursts``
+        is the list of per-burst metrics in chronological order;
+        ``trailing_gaps`` is a parallel list giving the ISI (ms) immediately
+        following each burst's last spike (the gap that closed the group),
+        or ``None`` when the group was closed by reaching the end of the
+        spike list; ``unburst_spike_count`` is the number of spikes that
+        were dropped from short candidate groups.
     """
     bursts: list[BurstMetrics] = []
+    trailing_gaps: list[float | None] = []
     unburst = 0
 
     n_spikes = len(peak_times)
     if n_spikes == 0:
-        return bursts, 0
+        return bursts, trailing_gaps, 0
 
     # Walk through ISIs, breaking groups whenever an ISI exceeds threshold.
     # Groups are closed both when an inter-burst gap is found and at the
@@ -313,15 +355,18 @@ def _group_spikes_into_bursts(
     group_start = 0  # index into peak_times of the first spike in the group
     group_isis: list[float] = []
 
-    def _close_group(end_idx: int) -> None:
+    def _close_group(end_idx: int, gap_ms: float | None) -> None:
         """Finalize the current candidate group ending at ``end_idx``.
 
         Promotes the group to a :class:`BurstMetrics` when its spike count
         meets ``min_spikes_per_burst``; otherwise its spikes are added to
-        the running unburst count.
+        the running unburst count.  When promoted, the trailing gap that
+        closed the group is appended to ``trailing_gaps`` in parallel.
 
         Args:
             end_idx: Index (in ``peak_times``) of the last spike in the group.
+            gap_ms: The ISI (ms) that closed this group, or ``None`` when
+                the group was closed by the end of the spike list.
         """
         nonlocal unburst
         spike_count = end_idx - group_start + 1
@@ -348,6 +393,7 @@ def _group_spikes_into_bursts(
                     mean_intra_burst_isi=mean_isi,
                 )
             )
+            trailing_gaps.append(gap_ms)
         else:
             unburst += spike_count
 
@@ -355,14 +401,14 @@ def _group_spikes_into_bursts(
         if isi <= threshold_ms:
             group_isis.append(float(isi))
         else:
-            _close_group(i)
+            _close_group(i, float(isi))
             group_start = i + 1
             group_isis = []
 
-    # Close the final group at the last spike.
-    _close_group(n_spikes - 1)
+    # Close the final group at the last spike; no following ISI exists.
+    _close_group(n_spikes - 1, None)
 
-    return bursts, unburst
+    return bursts, trailing_gaps, unburst
 
 
 def _empty_result(
@@ -375,11 +421,9 @@ def _empty_result(
     Args:
         isi_threshold_ms: Threshold that was applied (ms).
         threshold_method: How the threshold was chosen.
-        unburst_spike_count: Spikes to surface as unburst.  Defaults to 0
-            for the no-spikes call site; the default-fixed tonic
-            short-circuit in :func:`analyze_bursts` (when the
-            tight-cluster carve-out does not apply) passes the full spike
-            count through.
+        unburst_spike_count: Number of spikes to surface as unburst.
+            Defaults to 0; the only caller is the zero-spike path in
+            :func:`analyze_bursts`, which always uses the default.
 
     Returns:
         A :class:`BurstAnalysisResult` with ``burst_count`` of 0 and all
@@ -398,12 +442,59 @@ def _empty_result(
     )
 
 
+def _is_terminating_lts_cluster(
+    burst: BurstMetrics,
+    trailing_gap_ms: float | None,
+    trace_end_time_ms: float,
+) -> bool:
+    """Return True when an oversized tight cluster is a terminating LTS rebound.
+
+    An oversized cluster (more than :data:`_TIGHT_CLUSTER_MAX_ISIS` + 1 spikes)
+    is retained as a burst only when it matches the TRN/TC LTS rebound
+    phenotype (Huguenard & Prince 1992, J. Neurosci. 12:3804): fast
+    intra-burst ISIs consistent with the LTS frequency band, followed by
+    pronounced post-burst quiescence driven by the IKCa AHP.  A cluster that
+    runs through the last recorded spike with insufficient quiescence is
+    treated as a sustained tonic train and folded back into the unburst
+    count, preserving the issue #290 protection.
+
+    Args:
+        burst: The candidate burst to evaluate.
+        trailing_gap_ms: The ISI (ms) immediately following the burst's last
+            spike, or ``None`` when the burst closes at the end of the spike
+            list.
+        trace_end_time_ms: The last time point of the recording (ms).  Used
+            as the quiescent-window reference when ``trailing_gap_ms`` is
+            ``None``.
+
+    The single-gap assumption is intentional: a leading tonic segment
+    interrupted by one pause of at least :data:`_LTS_TERMINATION_GAP_RATIO`
+    × mean intra-burst ISI is treated as LTS termination and retained as a
+    burst.  This means only the trailing quiescence needs to be long enough;
+    the cluster need not be the last activity in the trace.
+
+    Returns:
+        ``True`` when the cluster should be retained as a burst; ``False``
+        when it should be reclassified as tonic and folded into the unburst
+        count.
+    """
+    mean_isi = burst.mean_intra_burst_isi
+    if mean_isi is None or mean_isi > _LTS_MAX_INTRA_BURST_ISI_MS:
+        return False
+    if trailing_gap_ms is not None:
+        return trailing_gap_ms >= _LTS_TERMINATION_GAP_RATIO * mean_isi
+    # No following spike: require a long enough quiescent window to the
+    # end of the recording.
+    return (trace_end_time_ms - burst.end_time) >= _LTS_QUIESCENT_TAIL_MS
+
+
 def analyze_bursts(
     ap_result: APAnalysisResult,
     *,
     total_duration_ms: float,
     isi_threshold_ms: float | None = None,
     min_spikes_per_burst: int = _DEFAULT_MIN_SPIKES_PER_BURST,
+    _trace_end_time_ms: float | None = None,
 ) -> BurstAnalysisResult:
     """Group detected spikes into bursts and compute burst metrics.
 
@@ -418,16 +509,26 @@ def analyze_bursts(
             If auto-detect cannot find a bimodal split it returns method
             ``"default-fixed"`` with threshold
             :data:`_TIGHT_CLUSTER_MAX_ISI_MS` (12 ms): contiguous runs of
-            ISIs at or below this group into bursts, longer ISIs end
-            them.  In the default-fixed path a size cap of
+            ISIs at or below this group into bursts, longer ISIs end them.
+            In the default-fixed path a size cap of
             :data:`_TIGHT_CLUSTER_MAX_ISIS` + 1 spikes per burst applies,
-            so sustained high-frequency tonic firing is not fabricated
-            into one giant burst (issue #290).  Caller-supplied
-            (``"user"``) and histogram-derived (``"auto-histogram"``)
-            thresholds bypass the size cap.
+            so sustained high-frequency tonic firing is not fabricated into
+            one giant burst (issue #290).  Oversized clusters that match the
+            LTS rebound phenotype — fast mean ISI (≤ 6 ms) and pronounced
+            post-burst quiescence — are retained via
+            :func:`_is_terminating_lts_cluster`, allowing the ~16-spike TRN
+            rebound (Huguenard & Prince 1992) to be reported correctly while
+            the tonic-train protection for Purkinje and HH presets is
+            preserved.  Caller-supplied (``"user"``) and histogram-derived
+            (``"auto-histogram"``) thresholds bypass the cap entirely.
         min_spikes_per_burst: Minimum spike count for a group to count as a
             burst.  Defaults to 2; isolated spikes are tracked via
             :attr:`BurstAnalysisResult.unburst_spike_count`.
+        _trace_end_time_ms: Last time point of the recording (ms), used as
+            the quiescent-window reference for the LTS termination check
+            when an oversized cluster ends at the last spike.  When
+            ``None``, defaults to the last spike's peak time, which is the
+            safe choice for callers that do not know the recording window.
 
     Returns:
         A :class:`BurstAnalysisResult` with per-burst and aggregate metrics.
@@ -446,7 +547,12 @@ def analyze_bursts(
     # ``min_spikes_per_burst=2`` (or to a single 1-spike burst when the
     # caller has lowered the minimum).
     peak_times = [s.peak_time for s in ap_result.spikes]
-    bursts, unburst = _group_spikes_into_bursts(
+    trace_end = (
+        float(_trace_end_time_ms)
+        if _trace_end_time_ms is not None
+        else float(peak_times[-1])
+    )
+    bursts, trailing_gaps, unburst = _group_spikes_into_bursts(
         peak_times,
         list(ap_result.isis),
         threshold,
@@ -456,16 +562,21 @@ def analyze_bursts(
     # In the default-fixed path, apply a size cap so sustained
     # high-frequency tonic firing (issue #290) is not fabricated into one
     # giant burst.  Real LTS-style bursts top out at 7–8 spikes (TC LTS
-    # 3–7; STN rebound 3–8); anything longer with all-short ISIs is
-    # tonic.  Caller-supplied (``"user"``) and histogram-derived
-    # (``"auto-histogram"``) thresholds bypass the cap — those callers
-    # have explicit knowledge of the trace shape.
+    # 3–7; STN rebound 3–8).  Oversized clusters that match the LTS rebound
+    # phenotype (fast mean ISI and pronounced post-burst quiescence, as
+    # identified by :func:`_is_terminating_lts_cluster`) are retained so
+    # the ~16-spike TRN rebound is reported correctly.  Caller-supplied
+    # (``"user"``) and histogram-derived (``"auto-histogram"``) thresholds
+    # bypass the cap entirely.
     if method == "default-fixed" and isi_threshold_ms is None and bursts:
-        survivors = [b for b in bursts if b.spike_count <= _TIGHT_CLUSTER_MAX_ISIS + 1]
-        rejected_spike_count = sum(
-            b.spike_count for b in bursts if b.spike_count > _TIGHT_CLUSTER_MAX_ISIS + 1
-        )
-        unburst += rejected_spike_count
+        survivors: list[BurstMetrics] = []
+        for burst, gap in zip(bursts, trailing_gaps):
+            if burst.spike_count <= _TIGHT_CLUSTER_MAX_ISIS + 1:
+                survivors.append(burst)
+            elif _is_terminating_lts_cluster(burst, gap, trace_end):
+                survivors.append(burst)
+            else:
+                unburst += burst.spike_count
         bursts = [
             BurstMetrics(
                 index=i,
@@ -569,4 +680,5 @@ def analyze_bursts_from_result(
         total_duration_ms=total_duration_ms,
         isi_threshold_ms=isi_threshold_ms,
         min_spikes_per_burst=min_spikes_per_burst,
+        _trace_end_time_ms=float(time[-1]),
     )

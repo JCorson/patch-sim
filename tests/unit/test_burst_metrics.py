@@ -13,6 +13,8 @@ import pytest
 
 from patch_sim.analysis.ap_metrics import APAnalysisResult, SpikeMetrics
 from patch_sim.analysis.burst_metrics import (
+    _LTS_QUIESCENT_TAIL_MS,
+    _LTS_TERMINATION_GAP_RATIO,
     BurstAnalysisResult,
     analyze_bursts,
     analyze_bursts_from_result,
@@ -430,3 +432,146 @@ def test_analyze_bursts_from_result_consumes_simulation_result() -> None:
     assert burst_result.burst_count == 2
     assert burst_result.threshold_method == "user"
     assert burst_result.mean_inter_burst_interval == pytest.approx(385.0, rel=0.05)
+
+
+# ---------------------------------------------------------------------------
+# Terminating-cluster LTS carve-out
+# ---------------------------------------------------------------------------
+
+
+def test_terminating_oversized_tight_cluster_retained_as_lts_burst() -> None:
+    """An oversized tight cluster followed by a long gap is retained as an LTS burst.
+
+    16 spikes at uniform ~3 ms ISIs (mean ISI well within the LTS band at
+    ~333 Hz) followed by an isolated spike ~400 ms later.  The ~400 ms
+    gap-to-mean-ISI ratio (~133×) far exceeds the termination threshold, so
+    the analyzer retains the oversized cluster as a single burst on the
+    default-fixed path.  The trailing isolated spike becomes unburst because
+    it is a single spike.
+    """
+    cluster_isis = [3.0] * 15  # 16 spikes, 15 ISIs of 3 ms
+    cluster_times = list(np.cumsum([10.0, *cluster_isis]))  # t=10..55 ms
+    isolated_spike = [cluster_times[-1] + 400.0]  # t≈455 ms
+    peak_times = cluster_times + isolated_spike
+
+    ap = _make_ap_result(peak_times)
+    result = analyze_bursts(
+        ap,
+        total_duration_ms=500.0,
+        _trace_end_time_ms=500.0,
+    )
+
+    assert result.threshold_method == "default-fixed"
+    assert result.burst_count == 1
+    assert result.bursts[0].spike_count == 16
+    # The trailing isolated spike is unburst (does not meet min_spikes_per_burst=2).
+    assert result.unburst_spike_count == 1
+
+
+def test_oversized_tight_cluster_to_trace_end_rejected_as_tonic() -> None:
+    """An oversized tight cluster running to trace end with no quiescent tail is tonic.
+
+    16 spikes at uniform ~3 ms ISIs are the last spikes in the trace, with
+    the trace ending only a few ms after the final spike.  The quiescent
+    tail (~3 ms) is far below _LTS_QUIESCENT_TAIL_MS, so the carve-out
+    does not apply and the cluster is folded back into the unburst count.
+    """
+    cluster_isis = [3.0] * 15  # 16 spikes, 15 ISIs of 3 ms
+    cluster_times = list(np.cumsum([10.0, *cluster_isis]))
+    last_spike = cluster_times[-1]
+    trace_end = last_spike + 3.0  # only 3 ms quiescent tail — below threshold
+
+    ap = _make_ap_result(cluster_times)
+    result = analyze_bursts(
+        ap,
+        total_duration_ms=float(trace_end - cluster_times[0]),
+        _trace_end_time_ms=trace_end,
+    )
+
+    assert result.threshold_method == "default-fixed"
+    assert result.burst_count == 0
+    assert result.unburst_spike_count == 16
+
+
+def test_oversized_tight_cluster_with_quiescent_tail_retained() -> None:
+    """An oversized cluster ending ~200 ms with a long quiescent tail is retained.
+
+    16 spikes at ~3 ms ISIs ending near t=200 ms, with
+    ``_trace_end_time_ms=400`` and no further spikes.  The quiescent tail
+    (≈200 ms) exceeds ``_LTS_QUIESCENT_TAIL_MS``, so the terminating-cluster
+    carve-out retains the cluster as a burst.
+    """
+    cluster_isis = [3.0] * 15  # 16 spikes, 15 ISIs of 3 ms
+    cluster_times = list(np.cumsum([10.0, *cluster_isis]))
+    # cluster_times[-1] ≈ 55 ms; trace ends at 400 ms → quiescent tail ~345 ms
+    trace_end = 400.0
+
+    ap = _make_ap_result(cluster_times)
+    result = analyze_bursts(
+        ap,
+        total_duration_ms=trace_end - cluster_times[0],
+        _trace_end_time_ms=trace_end,
+    )
+
+    assert result.threshold_method == "default-fixed"
+    assert result.burst_count == 1
+    assert result.bursts[0].spike_count == 16
+
+
+def test_oversized_tight_cluster_short_tail_rejected() -> None:
+    """An oversized cluster with a quiescent tail just below threshold is rejected.
+
+    Same 16-spike ~3 ms cluster as above, but with ``_trace_end_time_ms``
+    set so the post-cluster window is only ``_LTS_QUIESCENT_TAIL_MS - 1`` ms
+    (i.e. 29 ms), which is below the threshold.  The cluster is folded back
+    into the unburst count.
+    """
+    cluster_isis = [3.0] * 15  # 16 spikes, 15 ISIs of 3 ms
+    cluster_times = list(np.cumsum([10.0, *cluster_isis]))
+    last_spike = cluster_times[-1]
+    # Quiescent tail just below _LTS_QUIESCENT_TAIL_MS.
+    trace_end = last_spike + (_LTS_QUIESCENT_TAIL_MS - 1.0)
+
+    ap = _make_ap_result(cluster_times)
+    result = analyze_bursts(
+        ap,
+        total_duration_ms=trace_end - cluster_times[0],
+        _trace_end_time_ms=trace_end,
+    )
+
+    assert result.threshold_method == "default-fixed"
+    assert result.burst_count == 0
+    assert result.unburst_spike_count == 16
+
+
+def test_oversized_tight_cluster_short_interburst_gap_rejected_as_tonic() -> None:
+    """An oversized cluster followed by a gap below the LTS ratio threshold is tonic.
+
+    16 spikes at uniform 3 ms ISIs form an oversized cluster (mean ISI = 3 ms,
+    spike count > _TIGHT_CLUSTER_MAX_ISIS + 1 = 8).  A trailing gap of 13 ms
+    closes the group (13 > _TIGHT_CLUSTER_MAX_ISI_MS = 12 ms) but falls below
+    the LTS termination threshold of _LTS_TERMINATION_GAP_RATIO × mean_isi =
+    5 × 3 = 15 ms.  The cluster is therefore rejected as tonic and folded into
+    the unburst count; the subsequent fast spikes form a small burst.
+    """
+    # 16 spikes at 3 ms ISIs: mean_isi = 3 ms, ratio threshold = 5 × 3 = 15 ms.
+    # Trailing gap = 13 ms: closes the group (13 > 12) but below threshold (13 < 15).
+    cluster_isis = [3.0] * 15  # 16 spikes
+    cluster_times = list(np.cumsum([10.0, *cluster_isis]))  # t=10..55 ms
+    gap_ms = 13.0  # 13 > _TIGHT_CLUSTER_MAX_ISI_MS=12; 13 < 5×3=15
+    assert gap_ms > _DEFAULT_THRESHOLD_MS, "gap must close the burst group"
+    assert gap_ms < _LTS_TERMINATION_GAP_RATIO * 3.0, (
+        "gap must be below ratio threshold"
+    )
+    tail_times = [cluster_times[-1] + gap_ms + i * 3.0 for i in range(4)]
+
+    ap = _make_ap_result(cluster_times + tail_times)
+    result = analyze_bursts(
+        ap,
+        total_duration_ms=500.0,
+        _trace_end_time_ms=500.0,
+    )
+
+    assert result.threshold_method == "default-fixed"
+    # The oversized cluster is rejected; 16 spikes fold into unburst.
+    assert result.unburst_spike_count == 16
