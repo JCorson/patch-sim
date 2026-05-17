@@ -482,7 +482,7 @@ async def test_trn_hyperpolarization_burst_via_ui_build_neuron() -> None:
     own ``_build_neuron`` method (the same code the live Reflex app uses
     when the user clicks Run), then runs the HYPERPOLARIZATION_STEPS
     protocol via :func:`simulate_batch` and asserts each deeper sweep
-    (-3 to -5 µA/cm²) produces a 5+ spike rebound burst at 200–600 Hz.
+    (-1.2 to -2.0 µA/cm²) produces a 5+ spike rebound burst at 200–600 Hz.
 
     This covers the regression discovered when the user reported only ~2
     visible spikes per sweep in the UI: the previous version of
@@ -515,7 +515,7 @@ async def test_trn_hyperpolarization_burst_via_ui_build_neuron() -> None:
         simulate_batch(neuron, [sweep for sweep in protocol], simulate_current_clamp)
     )
 
-    # The deeper sweeps (indices 0, 1, 2 — currents -5, -4, -3 µA/cm²)
+    # The deeper sweeps (indices 0, 1, 2 — currents -2.0, -1.6, -1.2 µA/cm²)
     # must each produce a post-release LTS rebound burst.
     for sweep_idx in (0, 1, 2):
         result = results[sweep_idx]
@@ -542,16 +542,16 @@ async def test_trn_hyperpolarization_burst_via_ui_build_neuron() -> None:
         release_idx = min(int(neg_idx[-1]) + 1, time_arr.size - 1)
         release_ms = float(time_arr[release_idx])
         n_spikes, freq = post_release_rebound(time_arr, v_arr, release_ms)
-        assert 5 <= n_spikes <= 35, (
-            f"UI-build-path sweep {sweep_idx}: expected a 5–35 spike "
-            f"post-release deep-HP rebound, got {n_spikes} spikes after "
+        assert 5 <= n_spikes <= 20, (
+            f"UI-build-path sweep {sweep_idx}: expected a 5–20 spike "
+            f"post-release LTS rebound, got {n_spikes} spikes after "
             f"release at {release_ms:.0f} ms.  This regression points at "
             f"_build_neuron — a preset attribute (calcium_dynamics, channel "
             f"factory, etc.) is likely not propagated to the built Neuron."
         )
         assert freq is not None and 200.0 <= freq <= 600.0, (
             f"UI-build-path sweep {sweep_idx}: expected 200–600 Hz "
-            f"intra-burst frequency for the deep-HP rebound, got {freq} Hz."
+            f"intra-burst frequency for the LTS rebound, got {freq} Hz."
         )
 
 
