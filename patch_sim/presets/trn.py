@@ -55,19 +55,23 @@ PROTOCOL_ADJUSTMENTS: dict[str, dict[str, Any]] = {
         "stimulus_step": 0.5,
         "stimulus_duration": 100.0,
     },
-    # Sweep −5 → −1 µA/cm² (in 1.0 µA steps) for 500 ms with 100 ms pre
-    # and 300 ms post.  At ≤ −2 µA/cm² the cell de-inactivates ICaT and
-    # activates Ih enough to fire the HP92 rebound burst on release;
-    # the −1 µA step is included as a reference subthreshold sweep so
-    # the burst is visible by contrast.  Step duration is 500 ms (vs
-    # the 300 ms default) so Ih has time to fully activate.
+    # Sweep −2.0 → −0.4 µA/cm² (in 0.4 µA steps) for 500 ms with 100 ms
+    # pre and 300 ms post.  The deepest sweep parks Vm near −106 mV — a
+    # realistic post-inhibitory rebound depth (real TRN slice/in-vivo
+    # protocols rarely take the cell below ~−100 to −110 mV; Huguenard &
+    # Prince 1992).  The three deeper sweeps (−2.0 to −1.2 µA/cm²)
+    # de-inactivate ICaT and activate Ih enough to fire the HP92 5–15
+    # spike rebound burst on release; the shallowest −0.4 µA step is a
+    # near-subthreshold reference so the burst is visible by contrast.
+    # Step duration is 500 ms (vs the 300 ms default) so Ih has time to
+    # fully activate.
     HYPERPOLARIZATION_STEPS: {
         "pre_stimulus_duration": 100.0,
         "stimulus_duration": 500.0,
         "post_stimulus_duration": 300.0,
-        "min_stimulus": -5.0,
-        "max_stimulus": -1.0,
-        "stimulus_step": 1.0,
+        "min_stimulus": -2.0,
+        "max_stimulus": -0.4,
+        "stimulus_step": 0.4,
     },
     # Autonomous pacemaker: a small hyperpolarizing holding current
     # silences the tonic train during the chirp (mirrors a real ZAP
@@ -169,7 +173,7 @@ def make_trn() -> Neuron:
             make_ikca_channel(g_max=0.3),
             make_ih_channel(g_max=0.020),
         ),
-        # Peak ca_i reaches ~14–15 µM under REPETITIVE_FIRING and 8–18 µM under
+        # Peak ca_i reaches ~14–15 µM under REPETITIVE_FIRING and ~6–18 µM under
         # HYPERPOLARIZATION_STEPS (LTS rebound burst) — physiologically
         # consistent with TRN somatic Ca during high-frequency burst trains
         # (Cueni et al. 2008, Nat. Neurosci. 11:683).  The elevated Ca is

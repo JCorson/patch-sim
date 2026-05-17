@@ -64,7 +64,7 @@ def trn_intra_burst_ap_result(trn_neuron: Neuron):
     post = 200.0
     protocol = step_current(
         duration=pre + stim + post,
-        current_amplitude=-4.0,
+        current_amplitude=-2.0,
         step_start=pre,
         step_duration=stim,
     )

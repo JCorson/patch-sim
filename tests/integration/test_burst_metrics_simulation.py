@@ -235,7 +235,7 @@ def test_trn_step_release_produces_hp92_rebound_burst() -> None:
     post = 200.0
     protocol = step_current(
         duration=pre + stim + post,
-        current_amplitude=-4.0,
+        current_amplitude=-2.0,
         step_start=pre,
         step_duration=stim,
     )
@@ -251,13 +251,13 @@ def test_trn_step_release_produces_hp92_rebound_burst() -> None:
     rebound_bursts = [
         b
         for b in analysis.bursts
-        if 5 <= b.spike_count <= 35
+        if 5 <= b.spike_count <= 20
         and b.intra_burst_frequency is not None
         and 200.0 <= b.intra_burst_frequency <= 600.0
     ]
     assert len(rebound_bursts) >= 1, (
         f"Expected analyze_bursts_from_result to surface at least one HP92 "
-        f"rebound burst (5–35 spikes, 200–600 Hz), got bursts="
+        f"rebound burst (5–20 spikes, 200–600 Hz), got bursts="
         f"{[(b.spike_count, b.intra_burst_frequency) for b in analysis.bursts]}"
     )
 
@@ -288,8 +288,8 @@ def test_trn_hyperpolarization_steps_protocol_produces_burst_per_sweep() -> None
       executor used by the UI's run handler)
     - Analyze APs per sweep with :func:`analyze_aps`
 
-    For each sweep at -3 to -5 µA/cm², asserts a post-release LTS rebound
-    of 5–35 Na⁺ spikes at 200–600 Hz (pinned from the spike train, not the
+    For each sweep at -1.2 to -2.0 µA/cm², asserts a post-release LTS rebound
+    of 5–20 Na⁺ spikes at 200–600 Hz (pinned from the spike train, not the
     detector — see :func:`tests._rebound.post_release_rebound`).  This
     guards against
     regressions in the multi-sweep UI scenario, which the single-sweep test
@@ -306,8 +306,8 @@ def test_trn_hyperpolarization_steps_protocol_produces_burst_per_sweep() -> None
         simulate_batch(neuron, [sweep for sweep in protocol], simulate_current_clamp)
     )
 
-    # Sweeps are min-to-max in current amplitude: index 0 is deepest (-5).
-    # Verify deeper sweeps (-5, -4, -3) all produce HP92-shape bursts.
+    # Sweeps are min-to-max in current amplitude: index 0 is deepest (-2.0).
+    # Verify deeper sweeps (-2.0, -1.6, -1.2) all produce HP92-shape bursts.
     for sweep_idx in (0, 1, 2):
         result = results[sweep_idx]
         time_arr = np.asarray(result["time"])
@@ -325,13 +325,13 @@ def test_trn_hyperpolarization_steps_protocol_produces_burst_per_sweep() -> None
         rebound_bursts = [
             b
             for b in analysis.bursts
-            if 5 <= b.spike_count <= 35
+            if 5 <= b.spike_count <= 20
             and b.intra_burst_frequency is not None
             and 200.0 <= b.intra_burst_frequency <= 600.0
         ]
         assert len(rebound_bursts) >= 1, (
             f"Sweep {sweep_idx}: expected analyze_bursts to surface a HP92 "
-            f"rebound burst (5–35 spikes, 200–600 Hz), got bursts="
+            f"rebound burst (5–20 spikes, 200–600 Hz), got bursts="
             f"{[(b.spike_count, b.intra_burst_frequency) for b in analysis.bursts]}"
         )
 
@@ -341,21 +341,19 @@ def test_trn_hyperpolarization_steps_protocol_produces_burst_per_sweep() -> None
         release_idx = min(int(neg_idx[-1]) + 1, time_arr.size - 1)
         release_ms = float(time_arr[release_idx])
         n_spikes, freq = post_release_rebound(time_arr, v_arr, release_ms)
-        # Upper bound 35 because deeper hyperpolarizations (-5 µA) leave
-        # more Na⁺ available after the long Ih-driven hyperpolarization and
-        # produce larger rebound bursts (~25+ spikes), beyond the 5–15
-        # range Huguenard & Prince (1992) reported for typical
-        # hyperpolarization.  The canonical 5–20 band for the -4 µA × 500 ms
-        # protocol is enforced in
-        # test_trn_step_release_produces_hp92_rebound_burst above.
-        assert 5 <= n_spikes <= 35, (
-            f"Sweep {sweep_idx}: expected a 5–35 spike post-release deep-HP "
+        # The band tops out at ~15 spikes on the deepest sweep (-2.0 µA):
+        # at the physiological rebound depths this protocol sweeps, the
+        # HP92 5–15 phenotype holds, with the depolarized h-gate shift
+        # adding ~1 spike.  The 5–20 band keeps a tight regression guard
+        # while accepting the documented shift effect.
+        assert 5 <= n_spikes <= 20, (
+            f"Sweep {sweep_idx}: expected a 5–20 spike post-release LTS "
             f"rebound, got {n_spikes} spikes after release at "
             f"{release_ms:.0f} ms."
         )
         assert freq is not None and 200.0 <= freq <= 600.0, (
             f"Sweep {sweep_idx}: expected 200–600 Hz intra-burst frequency "
-            f"for the deep-HP rebound, got {freq} Hz."
+            f"for the LTS rebound, got {freq} Hz."
         )
 
 
