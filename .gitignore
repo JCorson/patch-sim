@@ -29,3 +29,6 @@ wheels/
 
 # Scratch
 scratch/
+
+# mkdocs build output
+site/

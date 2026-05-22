@@ -1,0 +1,43 @@
+site_name: Patch Clamp Simulator
+site_description: Hodgkin-Huxley patch clamp experiment simulator
+repo_url: https://github.com/JCorson/patch-sim
+docs_dir: docs
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - content.code.copy
+    - toc.integrate
+
+nav:
+  - Overview: index.md
+  - Neuron presets: presets.md
+  - Protocols & analysis: protocols-and-analysis.md
+  - Developer guide: developer-guide.md
+  - API reference:
+      - Neuron: api/neuron.md
+      - Simulation: api/simulation.md
+      - Protocols: api/protocols.md
+      - Analysis: api/analysis.md
+      - Presets: api/presets.md
+      - Channels: api/channels.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            members_order: source
+            separate_signature: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences
+  - tables
+  - toc:
+      permalink: true
