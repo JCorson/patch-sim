@@ -1,31 +1,35 @@
-"""Load the shared ``docs/`` prose pages for the in-app ``/help`` route.
+"""Load the application-documentation pages for the in-app ``/help`` route.
 
-The four prose Markdown files under the repository-root ``docs/`` directory are
-the single source of truth shared by the mkdocs site and the UI help page.
-They are read once at import and rendered by ``rx.markdown`` on the ``/help``
-route.
+The Markdown files under ``patch_sim_ui/help_content/`` are the user guide for
+the web application: how to configure a neuron, set up a protocol, run a
+simulation, and read the analysis. They are read once at import and rendered by
+``rx.markdown`` on the ``/help`` route.
 
-Like the ``assets/`` loader in :mod:`patch_sim_ui.state._figure_js`, this module
-assumes the app runs from the repository root (the documented ``uv run reflex
-run`` workflow) so that ``docs/`` resolves relative to the package.  Only the
-four named prose files are read; the ``docs/api/`` pages contain mkdocstrings
-``:::`` directives that are not valid Markdown for the UI renderer and are never
-loaded here.
+This is the *application* documentation track. The *library* documentation (the
+mkdocs API reference) lives separately under the repository-root ``docs/`` and
+is published as a static site; the help page links out to it.
+
+Help content lives inside the package, so it resolves relative to this module
+regardless of the working directory. Screenshots referenced by the prose are
+served by Reflex from the repository-root ``assets/screenshots/`` directory at
+``/screenshots/...``.
 """
 
 import pathlib
 import re
 
-_DOCS_DIR = pathlib.Path(__file__).parents[1] / "docs"
+_DOCS_DIR = pathlib.Path(__file__).parent / "help_content"
 
 #: URL of the deployed mkdocs API-reference site, linked from the help page.
 API_DOCS_URL: str = "https://jcorson.github.io/patch-sim/"
 
 #: Ordered ``(slug, label, filename)`` triples driving the help topic nav.
 _TOPICS: list[tuple[str, str, str]] = [
-    ("overview", "Overview", "index.md"),
-    ("presets", "Neuron presets", "presets.md"),
-    ("protocols", "Protocols & analysis", "protocols-and-analysis.md"),
+    ("getting-started", "Getting started", "getting-started.md"),
+    ("neuron", "Configuring the neuron", "neuron.md"),
+    ("protocol", "Setting up a protocol", "protocol.md"),
+    ("running", "Running & reading results", "running.md"),
+    ("analysis", "Analysis panels", "analysis.md"),
 ]
 
 #: Ordered ``(slug, label)`` pairs for building the topic nav.
@@ -35,21 +39,22 @@ HELP_TOPICS: list[tuple[str, str]] = [(slug, label) for slug, label, _ in _TOPIC
 DEFAULT_TOPIC: str = _TOPICS[0][0]
 
 # Markdown links whose target is not an absolute http(s) URL — i.e. the
-# mkdocs-internal cross-page and API links.  They have no meaning on the UI
-# help page (which switches topics by state, not by URL), so they are reduced
-# to their link text to avoid rendering dead links.
-_INTERNAL_LINK = re.compile(r"\[([^\]]+)\]\((?!https?://)[^)]*\)")
+# cross-topic links between help pages. They have no meaning on the help page
+# (which switches topics by state, not by URL), so they are reduced to their
+# link text. The ``(?<!\!)`` lookbehind leaves image syntax (``![alt](src)``)
+# untouched so screenshots still render.
+_INTERNAL_LINK = re.compile(r"(?<!\!)\[([^\]]+)\]\((?!https?://)[^)]*\)")
 
 
 def _load(filename: str) -> str:
-    """Read one prose file and strip its mkdocs-internal links.
+    """Read one help page and flatten its cross-topic links.
 
     Args:
-        filename: Name of the Markdown file under ``docs/``.
+        filename: Name of the Markdown file under ``help_content/``.
 
     Returns:
-        The file's contents with internal Markdown links flattened to plain
-        text and external (http/https) links left intact.
+        The file's contents with internal cross-topic links flattened to plain
+        text; image references and external (http/https) links are left intact.
     """
     text = (_DOCS_DIR / filename).read_text(encoding="utf-8")
     return _INTERNAL_LINK.sub(r"\1", text)
