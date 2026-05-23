@@ -5,12 +5,15 @@ Drives the live Reflex app with a headless browser and writes PNGs into
 in the in-app ``/help`` pages).
 
 Usage:
-    1. Start the app in one terminal:  ``uv run reflex run``
+    1. Start the app in production mode in one terminal:
+       ``uv run reflex run --env prod``
     2. In another, run this script:
        ``uv run --frozen --group screenshots python tools/capture_screenshots.py``
 
-The target URL defaults to ``http://localhost:3000`` and can be overridden with
-the ``PATCH_SIM_URL`` environment variable.
+Production mode is recommended: the dev server's hot-reloader can restart the
+backend worker mid-run and drop the in-flight simulation. The target URL
+defaults to ``http://localhost:3000`` and can be overridden with the
+``PATCH_SIM_URL`` environment variable.
 """
 
 import os
