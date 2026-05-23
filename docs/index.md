@@ -105,7 +105,5 @@ the squid preset, `INa`, `IK`, `INaL`, `IKL`), and the gating variables
 - [Neuron presets](presets.md) — the nine built-in cell types and their biology.
 - [Protocols & analysis](protocols-and-analysis.md) — the stimulus library and
   the analysis metrics.
-- [Developer guide](developer-guide.md) — architecture, conventions, and how to
-  extend the library.
 - **API reference** — the full auto-generated documentation for every public
   symbol (see the API reference section of this site).

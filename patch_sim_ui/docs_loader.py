@@ -26,7 +26,6 @@ _TOPICS: list[tuple[str, str, str]] = [
     ("overview", "Overview", "index.md"),
     ("presets", "Neuron presets", "presets.md"),
     ("protocols", "Protocols & analysis", "protocols-and-analysis.md"),
-    ("developer", "Developer guide", "developer-guide.md"),
 ]
 
 #: Ordered ``(slug, label)`` pairs for building the topic nav.

@@ -14,7 +14,6 @@ nav:
   - Overview: index.md
   - Neuron presets: presets.md
   - Protocols & analysis: protocols-and-analysis.md
-  - Developer guide: developer-guide.md
   - API reference:
       - Neuron: api/neuron.md
       - Simulation: api/simulation.md

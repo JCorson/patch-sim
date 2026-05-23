@@ -83,7 +83,7 @@ Every function and method — public, private, and dunder — must have a Google
 
 Documentation lives in three places that must stay in sync. Evaluate and update all three whenever a change affects user-facing behavior, the public API, or neuron/protocol/analysis semantics:
 
-- **Prose pages** in `docs/` (`index.md`, `presets.md`, `protocols-and-analysis.md`, `developer-guide.md`) — pure Markdown shared by the mkdocs site and the in-UI `/help` page. Update the relevant page when behavior or supported options change.
+- **Prose pages** in `docs/` (`index.md`, `presets.md`, `protocols-and-analysis.md`) — pure Markdown shared by the mkdocs site and the in-UI `/help` page. Update the relevant page when behavior or supported options change.
 - **In-UI help** — the `/help` Reflex route renders the `docs/` prose. No separate copy exists; editing the prose updates the UI. Add a new topic to `patch_sim_ui/docs_loader.py` when a new prose page is added.
 - **Docstrings** — Google-style docstrings on public symbols feed the mkdocstrings API reference (`docs/api/`). When you add or change a public symbol in `patch_sim/`, update its docstring and add a `:::` entry under `docs/api/` if it is a new top-level export.
 
