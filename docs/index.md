@@ -8,9 +8,13 @@ and ships with an interactive web UI inspired by pClamp.
 There are two ways to use it:
 
 - **The web UI** — configure a neuron, pick a stimulus protocol, run it, and
-  read live trace plots and analysis metrics. No coding required.
+  read live trace plots and analysis metrics. No coding required. A full user
+  guide for the app is built into it (the **Help** icon in the top bar).
 - **The Python library** — build neurons and protocols, run simulations, and
   analyze the results programmatically.
+
+This site is the **library reference**: how to use `patch_sim` from Python. For
+help driving the web app, open the in-app Help.
 
 ## The workflow
 
@@ -53,7 +57,8 @@ uv run reflex run
 ```
 
 Then open `http://localhost:3000`. Configure the neuron and protocol in the left
-sidebar, press **Run**, and inspect the trace and analysis panels.
+sidebar, press **Run**, and inspect the trace and analysis panels. The app's
+built-in **Help** page walks through each panel in detail.
 
 ## A first simulation in code
 

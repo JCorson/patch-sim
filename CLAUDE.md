@@ -81,13 +81,11 @@ Every function and method — public, private, and dunder — must have a Google
 
 ## Documentation
 
-Documentation lives in three places that must stay in sync. Evaluate and update all three whenever a change affects user-facing behavior, the public API, or neuron/protocol/analysis semantics:
+There are two documentation tracks, plus the docstrings that feed the API reference. Evaluate and update whatever a change touches:
 
-- **Prose pages** in `docs/` (`index.md`, `presets.md`, `protocols-and-analysis.md`) — pure Markdown shared by the mkdocs site and the in-UI `/help` page. Update the relevant page when behavior or supported options change.
-- **In-UI help** — the `/help` Reflex route renders the `docs/` prose. No separate copy exists; editing the prose updates the UI. Add a new topic to `patch_sim_ui/docs_loader.py` when a new prose page is added.
-- **Docstrings** — Google-style docstrings on public symbols feed the mkdocstrings API reference (`docs/api/`). When you add or change a public symbol in `patch_sim/`, update its docstring and add a `:::` entry under `docs/api/` if it is a new top-level export.
-
-Keep prose to Markdown that renders the same in both the UI and mkdocs (fenced code blocks and tables are safe); avoid bare `$` (the UI renderer treats it as math). Build the docs site to catch broken references: `uv run --frozen --group=docs mkdocs build --strict`.
+- **Library documentation** — the mkdocs site, for developers using `patch_sim` in Python. Prose pages live in `docs/` (`index.md`, `presets.md`, `protocols-and-analysis.md`) and the API reference is auto-generated under `docs/api/`. Update the relevant prose page when library behavior or supported options change. Build it to catch broken references: `uv run --frozen --group=docs mkdocs build --strict`. Avoid bare `$` and keep to Markdown that renders under both mkdocs and GitHub.
+- **Application documentation** — the in-app `/help` route, a user guide for the web app. Pages live in `patch_sim_ui/help_content/*.md` and are rendered by `rx.markdown`; add a new topic to `_TOPICS` in `patch_sim_ui/docs_loader.py` when you add a page. Update these when the UI's controls, panels, or workflow change. Screenshots are served from `assets/screenshots/` and regenerated with `uv run --frozen --group screenshots python tools/capture_screenshots.py` (against a running `uv run reflex run`); refresh them when the UI's appearance changes.
+- **Docstrings** — Google-style docstrings on public symbols feed the mkdocstrings API reference. When you add or change a public symbol in `patch_sim/`, update its docstring and add a `:::` entry under `docs/api/` if it is a new top-level export.
 
 ## Testing conventions
 
