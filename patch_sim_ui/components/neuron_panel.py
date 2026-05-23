@@ -333,4 +333,5 @@ def neuron_panel() -> rx.Component:
         spacing="3",
         width="100%",
         padding="4",
+        id="ps-neuron-panel",
     )

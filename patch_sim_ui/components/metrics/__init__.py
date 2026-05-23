@@ -217,6 +217,7 @@ def analysis_sidebar() -> rx.Component:
         background="var(--gray-1)",
         height="calc(100vh - 60px - 2 * var(--space-3))",
         flex_shrink="0",
+        id="ps-analysis-sidebar",
     )
 
 

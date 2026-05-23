@@ -122,6 +122,7 @@ def _sidebar() -> rx.Component:
         min_width="280px",
         border_right="1px solid var(--gray-4)",
         background="var(--gray-1)",
+        id="ps-sidebar",
     )
 
 

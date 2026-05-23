@@ -363,4 +363,5 @@ def sweep_manager() -> rx.Component:
         width="100%",
         padding_x="4",
         padding_y="2",
+        id="ps-sweep-manager",
     )
