@@ -76,6 +76,7 @@ def _header() -> rx.Component:
             rx.link(
                 rx.icon_button(rx.icon("circle-help"), variant="ghost", size="2"),
                 href="/help",
+                is_external=True,
             ),
             content="Help & documentation",
         ),
