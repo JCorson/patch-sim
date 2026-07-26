@@ -218,8 +218,8 @@ def test_band_restriction() -> None:
     assert result.f_start == 10.0
     assert result.f_end == 50.0
     freqs = np.asarray(result.frequencies)
-    assert np.min(freqs) >= 10.0
-    assert np.max(freqs) <= 50.0
+    assert freqs.min() >= 10.0
+    assert freqs.max() <= 50.0
 
 
 def test_interior_stimulus_dropout_does_not_spike_the_estimate() -> None:

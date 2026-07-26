@@ -4,11 +4,11 @@ version = "0.1.0"
 description = "Patch clamp experiment simulator implementing the Hodgkin-Huxley model for neuronal electrophysiology"
 readme = "README.md"
 license = "GPL-3.0-or-later"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
-    "numpy>=2.4.6",
+    "numpy>=2.5.1",
     "matplotlib>=3.11.1",
-    "scipy>=1.17.1",
+    "scipy>=1.18.0",
 ]
 
 [tool.ruff]
