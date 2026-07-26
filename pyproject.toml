@@ -60,6 +60,10 @@ addopts = "-n auto --dist=loadscope"
 filterwarnings = [
     "ignore::pydantic.warnings.PydanticDeprecatedSince20",
     "ignore:.*multi-threaded.*fork:DeprecationWarning:multiprocessing",
+    # starlette.testclient uses httpx2 when it is installed and otherwise
+    # falls back to httpx. Fail loudly if the fallback is ever taken again,
+    # rather than letting the warning scroll past in the summary.
+    "error:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
 ]
 
 [dependency-groups]
