@@ -103,3 +103,16 @@ def test_route_404_for_unknown_token() -> None:
     client = TestClient(starlette_app)
     resp = client.get("/api/figure/nonexistent")
     assert resp.status_code == 404
+
+
+def test_testclient_is_backed_by_httpx2() -> None:
+    """The Starlette test client binds httpx2 rather than the httpx fallback.
+
+    The ``filterwarnings`` guard in pyproject.toml keys off the text of
+    Starlette's deprecation warning, so it stops matching if that wording ever
+    changes.  This check keys off the bound module instead, so the two fail
+    independently and a reworded warning cannot leave the fallback unnoticed.
+    """
+    import starlette.testclient
+
+    assert starlette.testclient.httpx.__name__ == "httpx2"
