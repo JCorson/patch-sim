@@ -61,9 +61,10 @@ filterwarnings = [
     "ignore::pydantic.warnings.PydanticDeprecatedSince20",
     "ignore:.*multi-threaded.*fork:DeprecationWarning:multiprocessing",
     # starlette.testclient uses httpx2 when it is installed and otherwise
-    # falls back to httpx. Promote that fallback to a hard error so the
-    # unsupported path cannot be taken silently.
-    "error:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+    # falls back to httpx with a deprecation warning. Promote the whole
+    # warning class to a hard error so the unsupported path cannot be taken
+    # silently, whatever wording the warning carries.
+    "error::starlette.exceptions.StarletteDeprecationWarning",
 ]
 
 [dependency-groups]
