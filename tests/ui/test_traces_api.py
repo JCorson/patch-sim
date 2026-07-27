@@ -23,7 +23,7 @@ def _make_fig(n_traces: int = 2, n_pts: int = 10) -> go.Figure:
         n_pts: Number of data points per trace.
 
     Returns:
-        A ``go.Figure`` suitable for round-trip serialisation tests.
+        A ``go.Figure`` suitable for round-trip serialization tests.
     """
     fig = go.Figure()
     for i in range(n_traces):
