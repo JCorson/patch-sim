@@ -6,4 +6,13 @@ from reflex.plugins.sitemap import SitemapPlugin
 config = rx.Config(
     app_name="patch_sim_ui",
     disable_plugins=[SitemapPlugin],
+    plugins=[
+        rx.plugins.RadixThemesPlugin(
+            theme=rx.theme(
+                appearance="inherit",
+                accent_color="blue",
+                radius="medium",
+            ),
+        ),
+    ],
 )

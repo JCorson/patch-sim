@@ -172,14 +172,9 @@ def index() -> rx.Component:
     )
 
 
-app = rx.App(
-    theme=rx.theme(
-        appearance="inherit",
-        accent_color="blue",
-        radius="medium",
-    ),
-    api_transformer=_traces_app,
-)
+# The Radix theme is configured via ``rx.plugins.RadixThemesPlugin`` in
+# ``rxconfig.py``; ``App(theme=...)`` is deprecated and removed in Reflex 1.0.
+app = rx.App(api_transformer=_traces_app)
 app.add_page(
     index,
     route="/",
