@@ -1,6 +1,7 @@
 .web
 # Reflex build artifacts
 .web/
+reflex.lock/
 
 .states
 *.db
