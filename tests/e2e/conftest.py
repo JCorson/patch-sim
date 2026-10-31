@@ -10,7 +10,7 @@ Reflex state classes are imported; this module sets it at import time.
 
 import os
 from contextlib import asynccontextmanager
-from typing import AsyncIterator, Awaitable, Callable
+from typing import AsyncGenerator, Awaitable, Callable
 from unittest.mock import MagicMock, patch
 
 # Reflex's State.__init__ checks for PYTEST_CURRENT_TEST to permit bare
@@ -147,7 +147,7 @@ def state_tree() -> StateTree:
 
 
 @asynccontextmanager
-async def patch_get_state(tree: StateTree) -> AsyncIterator[None]:
+async def patch_get_state(tree: StateTree) -> AsyncGenerator[None]:
     """Patch ``get_state`` on all substates to resolve within *tree*.
 
     Args:
