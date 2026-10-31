@@ -21,9 +21,6 @@ ignore = []
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
-[tool.uv.sources]
-patch_sim = {path = "./patch_sim", editable = true}
-
 [tool.ty.src]
 include = ["./patch_sim", "./patch_sim_ui", "./tests"]
 
