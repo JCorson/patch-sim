@@ -21,9 +21,6 @@ ignore = []
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
-[tool.uv.sources]
-patch_sim = {path = "./patch_sim", editable = true}
-
 [tool.ty.src]
 include = ["./patch_sim", "./patch_sim_ui", "./tests"]
 
@@ -69,7 +66,7 @@ filterwarnings = [
 
 [dependency-groups]
 dev = [
-    "httpx2>=2.9.1",
+    "httpx2>=2.16.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
@@ -77,5 +74,5 @@ dev = [
 ]
 ui = [
     "plotly>=6.9.0",
-    "reflex>=0.9.7",
+    "reflex[pydantic]>=0.10.1",
 ]

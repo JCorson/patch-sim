@@ -24,13 +24,12 @@ class LogState(rx.State):
             in reverse chronological order so the most recent entry is
             always visible at the top of the panel without scrolling.
         """
-        min_level = logging.getLevelName(self.log_level_filter)
-        if not isinstance(min_level, int):
-            min_level = logging.DEBUG
+        levels = logging.getLevelNamesMapping()
+        min_level = levels.get(self.log_level_filter, logging.DEBUG)
         return [
             e
             for e in reversed(self.log_entries)
-            if logging.getLevelName(e.level) >= min_level
+            if levels.get(e.level, logging.NOTSET) >= min_level
         ]
 
     def toggle_log_panel(self):

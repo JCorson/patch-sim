@@ -161,7 +161,7 @@ def test_from_result_no_extra_columns_gives_only_core_currents_and_hh_gates() ->
 
 def test_from_result_i_prefix_goes_to_channel_currents() -> None:
     """Extra columns starting with I are placed in channel_currents."""
-    extra = {"Ih": list(np.ones(_N) * 0.5)}
+    extra = {"Ih": [0.5] * _N}
     s = Sweep.from_result(
         _make_result(extra_cols=extra), _make_stimulus(), "", "", "CC"
     )
@@ -1032,7 +1032,7 @@ def test_sweep_meta_negative_for_carrier_traces() -> None:
 
 def test_sweep_meta_with_additional_channels() -> None:
     """Additional current/gating traces carry the correct sweep index."""
-    extra = {"ih_current": list(np.ones(_N) * 0.5)}
+    extra = {"ih_current": [0.5] * _N}
     sweeps = [
         _make_sweep(label="s0", mode="Voltage Clamp", extra_cols=extra),
         _make_sweep(label="s1", mode="Voltage Clamp", extra_cols=extra),
