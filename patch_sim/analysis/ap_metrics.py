@@ -195,7 +195,7 @@ def analyze_aps(
     spikes: list[SpikeMetrics] = []
     last_peak_idx = -_REFRACTORY_SAMPLES - 1
 
-    for c_idx in crossing_indices:
+    for c_idx in crossing_indices.tolist():
         # Enforce refractory period
         if c_idx - last_peak_idx < _REFRACTORY_SAMPLES:
             continue
