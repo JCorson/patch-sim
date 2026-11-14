@@ -2514,3 +2514,45 @@ async def test_fingerprint_changes_when_preset_switch_changes_passive_channels()
         [_ async for _ in ns.load_neuron_preset(CORTICAL_PYRAMIDAL)]
         cortical_fingerprint = ns._compute_fingerprint()
     assert squid_fingerprint != cortical_fingerprint
+
+
+# ---------------------------------------------------------------------------
+# Export context capture
+# ---------------------------------------------------------------------------
+
+
+def test_record_export_context_captures_run_provenance() -> None:
+    """_record_export_context stores metadata, neuron name and protocol name."""
+    from patch_sim_ui.state.simulation import _protocol_export_params
+
+    st = _make_state()
+    st._current_sweeps = [_make_sweep("a"), _make_sweep("b")]
+    ps = _make_protocol_state()
+    st._record_export_context(
+        NEURON_PRESETS[SQUID_GIANT_AXON](),
+        neuron_preset=SQUID_GIANT_AXON,
+        protocol_preset="",
+        mode="Current Clamp",
+        ptype="Step",
+        protocol_params=_protocol_export_params(ps),
+    )
+    meta = dict(st._export_metadata)
+    assert meta["neuron_preset"] == SQUID_GIANT_AXON
+    assert meta["protocol_type"] == "Step"
+    assert meta["stimulus_duration_ms"] == f"{ps.stimulus_duration:g}"
+    assert meta["sweep s02"] == "b"
+    assert st._export_neuron_name == SQUID_GIANT_AXON
+    assert st._export_protocol_name == "Step"
+
+
+def test_clear_for_new_protocol_clears_export_context() -> None:
+    """_clear_for_new_protocol drops the export metadata along with the sweeps."""
+    st = _make_state()
+    st._current_sweeps = [_make_sweep()]
+    st._export_metadata = [("k", "v")]
+    st._export_neuron_name = "n"
+    st._export_protocol_name = "p"
+    st._clear_for_new_protocol()
+    assert st._export_metadata == []
+    assert st._export_neuron_name == ""
+    assert st._export_protocol_name == ""

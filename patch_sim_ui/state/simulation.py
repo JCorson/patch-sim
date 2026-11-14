@@ -31,6 +31,9 @@ from patch_sim_ui.channels import (
     CURRENT_FIELD_MAP,
     GATING_FIELD_MAP,
 )
+from patch_sim_ui.export import (
+    build_export_metadata,
+)
 from patch_sim_ui.plotting import (
     TraceVisibility,
     build_figure,
@@ -58,6 +61,27 @@ logger = logging.getLogger(__name__)
 _MT_DEBOUNCE_S: float = 0.3
 
 
+def _protocol_export_params(proto_st: "ProtocolState") -> dict[str, float]:
+    """Return the protocol timing and stimulus range recorded in exports.
+
+    Args:
+        proto_st: Protocol state to read.
+
+    Returns:
+        Mapping of export metadata key to value, with the stimulus unit
+        (uA/cm2 or mV) encoded in the key for the active clamp mode.
+    """
+    unit = "mV" if proto_st.clamp_mode != CURRENT_CLAMP else "uA_cm2"
+    return {
+        "pre_stimulus_duration_ms": proto_st.pre_stimulus_duration,
+        "stimulus_duration_ms": proto_st.stimulus_duration,
+        "post_stimulus_duration_ms": proto_st.post_stimulus_duration,
+        f"min_stimulus_{unit}": proto_st.min_stimulus,
+        f"max_stimulus_{unit}": proto_st.max_stimulus,
+        f"stimulus_step_{unit}": proto_st.stimulus_step,
+    }
+
+
 class SimulationState(rx.State):
     """State for simulation results, sweep collections, and figure rendering."""
 
@@ -75,6 +99,12 @@ class SimulationState(rx.State):
     # floats are not JSON-serialised on every state flush.  Served to the
     # browser via /api/figure/{sim_token} (see patch_sim_ui/api/traces.py).
     _current_sweeps: list[Sweep] = []  # Latest simulation result
+    # Provenance of ``_current_sweeps`` captured when the simulation ran (the
+    # live neuron/protocol panels may have changed since).  Backend-only for
+    # the same reason as the sweeps; consumed by ``export_csv``.
+    _export_metadata: list[tuple[str, str]] = []
+    _export_neuron_name: str = ""  # Neuron preset that produced the sweeps
+    _export_protocol_name: str = ""  # Protocol preset (or type) that ran
     stored_traces: list[Sweep] = []  # Oscilloscope-style stored reference traces
     # Short token identifying the latest figure in the side-channel store.
     # Pushed to the client so JS can fetch /api/figure/{sim_token}.
@@ -150,6 +180,9 @@ class SimulationState(rx.State):
         changes, ensuring stale results are not shown for the new protocol.
         """
         self._current_sweeps = []
+        self._export_metadata = []
+        self._export_neuron_name = ""
+        self._export_protocol_name = ""
         self.stored_traces = []
         self.sim_token = ""
         self._cont_has_state = False
@@ -441,6 +474,44 @@ class SimulationState(rx.State):
         if js:
             return rx.call_script(js)
 
+    def _record_export_context(
+        self,
+        neuron: "patch_sim.Neuron",
+        *,
+        neuron_preset: str,
+        protocol_preset: str,
+        mode: str,
+        ptype: str,
+        protocol_params: dict[str, float],
+    ) -> None:
+        """Capture the provenance of ``_current_sweeps`` for CSV export.
+
+        The neuron and protocol panels reflect live UI values rather than what
+        produced the displayed sweeps, so the context is recorded at run time.
+        Call after ``_current_sweeps`` has been assigned.
+
+        Args:
+            neuron: The neuron that was simulated.
+            neuron_preset: Name of the neuron preset in effect.
+            protocol_preset: Name of the protocol preset in effect (may be
+                empty when the user edited the protocol by hand).
+            mode: Clamp mode that was run.
+            ptype: Protocol type that was run.
+            protocol_params: Protocol timing and stimulus range, as returned
+                by :func:`_protocol_export_params`.
+        """
+        self._export_metadata = build_export_metadata(
+            neuron,
+            neuron_preset=neuron_preset,
+            protocol_preset=protocol_preset,
+            clamp_mode=mode,
+            protocol_type=ptype,
+            protocol_params=protocol_params,
+            sweep_labels=[s.label for s in self._current_sweeps],
+        )
+        self._export_neuron_name = neuron_preset
+        self._export_protocol_name = protocol_preset or ptype
+
     def _do_apply_simulation(
         self,
         result: _SimResult,
@@ -527,6 +598,9 @@ class SimulationState(rx.State):
                     neuron_st = await self.get_state(NeuronState)
                     neuron = neuron_st._build_neuron()
                     stimulus = proto_st._build_protocols()[0][0]
+                    neuron_preset = neuron_st.active_neuron_type
+                    protocol_preset = proto_st.active_protocol_preset
+                    export_params = _protocol_export_params(proto_st)
                     prior_V = self._cont_V
                     prior_ca_i = self._cont_ca_i
                     stored_traces_snap = list(self.stored_traces)
@@ -632,6 +706,14 @@ class SimulationState(rx.State):
                     if not self.continuous_mode:
                         break
                     self._current_sweeps = [sweep]
+                    self._record_export_context(
+                        neuron,
+                        neuron_preset=neuron_preset,
+                        protocol_preset=protocol_preset,
+                        mode=mode,
+                        ptype=ptype,
+                        protocol_params=export_params,
+                    )
                     self.sim_token = _cont_token
                     self._cont_V = last_V
                     self._cont_gating = last_gating
@@ -696,6 +778,9 @@ class SimulationState(rx.State):
             # Snapshot scalar protocol params so the executor call is thread-safe.
             stored_traces_snap = list(self.stored_traces)
             show_hover_snap = self.show_hover
+            neuron_preset = neuron_st.active_neuron_type
+            protocol_preset = proto_st.active_protocol_preset
+            export_params = _protocol_export_params(proto_st)
             min_stimulus = proto_st.min_stimulus
             max_stimulus = proto_st.max_stimulus
             stimulus_step = proto_st.stimulus_step
@@ -737,6 +822,14 @@ class SimulationState(rx.State):
             async with self:
                 analysis_st = await self.get_state(AnalysisState)
                 self._do_apply_simulation(_sim_result, analysis_st)
+                self._record_export_context(
+                    neuron,
+                    neuron_preset=neuron_preset,
+                    protocol_preset=protocol_preset,
+                    mode=mode,
+                    ptype=ptype,
+                    protocol_params=export_params,
+                )
             yield SimulationState.run_membrane_test
         finally:
             async with self:
