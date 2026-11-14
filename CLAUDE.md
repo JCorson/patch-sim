@@ -143,8 +143,10 @@ a PR is opened. All must pass with no errors.
 and `/uv run --frozen -m pytest tests/unit`.
 If the commit touches `patch_sim_ui/`, also run `tests/ui` and `tests/e2e`.
 
-**Before opening a PR:** full default suite (`/uv run --frozen -m pytest`)
-plus `tests/e2e`. `tests/integration` runs in CI only on a cron job,
-so this local run is its only pre-merge check.
+**Before opening a PR:** the default suite (`/uv run --frozen -m pytest`,
+which covers `tests/unit`, `tests/integration` and `tests/ui`) plus
+`/uv run --frozen -m pytest tests/e2e`, which is outside the default
+`testpaths`. `tests/integration` runs in CI only on a cron job, so this
+local run is its only pre-merge check.
 
 **Before finishing a task that does not end in a PR:** run the pre-PR checks.
