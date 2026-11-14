@@ -48,6 +48,7 @@ from patch_sim_ui.state._common import (
 )
 from patch_sim_ui.state._figure_js import (
     _render_download_js,
+    _render_export_figure_js,
     _render_fetch_figure_js,
     _render_sweep_highlight_js,
 )
@@ -599,6 +600,33 @@ class SimulationState(rx.State):
             log_st._refresh_logs()
         api_url = _get_config().api_url.rstrip("/")
         yield rx.call_script(_render_download_js(api_url, token))
+
+    def export_figure(self, fmt: str) -> Any:
+        """Download the trace figure as a PNG or SVG image.
+
+        The browser re-fetches the canonical light-theme figure for the
+        current ``sim_token`` and renders it at the on-screen size with the
+        on-screen trace visibility.
+
+        Args:
+            fmt: Image format, ``"png"`` or ``"svg"``.
+
+        Returns:
+            A script event, or ``None`` when *fmt* is unsupported or there is
+            no figure to export.
+        """
+        if fmt not in ("png", "svg") or not self.sim_token:
+            return None
+        filename = export_filename(
+            self._export_neuron_name or self._label_neuron_type,
+            self._export_protocol_name or "traces",
+            fmt,
+            datetime.now(),
+        ).rsplit(".", 1)[0]
+        api_url = _get_config().api_url.rstrip("/")
+        return rx.call_script(
+            _render_export_figure_js(self.sim_token, fmt, filename, api_url)
+        )
 
     @rx.event(background=True)
     async def run_continuous(self) -> AsyncGenerator[Any, None]:

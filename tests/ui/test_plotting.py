@@ -985,6 +985,16 @@ def test_sweep_meta_vc_multi_sweep() -> None:
     )
 
 
+def test_hover_carriers_are_tagged_in_multi_sweep() -> None:
+    """Hover-carrier traces carry meta.carrier so exports can drop them."""
+    sweeps = [_make_sweep(label=f"s{i}", mode="Current Clamp") for i in range(2)]
+    fig = build_figure(sweeps, TraceVisibility(), "Current Clamp")
+    carriers = [t for t in fig.data if t.meta.get("carrier")]
+    assert len(carriers) == 3
+    assert all(t.meta["sweep"] == -1 for t in carriers)
+    assert not any(t.meta.get("carrier") for t in fig.data if t.meta["sweep"] >= 0)
+
+
 def test_sweep_meta_cc_multi_sweep() -> None:
     """Multi-sweep CC figure embeds correct sweep index in trace meta."""
     sweeps = [_make_sweep(label=f"s{i}", mode="Current Clamp") for i in range(2)]

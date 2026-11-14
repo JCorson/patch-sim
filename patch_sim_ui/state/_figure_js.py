@@ -28,6 +28,11 @@ _SWEEP_HIGHLIGHT_JS: str = (_ASSETS_DIR / "sweep_highlight.js").read_text()
 #: :func:`_render_fetch_figure_js`.
 _FETCH_FIGURE_JS: str = (_ASSETS_DIR / "fetch_figure.js").read_text()
 
+#: Client-side PNG/SVG figure export.  Placeholder tokens (``/*API_URL*/``,
+#: ``/*TOKEN*/``, ``/*FORMAT*/``, ``/*FILENAME*/``) are substituted per call
+#: in :func:`_render_export_figure_js`.
+_EXPORT_FIGURE_JS: str = (_ASSETS_DIR / "export_figure.js").read_text()
+
 
 def _render_sweep_highlight_js(selected_sweep: int) -> str:
     """Return the sweep-highlight JS with styling constants substituted.
@@ -95,4 +100,24 @@ def _render_download_js(api_url: str, token: str) -> str:
         "a.click();"
         "a.remove();"
         "})();"
+    )
+
+
+def _render_export_figure_js(token: str, fmt: str, filename: str, api_url: str) -> str:
+    """Return the figure-export JS with all placeholder tokens substituted.
+
+    Args:
+        token: UUID hex token of the figure in the side-channel store.
+        fmt: Image format, ``"png"`` or ``"svg"``.
+        filename: Download filename without extension.
+        api_url: Base backend URL with any trailing slash already stripped.
+
+    Returns:
+        A self-contained JS string ready for ``rx.call_script``.
+    """
+    return (
+        _EXPORT_FIGURE_JS.replace("/*API_URL*/", api_url)
+        .replace("/*TOKEN*/", token)
+        .replace("/*FORMAT*/", json.dumps(fmt))
+        .replace("/*FILENAME*/", json.dumps(filename))
     )

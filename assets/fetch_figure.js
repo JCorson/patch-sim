@@ -97,7 +97,12 @@ setTimeout(async function () {
 
     // The mount is a plain HTML div (not a react-plotly.js component), so
     // Plotly.react's output is not wiped by a subsequent React re-render.
-    await Plotly.react(gd, fig.data, _layout, { responsive: true });
+    // The modebar camera exports the on-screen plot as a PNG at 3x scale.
+    await Plotly.react(gd, fig.data, _layout, {
+      responsive: true,
+      displaylogo: false,
+      toImageButtonOptions: { format: "png", filename: "patch-sim-traces", scale: 3 },
+    });
     /*POST_JS*/
   } catch (err) {
     console.error("[patch_sim] fetch figure error:", err);
