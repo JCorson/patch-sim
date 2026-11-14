@@ -80,8 +80,10 @@ def _render_fetch_figure_js(token: str, post_js: str, api_url: str) -> str:
 def _render_download_js(api_url: str, token: str) -> str:
     """Return JS that triggers a browser download of a stored export.
 
-    Clicks a transient hidden anchor pointing at ``/api/export/{token}``; the
-    server supplies the filename via ``Content-Disposition``.
+    Loads ``/api/export/{token}`` in a hidden iframe that removes itself after
+    60 s; the server supplies the filename via ``Content-Disposition``.  A
+    failed request (e.g. an evicted token) renders inside the iframe, so the
+    app tab never navigates away.
 
     Args:
         api_url: Base backend URL with any trailing slash already stripped.
@@ -93,12 +95,11 @@ def _render_download_js(api_url: str, token: str) -> str:
     url = json.dumps(f"{api_url}/api/export/{token}")
     return (
         "(function(){"
-        "var a=document.createElement('a');"
-        f"a.href={url};"
-        "a.style.display='none';"
-        "document.body.appendChild(a);"
-        "a.click();"
-        "a.remove();"
+        "var f=document.createElement('iframe');"
+        "f.style.display='none';"
+        f"f.src={url};"
+        "document.body.appendChild(f);"
+        "setTimeout(function(){f.remove();},60000);"
         "})();"
     )
 

@@ -1,4 +1,4 @@
-"""Tests for the one-shot export store (patch_sim_ui/api/exports.py)."""
+"""Tests for the export store (patch_sim_ui/api/exports.py)."""
 
 import pytest
 
@@ -28,12 +28,20 @@ def test_route_serves_csv_attachment() -> None:
     )
 
 
-def test_token_is_single_use() -> None:
-    """A second GET for the same token returns 404."""
+def test_repeated_get_succeeds() -> None:
+    """A retried or duplicated request for the same token still succeeds."""
     put("tok", "f.csv", b"x")
     client = TestClient(starlette_app)
     assert client.get("/api/export/tok").status_code == 200
-    assert client.get("/api/export/tok").status_code == 404
+    assert client.get("/api/export/tok").status_code == 200
+
+
+@pytest.mark.parametrize("name", ['a"b.csv', "a\r\nX: y.csv", "", "a b.csv", "é.csv"])
+def test_put_rejects_unsafe_filename(name: str) -> None:
+    """Filenames that could inject header content are refused."""
+    with pytest.raises(ValueError):
+        put("tok", name, b"x")
+    assert "tok" not in exports._STORE
 
 
 def test_unknown_token_404() -> None:
@@ -49,3 +57,4 @@ def test_fifo_eviction() -> None:
     assert len(exports._STORE) == exports._MAX_TOKENS
     assert tokens[0] not in exports._STORE
     assert tokens[-1] in exports._STORE
+    assert TestClient(starlette_app).get(f"/api/export/{tokens[0]}").status_code == 404

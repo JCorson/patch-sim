@@ -53,12 +53,14 @@ def test_no_stale_placeholder_tokens_remain_after_render() -> None:
 
 
 def test_download_js_targets_export_route() -> None:
-    """The download snippet points an anchor at /api/export/{token}."""
+    """The download snippet loads /api/export/{token} in a self-removing iframe."""
     from patch_sim_ui.state._figure_js import _render_download_js
 
     js = _render_download_js("http://example.test", "tok123")
     assert '"http://example.test/api/export/tok123"' in js
-    assert "click()" in js
+    assert "iframe" in js
+    assert "remove()" in js
+    assert "click()" not in js
 
 
 def test_export_figure_js_substitutes_all_placeholders() -> None:

@@ -1,13 +1,12 @@
-"""In-process store and Starlette route for one-shot data-export downloads.
+"""In-process store and Starlette route for data-export downloads.
 
 An export (e.g. a CSV of simulation traces) can be tens of megabytes, far too
 large to push through the Reflex WebSocket.  The producer :func:`put`s the
 encoded bytes under a uuid4 token, and the browser downloads them with a plain
-HTTP GET to ``/api/export/{token}``.  Each token is single-use: the first
-successful GET removes the entry.
+HTTP GET to ``/api/export/{token}``.  A token stays valid until FIFO eviction,
+so a retried or duplicated request still succeeds.
 
-The store is bounded to ``_MAX_TOKENS`` entries (FIFO eviction) so abandoned
-exports cannot accumulate.
+The store is bounded to ``_MAX_TOKENS`` entries so memory stays bounded.
 
 Deployment constraints:
 
@@ -22,6 +21,7 @@ Deployment constraints:
   need a per-session auth gate in ``_handle_export``.
 """
 
+import re
 import threading
 from collections import OrderedDict
 
@@ -31,6 +31,10 @@ from starlette.responses import Response
 from starlette.routing import Route
 
 _MAX_TOKENS = 2
+
+# Filenames are interpolated into a Content-Disposition header, so only a
+# conservative ASCII token is accepted.
+_SAFE_FILENAME = re.compile(r"[A-Za-z0-9._-]+")
 
 # Values are (filename, payload).  Keys are bare uuid4 hex tokens.
 _STORE: OrderedDict[str, tuple[str, bytes]] = OrderedDict()
@@ -47,15 +51,21 @@ def put(token: str, filename: str, payload: bytes) -> None:
         filename: Download filename; must already be filename-safe (see
             :func:`patch_sim_ui.export.export_filename`).
         payload: Encoded file contents.
+
+    Raises:
+        ValueError: If *filename* is not a safe ASCII token
+            (``[A-Za-z0-9._-]+``).
     """
+    if not _SAFE_FILENAME.fullmatch(filename):
+        raise ValueError(f"Unsafe export filename: {filename!r}")
     with _LOCK:
         _STORE[token] = (filename, payload)
         while len(_STORE) > _MAX_TOKENS:
             _STORE.popitem(last=False)
 
 
-def pop(token: str) -> tuple[str, bytes]:
-    """Remove and return the entry for *token*.
+def get(token: str) -> tuple[str, bytes]:
+    """Return the entry for *token* without removing it.
 
     Args:
         token: Token previously passed to :func:`put`.
@@ -64,10 +74,10 @@ def pop(token: str) -> tuple[str, bytes]:
         ``(filename, payload)``.
 
     Raises:
-        KeyError: When *token* is absent (unknown, evicted, or already used).
+        KeyError: When *token* is absent (unknown or evicted).
     """
     with _LOCK:
-        return _STORE.pop(token)
+        return _STORE[token]
 
 
 async def _handle_export(request: Request) -> Response:
@@ -78,11 +88,11 @@ async def _handle_export(request: Request) -> Response:
 
     Returns:
         HTTP 200 with the CSV as an attachment, or 404 when the token is
-        unknown or already consumed.
+        unknown or evicted.
     """
     token = request.path_params["token"]
     try:
-        filename, payload = pop(token)
+        filename, payload = get(token)
     except KeyError:
         return Response(content=b"export token not found", status_code=404)
     return Response(
