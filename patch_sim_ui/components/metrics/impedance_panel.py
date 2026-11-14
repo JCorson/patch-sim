@@ -6,6 +6,7 @@ active current-clamp protocol is a chirp (Frequency Response).
 
 import reflex as rx
 
+from patch_sim_ui.plotting._layout import ANALYSIS_PLOTLY_CONFIG
 from patch_sim_ui.state.analysis import AnalysisState
 
 
@@ -64,6 +65,7 @@ def _impedance_plot() -> rx.Component:
         ),
         rx.plotly(
             data=AnalysisState.impedance_figure,
+            config=ANALYSIS_PLOTLY_CONFIG,
             width="100%",
         ),
         direction="column",
