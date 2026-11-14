@@ -50,3 +50,27 @@ def test_no_stale_placeholder_tokens_remain_after_render() -> None:
     assert "abcdef" in fetch_js
     assert "POST_JS_BODY" in fetch_js
     assert "http://example.test" in fetch_js
+
+
+def test_download_js_targets_export_route() -> None:
+    """The download snippet loads /api/export/{token} in a self-removing iframe."""
+    from patch_sim_ui.state._figure_js import _render_download_js
+
+    js = _render_download_js("http://example.test", "tok123")
+    assert '"http://example.test/api/export/tok123"' in js
+    assert "iframe" in js
+    assert "remove()" in js
+    assert "click()" not in js
+
+
+def test_export_figure_js_substitutes_all_placeholders() -> None:
+    """The export snippet has no stale placeholders and JSON-quotes its strings."""
+    from patch_sim_ui.state._figure_js import _render_export_figure_js
+
+    js = _render_export_figure_js("tok9", "svg", 'a"b', "http://example.test")
+    for placeholder in ("/*API_URL*/", "/*TOKEN*/", "/*FORMAT*/", "/*FILENAME*/"):
+        assert placeholder not in js
+    assert 'var format = "svg";' in js
+    assert 'var filename = "a\\"b";' in js
+    assert "http://example.test" in js
+    assert "tok9" in js

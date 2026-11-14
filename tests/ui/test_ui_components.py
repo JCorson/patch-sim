@@ -118,6 +118,15 @@ def test_sweep_manager_renders_without_error():
     sweep_manager()
 
 
+def test_export_menu_lists_all_formats():
+    """The export menu renders its three export actions."""
+    from patch_sim_ui.components.sweep_manager import _export_menu
+
+    rendered = str(_export_menu())
+    for label in ("Traces as CSV", "Figure as PNG", "Figure as SVG"):
+        assert label in rendered
+
+
 def test_analysis_sidebar_renders_with_burst_data():
     """analysis_sidebar must render the new burst panel without error.
 

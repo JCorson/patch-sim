@@ -14,3 +14,10 @@ ANALYSIS_FIGURE_LAYOUT: dict = {
     "margin": {"l": 50, "r": 10, "t": 10, "b": 40},
     "height": 260,
 }
+
+#: Plotly ``config`` for analysis figures: hides the Plotly logo and makes the
+#: modebar camera export a 3x-scale PNG.  Passed as ``rx.plotly(config=...)``.
+ANALYSIS_PLOTLY_CONFIG: dict = {
+    "displaylogo": False,
+    "toImageButtonOptions": {"format": "png", "scale": 3},
+}

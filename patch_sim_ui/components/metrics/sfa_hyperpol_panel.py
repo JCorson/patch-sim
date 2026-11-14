@@ -6,6 +6,7 @@ when the corresponding data is available.
 
 import reflex as rx
 
+from patch_sim_ui.plotting._layout import ANALYSIS_PLOTLY_CONFIG
 from patch_sim_ui.state.analysis import AnalysisState
 
 
@@ -21,6 +22,7 @@ def _hyperpolarization_plot() -> rx.Component:
     return rx.flex(
         rx.plotly(
             data=AnalysisState.hyperpolarization_figure,
+            config=ANALYSIS_PLOTLY_CONFIG,
             width="100%",
         ),
         direction="column",
@@ -44,6 +46,7 @@ def _ap_sfa_plot() -> rx.Component:
     return rx.flex(
         rx.plotly(
             data=AnalysisState.sfa_figure,
+            config=ANALYSIS_PLOTLY_CONFIG,
             width="100%",
         ),
         direction="column",

@@ -18,18 +18,24 @@ import json
 import logging
 import time
 import uuid
+from datetime import datetime
 from typing import Any, AsyncGenerator
 
 import reflex as rx
 from reflex.config import get_config as _get_config
 
 import patch_sim
-from patch_sim.constants import CURRENT_CLAMP
+from patch_sim.constants import CURRENT_CLAMP, INACTIVATION_PROTOCOL, VOLTAGE_CLAMP
 from patch_sim_ui import constants, presets
-from patch_sim_ui.api import traces
+from patch_sim_ui.api import exports, traces
 from patch_sim_ui.channels import (
     CURRENT_FIELD_MAP,
     GATING_FIELD_MAP,
+)
+from patch_sim_ui.export import (
+    build_export_metadata,
+    export_filename,
+    sweeps_to_csv,
 )
 from patch_sim_ui.plotting import (
     TraceVisibility,
@@ -41,6 +47,8 @@ from patch_sim_ui.state._common import (
     _PLOTLY_GD_JS,
 )
 from patch_sim_ui.state._figure_js import (
+    _render_download_js,
+    _render_export_figure_js,
     _render_fetch_figure_js,
     _render_sweep_highlight_js,
 )
@@ -56,6 +64,95 @@ logger = logging.getLogger(__name__)
 
 #: Debounce window (seconds) for slider-driven membrane test requests.
 _MT_DEBOUNCE_S: float = 0.3
+
+
+_TIMING_PARAMS: list[tuple[str, str]] = [
+    ("pre_stimulus_duration", "pre_stimulus_duration_ms"),
+    ("stimulus_duration", "stimulus_duration_ms"),
+    ("post_stimulus_duration", "post_stimulus_duration_ms"),
+]
+_STEP_RANGE_CC: list[tuple[str, str]] = [
+    ("min_stimulus", "min_stimulus_uA_cm2"),
+    ("max_stimulus", "max_stimulus_uA_cm2"),
+    ("stimulus_step", "stimulus_step_uA_cm2"),
+]
+_STEP_RANGE_VC: list[tuple[str, str]] = [
+    ("min_stimulus", "min_stimulus_mV"),
+    ("max_stimulus", "max_stimulus_mV"),
+    ("stimulus_step", "stimulus_step_mV"),
+]
+_HOLDING_VC: list[tuple[str, str]] = [("holding_voltage", "holding_voltage_mV")]
+
+#: Stimulus parameters (beyond the timing fields) that
+#: :meth:`ProtocolState._build_protocols` actually feeds each protocol, as
+#: ``(ProtocolState field, export key)`` pairs with the unit in the key.
+_PROTOCOL_EXPORT_FIELDS: dict[tuple[str, str], list[tuple[str, str]]] = {
+    (CURRENT_CLAMP, "Step"): _STEP_RANGE_CC,
+    (CURRENT_CLAMP, "Ramp"): [
+        ("start_current", "start_current_uA_cm2"),
+        ("end_current", "end_current_uA_cm2"),
+    ],
+    (CURRENT_CLAMP, "Pulse Train"): [
+        ("pulse_amplitude", "pulse_amplitude_uA_cm2"),
+        ("pulse_width", "pulse_width_ms"),
+        ("pulse_interval", "pulse_interval_ms"),
+    ],
+    (CURRENT_CLAMP, "Sinusoidal"): [
+        ("dc_offset", "dc_offset_uA_cm2"),
+        ("amplitude", "amplitude_uA_cm2"),
+        ("frequency", "frequency_Hz"),
+    ],
+    (CURRENT_CLAMP, "Chirp"): [
+        ("dc_offset", "dc_offset_uA_cm2"),
+        ("amplitude", "amplitude_uA_cm2"),
+        ("start_frequency", "start_frequency_Hz"),
+        ("end_frequency", "end_frequency_Hz"),
+    ],
+    (CURRENT_CLAMP, "Noise"): [
+        ("mean_current", "mean_current_uA_cm2"),
+        ("std_current", "std_current_uA_cm2"),
+    ],
+    (VOLTAGE_CLAMP, "Step"): _HOLDING_VC + _STEP_RANGE_VC,
+    (VOLTAGE_CLAMP, "Ramp"): _HOLDING_VC
+    + [
+        ("vc_start_voltage", "start_voltage_mV"),
+        ("vc_end_voltage", "end_voltage_mV"),
+    ],
+    (VOLTAGE_CLAMP, "Pulse Train"): _HOLDING_VC
+    + [
+        ("vc_pulse_amplitude", "pulse_amplitude_mV"),
+        ("vc_pulse_width", "pulse_width_ms"),
+        ("vc_pulse_interval", "pulse_interval_ms"),
+    ],
+    # The swept range is the conditioning prepulse; the holding voltage is
+    # replaced by it, so only the test pulse is recorded besides the range.
+    (VOLTAGE_CLAMP, INACTIVATION_PROTOCOL): [
+        ("min_stimulus", "min_prepulse_mV"),
+        ("max_stimulus", "max_prepulse_mV"),
+        ("stimulus_step", "prepulse_step_mV"),
+        ("test_pulse_voltage", "test_pulse_voltage_mV"),
+    ],
+}
+
+
+def _protocol_export_params(proto_st: "ProtocolState") -> dict[str, float]:
+    """Return the protocol parameters recorded in exports.
+
+    Only the parameters that the active protocol actually uses are recorded
+    (see :data:`_PROTOCOL_EXPORT_FIELDS`), plus the pre/stim/post timing.
+
+    Args:
+        proto_st: Protocol state to read.
+
+    Returns:
+        Mapping of export metadata key to value, with the unit encoded in
+        the key.  The mapping is empty of stimulus fields for an unknown
+        protocol type.
+    """
+    fields = _TIMING_PARAMS + _PROTOCOL_EXPORT_FIELDS.get(
+        (proto_st.clamp_mode, proto_st.protocol_type), []
+    )
+    return {key: getattr(proto_st, attr) for attr, key in fields}
 
 
 class SimulationState(rx.State):
@@ -75,6 +172,12 @@ class SimulationState(rx.State):
     # floats are not JSON-serialised on every state flush.  Served to the
     # browser via /api/figure/{sim_token} (see patch_sim_ui/api/traces.py).
     _current_sweeps: list[Sweep] = []  # Latest simulation result
+    # Provenance of ``_current_sweeps`` captured when the simulation ran (the
+    # live neuron/protocol panels may have changed since).  Backend-only for
+    # the same reason as the sweeps; consumed by ``export_csv``.
+    _export_metadata: list[tuple[str, str]] = []
+    _export_neuron_name: str = ""  # Neuron preset that produced the sweeps
+    _export_protocol_name: str = ""  # Protocol preset (or type) that ran
     stored_traces: list[Sweep] = []  # Oscilloscope-style stored reference traces
     # Short token identifying the latest figure in the side-channel store.
     # Pushed to the client so JS can fetch /api/figure/{sim_token}.
@@ -150,6 +253,9 @@ class SimulationState(rx.State):
         changes, ensuring stale results are not shown for the new protocol.
         """
         self._current_sweeps = []
+        self._export_metadata = []
+        self._export_neuron_name = ""
+        self._export_protocol_name = ""
         self.stored_traces = []
         self.sim_token = ""
         self._cont_has_state = False
@@ -441,6 +547,47 @@ class SimulationState(rx.State):
         if js:
             return rx.call_script(js)
 
+    def _record_export_context(
+        self,
+        neuron: "patch_sim.Neuron",
+        *,
+        neuron_preset: str,
+        protocol_preset: str,
+        mode: str,
+        ptype: str,
+        protocol_params: dict[str, float],
+        continuous: bool = False,
+    ) -> None:
+        """Capture the provenance of ``_current_sweeps`` for CSV export.
+
+        The neuron and protocol panels reflect live UI values rather than what
+        produced the displayed sweeps, so the context is recorded at run time.
+        Call after ``_current_sweeps`` has been assigned.
+
+        Args:
+            neuron: The neuron that was simulated.
+            neuron_preset: Name of the neuron preset in effect.
+            protocol_preset: Name of the protocol preset in effect (may be
+                empty when the user edited the protocol by hand).
+            mode: Clamp mode that was run.
+            ptype: Protocol type that was run.
+            protocol_params: Protocol timing and stimulus range, as returned
+                by :func:`_protocol_export_params`.
+            continuous: Whether this is a continuous-mode iteration.
+        """
+        self._export_metadata = build_export_metadata(
+            neuron,
+            neuron_preset=neuron_preset,
+            protocol_preset=protocol_preset,
+            clamp_mode=mode,
+            protocol_type=ptype,
+            protocol_params=protocol_params,
+            sweep_labels=[s.label for s in self._current_sweeps],
+            continuous=continuous,
+        )
+        self._export_neuron_name = neuron_preset
+        self._export_protocol_name = protocol_preset or ptype
+
     def _do_apply_simulation(
         self,
         result: _SimResult,
@@ -493,6 +640,69 @@ class SimulationState(rx.State):
             return SimulationState.run_continuous  # type: ignore[return-value]
 
     @rx.event(background=True)
+    async def export_csv(self) -> AsyncGenerator[Any, None]:
+        """Export the latest run's simulated traces as a CSV download.
+
+        The sweeps and their provenance are snapshotted under the state lock;
+        the CSV is built in a thread executor and handed to the browser over
+        the ``/api/export/{token}`` side channel, because the payload is too
+        large for the WebSocket state delta.  In continuous mode the most
+        recent iteration is exported.
+        """
+        async with self:
+            sweeps = list(self._current_sweeps)
+            metadata = list(self._export_metadata)
+            neuron_name = self._export_neuron_name or self._label_neuron_type
+            protocol_name = self._export_protocol_name or "traces"
+        if not sweeps:
+            logger.warning("CSV export requested but there is no simulation result")
+            return
+
+        loop = asyncio.get_running_loop()
+        # One timestamp for both the header and the filename.
+        now = datetime.now().astimezone()
+        metadata.insert(1, ("exported_at", now.isoformat(timespec="seconds")))
+        text = await loop.run_in_executor(None, sweeps_to_csv, sweeps, metadata)
+        payload = text.encode("utf-8")
+        filename = export_filename(neuron_name, protocol_name, "csv", now)
+        token = uuid.uuid4().hex
+        exports.put(token, filename, payload)
+        logger.info("CSV export ready: %s (%.1f MB)", filename, len(payload) / 1e6)
+
+        async with self:
+            log_st = await self.get_state(LogState)
+            log_st._refresh_logs()
+        api_url = _get_config().api_url.rstrip("/")
+        yield rx.call_script(_render_download_js(api_url, token))
+
+    def export_figure(self, fmt: str) -> Any:
+        """Download the trace figure as a PNG or SVG image.
+
+        The browser re-fetches the canonical light-theme figure for the
+        current ``sim_token`` and renders it at the on-screen size with the
+        on-screen trace visibility.
+
+        Args:
+            fmt: Image format, ``"png"`` or ``"svg"``.
+
+        Returns:
+            A script event, or ``None`` when *fmt* is unsupported or there is
+            no figure to export.
+        """
+        if fmt not in ("png", "svg") or not self.sim_token:
+            return None
+        filename = export_filename(
+            self._export_neuron_name or self._label_neuron_type,
+            self._export_protocol_name or "traces",
+            fmt,
+            datetime.now(),
+        ).rsplit(".", 1)[0]
+        api_url = _get_config().api_url.rstrip("/")
+        return rx.call_script(
+            _render_export_figure_js(self.sim_token, fmt, filename, api_url)
+        )
+
+    @rx.event(background=True)
     async def run_continuous(self) -> AsyncGenerator[Any, None]:
         """Run simulations in a continuous loop until continuous_mode is False.
 
@@ -527,6 +737,9 @@ class SimulationState(rx.State):
                     neuron_st = await self.get_state(NeuronState)
                     neuron = neuron_st._build_neuron()
                     stimulus = proto_st._build_protocols()[0][0]
+                    neuron_preset = neuron_st.active_neuron_type
+                    protocol_preset = proto_st.active_protocol_preset
+                    export_params = _protocol_export_params(proto_st)
                     prior_V = self._cont_V
                     prior_ca_i = self._cont_ca_i
                     stored_traces_snap = list(self.stored_traces)
@@ -632,6 +845,15 @@ class SimulationState(rx.State):
                     if not self.continuous_mode:
                         break
                     self._current_sweeps = [sweep]
+                    self._record_export_context(
+                        neuron,
+                        neuron_preset=neuron_preset,
+                        protocol_preset=protocol_preset,
+                        mode=mode,
+                        ptype=ptype,
+                        protocol_params=export_params,
+                        continuous=True,
+                    )
                     self.sim_token = _cont_token
                     self._cont_V = last_V
                     self._cont_gating = last_gating
@@ -696,6 +918,9 @@ class SimulationState(rx.State):
             # Snapshot scalar protocol params so the executor call is thread-safe.
             stored_traces_snap = list(self.stored_traces)
             show_hover_snap = self.show_hover
+            neuron_preset = neuron_st.active_neuron_type
+            protocol_preset = proto_st.active_protocol_preset
+            export_params = _protocol_export_params(proto_st)
             min_stimulus = proto_st.min_stimulus
             max_stimulus = proto_st.max_stimulus
             stimulus_step = proto_st.stimulus_step
@@ -737,6 +962,14 @@ class SimulationState(rx.State):
             async with self:
                 analysis_st = await self.get_state(AnalysisState)
                 self._do_apply_simulation(_sim_result, analysis_st)
+                self._record_export_context(
+                    neuron,
+                    neuron_preset=neuron_preset,
+                    protocol_preset=protocol_preset,
+                    mode=mode,
+                    ptype=ptype,
+                    protocol_params=export_params,
+                )
             yield SimulationState.run_membrane_test
         finally:
             async with self:

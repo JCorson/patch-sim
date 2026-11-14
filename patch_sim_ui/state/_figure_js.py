@@ -28,6 +28,11 @@ _SWEEP_HIGHLIGHT_JS: str = (_ASSETS_DIR / "sweep_highlight.js").read_text()
 #: :func:`_render_fetch_figure_js`.
 _FETCH_FIGURE_JS: str = (_ASSETS_DIR / "fetch_figure.js").read_text()
 
+#: Client-side PNG/SVG figure export.  Placeholder tokens (``/*API_URL*/``,
+#: ``/*TOKEN*/``, ``/*FORMAT*/``, ``/*FILENAME*/``) are substituted per call
+#: in :func:`_render_export_figure_js`.
+_EXPORT_FIGURE_JS: str = (_ASSETS_DIR / "export_figure.js").read_text()
+
 
 def _render_sweep_highlight_js(selected_sweep: int) -> str:
     """Return the sweep-highlight JS with styling constants substituted.
@@ -69,4 +74,51 @@ def _render_fetch_figure_js(token: str, post_js: str, api_url: str) -> str:
         .replace("/*TOKEN*/", token)
         .replace("/*DARK_AXIS_STYLE*/", json.dumps(constants.DARK_AXIS_STYLE))
         .replace("/*POST_JS*/", post_js)
+    )
+
+
+def _render_download_js(api_url: str, token: str) -> str:
+    """Return JS that triggers a browser download of a stored export.
+
+    Loads ``/api/export/{token}`` in a hidden iframe that removes itself after
+    60 s; the server supplies the filename via ``Content-Disposition``.  A
+    failed request (e.g. an evicted token) renders inside the iframe, so the
+    app tab never navigates away.
+
+    Args:
+        api_url: Base backend URL with any trailing slash already stripped.
+        token: uuid4 hex token of the export in the side-channel store.
+
+    Returns:
+        A JS snippet ready for ``rx.call_script``.
+    """
+    url = json.dumps(f"{api_url}/api/export/{token}")
+    return (
+        "(function(){"
+        "var f=document.createElement('iframe');"
+        "f.style.display='none';"
+        f"f.src={url};"
+        "document.body.appendChild(f);"
+        "setTimeout(function(){f.remove();},60000);"
+        "})();"
+    )
+
+
+def _render_export_figure_js(token: str, fmt: str, filename: str, api_url: str) -> str:
+    """Return the figure-export JS with all placeholder tokens substituted.
+
+    Args:
+        token: UUID hex token of the figure in the side-channel store.
+        fmt: Image format, ``"png"`` or ``"svg"``.
+        filename: Download filename without extension.
+        api_url: Base backend URL with any trailing slash already stripped.
+
+    Returns:
+        A self-contained JS string ready for ``rx.call_script``.
+    """
+    return (
+        _EXPORT_FIGURE_JS.replace("/*API_URL*/", api_url)
+        .replace("/*TOKEN*/", token)
+        .replace("/*FORMAT*/", json.dumps(fmt))
+        .replace("/*FILENAME*/", json.dumps(filename))
     )

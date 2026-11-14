@@ -10,6 +10,7 @@ when calcium dynamics were active.
 import reflex as rx
 
 from patch_sim_ui.components.metrics.calcium_panel import _ca_transient_summary
+from patch_sim_ui.plotting._layout import ANALYSIS_PLOTLY_CONFIG
 from patch_sim_ui.state.analysis import AnalysisState
 
 
@@ -24,6 +25,7 @@ def _ap_fi_plot() -> rx.Component:
     return rx.flex(
         rx.plotly(
             data=AnalysisState.fi_figure,
+            config=ANALYSIS_PLOTLY_CONFIG,
             width="100%",
         ),
         direction="column",
@@ -43,6 +45,7 @@ def _gv_plot() -> rx.Component:
     return rx.flex(
         rx.plotly(
             data=AnalysisState.gv_figure,
+            config=ANALYSIS_PLOTLY_CONFIG,
             width="100%",
         ),
         direction="column",
@@ -65,6 +68,7 @@ def _inactivation_plot() -> rx.Component:
     return rx.flex(
         rx.plotly(
             data=AnalysisState.inactivation_figure,
+            config=ANALYSIS_PLOTLY_CONFIG,
             width="100%",
         ),
         direction="column",
@@ -85,6 +89,7 @@ def _tau_v_plot() -> rx.Component:
     return rx.flex(
         rx.plotly(
             data=AnalysisState.tau_v_figure,
+            config=ANALYSIS_PLOTLY_CONFIG,
             width="100%",
         ),
         direction="column",
@@ -124,6 +129,7 @@ def _iv_curve_tab() -> rx.Component:
                     AnalysisState.has_iv_data,
                     rx.plotly(
                         data=AnalysisState.iv_figure,
+                        config=ANALYSIS_PLOTLY_CONFIG,
                         width="100%",
                     ),
                     rx.box(),

@@ -2,6 +2,7 @@
 
 import reflex as rx
 
+from patch_sim_ui.api.exports import starlette_app as _exports_app
 from patch_sim_ui.api.traces import starlette_app as _traces_app
 from patch_sim_ui.components.log_panel import log_panel
 from patch_sim_ui.components.metrics import analysis_sidebar
@@ -174,7 +175,7 @@ def index() -> rx.Component:
 
 # The Radix theme is configured via ``rx.plugins.RadixThemesPlugin`` in
 # ``rxconfig.py``; ``App(theme=...)`` is deprecated and removed in Reflex 1.0.
-app = rx.App(api_transformer=_traces_app)
+app = rx.App(api_transformer=[_traces_app, _exports_app])
 app.add_page(
     index,
     route="/",
