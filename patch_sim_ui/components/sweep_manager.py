@@ -302,6 +302,7 @@ def _export_menu() -> rx.Component:
     Returns:
         A menu root whose trigger is the Export button.
     """
+    disabled = ~SimulationState.has_result | SimulationState.is_running
     return rx.menu.root(
         rx.menu.trigger(
             rx.button(
@@ -309,8 +310,9 @@ def _export_menu() -> rx.Component:
                 "Export",
                 size="1",
                 variant="soft",
-                disabled=~SimulationState.has_result | SimulationState.is_running,
+                disabled=disabled,
             ),
+            disabled=disabled,
         ),
         rx.menu.content(
             rx.menu.item("Traces as CSV", on_click=SimulationState.export_csv),

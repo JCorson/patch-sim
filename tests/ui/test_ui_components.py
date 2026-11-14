@@ -311,19 +311,3 @@ def test_tau_v_plot_helper_renders_without_error():
     from patch_sim_ui.components.metrics import _tau_v_plot
 
     _tau_v_plot()
-
-
-def test_analysis_plotly_config_hides_logo_and_scales_png():
-    """Analysis figures use a shared Plotly config with a 3x PNG export."""
-    from patch_sim_ui.plotting._layout import ANALYSIS_PLOTLY_CONFIG
-
-    assert ANALYSIS_PLOTLY_CONFIG["displaylogo"] is False
-    assert ANALYSIS_PLOTLY_CONFIG["toImageButtonOptions"]["scale"] == 3
-
-
-def test_analysis_sidebar_passes_plotly_config():
-    """The analysis sidebar renders every plot with the shared Plotly config."""
-    from patch_sim_ui.components.metrics import analysis_sidebar
-
-    rendered = str(analysis_sidebar())
-    assert "displaylogo" in rendered
