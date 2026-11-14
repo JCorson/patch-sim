@@ -132,14 +132,19 @@ If a step touches several files but they all belong to the same logical change,
 group them in a single commit. If a file contains changes from different plan
 steps, stage only the relevant hunks for each commit.
 
-Run the four checks listed below before every commit — not just at the end.
+Run the per-commit checks listed below before every commit — not just at the end.
 
-## Before finishing any task
+## Checks
 
-Run all four checks and ensure they pass before marking a task complete:
+Checks are tiered: a fast set before every commit, and the full suite before
+a PR is opened. All must pass with no errors.
 
-**Test suite:** `/uv run --frozen -m pytest --verbose`
-**Formatting:** `/ruff check .` and `/ruff format --check .`
-**Type checking:** `/ty check`
+**Before every commit:** `/ruff check .`, `/ruff format --check .`, `/ty check`,
+and `/uv run --frozen -m pytest tests/unit`.
+If the commit touches `patch_sim_ui/`, also run `tests/ui` and `tests/e2e`.
 
-All four must pass with no errors.
+**Before opening a PR:** full default suite (`/uv run --frozen -m pytest`)
+plus `tests/e2e`. `tests/integration` runs in CI only on a cron job,
+so this local run is its only pre-merge check.
+
+**Before finishing a task that does not end in a PR:** run the pre-PR checks.
