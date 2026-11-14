@@ -18,6 +18,7 @@ import json
 import logging
 import time
 import uuid
+from datetime import datetime
 from typing import Any, AsyncGenerator
 
 import reflex as rx
@@ -26,13 +27,15 @@ from reflex.config import get_config as _get_config
 import patch_sim
 from patch_sim.constants import CURRENT_CLAMP
 from patch_sim_ui import constants, presets
-from patch_sim_ui.api import traces
+from patch_sim_ui.api import exports, traces
 from patch_sim_ui.channels import (
     CURRENT_FIELD_MAP,
     GATING_FIELD_MAP,
 )
 from patch_sim_ui.export import (
     build_export_metadata,
+    export_filename,
+    sweeps_to_csv,
 )
 from patch_sim_ui.plotting import (
     TraceVisibility,
@@ -44,6 +47,7 @@ from patch_sim_ui.state._common import (
     _PLOTLY_GD_JS,
 )
 from patch_sim_ui.state._figure_js import (
+    _render_download_js,
     _render_fetch_figure_js,
     _render_sweep_highlight_js,
 )
@@ -562,6 +566,39 @@ class SimulationState(rx.State):
             # dispatch run_continuous immediately after toggle_continuous_mode
             # completes, without requiring this handler to be async.
             return SimulationState.run_continuous  # type: ignore[return-value]
+
+    @rx.event(background=True)
+    async def export_csv(self) -> AsyncGenerator[Any, None]:
+        """Export every computed trace of the latest run as a CSV download.
+
+        The sweeps and their provenance are snapshotted under the state lock;
+        the CSV is built in a thread executor and handed to the browser over
+        the ``/api/export/{token}`` side channel, because the payload is too
+        large for the WebSocket state delta.  In continuous mode the most
+        recent iteration is exported.
+        """
+        async with self:
+            sweeps = list(self._current_sweeps)
+            metadata = list(self._export_metadata)
+            neuron_name = self._export_neuron_name or self._label_neuron_type
+            protocol_name = self._export_protocol_name or "traces"
+        if not sweeps:
+            logger.warning("CSV export requested but there is no simulation result")
+            return
+
+        loop = asyncio.get_running_loop()
+        text = await loop.run_in_executor(None, sweeps_to_csv, sweeps, metadata)
+        payload = text.encode("utf-8")
+        filename = export_filename(neuron_name, protocol_name, "csv", datetime.now())
+        token = uuid.uuid4().hex
+        exports.put(token, filename, payload)
+        logger.info("CSV export ready: %s (%.1f MB)", filename, len(payload) / 1e6)
+
+        async with self:
+            log_st = await self.get_state(LogState)
+            log_st._refresh_logs()
+        api_url = _get_config().api_url.rstrip("/")
+        yield rx.call_script(_render_download_js(api_url, token))
 
     @rx.event(background=True)
     async def run_continuous(self) -> AsyncGenerator[Any, None]:

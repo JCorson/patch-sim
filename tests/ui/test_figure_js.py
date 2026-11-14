@@ -50,3 +50,12 @@ def test_no_stale_placeholder_tokens_remain_after_render() -> None:
     assert "abcdef" in fetch_js
     assert "POST_JS_BODY" in fetch_js
     assert "http://example.test" in fetch_js
+
+
+def test_download_js_targets_export_route() -> None:
+    """The download snippet points an anchor at /api/export/{token}."""
+    from patch_sim_ui.state._figure_js import _render_download_js
+
+    js = _render_download_js("http://example.test", "tok123")
+    assert '"http://example.test/api/export/tok123"' in js
+    assert "click()" in js

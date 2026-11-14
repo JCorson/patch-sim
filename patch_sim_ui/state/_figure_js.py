@@ -70,3 +70,29 @@ def _render_fetch_figure_js(token: str, post_js: str, api_url: str) -> str:
         .replace("/*DARK_AXIS_STYLE*/", json.dumps(constants.DARK_AXIS_STYLE))
         .replace("/*POST_JS*/", post_js)
     )
+
+
+def _render_download_js(api_url: str, token: str) -> str:
+    """Return JS that triggers a browser download of a stored export.
+
+    Clicks a transient hidden anchor pointing at ``/api/export/{token}``; the
+    server supplies the filename via ``Content-Disposition``.
+
+    Args:
+        api_url: Base backend URL with any trailing slash already stripped.
+        token: uuid4 hex token of the export in the side-channel store.
+
+    Returns:
+        A JS snippet ready for ``rx.call_script``.
+    """
+    url = json.dumps(f"{api_url}/api/export/{token}")
+    return (
+        "(function(){"
+        "var a=document.createElement('a');"
+        f"a.href={url};"
+        "a.style.display='none';"
+        "document.body.appendChild(a);"
+        "a.click();"
+        "a.remove();"
+        "})();"
+    )
