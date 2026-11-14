@@ -2541,8 +2541,53 @@ def test_record_export_context_captures_run_provenance() -> None:
     assert meta["protocol_type"] == "Step"
     assert meta["stimulus_duration_ms"] == f"{ps.stimulus_duration:g}"
     assert meta["sweep s02"] == "b"
+    assert meta["continuous_mode"] == "false"
     assert st._export_neuron_name == SQUID_GIANT_AXON
     assert st._export_protocol_name == "Step"
+
+
+def test_protocol_export_params_step_records_range() -> None:
+    """A current-clamp Step records its timing and min/max/step range."""
+    from patch_sim_ui.state.simulation import _protocol_export_params
+
+    ps = _make_protocol_state()
+    ps.protocol_type = "Step"
+    ps.min_stimulus, ps.max_stimulus, ps.stimulus_step = 0.0, 20.0, 5.0
+    params = _protocol_export_params(ps)
+    assert params["min_stimulus_uA_cm2"] == pytest.approx(0.0)
+    assert params["max_stimulus_uA_cm2"] == pytest.approx(20.0)
+    assert params["stimulus_step_uA_cm2"] == pytest.approx(5.0)
+    assert params["pre_stimulus_duration_ms"] == pytest.approx(ps.pre_stimulus_duration)
+    assert "holding_voltage_mV" not in params
+
+
+def test_protocol_export_params_ramp_records_endpoints_only() -> None:
+    """A current-clamp Ramp records start/end current, not the step range."""
+    from patch_sim_ui.state.simulation import _protocol_export_params
+
+    ps = _make_protocol_state()
+    ps.protocol_type = "Ramp"
+    ps.start_current, ps.end_current = 1.0, 9.0
+    params = _protocol_export_params(ps)
+    assert params["start_current_uA_cm2"] == pytest.approx(1.0)
+    assert params["end_current_uA_cm2"] == pytest.approx(9.0)
+    assert not any(k.startswith(("min_", "max_", "stimulus_step")) for k in params)
+
+
+def test_protocol_export_params_voltage_clamp_records_holding_voltage() -> None:
+    """Every voltage-clamp protocol records its holding voltage in mV."""
+    from patch_sim_ui.state.simulation import _protocol_export_params
+
+    ps = _make_protocol_state()
+    ps.clamp_mode = "Voltage Clamp"
+    ps.holding_voltage = -80.0
+    for ptype in ("Step", "Ramp", "Pulse Train"):
+        ps.protocol_type = ptype
+        params = _protocol_export_params(ps)
+        assert params["holding_voltage_mV"] == pytest.approx(-80.0)
+    ps.protocol_type = "Step"
+    ps.min_stimulus = -20.0
+    assert _protocol_export_params(ps)["min_stimulus_mV"] == pytest.approx(-20.0)
 
 
 def test_clear_for_new_protocol_clears_export_context() -> None:
@@ -2567,7 +2612,12 @@ def test_export_figure_rejects_bad_format_and_missing_figure() -> None:
 
 
 def test_export_figure_builds_script_for_current_token() -> None:
-    """export_figure emits a script event once a figure token exists."""
+    """export_figure's script carries the token and an extensionless stem."""
     st = _make_state()
     st.sim_token = "tok"
-    assert st.export_figure("svg") is not None
+    event = st.export_figure("svg")
+    script = str(event)
+    assert "tok" in script
+    assert "patch-sim_" in script
+    assert ".svg" not in script
+    assert ".png" not in script

@@ -25,7 +25,7 @@ import reflex as rx
 from reflex.config import get_config as _get_config
 
 import patch_sim
-from patch_sim.constants import CURRENT_CLAMP
+from patch_sim.constants import CURRENT_CLAMP, INACTIVATION_PROTOCOL, VOLTAGE_CLAMP
 from patch_sim_ui import constants, presets
 from patch_sim_ui.api import exports, traces
 from patch_sim_ui.channels import (
@@ -66,25 +66,93 @@ logger = logging.getLogger(__name__)
 _MT_DEBOUNCE_S: float = 0.3
 
 
+_TIMING_PARAMS: list[tuple[str, str]] = [
+    ("pre_stimulus_duration", "pre_stimulus_duration_ms"),
+    ("stimulus_duration", "stimulus_duration_ms"),
+    ("post_stimulus_duration", "post_stimulus_duration_ms"),
+]
+_STEP_RANGE_CC: list[tuple[str, str]] = [
+    ("min_stimulus", "min_stimulus_uA_cm2"),
+    ("max_stimulus", "max_stimulus_uA_cm2"),
+    ("stimulus_step", "stimulus_step_uA_cm2"),
+]
+_STEP_RANGE_VC: list[tuple[str, str]] = [
+    ("min_stimulus", "min_stimulus_mV"),
+    ("max_stimulus", "max_stimulus_mV"),
+    ("stimulus_step", "stimulus_step_mV"),
+]
+_HOLDING_VC: list[tuple[str, str]] = [("holding_voltage", "holding_voltage_mV")]
+
+#: Stimulus parameters (beyond the timing fields) that
+#: :meth:`ProtocolState._build_protocols` actually feeds each protocol, as
+#: ``(ProtocolState field, export key)`` pairs with the unit in the key.
+_PROTOCOL_EXPORT_FIELDS: dict[tuple[str, str], list[tuple[str, str]]] = {
+    (CURRENT_CLAMP, "Step"): _STEP_RANGE_CC,
+    (CURRENT_CLAMP, "Ramp"): [
+        ("start_current", "start_current_uA_cm2"),
+        ("end_current", "end_current_uA_cm2"),
+    ],
+    (CURRENT_CLAMP, "Pulse Train"): [
+        ("pulse_amplitude", "pulse_amplitude_uA_cm2"),
+        ("pulse_width", "pulse_width_ms"),
+        ("pulse_interval", "pulse_interval_ms"),
+    ],
+    (CURRENT_CLAMP, "Sinusoidal"): [
+        ("dc_offset", "dc_offset_uA_cm2"),
+        ("amplitude", "amplitude_uA_cm2"),
+        ("frequency", "frequency_Hz"),
+    ],
+    (CURRENT_CLAMP, "Chirp"): [
+        ("dc_offset", "dc_offset_uA_cm2"),
+        ("amplitude", "amplitude_uA_cm2"),
+        ("start_frequency", "start_frequency_Hz"),
+        ("end_frequency", "end_frequency_Hz"),
+    ],
+    (CURRENT_CLAMP, "Noise"): [
+        ("mean_current", "mean_current_uA_cm2"),
+        ("std_current", "std_current_uA_cm2"),
+    ],
+    (VOLTAGE_CLAMP, "Step"): _HOLDING_VC + _STEP_RANGE_VC,
+    (VOLTAGE_CLAMP, "Ramp"): _HOLDING_VC
+    + [
+        ("vc_start_voltage", "start_voltage_mV"),
+        ("vc_end_voltage", "end_voltage_mV"),
+    ],
+    (VOLTAGE_CLAMP, "Pulse Train"): _HOLDING_VC
+    + [
+        ("vc_pulse_amplitude", "pulse_amplitude_mV"),
+        ("vc_pulse_width", "pulse_width_ms"),
+        ("vc_pulse_interval", "pulse_interval_ms"),
+    ],
+    # The swept range is the conditioning prepulse; the holding voltage is
+    # replaced by it, so only the test pulse is recorded besides the range.
+    (VOLTAGE_CLAMP, INACTIVATION_PROTOCOL): [
+        ("min_stimulus", "min_prepulse_mV"),
+        ("max_stimulus", "max_prepulse_mV"),
+        ("stimulus_step", "prepulse_step_mV"),
+        ("test_pulse_voltage", "test_pulse_voltage_mV"),
+    ],
+}
+
+
 def _protocol_export_params(proto_st: "ProtocolState") -> dict[str, float]:
-    """Return the protocol timing and stimulus range recorded in exports.
+    """Return the protocol parameters recorded in exports.
+
+    Only the parameters that the active protocol actually uses are recorded
+    (see :data:`_PROTOCOL_EXPORT_FIELDS`), plus the pre/stim/post timing.
 
     Args:
         proto_st: Protocol state to read.
 
     Returns:
-        Mapping of export metadata key to value, with the stimulus unit
-        (uA/cm2 or mV) encoded in the key for the active clamp mode.
+        Mapping of export metadata key to value, with the unit encoded in
+        the key.  The mapping is empty of stimulus fields for an unknown
+        protocol type.
     """
-    unit = "mV" if proto_st.clamp_mode != CURRENT_CLAMP else "uA_cm2"
-    return {
-        "pre_stimulus_duration_ms": proto_st.pre_stimulus_duration,
-        "stimulus_duration_ms": proto_st.stimulus_duration,
-        "post_stimulus_duration_ms": proto_st.post_stimulus_duration,
-        f"min_stimulus_{unit}": proto_st.min_stimulus,
-        f"max_stimulus_{unit}": proto_st.max_stimulus,
-        f"stimulus_step_{unit}": proto_st.stimulus_step,
-    }
+    fields = _TIMING_PARAMS + _PROTOCOL_EXPORT_FIELDS.get(
+        (proto_st.clamp_mode, proto_st.protocol_type), []
+    )
+    return {key: getattr(proto_st, attr) for attr, key in fields}
 
 
 class SimulationState(rx.State):
@@ -488,6 +556,7 @@ class SimulationState(rx.State):
         mode: str,
         ptype: str,
         protocol_params: dict[str, float],
+        continuous: bool = False,
     ) -> None:
         """Capture the provenance of ``_current_sweeps`` for CSV export.
 
@@ -504,6 +573,7 @@ class SimulationState(rx.State):
             ptype: Protocol type that was run.
             protocol_params: Protocol timing and stimulus range, as returned
                 by :func:`_protocol_export_params`.
+            continuous: Whether this is a continuous-mode iteration.
         """
         self._export_metadata = build_export_metadata(
             neuron,
@@ -513,6 +583,7 @@ class SimulationState(rx.State):
             protocol_type=ptype,
             protocol_params=protocol_params,
             sweep_labels=[s.label for s in self._current_sweeps],
+            continuous=continuous,
         )
         self._export_neuron_name = neuron_preset
         self._export_protocol_name = protocol_preset or ptype
@@ -570,7 +641,7 @@ class SimulationState(rx.State):
 
     @rx.event(background=True)
     async def export_csv(self) -> AsyncGenerator[Any, None]:
-        """Export every computed trace of the latest run as a CSV download.
+        """Export the latest run's simulated traces as a CSV download.
 
         The sweeps and their provenance are snapshotted under the state lock;
         the CSV is built in a thread executor and handed to the browser over
@@ -588,9 +659,12 @@ class SimulationState(rx.State):
             return
 
         loop = asyncio.get_running_loop()
+        # One timestamp for both the header and the filename.
+        now = datetime.now().astimezone()
+        metadata.insert(1, ("exported_at", now.isoformat(timespec="seconds")))
         text = await loop.run_in_executor(None, sweeps_to_csv, sweeps, metadata)
         payload = text.encode("utf-8")
-        filename = export_filename(neuron_name, protocol_name, "csv", datetime.now())
+        filename = export_filename(neuron_name, protocol_name, "csv", now)
         token = uuid.uuid4().hex
         exports.put(token, filename, payload)
         logger.info("CSV export ready: %s (%.1f MB)", filename, len(payload) / 1e6)
@@ -778,6 +852,7 @@ class SimulationState(rx.State):
                         mode=mode,
                         ptype=ptype,
                         protocol_params=export_params,
+                        continuous=True,
                     )
                     self.sim_token = _cont_token
                     self._cont_V = last_V

@@ -185,7 +185,8 @@ def test_build_export_metadata_contents() -> None:
             protocol_type="Step",
             protocol_params={"stimulus_duration_ms": 30.0},
             sweep_labels=["-10 mV", "+0 mV"],
-            now=datetime(2026, 1, 2, 3, 4, 5).astimezone(),
+            continuous=True,
+            simulated_at=datetime(2026, 1, 2, 3, 4, 5).astimezone(),
         )
     )
     assert meta["clamp_mode"] == VOLTAGE_CLAMP
@@ -193,10 +194,24 @@ def test_build_export_metadata_contents() -> None:
     assert meta["dt_ms"] == "0.025"
     assert meta["sampling_hz"] == "40000"
     assert meta["stimulus_duration_ms"] == "30"
-    assert meta["exported_at"].startswith("2026-01-02T03:04:05")
+    assert meta["simulated_at"].startswith("2026-01-02T03:04:05")
+    assert meta["continuous_mode"] == "true"
+    assert "exported_at" not in meta
     assert meta["sweep s01"] == "-10 mV"
     assert meta["sweep s02"] == "+0 mV"
     assert "C_m" in meta
+
+
+def test_nan_in_data_is_written_as_empty_cell() -> None:
+    """A NaN produced by the simulation becomes an empty cell, not 'nan'."""
+    sweep = _sweep()
+    sweep.voltage[1] = float("nan")
+    csv = sweeps_to_csv([sweep])
+    assert "nan" not in csv.lower()
+    rows = [ln for ln in csv.splitlines() if not ln.startswith("#")]
+    header = rows[0].split(",")
+    cell = rows[2].split(",")[header.index("V_mV")]
+    assert cell == ""
 
 
 def test_export_filename_format() -> None:

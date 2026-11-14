@@ -1,4 +1,4 @@
-"""CSV export of simulation results (no Reflex dependency).
+"""CSV export of simulation results.
 
 The CSV is wide: one row per time sample, one column per
 (quantity, sweep) pair.  Columns are ordered quantity-major and
@@ -8,13 +8,16 @@ sweep-minor so that each quantity's sweeps sit side by side::
 
 A single sweep carries no ``_sNN`` suffix.  Voltage-clamp sweeps export the
 command voltage once (``Vcmd_mV``) because the recorded voltage equals the
-command.  Every computed trace is exported regardless of plot visibility.
+command.  All simulated voltage, stimulus, total and per-channel currents,
+gating variables, and ``ca_i`` are exported regardless of plot visibility;
+dV/dt and stored reference traces are not included.
 
 A ``# key: value`` comment block precedes the header row and records the
 neuron, protocol, and sampling parameters that produced the data.  All
 headers and metadata are ASCII so the file opens cleanly in any tool.
 """
 
+import functools
 import io
 import re
 import unicodedata
@@ -40,6 +43,19 @@ _ASCII_SUBSTITUTIONS: dict[str, str] = {
 
 #: Gating-dict key holding intracellular calcium concentration (mM).
 _CA_I_KEY = "ca_i"
+
+
+@functools.cache
+def _patch_sim_version() -> str:
+    """Return the installed patch_sim version, looked up once per process.
+
+    Returns:
+        The distribution version, or ``"unknown"`` when not installed.
+    """
+    try:
+        return importlib_metadata.version("patch_sim")
+    except importlib_metadata.PackageNotFoundError:
+        return "unknown"
 
 
 def _ascii(text: str) -> str:
@@ -163,7 +179,8 @@ def build_export_metadata(
     protocol_type: str,
     protocol_params: Mapping[str, float],
     sweep_labels: Sequence[str],
-    now: datetime | None = None,
+    continuous: bool = False,
+    simulated_at: datetime | None = None,
 ) -> list[tuple[str, str]]:
     """Return ``(key, value)`` metadata describing how the data were produced.
 
@@ -176,21 +193,22 @@ def build_export_metadata(
         protocol_params: Protocol timing and stimulus parameters keyed by
             the name to record (e.g. ``"stimulus_duration_ms"``).
         sweep_labels: One label per exported sweep, in export order.
-        now: Export timestamp; defaults to the current local time.
+        continuous: Whether the run was a continuous-mode iteration, whose
+            initial conditions are the previous iteration's end state rather
+            than the steady state.
+        simulated_at: When the simulation finished; defaults to the current
+            local time.  The export time is added separately by the caller.
 
     Returns:
         Ordered ``(key, value)`` pairs.  Keys and values are not yet
         ASCII-sanitized; :func:`sweeps_to_csv` does that when writing.
     """
-    now = now or datetime.now().astimezone()
-    try:
-        version = importlib_metadata.version("patch_sim")
-    except importlib_metadata.PackageNotFoundError:
-        version = "unknown"
+    simulated_at = simulated_at or datetime.now().astimezone()
 
     meta: list[tuple[str, str]] = [
-        ("patch_sim_version", version),
-        ("exported_at", now.isoformat(timespec="seconds")),
+        ("patch_sim_version", _patch_sim_version()),
+        ("simulated_at", simulated_at.isoformat(timespec="seconds")),
+        ("continuous_mode", "true" if continuous else "false"),
         ("clamp_mode", clamp_mode),
         ("neuron_preset", neuron_preset),
         ("protocol_preset", protocol_preset),
@@ -221,6 +239,8 @@ def sweeps_to_csv(
 
     Time is taken from the longest sweep; shorter sweeps leave their trailing
     cells empty.  Time uses four decimals and data six significant digits.
+    NaN values, whether padding or produced by the simulation, are written as
+    empty cells.
 
     Args:
         sweeps: Sweeps to export, all in one clamp mode.
