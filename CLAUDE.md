@@ -69,6 +69,10 @@ uv run reflex run
 
 The app serves on `http://localhost:3000`.
 
+The root `Dockerfile` builds a production image from an allowlist
+`.dockerignore`: any new top-level file or directory the app reads at runtime
+must be added to that allowlist, or the image will not include it.
+
 ## Package manager
 
 This project uses **uv**. Use `/uv run --frozen` to run commands and `/uv add` to add dependencies. Never use `pip` directly.

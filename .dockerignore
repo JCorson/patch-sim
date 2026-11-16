@@ -1,0 +1,17 @@
+# Allowlist: only what the image needs to build and run the app.
+# Any new top-level file or directory the app reads at runtime must be added here.
+*
+!pyproject.toml
+!uv.lock
+!.python-version
+!rxconfig.py
+!README.md
+!LICENSE
+!patch_sim/
+!patch_sim_ui/
+!assets/
+
+# Generated or cached content inside the allowed paths.
+**/__pycache__
+**/*.py[cod]
+assets/external

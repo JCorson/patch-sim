@@ -1,0 +1,14 @@
+services:
+  patch-sim:
+    build: .
+    image: patch-sim
+    ports:
+      - "3000:3000"
+    # If the browser reaches the app at any URL other than
+    # http://localhost:3000 (another host port, or another machine), set that
+    # URL here, e.g. for host port 8080:
+    # ports:
+    #   - "8080:3000"
+    # environment:
+    #   REFLEX_API_URL: "http://localhost:8080"
+    init: true

@@ -16,3 +16,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+
+  # Configuration for the Docker base image
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"

@@ -60,6 +60,17 @@ Then open `http://localhost:3000`. Configure the neuron and protocol in the left
 sidebar, press **Run**, and inspect the trace and analysis panels. The app's
 built-in **Help** page walks through each panel in detail.
 
+To run the UI without installing uv or Python, build and run the Docker image
+from the repository root:
+
+```
+docker build -t patch-sim .
+docker run --rm -p 3000:3000 patch-sim
+```
+
+See [Running with Docker](https://github.com/JCorson/patch-sim#running-with-docker)
+in the README for Docker Compose, custom ports, and access from other machines.
+
 ## A first simulation in code
 
 The example below builds a classic squid-axon neuron, injects a 50 ms current
